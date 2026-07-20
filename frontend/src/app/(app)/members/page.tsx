@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, MailPlus, Trash2, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { Loader2, MailPlus, Trash2, UserPlus, Mail } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { inviteSchema } from "@/lib/validators";
 import type { Invitation, Member } from "@/lib/types";
@@ -124,7 +125,6 @@ export default function MembersPage() {
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         onInvited={() => {
-          setInviteOpen(false);
           void load();
         }}
       />
@@ -145,6 +145,19 @@ function InviteDialog({
   const [role, setRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  function reset() {
+    setEmail("");
+    setRole("MEMBER");
+    setError(null);
+    setSentTo(null);
+  }
+
+  function close() {
+    reset();
+    onClose();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -157,8 +170,7 @@ function InviteDialog({
     setBusy(true);
     try {
       await api.createInvitation(parsed.data.email, parsed.data.role);
-      setEmail("");
-      setRole("MEMBER");
+      setSentTo(parsed.data.email);
       onInvited();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to send invitation");
@@ -167,8 +179,34 @@ function InviteDialog({
     }
   }
 
+  if (sentTo) {
+    return (
+      <Modal open={open} onClose={close} title="Invitation sent">
+        <div className="flex flex-col gap-4">
+          <Alert tone="success">
+            Invitation created for <span className="font-medium">{sentTo}</span>.
+          </Alert>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+            <p className="flex items-center gap-2 font-medium text-white">
+              <Mail className="h-4 w-4 text-aqua" /> No email server in local dev
+            </p>
+            <p className="mt-1.5">
+              The invite link is waiting in the{" "}
+              <Link href="/dev/mailbox" target="_blank" className="text-violet hover:underline">dev mailbox</Link>.
+              Open it, click the link, and the new member sets their own password and is logged in.
+            </p>
+          </div>
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => reset()}>Invite another</Button>
+            <Button onClick={close}>Done</Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Invite a team member">
+    <Modal open={open} onClose={close} title="Invite a team member">
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         {error && <Alert tone="error">{error}</Alert>}
         <Field label="Email" htmlFor="invite-email">
@@ -187,7 +225,7 @@ function InviteDialog({
           </select>
         </Field>
         <div className="mt-2 flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={close}>Cancel</Button>
           <Button type="submit" disabled={busy}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} Send invite
           </Button>

@@ -18,14 +18,22 @@ public class ConsoleEmailService implements EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(ConsoleEmailService.class);
 
+    private final DevMailbox mailbox;
+
+    public ConsoleEmailService(DevMailbox mailbox) {
+        this.mailbox = mailbox;
+    }
+
     @Override
     public void sendVerificationEmail(String to, String verificationUrl) {
         banner("VERIFY EMAIL", to, verificationUrl);
+        mailbox.record(to, "Verify your Calyvora email", verificationUrl);
     }
 
     @Override
     public void sendInvitationEmail(String to, String companyName, String acceptUrl) {
         banner("INVITE → " + companyName, to, acceptUrl);
+        mailbox.record(to, "You're invited to " + companyName + " on Calyvora", acceptUrl);
     }
 
     private void banner(String kind, String to, String url) {

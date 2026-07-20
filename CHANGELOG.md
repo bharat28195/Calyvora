@@ -4,6 +4,15 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-20 — Demo hardening: invite flow works without email
+- **Fix:** `GET /api/v1/invitations/preview` was not in the public-endpoints list, so the
+  invite-accept page 401'd for a logged-out invitee ("invitation is invalid"). Made it public.
+- **Dev mailbox in the app.** Under the `embedded` profile the backend now captures verification /
+  invite links in an in-memory `DevMailbox` and serves them at `GET /api/v1/dev/mailbox` (public,
+  dev-only). The existing `/dev/mailbox` page now works in **live** mode too — no SMTP needed. The
+  Members → invite dialog shows a success step pointing there. Full flow verified end-to-end:
+  invite → open dev mailbox → accept link → set password → member logs in.
+
 ### 2026-07-20 — Knowledge OS (Sprint 4): the third app completes the trio
 Built Knowledge OS (a docs/wiki) full-stack on the foundation, completing the **People / Work /
 Knowledge** trio. Backend `com.calyvora.knowledge`, Flyway `V8`/`V9`, frontend

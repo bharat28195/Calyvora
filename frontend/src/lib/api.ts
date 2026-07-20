@@ -21,7 +21,7 @@ import {
   type Member,
   type Role,
 } from "@/lib/types";
-import { mockBackend } from "@/lib/mock/backend";
+import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
 // Frontend-first: mock is the default. Set NEXT_PUBLIC_API_MODE=live to hit the real backend.
 const LIVE = process.env.NEXT_PUBLIC_API_MODE === "live";
@@ -307,6 +307,16 @@ export const api = {
     return LIVE
       ? http<PageSummary[]>(`/knowledge/search?q=${encodeURIComponent(q)}`)
       : mockBackend.searchPages(accessToken, q);
+  },
+
+  // --- dev mailbox (local dev only: verification/invite links, no SMTP needed) ---
+  devMailbox(): Promise<MailMessage[]> {
+    return LIVE ? http<MailMessage[]>("/dev/mailbox") : Promise.resolve(mockBackend.mailbox());
+  },
+  clearDevMailbox(): Promise<void> {
+    if (LIVE) return http<void>("/dev/mailbox", { method: "DELETE" });
+    mockBackend.reset();
+    return Promise.resolve();
   },
 };
 

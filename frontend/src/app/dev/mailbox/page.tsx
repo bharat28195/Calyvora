@@ -3,19 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Mail, RefreshCw, Trash2 } from "lucide-react";
-import { mockBackend, type MailMessage } from "@/lib/mock/backend";
+import { api } from "@/lib/api";
+import { type MailMessage } from "@/lib/mock/backend";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
 /**
- * Dev-only mock mailbox. In local (mock) mode, verification and invite "emails" land here so you
- * can click their links without a real SMTP server. The real backend sends these via Mailpit
- * (http://localhost:8025).
+ * Dev-only mailbox. Verification and invite "emails" land here so you can click their links without
+ * a real SMTP server. Works in both modes: the in-browser mock, and the live backend under the
+ * `embedded` profile (served from `GET /api/v1/dev/mailbox`).
  */
 export default function MailboxPage() {
   const [messages, setMessages] = useState<MailMessage[]>([]);
 
-  const refresh = () => setMessages(mockBackend.mailbox());
+  const refresh = () => void api.devMailbox().then(setMessages).catch(() => setMessages([]));
   useEffect(refresh, []);
 
   return (
@@ -34,12 +35,9 @@ export default function MailboxPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              mockBackend.reset();
-              refresh();
-            }}
+            onClick={() => void api.clearDevMailbox().then(refresh)}
           >
-            <Trash2 className="h-4 w-4" /> Reset all data
+            <Trash2 className="h-4 w-4" /> Clear mailbox
           </Button>
         </div>
       </div>
