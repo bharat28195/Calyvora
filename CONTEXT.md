@@ -138,7 +138,8 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
 
 ## 7. What's next (open)
 - **Foundation hardening (deferred Sprint-1 debt — now the top priority, must not keep slipping):**
-  Postgres **RLS** (SD-2), **RS256** JWT + key rotation (SD-5).
+  Postgres **RLS** (SD-2). ~~RS256 JWT + key rotation (SD-5)~~ **DONE 2026-07-21** (SD-5a/SD-23/SD-24 —
+  RS256 signing, `kid` rotation, `/.well-known/jwks.json`).
 - **App depth (future):** Knowledge (page version history, rich editor, comments, per-space permissions,
   full-text/tsvector search); People (payroll/comp, performance, accruals); Work (comments, subtasks,
   filters, sprints, notifications).
@@ -150,7 +151,8 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
 - **Frontend-first**: build/verify UI before backend (toolchain gap). Mock backend mirrors §7 contract.
 - **No Docker** → Zonky embedded Postgres for tests/local run.
 - SD-1..SD-8: JPA; app-layer tenant isolation + RLS deferred to Sprint 2; email globally unique;
-  register creates Company+Owner PENDING; HS256 JWT + rotating refresh; Mailpit; roles OWNER/ADMIN/MEMBER.
+  register creates Company+Owner PENDING; **RS256 JWT (SD-5a, was HS256) + rotating refresh**; Mailpit;
+  roles OWNER/ADMIN/MEMBER.
 
 ## 7. Working agreements
 - **No PRs** — complete the full app locally first (founder directive 2026-07-10).

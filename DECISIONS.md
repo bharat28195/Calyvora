@@ -5,6 +5,18 @@
 > narrative lives in [FOUNDER.md](FOUNDER.md). IDs: `ADR-##` architecture, `PD-##` product,
 > `SD-##` Sprint-scoped implementation decision.
 
+## Foundation hardening — RS256 JWT + key rotation (2026-07-21)
+
+| ID | Decision | Rationale (short) | Alternatives rejected | Status |
+|----|----------|-------------------|-----------------------|--------|
+| SD-5a | **Access tokens now signed with RS256** (asymmetric), not the HS256 shared secret | Verifiers hold only the public key — no shared secret to leak; a compromised verifier can't mint tokens | Keep HS256 (couples every verifier to the signing secret) | Accepted — **fulfils the deferred half of SD-5** |
+| SD-23 | **Key rotation via a `kid`-tagged key set**: one active signing key, all configured keys trusted for verification | Zero-downtime rotation — publish the new key, flip active, retire the old once its last token expires | Single fixed key (no rotation path); restart-to-rotate (drops live tokens) | Accepted |
+| SD-24 | **Public keys served at `/.well-known/jwks.json`** (RFC 7517) | Standard discovery so the frontend / a gateway / future services verify tokens without out-of-band key sharing | Bundle keys into each client (stale on rotation) | Accepted |
+| SD-25 | **Empty key config → ephemeral in-memory keypair at startup** (local/dev/test only, logs a warning) | Keeps dev zero-config while making it loud that a shared env MUST supply PEM keys | Require PEM keys everywhere (dev friction); ship a committed dev private key (leak risk) | Accepted |
+
+Fulfils the `RS256 in Sprint 2` follow-up on **SD-5** below. Keys are PKCS#8 PEM via
+`calyvora.security.jwt.{active-kid,keys}`; see [application.yml](backend/src/main/resources/application.yml).
+
 ## Sprint 5 — Work OS depth: Sprints, Backlog & Tickets (2026-07-20)
 
 | ID | Decision | Rationale (short) | Alternatives rejected | Status |
@@ -40,7 +52,7 @@ the People org graph without duplicating provisioning (People OS owns that rule)
 | SD-2 | **Tenant isolation via `company_id` + `TenantContext` (app-layer)**; RLS deferred to Sprint 2 | One-sprint pragmatism; guarded by adversarial cross-tenant tests | RLS now (higher setup cost) | Accepted (debt logged) |
 | SD-3 | **Email globally unique; user in exactly one company** | Simplest correct MVP | `memberships` join table now (over-engineered for Sprint 1) | Accepted; superseded plan in Future |
 | SD-4 | **Create Company + Owner at register (PENDING); verify activates** | Avoids separate registrations table | Separate `registrations` staging table | Accepted |
-| SD-5 | **Access JWT ~15m + rotating refresh cookie (hashed, reuse-detection)**; HS256 | Security/simplicity balance | Long-lived JWT (unsafe); sessions (stateful) | Accepted; RS256 in Sprint 2 |
+| SD-5 | **Access JWT ~15m + rotating refresh cookie (hashed, reuse-detection)**; HS256 | Security/simplicity balance | Long-lived JWT (unsafe); sessions (stateful) | Accepted; **HS256→RS256 done 2026-07-21, see SD-5a/SD-23** |
 | SD-6 | **Mailpit** for local email; `EmailService` interface | Zero-dependency local demo; swappable | Real SMTP in dev (friction) | Accepted |
 | SD-7 | **Monorepo**, ~~Gradle (Kotlin DSL)~~ backend | Atomic changes; matches constitution | Polyrepo; Maven | **Superseded by SD-9** (build tool → Maven); monorepo stance still Accepted |
 | SD-9 | **Maven** (not Gradle) as the backend build tool | Founder directive (2026-07-09): team standardizes on Maven — familiarity + ubiquitous Spring Boot tooling/examples. Supersedes the Gradle half of SD-7. | Gradle Kotlin DSL (rejected per founder) | Accepted |

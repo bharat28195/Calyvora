@@ -41,9 +41,18 @@ calyvora:
     from: ${MAIL_FROM:no-reply@calyvora.local}
   security:
     jwt:
-      # HS256 shared secret for Sprint 1 (SD-5). MUST be overridden in any shared env.
-      # Base64-encoded, >= 256 bits. Rotate to RS256 in Sprint 2.
-      secret: ${JWT_SECRET:ZGV2LW9ubHktY2FseXZvcmEtc3ByaW50MS1qd3Qtc2VjcmV0LWNoYW5nZS1tZS1wbGVhc2U=}
+      # RS256 asymmetric signing with key rotation (SD-5).
+      # Leaving `keys` empty generates an EPHEMERAL keypair at startup — fine for local/dev/test,
+      # never for a shared env (tokens die on restart). To configure real keys, set active-kid and
+      # supply one or more PKCS#8 PEM keypairs; rotate by adding a key, flipping active-kid, then
+      # dropping the retired key once its last token has expired. Public keys are served at
+      # /.well-known/jwks.json. Example wiring via env for a shared environment:
+      #   active-kid: ${JWT_ACTIVE_KID:}
+      #   keys:
+      #     - kid: ${JWT_KID_1:}
+      #       private-key-pem: ${JWT_PRIVATE_KEY_1:}
+      #       public-key-pem: ${JWT_PUBLIC_KEY_1:}
+      active-kid: ${JWT_ACTIVE_KID:}
       access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
       issuer: calyvora
     refresh:

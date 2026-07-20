@@ -48,6 +48,7 @@ public class SecurityConfig {
             "/swagger-ui.html",
             "/actuator/health",
             "/actuator/health/**",
+            "/.well-known/jwks.json",   // public RS256 verification keys (SD-5)
     };
 
     private final AppProperties props;

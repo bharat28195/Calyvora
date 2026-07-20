@@ -60,6 +60,20 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 > Running log of the founder's and co-founder's thinking — ideas, observed problems, competitor
 > inspiration, opportunities, and open questions. Newest first.
 
+**2026-07-21 (Paying down foundation debt — RS256 before more features)**
+- **Stopped the RS256 follow-up from slipping again.** Access tokens were still HS256 (a shared secret)
+  since Sprint 1, deferred twice. Before building any more app depth we cut over to **RS256 asymmetric
+  signing**: signers hold the private key, verifiers hold only the public key — there is no longer a
+  shared secret whose leak would let a verifier forge tokens. Fulfils the deferred half of SD-5.
+- **Built rotation in from day one, not as a later retrofit.** Keys carry a `kid`; one key is active for
+  signing while every configured key stays trusted for verification, so we can rotate with zero downtime
+  (publish new → flip active → retire old once its last token expires). Public keys are discoverable at
+  `/.well-known/jwks.json` (RFC 7517) so the frontend or a future gateway verifies tokens without us
+  hand-delivering keys. Decisions logged as SD-5a/SD-23/SD-24.
+- **Kept dev zero-config without shipping a secret.** No keys configured → an ephemeral keypair is
+  generated at boot with a loud warning, rather than committing a dev private key to the repo. 7 new
+  tests (60 total), full suite green. Next foundation item: Postgres RLS (SD-2).
+
 **2026-07-20 (Work OS deepened — first real "depth" investment after the trio)**
 - **From a board to a workspace.** Work OS now has a left-pane workspace — Board · Backlog · Sprints ·
   Tickets — with real agile sprints (create → start → complete, ≤1 active per project, unfinished work

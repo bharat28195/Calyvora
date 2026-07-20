@@ -4,6 +4,21 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-21 — Foundation hardening: RS256 JWT signing + key rotation (SD-5a/SD-23/SD-24)
+Replaced the HS256 shared-secret access token with **RS256 asymmetric signing** and a rotation-ready
+key set. Verifiers now need only the public key — there's no shared signing secret to leak.
+**7 new backend tests** (60 total); full suite green; no change to the token's claims or the login flow.
+
+- **RS256 signing.** `JwtKeyStore` holds the keys; the active key's `kid` is stamped into the JWS
+  header, and verification selects the matching public key by `kid`. HS256 removed entirely.
+- **Key rotation.** One active signing key, every configured key trusted for verification — so a new
+  key can be published and made active while tokens signed by the retiring key still verify until they
+  expire (zero downtime). Configured via `calyvora.security.jwt.{active-kid,keys}` (PKCS#8 PEM).
+- **JWKS discovery.** Public keys are served at `GET /.well-known/jwks.json` (RFC 7517), public and
+  unauthenticated, so any peer verifies Calyvora tokens without out-of-band key sharing.
+- **Dev ergonomics.** With no keys configured, an ephemeral RSA keypair is generated at startup
+  (local/dev/test) with a loud warning — a shared environment must supply real PEM keys.
+
 ### 2026-07-20 — Work OS depth (Sprint 5): Sprints, Backlog, Tickets + workspace layout
 Turned the single Work board into a **project workspace** with a left-pane nav (Board · Backlog ·
 Sprints · Tickets). Backend `com.calyvora.work`, Flyway `V10`/`V11`. **5 new integration tests**
