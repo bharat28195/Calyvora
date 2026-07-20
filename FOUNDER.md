@@ -10,7 +10,7 @@
 > (ISO `YYYY-MM-DD`) and a stable ID (`PD-##` product, `ADR-##` architecture) so we can
 > cross-reference. Dates are absolute, never "last week."
 
-**Last updated:** 2026-07-20 · **Stage:** **Sprint 1 ✅ · People OS ✅ · Work OS ✅ (+depth) · Knowledge OS ✅** — the Phase-1 trio is complete + Work OS deepened into a sprints/backlog/tickets workspace; three full apps on one platform, 58 tests, verified live
+**Last updated:** 2026-07-21 · **Stage:** **Sprint 1 ✅ · People OS ✅ · Work OS ✅ (+depth) · Knowledge OS ✅ · Foundation hardening ✅** — the Phase-1 trio on one platform, plus the deferred Sprint-1 security debt now cleared (Postgres RLS + RS256 JWT with rotation); 61 tests, verified live
 
 ---
 
@@ -60,7 +60,18 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 > Running log of the founder's and co-founder's thinking — ideas, observed problems, competitor
 > inspiration, opportunities, and open questions. Newest first.
 
-**2026-07-21 (Paying down foundation debt — RS256 before more features)**
+**2026-07-21 (Foundation debt cleared — RLS + RS256 before more features)**
+- **The database now enforces tenant isolation itself (SD-2).** Until today, one tenant not seeing
+  another's data rested entirely on every query remembering its `company_id` filter — one forgotten
+  `where` clause, or one injection, and it's a breach. We added Postgres Row-Level Security on all 11
+  tenant-owned tables (V12): each request binds its tenant to the connection as a session GUC, and the
+  DB refuses to read or write any other tenant's rows. It's *defense in depth* — the app-layer checks
+  stay; RLS is the backstop. Deny-by-default too: a connection with no bound tenant sees nothing.
+- **Named the sharp edge instead of hiding it.** RLS is bypassed by Postgres superusers, and our
+  embedded dev DB connects as one — so I made the test drop to a NOSUPERUSER role via `SET ROLE` (which
+  IS subject to RLS) to prove the policies actually bite, and wrote down loudly that the production DB
+  role must be NOSUPERUSER. Better an honest boundary in the record than a green test that proves nothing.
+
 - **Stopped the RS256 follow-up from slipping again.** Access tokens were still HS256 (a shared secret)
   since Sprint 1, deferred twice. Before building any more app depth we cut over to **RS256 asymmetric
   signing**: signers hold the private key, verifiers hold only the public key — there is no longer a

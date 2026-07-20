@@ -137,9 +137,10 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
   `/work/projects/{id}/tickets`, `PATCH/DELETE /work/tickets/{id}`. **Debt: graduates to Service OS (SD-22b).**
 
 ## 7. What's next (open)
-- **Foundation hardening (deferred Sprint-1 debt — now the top priority, must not keep slipping):**
-  Postgres **RLS** (SD-2). ~~RS256 JWT + key rotation (SD-5)~~ **DONE 2026-07-21** (SD-5a/SD-23/SD-24 —
-  RS256 signing, `kid` rotation, `/.well-known/jwks.json`).
+- **Foundation hardening (deferred Sprint-1 debt — CLEARED 2026-07-21):**
+  ~~Postgres RLS (SD-2)~~ **DONE** (SD-2a..d — RLS `ENABLE`+`FORCE` on all 11 tenant tables, V12,
+  bound per-connection via `TenantAwareDataSource` GUC; app DB role must be `NOSUPERUSER` in prod).
+  ~~RS256 JWT + key rotation (SD-5)~~ **DONE** (SD-5a/SD-23/SD-24 — RS256, `kid` rotation, JWKS).
 - **App depth (future):** Knowledge (page version history, rich editor, comments, per-space permissions,
   full-text/tsvector search); People (payroll/comp, performance, accruals); Work (comments, subtasks,
   filters, sprints, notifications).

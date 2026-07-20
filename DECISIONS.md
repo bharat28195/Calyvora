@@ -5,7 +5,18 @@
 > narrative lives in [FOUNDER.md](FOUNDER.md). IDs: `ADR-##` architecture, `PD-##` product,
 > `SD-##` Sprint-scoped implementation decision.
 
-## Foundation hardening — RS256 JWT + key rotation (2026-07-21)
+## Foundation hardening — Postgres RLS + RS256 JWT (2026-07-21)
+
+### Row-Level Security (fulfils the deferred half of SD-2)
+
+| ID | Decision | Rationale (short) | Alternatives rejected | Status |
+|----|----------|-------------------|-----------------------|--------|
+| SD-2a | **RLS enabled + FORCED on all 11 tenant-owned tables**, one `tenant_isolation` policy each keyed off the `calyvora.company_id` session GUC | Defense-in-depth *below* the app: even a service that forgets its `company_id` filter can't leak another tenant's rows. Complements, never replaces, `TenantContext` | App-layer filtering alone (one missed `where` = a breach) | Accepted — migration V12 |
+| SD-2b | **Tenant bound per pooled connection via a GUC** set by `TenantAwareDataSource` from `TenantContext`; empty ⇒ NULL predicate ⇒ deny-by-default | Works with connection pooling and needs no per-query change; unset tenant sees nothing rather than everything | `SET LOCAL` per @Transactional (misses non-tx reads); a tenant column check in every query (already have that at the app layer) | Accepted |
+| SD-2c | **Auth surface excluded from RLS** (users, invitations, companies, *_tokens) | Those are queried *before* a tenant is bound (register/login/verify/invite-accept); a tenant policy would break them and they're already narrow unique-key lookups | RLS everywhere (breaks the pre-auth flows) | Accepted |
+| SD-2d | **The app's DB role MUST be NOSUPERUSER / no BYPASSRLS in shared envs** | Superusers bypass RLS by design; the layer is inert otherwise. Proven by a test that drops to a NOSUPERUSER role via `SET ROLE` | Rely on the embedded superuser (RLS silently inert) | Accepted; documented in V12 + application.yml |
+
+### RS256 JWT signing + key rotation (fulfils the deferred half of SD-5)
 
 | ID | Decision | Rationale (short) | Alternatives rejected | Status |
 |----|----------|-------------------|-----------------------|--------|
@@ -49,7 +60,7 @@ the People org graph without duplicating provisioning (People OS owns that rule)
 | ID | Decision | Rationale (short) | Alternatives rejected | Status |
 |----|----------|-------------------|-----------------------|--------|
 | SD-1 | **JPA/Hibernate** for persistence | Velocity for related entities; less boilerplate | Spring Data JDBC (more explicit, more code) | Accepted |
-| SD-2 | **Tenant isolation via `company_id` + `TenantContext` (app-layer)**; RLS deferred to Sprint 2 | One-sprint pragmatism; guarded by adversarial cross-tenant tests | RLS now (higher setup cost) | Accepted (debt logged) |
+| SD-2 | **Tenant isolation via `company_id` + `TenantContext` (app-layer)**; RLS deferred to Sprint 2 | One-sprint pragmatism; guarded by adversarial cross-tenant tests | RLS now (higher setup cost) | Accepted; **RLS added 2026-07-21, see SD-2a..d** |
 | SD-3 | **Email globally unique; user in exactly one company** | Simplest correct MVP | `memberships` join table now (over-engineered for Sprint 1) | Accepted; superseded plan in Future |
 | SD-4 | **Create Company + Owner at register (PENDING); verify activates** | Avoids separate registrations table | Separate `registrations` staging table | Accepted |
 | SD-5 | **Access JWT ~15m + rotating refresh cookie (hashed, reuse-detection)**; HS256 | Security/simplicity balance | Long-lived JWT (unsafe); sessions (stateful) | Accepted; **HS256→RS256 done 2026-07-21, see SD-5a/SD-23** |

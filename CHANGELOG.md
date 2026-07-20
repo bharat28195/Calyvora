@@ -4,6 +4,20 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-21 — Foundation hardening: Postgres Row-Level Security (SD-2a..d)
+Added a **database-enforced** tenant-isolation layer beneath the app's `TenantContext` checks, so a
+missed `company_id` filter (or an injection) can no longer leak another tenant's data. **1 new test**
+(61 total) that drops to a NOSUPERUSER role and proves the DB itself blocks cross-tenant reads/writes.
+
+- **RLS on all 11 tenant tables** (`company_settings`, People/Work/Knowledge domain tables), `ENABLE`
+  + `FORCE`, each with one `tenant_isolation` policy — Flyway `V12`. Auth-surface tables (users,
+  invitations, companies, token tables) are excluded: they're queried before a tenant is bound.
+- **Per-connection tenant binding.** `TenantAwareDataSource` sets the Postgres session GUC
+  `calyvora.company_id` from `TenantContext` on every borrowed connection; unset ⇒ NULL predicate ⇒
+  **deny-by-default** (a connection with no bound tenant sees nothing).
+- **Operational requirement:** the app's DB role must be `NOSUPERUSER` without `BYPASSRLS` in shared
+  environments (superusers bypass RLS by design) — documented in V12 and `application.yml`.
+
 ### 2026-07-21 — Foundation hardening: RS256 JWT signing + key rotation (SD-5a/SD-23/SD-24)
 Replaced the HS256 shared-secret access token with **RS256 asymmetric signing** and a rotation-ready
 key set. Verifiers now need only the public key — there's no shared signing secret to leak.
