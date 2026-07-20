@@ -36,6 +36,16 @@ public class TaskController {
         return taskService.listForProject(projectId);
     }
 
+    @GetMapping("/projects/{projectId}/board")
+    public com.calyvora.work.dto.BoardResponse board(@PathVariable UUID projectId) {
+        return taskService.board(projectId);
+    }
+
+    @GetMapping("/projects/{projectId}/backlog")
+    public List<TaskResponse> backlog(@PathVariable UUID projectId) {
+        return taskService.backlog(projectId);
+    }
+
     @PostMapping("/projects/{projectId}/tasks")
     public ResponseEntity<TaskResponse> create(@PathVariable UUID projectId,
                                                @Valid @RequestBody CreateTaskRequest request,

@@ -1,30 +1,29 @@
 package com.calyvora.work.dto;
 
-import com.calyvora.work.Task;
+import com.calyvora.work.Ticket;
 
-public record TaskResponse(
+public record TicketResponse(
         String id,
         String projectId,
         String ref,
         int number,
-        String title,
+        String subject,
         String description,
+        String requesterName,
+        String requesterEmail,
         String status,
         String priority,
         String assigneeId,
         String assigneeName,
-        String sprintId,
-        String dueDate,
         String createdAt
 ) {
-    public static TaskResponse of(Task t, String projectKey, String assigneeName) {
-        return new TaskResponse(
+    public static TicketResponse of(Ticket t, String projectKey, String assigneeName) {
+        return new TicketResponse(
                 t.getId().toString(), t.getProjectId().toString(),
-                projectKey + "-" + t.getNumber(), t.getNumber(), t.getTitle(), t.getDescription(),
+                projectKey + "-T" + t.getNumber(), t.getNumber(), t.getSubject(), t.getDescription(),
+                t.getRequesterName(), t.getRequesterEmail(),
                 t.getStatus().name(), t.getPriority().name(),
                 t.getAssigneeId() == null ? null : t.getAssigneeId().toString(), assigneeName,
-                t.getSprintId() == null ? null : t.getSprintId().toString(),
-                t.getDueDate() == null ? null : t.getDueDate().toString(),
                 t.getCreatedAt().toString());
     }
 }

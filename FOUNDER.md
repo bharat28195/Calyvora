@@ -10,7 +10,7 @@
 > (ISO `YYYY-MM-DD`) and a stable ID (`PD-##` product, `ADR-##` architecture) so we can
 > cross-reference. Dates are absolute, never "last week."
 
-**Last updated:** 2026-07-20 · **Stage:** **Sprint 1 ✅ · People OS ✅ · Work OS ✅ · Knowledge OS ✅** — the Phase-1 trio is complete, three full apps on one platform, 48 tests, verified live; the task ↔ doc ↔ person graph proven
+**Last updated:** 2026-07-20 · **Stage:** **Sprint 1 ✅ · People OS ✅ · Work OS ✅ (+depth) · Knowledge OS ✅** — the Phase-1 trio is complete + Work OS deepened into a sprints/backlog/tickets workspace; three full apps on one platform, 58 tests, verified live
 
 ---
 
@@ -59,6 +59,19 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > Running log of the founder's and co-founder's thinking — ideas, observed problems, competitor
 > inspiration, opportunities, and open questions. Newest first.
+
+**2026-07-20 (Work OS deepened — first real "depth" investment after the trio)**
+- **From a board to a workspace.** Work OS now has a left-pane workspace — Board · Backlog · Sprints ·
+  Tickets — with real agile sprints (create → start → complete, ≤1 active per project, unfinished work
+  carries back to the backlog) and a lightweight support-tickets type. `com.calyvora.work` grew Flyway
+  V10/V11; 5 new integration tests (58 total), verified live: a "Sprint 1" running with two tasks on the
+  board, one task left in the backlog, and tickets PLT-T1/T2 with a People-employee assignee.
+- **Restraint held where it mattered (SD-22b).** The founder asked for support tickets *inside* Work. I
+  built a thin version but logged it as deliberate debt: tickets' true system of record is **Service OS**
+  (Phase 2), with customers/SLAs Work doesn't model. We took the shortcut knowingly, in writing, rather
+  than quietly letting Work become a CRM — protecting the "one system of record per entity" principle.
+- **The cross-app graph keeps paying off.** Both task assignees and ticket assignees are People
+  employees — the same org graph, now feeding a third surface. No new glue.
 
 **2026-07-20 (Knowledge OS shipped — the Phase-1 trio is complete)**
 - **Third full app on the platform; the depth-first bet (PD-02) is delivered.** Knowledge OS — spaces,
@@ -206,6 +219,21 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   `ILIKE`, not full-text. All logged as future work in the Sprint 4 plan §5.
 - **Final outcome:** _Shipped & verified live 2026-07-20 (6 tests; a page authored by a People employee and
   linked to Work `PLT-1`, found by full-text search)._ The Phase-1 trio is complete.
+
+### PD-07 · 2026-07-20 · Work OS depth — sprints, backlog & a workspace (tickets as logged debt)
+- **Decision:** Deepen Work OS from a single Kanban board into a **project workspace** (Board · Backlog ·
+  Sprints · Tickets). Add agile **sprints** (≤1 active/project; complete carries unfinished work to the
+  backlog), a **backlog**, and a **lightweight support-tickets** type. Plan:
+  [docs/Sprint5-WorkOS-Sprints.md](docs/Sprint5-WorkOS-Sprints.md).
+- **Reason:** After completing the Phase-1 trio, the highest-value move is *depth* in the app teams use
+  daily. Sprints/backlog are table-stakes for real work management; the founder also wanted tickets now.
+- **Alternatives considered:** a standalone agile tool integrated later (rejected — integration tax);
+  full **Service OS** for tickets now (rejected — Phase-2 scope; would sprawl). Tickets are therefore a
+  **deliberate, logged shortcut** (SD-22b) that graduates to Service OS.
+- **Trade-offs / debt:** no drag-and-drop, burndown/velocity, sub-tasks, or per-project roles yet;
+  tickets lack customers/SLAs/comments (that's Service OS). All logged in the Sprint 5 plan §5.
+- **Final outcome:** _Shipped & verified live 2026-07-20 (5 tests; active sprint on the board, backlog,
+  and tickets with People-employee assignees)._
 
 ### PD-05 · 2026-07-10 · Work OS is the second app; tasks link to People employees
 - **Decision:** Build **Work OS** (projects + Kanban tasks + My Work) as the second Phase-1 app, with a

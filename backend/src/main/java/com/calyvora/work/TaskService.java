@@ -9,7 +9,9 @@ import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
 import com.calyvora.people.Employee;
 import com.calyvora.people.EmployeeRepository;
+import com.calyvora.work.dto.BoardResponse;
 import com.calyvora.work.dto.CreateTaskRequest;
+import com.calyvora.work.dto.SprintResponse;
 import com.calyvora.work.dto.TaskResponse;
 import com.calyvora.work.dto.UpdateTaskRequest;
 import org.springframework.stereotype.Service;
@@ -30,13 +32,16 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final SprintRepository sprintRepository;
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
 
     public TaskService(TaskRepository taskRepository, ProjectRepository projectRepository,
-                       EmployeeRepository employeeRepository, UserRepository userRepository) {
+                       SprintRepository sprintRepository, EmployeeRepository employeeRepository,
+                       UserRepository userRepository) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
+        this.sprintRepository = sprintRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
     }
@@ -48,6 +53,37 @@ public class TaskService {
         return taskRepository.findByProjectIdOrderBySortOrderAscNumberAsc(projectId).stream()
                 .map(t -> TaskResponse.of(t, project.getKey(), assigneeName(names, t.getAssigneeId())))
                 .toList();
+    }
+
+    /** The backlog: tasks in the project not assigned to any sprint. */
+    @Transactional(readOnly = true)
+    public List<TaskResponse> backlog(UUID projectId) {
+        Project project = requireProject(projectId);
+        Map<UUID, String> names = new HashMap<>();
+        return taskRepository.findByProjectIdAndSprintIdIsNullOrderBySortOrderAscNumberAsc(projectId).stream()
+                .map(t -> TaskResponse.of(t, project.getKey(), assigneeName(names, t.getAssigneeId())))
+                .toList();
+    }
+
+    /**
+     * The board: the active sprint's tasks, or — if the project has no active sprint — the un-sprinted
+     * tasks so Work is usable before any sprint exists (SD-21).
+     */
+    @Transactional(readOnly = true)
+    public BoardResponse board(UUID projectId) {
+        Project project = requireProject(projectId);
+        Sprint active = sprintRepository.findByProjectIdAndStatus(projectId, SprintStatus.ACTIVE).orElse(null);
+        List<Task> tasks = active != null
+                ? taskRepository.findBySprintIdOrderBySortOrderAscNumberAsc(active.getId())
+                : taskRepository.findByProjectIdAndSprintIdIsNullOrderBySortOrderAscNumberAsc(projectId);
+        Map<UUID, String> names = new HashMap<>();
+        List<TaskResponse> taskResponses = tasks.stream()
+                .map(t -> TaskResponse.of(t, project.getKey(), assigneeName(names, t.getAssigneeId())))
+                .toList();
+        SprintResponse activeSprint = active == null ? null : SprintResponse.of(active,
+                taskRepository.countBySprintId(active.getId()),
+                taskRepository.countBySprintIdAndStatus(active.getId(), TaskStatus.DONE));
+        return new BoardResponse(activeSprint, taskResponses);
     }
 
     @Transactional
@@ -76,6 +112,7 @@ public class TaskService {
         if (request.status() != null) task.setStatus(TaskStatus.valueOf(request.status()));
         if (request.priority() != null) task.setPriority(TaskPriority.valueOf(request.priority()));
         if (request.assigneeId() != null) task.setAssigneeId(resolveAssignee(companyId, request.assigneeId()));
+        if (request.sprintId() != null) task.setSprintId(resolveSprint(companyId, task.getProjectId(), request.sprintId()));
         if (request.dueDate() != null) {
             task.setDueDate(request.dueDate().isBlank() ? null : LocalDate.parse(request.dueDate()));
         }
@@ -126,6 +163,25 @@ public class TaskService {
         }
         employeeRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new NotFoundException("Assignee not found"));
+        return id;
+    }
+
+    /** Resolve an optional sprint for a task; blank clears it (moves the task to the backlog). */
+    private UUID resolveSprint(UUID companyId, UUID projectId, String sprintId) {
+        if (sprintId.isBlank()) {
+            return null;
+        }
+        UUID id;
+        try {
+            id = UUID.fromString(sprintId);
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Invalid sprint id");
+        }
+        Sprint sprint = sprintRepository.findByIdAndCompanyId(id, companyId)
+                .orElseThrow(() -> new NotFoundException("Sprint not found"));
+        if (!sprint.getProjectId().equals(projectId)) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Sprint belongs to a different project");
+        }
         return id;
     }
 

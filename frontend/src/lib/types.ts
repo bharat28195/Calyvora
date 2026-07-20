@@ -129,7 +129,47 @@ export interface Task {
   priority: TaskPriorityT;
   assigneeId: string | null;
   assigneeName: string | null;
+  sprintId: string | null;
   dueDate: string | null;
+  createdAt: string;
+}
+
+export type SprintStatusT = "PLANNED" | "ACTIVE" | "COMPLETED";
+
+export interface Sprint {
+  id: string;
+  projectId: string;
+  name: string;
+  goal: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: SprintStatusT;
+  taskCount: number;
+  doneCount: number;
+  createdAt: string;
+}
+
+/** The board view: the active sprint (null if none) and the tasks currently on the board. */
+export interface Board {
+  activeSprint: Sprint | null;
+  tasks: Task[];
+}
+
+export type TicketStatusT = "OPEN" | "PENDING" | "RESOLVED" | "CLOSED";
+
+export interface Ticket {
+  id: string;
+  projectId: string;
+  ref: string;
+  number: number;
+  subject: string;
+  description: string | null;
+  requesterName: string | null;
+  requesterEmail: string | null;
+  status: TicketStatusT;
+  priority: TaskPriorityT;
+  assigneeId: string | null;
+  assigneeName: string | null;
   createdAt: string;
 }
 

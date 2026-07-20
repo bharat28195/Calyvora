@@ -12,11 +12,21 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     List<Task> findByProjectIdOrderBySortOrderAscNumberAsc(UUID projectId);
 
+    List<Task> findByProjectIdAndSprintIdIsNullOrderBySortOrderAscNumberAsc(UUID projectId);
+
+    List<Task> findBySprintIdOrderBySortOrderAscNumberAsc(UUID sprintId);
+
+    List<Task> findBySprintId(UUID sprintId);
+
     Optional<Task> findByIdAndCompanyId(UUID id, UUID companyId);
 
     long countByProjectId(UUID projectId);
 
     long countByProjectIdAndStatusNot(UUID projectId, TaskStatus status);
+
+    long countBySprintId(UUID sprintId);
+
+    long countBySprintIdAndStatus(UUID sprintId, TaskStatus status);
 
     List<Task> findByAssigneeIdAndStatusNotOrderByDueDateAscCreatedAtAsc(UUID assigneeId, TaskStatus status);
 

@@ -5,7 +5,7 @@
 > Binding architecture = [/docs](docs/README.md). Narrative/decisions = [FOUNDER.md](FOUNDER.md) /
 > [DECISIONS.md](DECISIONS.md). This file = practical "how to pick up where we left off."
 
-**Last updated:** 2026-07-20 · **Current focus:** Sprint 1 ✅, **People OS ✅**, **Work OS ✅**, and **Knowledge OS ✅ COMPLETE** — the **Phase-1 trio** (People/Work/Knowledge) is done, three full apps on the platform, **48 backend tests**, all verified live. Cross-app graph proven end-to-end: a Knowledge page's author is a People employee and it links a Work task (task ↔ doc ↔ person).
+**Last updated:** 2026-07-20 · **Current focus:** **Phase-1 trio COMPLETE** (People/Work/Knowledge) **+ Work OS deepened** into a Sprints/Backlog/Tickets workspace (Sprint 5). Three full apps on the platform, **58 backend tests**, all verified live. Cross-app graph proven end-to-end: a Knowledge page's author is a People employee and links a Work task (task ↔ doc ↔ person); Work task & ticket assignees are People employees.
 
 ---
 
@@ -124,6 +124,17 @@ Flyway `V8`/`V9`, frontend `frontend/src/app/(app)/knowledge/*`. **6 Knowledge O
 - **K4 Search** — `GET /knowledge/search?q=` title/body, tenant-scoped, with snippet.
 - **K5 My pages** — `GET /knowledge/pages/mine`; `/knowledge/mine`.
 - **Cross-app proof:** one page ties a person (author) to a task (`PLT-1`) to knowledge — the trio's graph.
+
+## 6c. Sprint 5: Work OS depth (Sprints · Backlog · Tickets) — ✅ COMPLETE
+Plan: [docs/Sprint5-WorkOS-Sprints.md](docs/Sprint5-WorkOS-Sprints.md). Backend `com.calyvora.work`,
+Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to-end.
+- **Workspace UI:** `/work/{projectId}` is now a left-pane workspace — **Board · Backlog · Sprints · Tickets**.
+- **S1 Sprints** — `Sprint` (name/goal/dates/status); `/work/projects/{id}/sprints` CRUD + `start`/`complete`.
+  ≤1 ACTIVE/project (partial unique index); complete returns unfinished tasks to backlog. `tasks.sprint_id` added.
+- **S2 Backlog/Board** — `GET /work/projects/{id}/backlog` (un-sprinted); `GET .../board` (active sprint + tasks, else backlog).
+  Assign a task to a sprint / move to backlog via `PATCH /work/tasks/{id}` `sprintId` ("" = backlog).
+- **S3 Tickets** — `Ticket` (subject/requester/status/priority, ref `KEY-T{n}`, assignee = People employee);
+  `/work/projects/{id}/tickets`, `PATCH/DELETE /work/tickets/{id}`. **Debt: graduates to Service OS (SD-22b).**
 
 ## 7. What's next (open)
 - **Foundation hardening (deferred Sprint-1 debt — now the top priority, must not keep slipping):**

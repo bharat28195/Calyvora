@@ -5,6 +5,19 @@
 > narrative lives in [FOUNDER.md](FOUNDER.md). IDs: `ADR-##` architecture, `PD-##` product,
 > `SD-##` Sprint-scoped implementation decision.
 
+## Sprint 5 — Work OS depth: Sprints, Backlog & Tickets (2026-07-20)
+
+| ID | Decision | Rationale (short) | Alternatives rejected | Status |
+|----|----------|-------------------|-----------------------|--------|
+| SD-18 | **Sprints belong to a project; a task has an optional `sprint_id`** (null = backlog) | Matches how teams plan; a task is in ≤1 sprint or the backlog | Global sprints; many-to-many task↔sprint | Accepted |
+| SD-19 | **≤1 ACTIVE sprint per project**, enforced by a partial unique index | The board's "current sprint" must be unambiguous | App-only check (racy); many active | Accepted |
+| SD-20 | **Completing a sprint returns its non-DONE tasks to the backlog** | Standard agile carry-over; nothing lost | Force-close tasks; strand them | Accepted |
+| SD-21 | **Board = active sprint; if none, board shows the backlog** | Work is usable before any sprint exists | Force sprint creation first | Accepted |
+| SD-22 | **Support tickets are a lightweight type inside Work** (assignee = People employee) | Founder wants tickets now; thin version proves the shape | Full Service OS now; free-text assignee | Accepted (debt) |
+| SD-22b | **Tickets are deliberate debt → graduate to Service OS (Phase 2)** | Honesty in the record; tickets' real SoR is customers/SLAs | Pretend Work is the permanent home | Accepted; logged |
+
+Full context: [docs/Sprint5-WorkOS-Sprints.md](docs/Sprint5-WorkOS-Sprints.md).
+
 ## Sprint 4 — Knowledge OS (2026-07-20)
 
 | ID | Decision | Rationale (short) | Alternatives rejected | Status |

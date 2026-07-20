@@ -17,6 +17,9 @@ import {
   type OnboardingTask,
   type Project,
   type Task,
+  type Sprint,
+  type Board,
+  type Ticket,
   type Space,
   type KnowledgePage,
   type PageSummary,
@@ -125,8 +128,35 @@ interface TaskRow {
   status: Task["status"];
   priority: Task["priority"];
   assigneeId: string | null;
+  sprintId: string | null;
   dueDate: string | null;
   sortOrder: number;
+  createdAt: string;
+}
+interface SprintRow {
+  id: string;
+  companyId: string;
+  projectId: string;
+  name: string;
+  goal: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: Sprint["status"];
+  createdAt: string;
+}
+interface TicketRow {
+  id: string;
+  companyId: string;
+  projectId: string;
+  number: number;
+  subject: string;
+  description: string | null;
+  requesterName: string | null;
+  requesterEmail: string | null;
+  status: Ticket["status"];
+  priority: Ticket["priority"];
+  assigneeId: string | null;
+  createdBy: string;
   createdAt: string;
 }
 interface SpaceRow {
@@ -166,6 +196,8 @@ interface DB {
   leave: LeaveRow[];
   projects: ProjectRow[];
   tasks: TaskRow[];
+  sprints: SprintRow[];
+  tickets: TicketRow[];
   spaces: SpaceRow[];
   pages: PageRow[];
   sessions: Record<string, string>; // accessToken -> userId
@@ -191,11 +223,11 @@ function err(status: number, code: string, message: string, fields?: Record<stri
 
 function load(): DB {
   if (typeof window === "undefined") {
-    return { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], projects: [], tasks: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
+    return { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], projects: [], tasks: [], sprints: [], tickets: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
   }
   const raw = window.localStorage.getItem(KEY);
   if (!raw) {
-    const fresh: DB = { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], projects: [], tasks: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
+    const fresh: DB = { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], projects: [], tasks: [], sprints: [], tickets: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
     window.localStorage.setItem(KEY, JSON.stringify(fresh));
     return fresh;
   }
@@ -871,13 +903,13 @@ export const mockBackend = {
     const row: TaskRow = {
       id: uuid(), companyId: user.companyId, projectId, number, title: input.title.trim(),
       description: input.description || null, status: "TODO", priority: (input.priority as TaskRow["priority"]) || "MEDIUM",
-      assigneeId: input.assigneeId || null, dueDate: input.dueDate || null, sortOrder: number, createdAt: new Date().toISOString(),
+      assigneeId: input.assigneeId || null, sprintId: null, dueDate: input.dueDate || null, sortOrder: number, createdAt: new Date().toISOString(),
     };
     db.tasks.push(row);
     save(db);
     return toTask(db, row, project);
   },
-  async updateTask(accessToken: string | null, id: string, patch: { title?: string; description?: string; status?: string; priority?: string; assigneeId?: string; dueDate?: string }): Promise<Task> {
+  async updateTask(accessToken: string | null, id: string, patch: { title?: string; description?: string; status?: string; priority?: string; assigneeId?: string; sprintId?: string; dueDate?: string }): Promise<Task> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
@@ -888,6 +920,7 @@ export const mockBackend = {
     if (patch.status !== undefined) row.status = patch.status as TaskRow["status"];
     if (patch.priority !== undefined) row.priority = patch.priority as TaskRow["priority"];
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId || null;
+    if (patch.sprintId !== undefined) row.sprintId = patch.sprintId || null;
     if (patch.dueDate !== undefined) row.dueDate = patch.dueDate || null;
     save(db);
     const project = db.projects.find((p) => p.id === row.projectId)!;
@@ -1038,6 +1071,160 @@ export const mockBackend = {
       .map((p) => toPageSummary(db, p, knowledgeSnippet(p.body, query)));
   },
 
+  // --- Work OS (board & backlog) ---
+  async board(accessToken: string | null, projectId: string): Promise<Board> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
+    if (!project) throw err(404, "NOT_FOUND", "Project not found");
+    const active = db.sprints.find((s) => s.projectId === projectId && s.status === "ACTIVE") || null;
+    const rows = active
+      ? db.tasks.filter((t) => t.sprintId === active.id)
+      : db.tasks.filter((t) => t.projectId === projectId && !t.sprintId);
+    const tasks = rows.sort((a, b) => a.sortOrder - b.sortOrder || a.number - b.number).map((t) => toTask(db, t, project));
+    return { activeSprint: active ? toSprint(db, active) : null, tasks };
+  },
+  async backlog(accessToken: string | null, projectId: string): Promise<Task[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
+    if (!project) throw err(404, "NOT_FOUND", "Project not found");
+    return db.tasks
+      .filter((t) => t.projectId === projectId && !t.sprintId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.number - b.number)
+      .map((t) => toTask(db, t, project));
+  },
+
+  // --- Work OS (sprints) ---
+  async listSprints(accessToken: string | null, projectId: string): Promise<Sprint[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
+    if (!project) throw err(404, "NOT_FOUND", "Project not found");
+    return db.sprints.filter((s) => s.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((s) => toSprint(db, s));
+  },
+  async createSprint(accessToken: string | null, projectId: string, input: { name: string; goal?: string; startDate?: string; endDate?: string }): Promise<Sprint> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
+    if (!project) throw err(404, "NOT_FOUND", "Project not found");
+    const row: SprintRow = { id: uuid(), companyId: user.companyId, projectId, name: input.name.trim(), goal: input.goal || null, startDate: input.startDate || null, endDate: input.endDate || null, status: "PLANNED", createdAt: new Date().toISOString() };
+    db.sprints.push(row);
+    save(db);
+    return toSprint(db, row);
+  },
+  async updateSprint(accessToken: string | null, id: string, patch: { name?: string; goal?: string; startDate?: string; endDate?: string }): Promise<Sprint> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
+    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
+    if (patch.name !== undefined && patch.name) row.name = patch.name;
+    if (patch.goal !== undefined) row.goal = patch.goal || null;
+    if (patch.startDate !== undefined) row.startDate = patch.startDate || null;
+    if (patch.endDate !== undefined) row.endDate = patch.endDate || null;
+    save(db);
+    return toSprint(db, row);
+  },
+  async startSprint(accessToken: string | null, id: string): Promise<Sprint> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
+    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
+    if (row.status === "COMPLETED") throw err(409, "CONFLICT", "A completed sprint cannot be started");
+    if (db.sprints.some((s) => s.projectId === row.projectId && s.status === "ACTIVE" && s.id !== row.id)) {
+      throw err(409, "CONFLICT", "This project already has an active sprint");
+    }
+    row.status = "ACTIVE";
+    save(db);
+    return toSprint(db, row);
+  },
+  async completeSprint(accessToken: string | null, id: string): Promise<Sprint> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
+    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
+    if (row.status !== "ACTIVE") throw err(409, "CONFLICT", "Only an active sprint can be completed");
+    for (const t of db.tasks) if (t.sprintId === row.id && t.status !== "DONE") t.sprintId = null;
+    row.status = "COMPLETED";
+    save(db);
+    return toSprint(db, row);
+  },
+  async deleteSprint(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
+    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
+    for (const t of db.tasks) if (t.sprintId === id) t.sprintId = null;
+    db.sprints = db.sprints.filter((s) => s.id !== id);
+    save(db);
+  },
+
+  // --- Work OS (support tickets) ---
+  async listTickets(accessToken: string | null, projectId: string): Promise<Ticket[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
+    if (!project) throw err(404, "NOT_FOUND", "Project not found");
+    return db.tickets.filter((t) => t.projectId === projectId).sort((a, b) => b.number - a.number).map((t) => toTicket(db, t));
+  },
+  async createTicket(accessToken: string | null, projectId: string, input: { subject: string; description?: string; requesterName?: string; requesterEmail?: string; priority?: string; assigneeId?: string }): Promise<Ticket> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
+    if (!project) throw err(404, "NOT_FOUND", "Project not found");
+    if (input.assigneeId && !db.employees.some((e) => e.id === input.assigneeId && e.companyId === user.companyId)) {
+      throw err(404, "NOT_FOUND", "Assignee not found");
+    }
+    const number = db.tickets.filter((t) => t.projectId === projectId).reduce((m, t) => Math.max(m, t.number), 0) + 1;
+    const row: TicketRow = {
+      id: uuid(), companyId: user.companyId, projectId, number, subject: input.subject.trim(),
+      description: input.description || null, requesterName: input.requesterName || null, requesterEmail: input.requesterEmail || null,
+      status: "OPEN", priority: (input.priority as TicketRow["priority"]) || "MEDIUM", assigneeId: input.assigneeId || null,
+      createdBy: user.id, createdAt: new Date().toISOString(),
+    };
+    db.tickets.push(row);
+    save(db);
+    return toTicket(db, row);
+  },
+  async updateTicket(accessToken: string | null, id: string, patch: { subject?: string; description?: string; requesterName?: string; requesterEmail?: string; status?: string; priority?: string; assigneeId?: string }): Promise<Ticket> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const row = db.tickets.find((t) => t.id === id && t.companyId === user.companyId);
+    if (!row) throw err(404, "NOT_FOUND", "Ticket not found");
+    if (patch.assigneeId && !db.employees.some((e) => e.id === patch.assigneeId && e.companyId === user.companyId)) {
+      throw err(404, "NOT_FOUND", "Assignee not found");
+    }
+    if (patch.subject !== undefined && patch.subject) row.subject = patch.subject;
+    if (patch.description !== undefined) row.description = patch.description || null;
+    if (patch.requesterName !== undefined) row.requesterName = patch.requesterName || null;
+    if (patch.requesterEmail !== undefined) row.requesterEmail = patch.requesterEmail || null;
+    if (patch.status !== undefined) row.status = patch.status as TicketRow["status"];
+    if (patch.priority !== undefined) row.priority = patch.priority as TicketRow["priority"];
+    if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId || null;
+    save(db);
+    return toTicket(db, row);
+  },
+  async deleteTicket(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const row = db.tickets.find((t) => t.id === id && t.companyId === user.companyId);
+    if (!row) throw err(404, "NOT_FOUND", "Ticket not found");
+    db.tickets = db.tickets.filter((t) => t.id !== id);
+    save(db);
+  },
+
   mailbox(): MailMessage[] {
     return load().mailbox;
   },
@@ -1179,7 +1366,49 @@ function toTask(db: DB, t: TaskRow, project: ProjectRow): Task {
     priority: t.priority,
     assigneeId: t.assigneeId,
     assigneeName,
+    sprintId: t.sprintId,
     dueDate: t.dueDate,
+    createdAt: t.createdAt,
+  };
+}
+
+function toSprint(db: DB, s: SprintRow): Sprint {
+  const tasks = db.tasks.filter((t) => t.sprintId === s.id);
+  return {
+    id: s.id,
+    projectId: s.projectId,
+    name: s.name,
+    goal: s.goal,
+    startDate: s.startDate,
+    endDate: s.endDate,
+    status: s.status,
+    taskCount: tasks.length,
+    doneCount: tasks.filter((t) => t.status === "DONE").length,
+    createdAt: s.createdAt,
+  };
+}
+
+function toTicket(db: DB, t: TicketRow): Ticket {
+  const project = db.projects.find((p) => p.id === t.projectId);
+  let assigneeName: string | null = null;
+  if (t.assigneeId) {
+    const emp = db.employees.find((e) => e.id === t.assigneeId);
+    const user = emp ? db.users.find((u) => u.id === emp.userId) : undefined;
+    assigneeName = user ? `${user.firstName} ${user.lastName}` : null;
+  }
+  return {
+    id: t.id,
+    projectId: t.projectId,
+    ref: `${project ? project.key : "?"}-T${t.number}`,
+    number: t.number,
+    subject: t.subject,
+    description: t.description,
+    requesterName: t.requesterName,
+    requesterEmail: t.requesterEmail,
+    status: t.status,
+    priority: t.priority,
+    assigneeId: t.assigneeId,
+    assigneeName,
     createdAt: t.createdAt,
   };
 }

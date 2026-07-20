@@ -4,6 +4,22 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-20 — Work OS depth (Sprint 5): Sprints, Backlog, Tickets + workspace layout
+Turned the single Work board into a **project workspace** with a left-pane nav (Board · Backlog ·
+Sprints · Tickets). Backend `com.calyvora.work`, Flyway `V10`/`V11`. **5 new integration tests**
+(58 total), incl. cross-tenant isolation on sprints & tickets; verified live end-to-end.
+
+- **S1 — Sprints.** `Sprint` (name/goal/dates/status PLANNED→ACTIVE→COMPLETED). CRUD +
+  `POST /work/sprints/{id}/start|complete`. **≤1 active sprint per project** (partial unique index);
+  completing a sprint **returns unfinished tasks to the backlog**. Tasks gained `sprint_id`.
+- **S2 — Backlog.** `GET /work/projects/{id}/backlog` (un-sprinted tasks); `GET .../board` returns the
+  active sprint + its tasks, or the backlog if no sprint is active. "Move to sprint" from the backlog.
+- **S3 — Support Tickets** (lightweight, in Work — graduates to Service OS, SD-22b). `Ticket`
+  (subject/requester/status OPEN→CLOSED/priority, ref `KEY-T{n}`), assignee = People `Employee`.
+  `GET/POST /work/projects/{id}/tickets`, `PATCH/DELETE /work/tickets/{id}`.
+- **UI:** `/work/{projectId}` is now a left-pane workspace — Kanban board (sprint-aware), backlog list
+  with move-to-sprint, sprint management (start/complete/delete), and a tickets list with editor.
+
 ### 2026-07-20 — Demo hardening: invite flow works without email
 - **Fix:** `GET /api/v1/invitations/preview` was not in the public-endpoints list, so the
   invite-accept page 401'd for a logged-out invitee ("invitation is invalid"). Made it public.

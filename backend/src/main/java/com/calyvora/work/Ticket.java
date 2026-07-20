@@ -10,13 +10,15 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.UUID;
 
-/** A unit of work in a project (Work OS slice W2). Assignee is a People OS employee (cross-app link). */
+/**
+ * A lightweight support ticket in a project (Work OS slice S3). Assignee is a People OS employee
+ * (cross-app link). Deliberate debt — the real system of record is Service OS (SD-22b).
+ */
 @Entity
-@Table(name = "tasks")
-public class Task {
+@Table(name = "tickets")
+public class Ticket {
 
     @Id
     private UUID id;
@@ -31,14 +33,20 @@ public class Task {
     private int number;
 
     @Column(nullable = false, length = 200)
-    private String title;
+    private String subject;
 
     @Column(length = 4000)
     private String description;
 
+    @Column(name = "requester_name", length = 160)
+    private String requesterName;
+
+    @Column(name = "requester_email", length = 200)
+    private String requesterEmail;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 24)
-    private TaskStatus status = TaskStatus.TODO;
+    private TicketStatus status = TicketStatus.OPEN;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 24)
@@ -47,17 +55,8 @@ public class Task {
     @Column(name = "assignee_id")
     private UUID assigneeId;
 
-    @Column(name = "sprint_id")
-    private UUID sprintId;
-
-    @Column(name = "due_date")
-    private LocalDate dueDate;
-
     @Column(name = "created_by", nullable = false)
     private UUID createdBy;
-
-    @Column(name = "sort_order", nullable = false)
-    private int sortOrder;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -65,15 +64,15 @@ public class Task {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected Task() {
+    protected Ticket() {
     }
 
-    public Task(UUID id, UUID companyId, UUID projectId, int number, String title, UUID createdBy) {
+    public Ticket(UUID id, UUID companyId, UUID projectId, int number, String subject, UUID createdBy) {
         this.id = id;
         this.companyId = companyId;
         this.projectId = projectId;
         this.number = number;
-        this.title = title;
+        this.subject = subject;
         this.createdBy = createdBy;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
@@ -108,12 +107,12 @@ public class Task {
         return number;
     }
 
-    public String getTitle() {
-        return title;
+    public String getSubject() {
+        return subject;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
+    public void setSubject(String subject) {
+        this.subject = subject;
     }
 
     public String getDescription() {
@@ -124,11 +123,27 @@ public class Task {
         this.description = description;
     }
 
-    public TaskStatus getStatus() {
+    public String getRequesterName() {
+        return requesterName;
+    }
+
+    public void setRequesterName(String requesterName) {
+        this.requesterName = requesterName;
+    }
+
+    public String getRequesterEmail() {
+        return requesterEmail;
+    }
+
+    public void setRequesterEmail(String requesterEmail) {
+        this.requesterEmail = requesterEmail;
+    }
+
+    public TicketStatus getStatus() {
         return status;
     }
 
-    public void setStatus(TaskStatus status) {
+    public void setStatus(TicketStatus status) {
         this.status = status;
     }
 
@@ -148,32 +163,8 @@ public class Task {
         this.assigneeId = assigneeId;
     }
 
-    public UUID getSprintId() {
-        return sprintId;
-    }
-
-    public void setSprintId(UUID sprintId) {
-        this.sprintId = sprintId;
-    }
-
-    public LocalDate getDueDate() {
-        return dueDate;
-    }
-
-    public void setDueDate(LocalDate dueDate) {
-        this.dueDate = dueDate;
-    }
-
     public UUID getCreatedBy() {
         return createdBy;
-    }
-
-    public int getSortOrder() {
-        return sortOrder;
-    }
-
-    public void setSortOrder(int sortOrder) {
-        this.sortOrder = sortOrder;
     }
 
     public Instant getCreatedAt() {
