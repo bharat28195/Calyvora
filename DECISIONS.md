@@ -1,0 +1,46 @@
+# DECISIONS.md — Architecture & Product Decision Ledger
+
+> Canonical, append-only ledger of significant decisions. Newest first. Each entry is immutable;
+> superseded decisions are marked, never deleted. Deep rationale lives in [/docs](docs/README.md);
+> narrative lives in [FOUNDER.md](FOUNDER.md). IDs: `ADR-##` architecture, `PD-##` product,
+> `SD-##` Sprint-scoped implementation decision.
+
+## Sprint 4 — Knowledge OS (2026-07-20)
+
+| ID | Decision | Rationale (short) | Alternatives rejected | Status |
+|----|----------|-------------------|-----------------------|--------|
+| SD-13 | **Spaces contain Pages** (Space ≈ Work Project) | Reuses the proven container pattern; gives docs a tenant-scoped home with a KEY | One flat page pool; folders-as-pages only | Accepted |
+| SD-14 | **A Page's author is a People `Employee`; a Page may link one Work `Task`** | The cross-app moat made concrete — real FKs into People and Work (`author_id`, `linked_task_id`), not name strings | Free-text author (throws away the graph); no task link (loses doc↔task) | Accepted |
+| SD-15 | **Page body is plain Markdown stored as `text`** | Zero-dependency, portable, renders anywhere; enough for MVP | Rich JSON block model (heavy); HTML (unsafe) | Accepted; rich editor later |
+| SD-16 | **Pages have `DRAFT`/`PUBLISHED` status + optional `parent_id` tree** | Mirrors real wikis (drafts + nesting) without a CMS | Versioning/history (deferred); flat-only | Accepted |
+| SD-17 | **Collaborative RBAC:** any member creates/edits spaces & pages; **archiving a space is OWNER/ADMIN** | Same posture as Work OS — knowledge is a team asset | Per-space ACLs (deferred); author-only edit (too rigid) | Accepted |
+
+Also: added `EmployeeService.ensureEmployeeId(companyId, userId)` so other OS-apps attach authorship to
+the People org graph without duplicating provisioning (People OS owns that rule). Full context:
+[docs/Sprint4-KnowledgeOS.md](docs/Sprint4-KnowledgeOS.md).
+
+## Sprint 1 — Platform Foundation (2026-07-05)
+
+| ID | Decision | Rationale (short) | Alternatives rejected | Status |
+|----|----------|-------------------|-----------------------|--------|
+| SD-1 | **JPA/Hibernate** for persistence | Velocity for related entities; less boilerplate | Spring Data JDBC (more explicit, more code) | Accepted |
+| SD-2 | **Tenant isolation via `company_id` + `TenantContext` (app-layer)**; RLS deferred to Sprint 2 | One-sprint pragmatism; guarded by adversarial cross-tenant tests | RLS now (higher setup cost) | Accepted (debt logged) |
+| SD-3 | **Email globally unique; user in exactly one company** | Simplest correct MVP | `memberships` join table now (over-engineered for Sprint 1) | Accepted; superseded plan in Future |
+| SD-4 | **Create Company + Owner at register (PENDING); verify activates** | Avoids separate registrations table | Separate `registrations` staging table | Accepted |
+| SD-5 | **Access JWT ~15m + rotating refresh cookie (hashed, reuse-detection)**; HS256 | Security/simplicity balance | Long-lived JWT (unsafe); sessions (stateful) | Accepted; RS256 in Sprint 2 |
+| SD-6 | **Mailpit** for local email; `EmailService` interface | Zero-dependency local demo; swappable | Real SMTP in dev (friction) | Accepted |
+| SD-7 | **Monorepo**, ~~Gradle (Kotlin DSL)~~ backend | Atomic changes; matches constitution | Polyrepo; Maven | **Superseded by SD-9** (build tool → Maven); monorepo stance still Accepted |
+| SD-9 | **Maven** (not Gradle) as the backend build tool | Founder directive (2026-07-09): team standardizes on Maven — familiarity + ubiquitous Spring Boot tooling/examples. Supersedes the Gradle half of SD-7. | Gradle Kotlin DSL (rejected per founder) | Accepted |
+| SD-10 | **Zonky embedded Postgres** for integration tests + an `embedded` run profile | Dev machine has no Docker; embedded PG runs a real Postgres binary so tenant-isolation tests and local runs use real SQL (not H2). | Testcontainers (needs Docker); H2 (not Postgres-faithful) | Accepted (CI still uses Docker/Testcontainers-capable runner) |
+| SD-11 | **Refresh-token reuse revocation runs in a `REQUIRES_NEW` tx** (`RefreshTokenRevoker`) | On reuse we revoke the whole family then throw 401; a same-tx revoke would be rolled back by that throw, leaving stolen tokens live. | Revoke in the same tx (insecure — rolled back) | Accepted |
+| SD-12 | **`ConsoleEmailService` prints links under the `embedded` profile**; mail-send failures are swallowed; actuator mail health disabled | Local dev without Mailpit still needs the verification/invite link, and a downed SMTP must never 500 a registration or mark the app DOWN. | Require Mailpit always (friction) | Accepted |
+| SD-8 | **Roles `OWNER/ADMIN/MEMBER` only** | Smallest set to prove RBAC | Full RBAC+ABAC engine now | Accepted; full engine later |
+
+Full context: [docs/Sprint1.md §0](docs/Sprint1.md#0-key-sprint-1-decisions-please-veto-any-you-disagree-with).
+
+## Foundational (2026-07-05) — see FOUNDER.md for full detail
+`ADR-01` Modular monolith · `ADR-02` Postgres/Redis/Kafka/OpenSearch/pgvector · `ADR-03` Kafka +
+outbox + CloudEvents · `ADR-04` Zero-Trust security (OIDC/SSO, RBAC+ABAC, per-tenant keys, audit) ·
+`ADR-05` AI as Foundation primitive · `ADR-06` Hybrid 3-tier multi-tenancy · `ADR-07` **Backend =
+Java + Spring Boot** (was .NET). · `PD-01` 14-app decomposition · `PD-02` Depth-first phasing.
+Detail: [FOUNDER.md §4](FOUNDER.md#4-architecture-decision-log).

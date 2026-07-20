@@ -1,0 +1,16 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Calyvora — The AI-Native Enterprise OS",
+  description:
+    "One platform, one identity, one data fabric, one AI layer. Replace the 20–40 disconnected tools you run with a single AI-native Enterprise Operating System.",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className="dark">
+      <body>{children}</body>
+    </html>
+  );
+}

@@ -1,0 +1,221 @@
+// API contract types (Sprint1 §7). Kept in sync with backend DTOs.
+
+export type Role = "OWNER" | "ADMIN" | "MEMBER";
+export type UserStatus = "PENDING_VERIFICATION" | "INVITED" | "ACTIVE" | "DISABLED";
+export type CompanyStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+
+export interface Me {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: Role;
+    status: UserStatus;
+  };
+  company: {
+    id: string;
+    name: string;
+    slug: string;
+    status: CompanyStatus;
+  };
+}
+
+export interface CompanySettings {
+  companyId: string;
+  timezone: string;
+  locale: string;
+  logoUrl: string | null;
+}
+
+export interface Member {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: Role;
+  status: UserStatus;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: Role;
+  status: InvitationStatus;
+  invitedByEmail: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN";
+export type EmploymentStatus = "ONBOARDING" | "ACTIVE" | "TERMINATED";
+
+export interface Employee {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: Role;
+  employeeNo: string | null;
+  jobTitle: string | null;
+  employmentType: EmploymentType | null;
+  employmentStatus: EmploymentStatus;
+  departmentId: string | null;
+  managerId: string | null;
+  workLocation: string | null;
+  phone: string | null;
+  startDate: string | null;
+}
+
+export type LeaveTypeT = "VACATION" | "SICK" | "PERSONAL" | "UNPAID";
+export type LeaveStatusT = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: LeaveTypeT;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string | null;
+  status: LeaveStatusT;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export interface LeaveBalance {
+  allowanceDays: number;
+  usedDays: number;
+  remainingDays: number;
+  pendingDays: number;
+}
+
+export interface OnboardingTask {
+  id: string;
+  employeeId: string;
+  title: string;
+  sortOrder: number;
+  completed: boolean;
+  completedAt: string | null;
+}
+
+export type TaskStatusT = "TODO" | "IN_PROGRESS" | "DONE";
+export type TaskPriorityT = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export interface Project {
+  id: string;
+  name: string;
+  key: string;
+  description: string | null;
+  status: "ACTIVE" | "ARCHIVED";
+  leadUserId: string | null;
+  leadName: string | null;
+  taskCount: number;
+  openTaskCount: number;
+  createdAt: string;
+}
+
+export interface Task {
+  id: string;
+  projectId: string;
+  ref: string;
+  number: number;
+  title: string;
+  description: string | null;
+  status: TaskStatusT;
+  priority: TaskPriorityT;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  dueDate: string | null;
+  createdAt: string;
+}
+
+export type SpaceStatusT = "ACTIVE" | "ARCHIVED";
+export type PageStatusT = "DRAFT" | "PUBLISHED";
+
+export interface Space {
+  id: string;
+  name: string;
+  key: string;
+  description: string | null;
+  status: SpaceStatusT;
+  pageCount: number;
+  createdAt: string;
+}
+
+/** Full page detail (includes the Markdown body + resolved cross-app labels). */
+export interface KnowledgePage {
+  id: string;
+  spaceId: string;
+  parentId: string | null;
+  title: string;
+  body: string | null;
+  status: PageStatusT;
+  authorId: string | null;
+  authorName: string | null;
+  linkedTaskId: string | null;
+  linkedTaskRef: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Lightweight page row for trees, "my pages", and search (no body; optional snippet). */
+export interface PageSummary {
+  id: string;
+  spaceId: string;
+  spaceName: string | null;
+  parentId: string | null;
+  title: string;
+  status: PageStatusT;
+  authorName: string | null;
+  linkedTaskRef: string | null;
+  snippet: string | null;
+  updatedAt: string;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  parentId: string | null;
+  leadUserId: string | null;
+  leadName: string | null;
+  memberCount: number;
+}
+
+export interface DashboardSummary {
+  companyName: string;
+  memberCount: number;
+  pendingInviteCount: number;
+  yourRole: Role;
+}
+
+export interface LoginResult {
+  accessToken: string;
+  me: Me;
+}
+
+/** Shape of the one API error envelope (Sprint1 §13). */
+export interface ApiErrorBody {
+  timestamp: string;
+  status: number;
+  code: string;
+  message: string;
+  correlationId?: string;
+  errors?: { field: string; message: string }[];
+}
+
+export class ApiError extends Error {
+  status: number;
+  code: string;
+  fieldErrors: Record<string, string>;
+
+  constructor(body: ApiErrorBody) {
+    super(body.message);
+    this.status = body.status;
+    this.code = body.code;
+    this.fieldErrors = Object.fromEntries((body.errors ?? []).map((e) => [e.field, e.message]));
+  }
+}

@@ -1,0 +1,8 @@
+# Local development overrides (active by default via SPRING_PROFILES_ACTIVE=local).
+# Pairs with infra/docker-compose.yml (Postgres on 5432, Mailpit SMTP on 1025).
+spring:
+  jpa:
+    show-sql: false
+logging:
+  level:
+    com.calyvora: debug
