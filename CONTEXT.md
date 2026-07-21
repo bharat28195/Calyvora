@@ -137,6 +137,11 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
   `/work/projects/{id}/tickets`, `PATCH/DELETE /work/tickets/{id}`. **Debt: graduates to Service OS (SD-22b).**
 
 ## 7. What's next (open)
+- **★ Founder feedback backlog (2026-07-22) — the active roadmap:** all handwritten notes transcribed &
+  status-tracked in **[docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)**. Order:
+  A) quick wins + members-dropdown bug → B) role-based dashboards + attendance → C) People OS depth
+  (salary/payslip/profile/perf/goals) → D) new modules (Clients ⭐, Documents, Notifications/Inbox).
+  Branding: product name pending (Calyvora = parent); wired via `frontend/src/lib/brand.ts` + `Wordmark`.
 - **Foundation hardening (deferred Sprint-1 debt — CLEARED 2026-07-21):**
   ~~Postgres RLS (SD-2)~~ **DONE** (SD-2a..d — RLS `ENABLE`+`FORCE` on all 11 tenant tables, V12,
   bound per-connection via `TenantAwareDataSource` GUC; app DB role must be `NOSUPERUSER` in prod).

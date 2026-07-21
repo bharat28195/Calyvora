@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { Wordmark } from "@/components/layout/wordmark";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,8 +8,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="absolute right-5 top-5">
         <ThemeToggle />
       </div>
-      <Link href="/" className="mb-8 text-xl font-semibold tracking-tight">
-        Calyvora
+      <Link href="/" className="mb-8">
+        <Wordmark className="scale-110" />
       </Link>
       <div className="w-full max-w-md">{children}</div>
     </div>
