@@ -265,6 +265,17 @@ export interface SearchResponse {
   groups: SearchGroup[];
 }
 
+export interface AssistantSource {
+  kind: string;
+  title: string;
+  href: string;
+}
+export interface AssistantResponse {
+  answer: string;
+  mode: "claude" | "local";
+  sources: AssistantSource[];
+}
+
 /** Shape of the one API error envelope (Sprint1 §13). */
 export interface ApiErrorBody {
   timestamp: string;

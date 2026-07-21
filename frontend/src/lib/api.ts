@@ -24,6 +24,7 @@ import {
   type Member,
   type Role,
   type SearchResponse,
+  type AssistantResponse,
 } from "@/lib/types";
 import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
@@ -388,6 +389,13 @@ export const api = {
     return LIVE
       ? http<SearchResponse>(`/search?q=${encodeURIComponent(q)}`)
       : mockBackend.globalSearch(accessToken, q);
+  },
+
+  // --- cross-app AI assistant ---
+  askAssistant(question: string): Promise<AssistantResponse> {
+    return LIVE
+      ? http<AssistantResponse>("/assistant/ask", { method: "POST", body: JSON.stringify({ question }) })
+      : mockBackend.askAssistant(accessToken, question);
   },
 
   // --- dev mailbox (local dev only: verification/invite links, no SMTP needed) ---

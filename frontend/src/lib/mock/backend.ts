@@ -11,6 +11,7 @@ import {
   type SearchResponse,
   type SearchGroup,
   type SearchHit,
+  type AssistantResponse,
   type Department,
   type Employee,
   type Invitation,
@@ -1137,6 +1138,59 @@ export const mockBackend = {
     if (work.length) groups.push({ label: "Work", hits: work });
     if (knowledge.length) groups.push({ label: "Knowledge", hits: knowledge });
     return { query, total: people.length + work.length + knowledge.length, groups };
+  },
+
+  async askAssistant(accessToken: string | null, question: string): Promise<AssistantResponse> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const cid = user.companyId;
+    const q = (question || "").toLowerCase();
+    const mine = <T extends { companyId: string }>(rows: T[]) => rows.filter((r) => r.companyId === cid);
+    const has = (s: string | null | undefined) => (s || "").toLowerCase().includes(q);
+
+    const metrics: Record<string, number> = {
+      members: db.users.filter((u) => u.companyId === cid && u.status === "ACTIVE").length,
+      departments: mine(db.departments).length,
+      projects: mine(db.projects).length,
+      openTasks: mine(db.tasks).filter((t) => t.status !== "DONE").length,
+      openTickets: mine(db.tickets).filter((t) => t.status === "OPEN" || t.status === "PENDING").length,
+      spaces: mine(db.spaces).length,
+      pages: mine(db.pages).length,
+    };
+    const say = (n: number, noun: string) => `You have **${n}** ${noun}${n === 1 ? "" : "s"}.`;
+
+    if (q.includes("how many") || q.includes("number of") || q.includes("count")) {
+      if (q.includes("ticket")) return { answer: say(metrics.openTickets, "open support ticket"), mode: "local", sources: [] };
+      if (q.includes("task")) return { answer: say(metrics.openTasks, "open task"), mode: "local", sources: [] };
+      if (q.includes("project")) return { answer: say(metrics.projects, "project"), mode: "local", sources: [] };
+      if (q.includes("page") || q.includes("doc")) return { answer: say(metrics.pages, "knowledge page"), mode: "local", sources: [] };
+      if (q.includes("employee") || q.includes("people") || q.includes("member") || q.includes("team") || q.includes("staff"))
+        return { answer: say(metrics.members, "team member"), mode: "local", sources: [] };
+      if (q.includes("department")) return { answer: say(metrics.departments, "department"), mode: "local", sources: [] };
+    }
+
+    const pages = mine(db.pages).filter((p) => has(p.title) || has(p.body)).slice(0, 3);
+    if (pages.length) {
+      const spaces = mine(db.spaces);
+      const answer =
+        "Here's what I found in your Knowledge base:\n\n" +
+        pages.slice(0, 2).map((p) => `**${p.title}**\n${(p.body || "").replace(/\s+/g, " ").slice(0, 240)}…`).join("\n\n");
+      const sources = pages.map((p) => {
+        void spaces;
+        return { kind: "page", title: p.title, href: `/knowledge/${p.spaceId}` };
+      });
+      return { answer, mode: "local", sources };
+    }
+
+    return {
+      answer:
+        `Here's your company at a glance:\n\n- **${metrics.members}** team members across **${metrics.departments}** departments\n` +
+        `- **${metrics.openTasks}** open tasks and **${metrics.openTickets}** open tickets in **${metrics.projects}** project(s)\n` +
+        `- **${metrics.pages}** knowledge pages in **${metrics.spaces}** space(s)\n\nAsk me about a person, a project, a ticket, or anything in your docs.`,
+      mode: "local",
+      sources: [],
+    };
   },
 
   // --- Work OS (board & backlog) ---

@@ -8,6 +8,7 @@ import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import { CommandBar } from "@/components/layout/command-bar";
+import { AssistantPanel } from "@/components/layout/assistant-panel";
 
 interface NavItem {
   href: string;
@@ -95,6 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
+      <AssistantPanel />
     </div>
   );
 }
