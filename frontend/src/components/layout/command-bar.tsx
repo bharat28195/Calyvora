@@ -63,56 +63,56 @@ export function CommandBar() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white/40 hover:bg-white/10 hover:text-white/70"
+        className="inline-flex h-9 items-center gap-2 rounded-md border border-fg/10 bg-fg/5 px-3 text-sm text-fg/40 hover:bg-fg/10 hover:text-fg/70"
         aria-label="Search"
       >
         <Search className="h-4 w-4" />
         <span className="hidden md:inline">Search…</span>
-        <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50 md:inline">⌘K</kbd>
+        <kbd className="hidden rounded bg-fg/10 px-1.5 py-0.5 text-[10px] text-fg/50 md:inline">⌘K</kbd>
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh] backdrop-blur-sm"
           onClick={() => setOpen(false)}>
-          <div className="w-full max-w-xl overflow-hidden rounded-xl border border-white/10 bg-ink shadow-2xl"
+          <div className="w-full max-w-xl overflow-hidden rounded-xl border border-fg/10 bg-surface shadow-2xl"
             onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 border-b border-white/10 px-4">
-              <Search className="h-4 w-4 shrink-0 text-white/40" />
+            <div className="flex items-center gap-3 border-b border-fg/10 px-4">
+              <Search className="h-4 w-4 shrink-0 text-fg/40" />
               <input
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && flat[0]) go(flat[0]); }}
                 placeholder="Search people, projects, tasks, tickets, docs…"
-                className="h-14 w-full bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none"
+                className="h-14 w-full bg-transparent text-sm text-fg placeholder:text-fg/30 focus:outline-none"
               />
-              {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-white/40" />}
+              {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-fg/40" />}
             </div>
 
             <div className="max-h-[50vh] overflow-y-auto p-2">
               {q.trim().length < 2 ? (
-                <p className="px-3 py-8 text-center text-sm text-white/30">Type at least 2 characters.</p>
+                <p className="px-3 py-8 text-center text-sm text-fg/30">Type at least 2 characters.</p>
               ) : results && results.total > 0 ? (
                 results.groups.map((group) => (
                   <div key={group.label} className="mb-2">
-                    <p className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-white/30">{group.label}</p>
+                    <p className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-fg/30">{group.label}</p>
                     {group.hits.map((hit, i) => (
                       <button
                         key={`${group.label}-${i}`}
                         onClick={() => go(hit)}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-white/5"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-fg/5"
                       >
                         <span className="shrink-0">{ICON[hit.kind]}</span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm text-white">{hit.title}</span>
-                          <span className="block truncate text-xs text-white/40">{hit.subtitle}</span>
+                          <span className="block truncate text-sm text-fg">{hit.title}</span>
+                          <span className="block truncate text-xs text-fg/40">{hit.subtitle}</span>
                         </span>
                       </button>
                     ))}
                   </div>
                 ))
               ) : !loading ? (
-                <p className="px-3 py-8 text-center text-sm text-white/30">No results for “{q}”.</p>
+                <p className="px-3 py-8 text-center text-sm text-fg/30">No results for “{q}”.</p>
               ) : null}
             </div>
           </div>

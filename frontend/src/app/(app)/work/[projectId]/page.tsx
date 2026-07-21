@@ -28,24 +28,24 @@ const ORDER: TaskStatusT[] = ["TODO", "IN_PROGRESS", "DONE"];
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 const TICKET_STATUSES = ["OPEN", "PENDING", "RESOLVED", "CLOSED"] as const;
 const priorityChip: Record<string, string> = {
-  LOW: "bg-white/10 text-white/50",
+  LOW: "bg-fg/10 text-fg/50",
   MEDIUM: "bg-sky-500/15 text-sky-300",
   HIGH: "bg-amber-500/15 text-amber-300",
   URGENT: "bg-red-500/15 text-red-300",
 };
 const sprintChip: Record<string, string> = {
-  PLANNED: "bg-white/10 text-white/60",
+  PLANNED: "bg-fg/10 text-fg/60",
   ACTIVE: "bg-emerald-500/15 text-emerald-300",
-  COMPLETED: "bg-white/10 text-white/40",
+  COMPLETED: "bg-fg/10 text-fg/40",
 };
 const ticketChip: Record<string, string> = {
   OPEN: "bg-sky-500/15 text-sky-300",
   PENDING: "bg-amber-500/15 text-amber-300",
   RESOLVED: "bg-emerald-500/15 text-emerald-300",
-  CLOSED: "bg-white/10 text-white/40",
+  CLOSED: "bg-fg/10 text-fg/40",
 };
 const selectCls =
-  "h-11 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
+  "h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
 
 const NAV: { view: View; label: string; icon: typeof LayoutGrid }[] = [
   { view: "board", label: "Board", icon: LayoutGrid },
@@ -76,7 +76,7 @@ export default function WorkspacePage() {
 
   return (
     <div>
-      <Link href="/work" className="text-sm text-white/50 hover:text-white">← Projects</Link>
+      <Link href="/work" className="text-sm text-fg/50 hover:text-fg">← Projects</Link>
       <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight">
         <span className="rounded-md bg-violet/20 px-2 py-0.5 text-sm font-semibold text-violet">{project.key}</span>
         {project.name}
@@ -90,7 +90,7 @@ export default function WorkspacePage() {
               onClick={() => setView(n.view)}
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                view === n.view ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white",
+                view === n.view ? "bg-fg/10 text-fg" : "text-fg/60 hover:bg-fg/5 hover:text-fg",
               )}
             >
               <n.icon className="h-4 w-4 shrink-0" />
@@ -152,12 +152,12 @@ function BoardView({ projectId, employees }: { projectId: string; employees: Emp
             <div className="flex items-center gap-2">
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", sprintChip.ACTIVE)}>Active sprint</span>
               <h2 className="text-lg font-semibold">{active.name}</h2>
-              <span className="text-xs text-white/40">{active.doneCount}/{active.taskCount} done</span>
+              <span className="text-xs text-fg/40">{active.doneCount}/{active.taskCount} done</span>
             </div>
           ) : (
             <div>
               <h2 className="text-lg font-semibold">Board</h2>
-              <p className="text-xs text-white/40">No active sprint — showing the backlog. Start a sprint from the Sprints tab.</p>
+              <p className="text-xs text-fg/40">No active sprint — showing the backlog. Start a sprint from the Sprints tab.</p>
             </div>
           )}
         </div>
@@ -168,44 +168,44 @@ function BoardView({ projectId, employees }: { projectId: string; employees: Emp
         {COLUMNS.map((col) => {
           const items = board.tasks.filter((t) => t.status === col.status);
           return (
-            <div key={col.status} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+            <div key={col.status} className="rounded-2xl border border-fg/10 bg-fg/[0.02] p-3">
               <div className="mb-3 flex items-center justify-between px-1">
-                <h3 className="text-sm font-medium text-white/70">{col.label}</h3>
-                <span className="text-xs text-white/30">{items.length}</span>
+                <h3 className="text-sm font-medium text-fg/70">{col.label}</h3>
+                <span className="text-xs text-fg/30">{items.length}</span>
               </div>
               <div className="flex flex-col gap-2">
                 {items.map((t) => (
-                  <Card key={t.id} className="cursor-pointer p-3 hover:border-white/20" onClick={() => setDetail(t)}>
+                  <Card key={t.id} className="cursor-pointer p-3 hover:border-fg/20" onClick={() => setDetail(t)}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-white/40">{t.ref}</span>
+                      <span className="text-xs font-medium text-fg/40">{t.ref}</span>
                       <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", priorityChip[t.priority])}>
                         {t.priority.toLowerCase()}
                       </span>
                     </div>
-                    <p className={cn("mt-1.5 text-sm", t.status === "DONE" && "text-white/50 line-through")}>{t.title}</p>
+                    <p className={cn("mt-1.5 text-sm", t.status === "DONE" && "text-fg/50 line-through")}>{t.title}</p>
                     <div className="mt-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-white/40">
+                      <div className="flex items-center gap-2 text-xs text-fg/40">
                         {t.assigneeName ? (
                           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-aqua/20 text-[9px] font-semibold text-aqua">
                             {initials(t.assigneeName)}
                           </span>
-                        ) : <span className="text-white/25">Unassigned</span>}
+                        ) : <span className="text-fg/25">Unassigned</span>}
                         {t.dueDate && <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{t.dueDate}</span>}
                       </div>
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <button disabled={t.status === "TODO"} onClick={() => move(t, -1)}
-                          className="rounded p-0.5 text-white/30 hover:text-white disabled:opacity-20" aria-label="Move left">
+                          className="rounded p-0.5 text-fg/30 hover:text-fg disabled:opacity-20" aria-label="Move left">
                           <ChevronLeft className="h-4 w-4" />
                         </button>
                         <button disabled={t.status === "DONE"} onClick={() => move(t, 1)}
-                          className="rounded p-0.5 text-white/30 hover:text-white disabled:opacity-20" aria-label="Move right">
+                          className="rounded p-0.5 text-fg/30 hover:text-fg disabled:opacity-20" aria-label="Move right">
                           <ChevronRight className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
                   </Card>
                 ))}
-                {items.length === 0 && <p className="px-1 py-4 text-center text-xs text-white/25">Nothing here</p>}
+                {items.length === 0 && <p className="px-1 py-4 text-center text-xs text-fg/25">Nothing here</p>}
               </div>
             </div>
           );
@@ -262,19 +262,19 @@ function BacklogView({ projectId, employees }: { projectId: string; employees: E
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Backlog</h2>
-          <p className="text-xs text-white/40">{tasks.length} un-sprinted {tasks.length === 1 ? "task" : "tasks"}. Pull work into a sprint to plan it.</p>
+          <p className="text-xs text-fg/40">{tasks.length} un-sprinted {tasks.length === 1 ? "task" : "tasks"}. Pull work into a sprint to plan it.</p>
         </div>
         <Button onClick={() => setAdding(true)}><Plus className="h-4 w-4" /> Add task</Button>
       </div>
 
       <div className="mt-6 space-y-2">
         {tasks.length === 0 ? (
-          <Card className="py-10 text-center text-sm text-white/40">The backlog is empty.</Card>
+          <Card className="py-10 text-center text-sm text-fg/40">The backlog is empty.</Card>
         ) : tasks.map((t) => (
           <Card key={t.id} className="flex items-center gap-3 p-3">
             <button className="min-w-0 flex-1 text-left" onClick={() => setDetail(t)}>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-white/40">{t.ref}</span>
+                <span className="text-xs font-medium text-fg/40">{t.ref}</span>
                 <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", priorityChip[t.priority])}>{t.priority.toLowerCase()}</span>
               </div>
               <p className="mt-1 truncate text-sm">{t.title}</p>
@@ -285,12 +285,12 @@ function BacklogView({ projectId, employees }: { projectId: string; employees: E
               </span>
             )}
             <select
-              className="h-9 rounded-lg border border-white/15 bg-white/5 px-2 text-xs text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+              className="h-9 rounded-lg border border-fg/15 bg-fg/5 px-2 text-xs text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
               value=""
               onChange={async (e) => { if (e.target.value) { await api.updateTask(t.id, { sprintId: e.target.value }); void load(); } }}
             >
-              <option value="" className="bg-ink">Move to sprint…</option>
-              {sprints.map((s) => <option key={s.id} value={s.id} className="bg-ink">{s.name}</option>)}
+              <option value="" className="bg-surface">Move to sprint…</option>
+              {sprints.map((s) => <option key={s.id} value={s.id} className="bg-surface">{s.name}</option>)}
             </select>
           </Card>
         ))}
@@ -347,7 +347,7 @@ function SprintsView({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Sprints</h2>
-          <p className="text-xs text-white/40">Plan work into time-boxes. One sprint runs at a time.</p>
+          <p className="text-xs text-fg/40">Plan work into time-boxes. One sprint runs at a time.</p>
         </div>
         <Button onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> New sprint</Button>
       </div>
@@ -356,7 +356,7 @@ function SprintsView({ projectId }: { projectId: string }) {
 
       <div className="mt-6 space-y-3">
         {sprints.length === 0 ? (
-          <Card className="py-10 text-center text-sm text-white/40">No sprints yet. Create one, then pull tasks in from the Backlog.</Card>
+          <Card className="py-10 text-center text-sm text-fg/40">No sprints yet. Create one, then pull tasks in from the Backlog.</Card>
         ) : sprints.map((s) => (
           <Card key={s.id} className="p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -365,8 +365,8 @@ function SprintsView({ projectId }: { projectId: string }) {
                   <h3 className="font-medium">{s.name}</h3>
                   <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", sprintChip[s.status])}>{s.status.toLowerCase()}</span>
                 </div>
-                {s.goal && <p className="mt-1 text-sm text-white/50">{s.goal}</p>}
-                <p className="mt-2 flex items-center gap-3 text-xs text-white/40">
+                {s.goal && <p className="mt-1 text-sm text-fg/50">{s.goal}</p>}
+                <p className="mt-2 flex items-center gap-3 text-xs text-fg/40">
                   <span>{s.doneCount}/{s.taskCount} done</span>
                   {(s.startDate || s.endDate) && <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{s.startDate ?? "?"} → {s.endDate ?? "?"}</span>}
                 </p>
@@ -385,7 +385,7 @@ function SprintsView({ projectId }: { projectId: string }) {
                 <button
                   onClick={() => { if (confirm("Delete this sprint? Its tasks return to the backlog.")) void act(s.id, () => api.deleteSprint(s.id)); }}
                   disabled={busyId === s.id}
-                  className="rounded-md p-2 text-white/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50" aria-label="Delete sprint">
+                  className="rounded-md p-2 text-fg/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50" aria-label="Delete sprint">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
@@ -465,29 +465,29 @@ function TicketsView({ projectId, employees }: { projectId: string; employees: E
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Support tickets</h2>
-          <p className="text-xs text-white/40">Requests from customers or teammates, assigned to your people.</p>
+          <p className="text-xs text-fg/40">Requests from customers or teammates, assigned to your people.</p>
         </div>
         <Button onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> New ticket</Button>
       </div>
 
       <div className="mt-6 space-y-2">
         {tickets.length === 0 ? (
-          <Card className="py-10 text-center text-sm text-white/40">No tickets yet.</Card>
+          <Card className="py-10 text-center text-sm text-fg/40">No tickets yet.</Card>
         ) : tickets.map((t) => (
-          <Card key={t.id} className="flex cursor-pointer items-center gap-3 p-3 hover:border-white/20" onClick={() => setDetail(t)}>
+          <Card key={t.id} className="flex cursor-pointer items-center gap-3 p-3 hover:border-fg/20" onClick={() => setDetail(t)}>
             <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", ticketChip[t.status])}>{t.status.toLowerCase()}</span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-white/40">{t.ref}</span>
+                <span className="text-xs font-medium text-fg/40">{t.ref}</span>
                 <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", priorityChip[t.priority])}>{t.priority.toLowerCase()}</span>
               </div>
               <p className="mt-0.5 truncate text-sm">{t.subject}</p>
-              {t.requesterName && <p className="text-xs text-white/40">from {t.requesterName}</p>}
+              {t.requesterName && <p className="text-xs text-fg/40">from {t.requesterName}</p>}
             </div>
             {t.assigneeName ? (
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-aqua/20 text-[9px] font-semibold text-aqua" title={t.assigneeName}>{initials(t.assigneeName)}</span>
-            ) : <span className="text-xs text-white/25">Unassigned</span>}
-            <ArrowRight className="h-4 w-4 text-white/20" />
+            ) : <span className="text-xs text-fg/25">Unassigned</span>}
+            <ArrowRight className="h-4 w-4 text-fg/20" />
           </Card>
         ))}
       </div>
@@ -558,20 +558,20 @@ function TicketDialog({
           {initial && (
             <Field label="Status" htmlFor="tk-status">
               <select id="tk-status" className={selectCls} value={form.status} onChange={set("status")}>
-                {TICKET_STATUSES.map((s) => <option key={s} value={s} className="bg-ink">{s.toLowerCase()}</option>)}
+                {TICKET_STATUSES.map((s) => <option key={s} value={s} className="bg-surface">{s.toLowerCase()}</option>)}
               </select>
             </Field>
           )}
           <Field label="Priority" htmlFor="tk-pri">
             <select id="tk-pri" className={selectCls} value={form.priority} onChange={set("priority")}>
-              {PRIORITIES.map((p) => <option key={p} value={p} className="bg-ink">{p.toLowerCase()}</option>)}
+              {PRIORITIES.map((p) => <option key={p} value={p} className="bg-surface">{p.toLowerCase()}</option>)}
             </select>
           </Field>
         </div>
         <Field label="Assignee" htmlFor="tk-assignee">
           <select id="tk-assignee" className={selectCls} value={form.assigneeId} onChange={set("assigneeId")}>
-            <option value="" className="bg-ink">Unassigned</option>
-            {employees.map((e) => <option key={e.id} value={e.id} className="bg-ink">{e.firstName} {e.lastName}</option>)}
+            <option value="" className="bg-surface">Unassigned</option>
+            {employees.map((e) => <option key={e.id} value={e.id} className="bg-surface">{e.firstName} {e.lastName}</option>)}
           </select>
         </Field>
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -644,7 +644,7 @@ function TaskDialog({
         <div className="grid grid-cols-2 gap-3">
           <Field label="Priority" htmlFor="t-pri">
             <select id="t-pri" className={selectCls} value={form.priority} onChange={set("priority")}>
-              {PRIORITIES.map((p) => <option key={p} value={p} className="bg-ink">{p.toLowerCase()}</option>)}
+              {PRIORITIES.map((p) => <option key={p} value={p} className="bg-surface">{p.toLowerCase()}</option>)}
             </select>
           </Field>
           <Field label="Due date" htmlFor="t-due"><Input id="t-due" type="date" value={form.dueDate} onChange={set("dueDate")} /></Field>
@@ -652,15 +652,15 @@ function TaskDialog({
         <div className={cn("grid gap-3", showSprint ? "grid-cols-2" : "grid-cols-1")}>
           <Field label="Assignee" htmlFor="t-assignee">
             <select id="t-assignee" className={selectCls} value={form.assigneeId} onChange={set("assigneeId")}>
-              <option value="" className="bg-ink">Unassigned</option>
-              {employees.map((e) => <option key={e.id} value={e.id} className="bg-ink">{e.firstName} {e.lastName}</option>)}
+              <option value="" className="bg-surface">Unassigned</option>
+              {employees.map((e) => <option key={e.id} value={e.id} className="bg-surface">{e.firstName} {e.lastName}</option>)}
             </select>
           </Field>
           {showSprint && (
             <Field label="Sprint" htmlFor="t-sprint">
               <select id="t-sprint" className={selectCls} value={form.sprintId} onChange={set("sprintId")}>
-                <option value="" className="bg-ink">Backlog</option>
-                {sprints.map((s) => <option key={s.id} value={s.id} className="bg-ink">{s.name}</option>)}
+                <option value="" className="bg-surface">Backlog</option>
+                {sprints.map((s) => <option key={s.id} value={s.id} className="bg-surface">{s.name}</option>)}
               </select>
             </Field>
           )}

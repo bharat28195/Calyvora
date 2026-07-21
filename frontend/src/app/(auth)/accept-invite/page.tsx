@@ -85,7 +85,7 @@ function AcceptInviteInner() {
         <XCircle className="mx-auto h-10 w-10 text-red-400" />
         <CardTitle className="mt-4">Invitation problem</CardTitle>
         <CardDescription>{loadError}</CardDescription>
-        <Link href="/login" className="mt-6 inline-block text-sm text-white/60 hover:text-white">
+        <Link href="/login" className="mt-6 inline-block text-sm text-fg/60 hover:text-fg">
           Back to log in
         </Link>
       </Card>
@@ -111,11 +111,11 @@ function AcceptInviteInner() {
     <Card>
       <CardTitle>Join {preview?.companyName}</CardTitle>
       <CardDescription>
-        You were invited as <span className="text-white">{preview?.role.toLowerCase()}</span>. Set your
+        You were invited as <span className="text-fg">{preview?.role.toLowerCase()}</span>. Set your
         name and a password to accept.
       </CardDescription>
 
-      <div className="mt-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/60">
+      <div className="mt-4 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg/60">
         {preview?.email}
       </div>
 
@@ -142,7 +142,7 @@ function AcceptInviteInner() {
         {values.password.length > 0 && (
           <div className="flex h-1.5 gap-1" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className={`flex-1 rounded-full ${i < strength ? "bg-violet" : "bg-white/10"}`} />
+              <div key={i} className={`flex-1 rounded-full ${i < strength ? "bg-violet" : "bg-fg/10"}`} />
             ))}
           </div>
         )}

@@ -8,12 +8,13 @@ type Size = "sm" | "md" | "lg";
 const base =
   "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet focus-visible:ring-offset-2 " +
-  "focus-visible:ring-offset-ink disabled:pointer-events-none disabled:opacity-50";
+  "focus-visible:ring-offset-app disabled:pointer-events-none disabled:opacity-50";
 
 const variants: Record<Variant, string> = {
+  // White text is intentional — it sits on the solid violet accent in both themes.
   primary: "bg-violet text-white hover:bg-violet/90",
-  secondary: "border border-white/15 bg-white/5 text-white hover:bg-white/10",
-  ghost: "text-white/80 hover:text-white hover:bg-white/5",
+  secondary: "border border-fg/15 bg-fg/5 text-fg hover:bg-fg/10",
+  ghost: "text-fg/80 hover:text-fg hover:bg-fg/5",
 };
 
 const sizes: Record<Size, string> = {

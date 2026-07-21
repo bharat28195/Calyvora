@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import { CommandBar } from "@/components/layout/command-bar";
 import { AssistantPanel } from "@/components/layout/assistant-panel";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 interface NavItem {
   href: string;
@@ -43,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-white/10 bg-ink/60 backdrop-blur">
+      <header className="border-b border-fg/10 bg-surface/60 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="font-semibold tracking-tight">
@@ -58,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm transition-colors",
-                      active ? "bg-white/10 text-white" : "text-white/60 hover:text-white",
+                      active ? "bg-fg/10 text-fg" : "text-fg/60 hover:text-fg",
                     )}
                   >
                     {item.label}
@@ -70,11 +71,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-4">
             <CommandBar />
+            <ThemeToggle />
             <div className="hidden text-right sm:block">
-              <p className="text-sm text-white">
+              <p className="text-sm text-fg">
                 {user.firstName} {user.lastName}
               </p>
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-fg/40">
                 {company.name} · {user.role}
               </p>
             </div>
@@ -85,7 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 window.location.assign("/login");
               }}
               disabled={loggingOut}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm text-white/60 hover:bg-white/5 hover:text-white disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm text-fg/60 hover:bg-fg/5 hover:text-fg disabled:opacity-50"
               aria-label="Log out"
             >
               {loggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}

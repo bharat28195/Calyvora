@@ -18,11 +18,11 @@ export default function MyPagesPage() {
 
   return (
     <div>
-      <Link href="/knowledge" className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-white">
+      <Link href="/knowledge" className="inline-flex items-center gap-1.5 text-sm text-fg/50 hover:text-fg">
         <ArrowLeft className="h-4 w-4" /> Knowledge
       </Link>
       <h1 className="mt-3 text-2xl font-semibold tracking-tight">My pages</h1>
-      <p className="mt-1 text-white/50">Everything you&apos;ve authored, across every space.</p>
+      <p className="mt-1 text-fg/50">Everything you&apos;ve authored, across every space.</p>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
@@ -30,22 +30,22 @@ export default function MyPagesPage() {
         <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
       ) : pages.length === 0 ? (
         <Card className="mt-8 flex flex-col items-center gap-3 py-12 text-center">
-          <FileText className="h-8 w-8 text-white/30" />
+          <FileText className="h-8 w-8 text-fg/30" />
           <CardTitle>Nothing yet</CardTitle>
-          <p className="text-sm text-white/50">Pages you write will show up here.</p>
+          <p className="text-sm text-fg/50">Pages you write will show up here.</p>
         </Card>
       ) : (
         <div className="mt-8 space-y-2">
           {pages.map((p) => (
             <Link key={p.id} href={`/knowledge/${p.spaceId}?page=${p.id}`}>
-              <Card className="flex items-center gap-3 transition-colors hover:border-white/20">
-                <FileText className="h-4 w-4 shrink-0 text-white/30" />
+              <Card className="flex items-center gap-3 transition-colors hover:border-fg/20">
+                <FileText className="h-4 w-4 shrink-0 text-fg/30" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium">{p.title}</span>
                     {p.status === "DRAFT" && <span className="shrink-0 text-[10px] uppercase tracking-wide text-amber-300/70">draft</span>}
                   </div>
-                  <p className="text-xs text-white/40">{p.spaceName}</p>
+                  <p className="text-xs text-fg/40">{p.spaceName}</p>
                 </div>
                 {p.linkedTaskRef && (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded bg-aqua/15 px-1.5 py-0.5 text-xs font-medium text-aqua">

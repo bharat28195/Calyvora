@@ -32,12 +32,12 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-ink p-6 shadow-2xl"
+        className="w-full max-w-md rounded-2xl border border-fg/10 bg-surface p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-white/50 hover:bg-white/5 hover:text-white">
+          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-fg/50 hover:bg-fg/5 hover:text-fg">
             <X className="h-5 w-5" />
           </button>
         </div>

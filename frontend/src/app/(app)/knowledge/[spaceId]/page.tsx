@@ -63,7 +63,7 @@ function SpacePage() {
 
   return (
     <div>
-      <Link href="/knowledge" className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-white">
+      <Link href="/knowledge" className="inline-flex items-center gap-1.5 text-sm text-fg/50 hover:text-fg">
         <ArrowLeft className="h-4 w-4" /> Spaces
       </Link>
 
@@ -74,7 +74,7 @@ function SpacePage() {
         </div>
         <NewPageButton onCreate={createPage} busy={creating} />
       </div>
-      {space?.description && <p className="mt-1 text-white/50">{space.description}</p>}
+      {space?.description && <p className="mt-1 text-fg/50">{space.description}</p>}
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
@@ -84,7 +84,7 @@ function SpacePage() {
           {pages === null ? (
             <Card><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></Card>
           ) : pages.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-center text-sm text-white/40">
+            <p className="rounded-lg border border-dashed border-fg/10 px-4 py-6 text-center text-sm text-fg/40">
               No pages yet.
             </p>
           ) : (
@@ -107,8 +107,8 @@ function SpacePage() {
             />
           ) : (
             <Card className="flex flex-col items-center gap-3 py-16 text-center">
-              <FileText className="h-8 w-8 text-white/30" />
-              <p className="text-sm text-white/50">Select a page, or create one to start writing.</p>
+              <FileText className="h-8 w-8 text-fg/30" />
+              <p className="text-sm text-fg/50">Select a page, or create one to start writing.</p>
             </Card>
           )}
         </section>
@@ -144,10 +144,10 @@ function TreeRow({ node, depth, selectedId, onSelect }: { node: TreeNode; depth:
         style={{ paddingLeft: 12 + depth * 16 }}
         className={cn(
           "flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm transition-colors",
-          node.page.id === selectedId ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white",
+          node.page.id === selectedId ? "bg-fg/10 text-fg" : "text-fg/60 hover:bg-fg/5 hover:text-fg",
         )}
       >
-        <FileText className="h-3.5 w-3.5 shrink-0 text-white/30" />
+        <FileText className="h-3.5 w-3.5 shrink-0 text-fg/30" />
         <span className="truncate">{node.page.title}</span>
         {node.page.status === "DRAFT" && <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-amber-300/70">draft</span>}
       </button>
@@ -241,8 +241,8 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
     <Card className="min-h-[24rem]">
       {error && <Alert tone="error" className="mb-4">{error}</Alert>}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-        <div className="flex items-center gap-2 text-xs text-white/40">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-fg/10 pb-4">
+        <div className="flex items-center gap-2 text-xs text-fg/40">
           <StatusChip status={page.status} />
           {page.authorName && <span>· by {page.authorName}</span>}
           {page.linkedTaskRef && (
@@ -262,7 +262,7 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> Edit</Button>
           )}
           <button onClick={remove} disabled={busy} aria-label="Delete page"
-            className="rounded-md p-2 text-white/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50">
+            className="rounded-md p-2 text-fg/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
@@ -280,7 +280,7 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
               onChange={(e) => setBody(e.target.value)}
               rows={16}
               placeholder="# Heading&#10;&#10;Write with **Markdown**. Use `-` for lists, `code`, and ## sub-headings."
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm text-white placeholder:text-white/30 focus:border-violet focus:outline-none"
+              className="w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 font-mono text-sm text-fg placeholder:text-fg/30 focus:border-violet focus:outline-none"
             />
           </Field>
           <div className="flex items-center gap-2">
@@ -293,7 +293,7 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
           <h2 className="text-xl font-semibold tracking-tight">{page.title}</h2>
           <div className="mt-4">
             {page.body ? <Markdown source={page.body} /> : (
-              <p className="flex items-center gap-2 text-sm text-white/40">
+              <p className="flex items-center gap-2 text-sm text-fg/40">
                 <Eye className="h-4 w-4" /> This page is empty. <button onClick={() => setEditing(true)} className="text-violet hover:underline">Add content →</button>
               </p>
             )}
@@ -367,13 +367,13 @@ function LinkTaskDialog({ open, onClose, current, onPick }: {
   return (
     <Modal open={open} onClose={onClose} title="Link a Work task">
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-white/50">Connect this doc to a task in Work OS — the doc↔task link that ties knowledge to delivery.</p>
+        <p className="text-sm text-fg/50">Connect this doc to a task in Work OS — the doc↔task link that ties knowledge to delivery.</p>
         <Field label="Project" htmlFor="lt-project">
           <select
             id="lt-project"
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-violet focus:outline-none"
+            className="w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg focus:border-violet focus:outline-none"
           >
             <option value="">Select a project…</option>
             {projects?.map((p) => <option key={p.id} value={p.id}>{p.key} · {p.name}</option>)}
@@ -384,13 +384,13 @@ function LinkTaskDialog({ open, onClose, current, onPick }: {
             {tasks === null ? (
               <Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" />
             ) : tasks.length === 0 ? (
-              <p className="text-sm text-white/40">No tasks in this project.</p>
+              <p className="text-sm text-fg/40">No tasks in this project.</p>
             ) : (
               tasks.map((t) => (
                 <button key={t.id} onClick={() => onPick(t.id)}
-                  className={cn("flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-white/5",
+                  className={cn("flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-fg/5",
                     t.id === current && "bg-violet/10")}>
-                  <span className="font-mono text-xs text-white/40">{t.ref}</span>
+                  <span className="font-mono text-xs text-fg/40">{t.ref}</span>
                   <span className="truncate">{t.title}</span>
                 </button>
               ))
@@ -410,7 +410,7 @@ function LinkTaskDialog({ open, onClose, current, onPick }: {
 
 function Markdown({ source }: { source: string }) {
   const html = useMemo(() => renderMarkdown(source), [source]);
-  return <div className="prose-invert space-y-2 text-sm leading-relaxed text-white/80" dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div className="prose-invert space-y-2 text-sm leading-relaxed text-fg/80" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function escapeHtml(s: string): string {
@@ -419,7 +419,7 @@ function escapeHtml(s: string): string {
 
 function inline(s: string): string {
   return escapeHtml(s)
-    .replace(/`([^`]+)`/g, '<code class="rounded bg-white/10 px-1 py-0.5 text-[0.85em]">$1</code>')
+    .replace(/`([^`]+)`/g, '<code class="rounded bg-fg/10 px-1 py-0.5 text-[0.85em]">$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
 }
@@ -440,9 +440,9 @@ function renderMarkdown(md: string): string {
       continue;
     }
     flush();
-    if (/^###\s+/.test(line)) out.push(`<h4 class="mt-3 font-semibold text-white">${inline(line.slice(4))}</h4>`);
-    else if (/^##\s+/.test(line)) out.push(`<h3 class="mt-4 text-lg font-semibold text-white">${inline(line.slice(3))}</h3>`);
-    else if (/^#\s+/.test(line)) out.push(`<h2 class="mt-4 text-xl font-semibold text-white">${inline(line.slice(2))}</h2>`);
+    if (/^###\s+/.test(line)) out.push(`<h4 class="mt-3 font-semibold text-fg">${inline(line.slice(4))}</h4>`);
+    else if (/^##\s+/.test(line)) out.push(`<h3 class="mt-4 text-lg font-semibold text-fg">${inline(line.slice(3))}</h3>`);
+    else if (/^#\s+/.test(line)) out.push(`<h2 class="mt-4 text-xl font-semibold text-fg">${inline(line.slice(2))}</h2>`);
     else if (line.trim() === "") out.push("");
     else out.push(`<p>${inline(line)}</p>`);
   }

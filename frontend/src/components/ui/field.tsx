@@ -16,11 +16,11 @@ export function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-sm font-medium text-white/80">
+      <label htmlFor={htmlFor} className="text-sm font-medium text-fg/80">
         {label}
       </label>
       {children}
-      {hint && !error && <p className="text-xs text-white/40">{hint}</p>}
+      {hint && !error && <p className="text-xs text-fg/40">{hint}</p>}
       {error && (
         <p id={`${htmlFor}-error`} className="text-xs text-red-400">
           {error}

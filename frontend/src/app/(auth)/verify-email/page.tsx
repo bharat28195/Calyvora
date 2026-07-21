@@ -68,7 +68,7 @@ function VerifyEmailInner() {
       <CardDescription>{message}</CardDescription>
       <div className="mt-6">
         <ResendForm />
-        <Link href="/login" className="mt-4 inline-block text-sm text-white/60 hover:text-white">
+        <Link href="/login" className="mt-4 inline-block text-sm text-fg/60 hover:text-fg">
           Back to log in
         </Link>
       </div>

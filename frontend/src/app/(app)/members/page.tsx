@@ -47,7 +47,7 @@ export default function MembersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-          <p className="mt-1 text-white/50">Your team and pending invitations.</p>
+          <p className="mt-1 text-fg/50">Your team and pending invitations.</p>
         </div>
         <Button onClick={() => setInviteOpen(true)}>
           <UserPlus className="h-4 w-4" /> Invite
@@ -64,7 +64,7 @@ export default function MembersPage() {
         <>
           <Card className="mt-8 overflow-hidden p-0">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/40">
+              <thead className="border-b border-fg/10 text-xs uppercase tracking-wide text-fg/40">
                 <tr>
                   <th className="px-5 py-3 font-medium">Name</th>
                   <th className="px-5 py-3 font-medium">Email</th>
@@ -74,9 +74,9 @@ export default function MembersPage() {
               </thead>
               <tbody>
                 {members.map((m) => (
-                  <tr key={m.id} className="border-b border-white/5 last:border-0">
+                  <tr key={m.id} className="border-b border-fg/5 last:border-0">
                     <td className="px-5 py-3">{m.firstName} {m.lastName}</td>
-                    <td className="px-5 py-3 text-white/70">{m.email}</td>
+                    <td className="px-5 py-3 text-fg/70">{m.email}</td>
                     <td className="px-5 py-3"><Badge value={m.role} /></td>
                     <td className="px-5 py-3"><Badge value={m.status} /></td>
                   </tr>
@@ -85,12 +85,12 @@ export default function MembersPage() {
             </table>
           </Card>
 
-          <h2 className="mt-10 text-sm font-medium uppercase tracking-wide text-white/40">
+          <h2 className="mt-10 text-sm font-medium uppercase tracking-wide text-fg/40">
             Pending invitations
           </h2>
           {invites.length === 0 ? (
-            <Card className="mt-3 flex items-center gap-3 text-sm text-white/50">
-              <MailPlus className="h-5 w-5 text-white/30" />
+            <Card className="mt-3 flex items-center gap-3 text-sm text-fg/50">
+              <MailPlus className="h-5 w-5 text-fg/30" />
               No pending invitations. Invite someone to get started.
             </Card>
           ) : (
@@ -98,10 +98,10 @@ export default function MembersPage() {
               <table className="w-full text-left text-sm">
                 <tbody>
                   {invites.map((inv) => (
-                    <tr key={inv.id} className="border-b border-white/5 last:border-0">
-                      <td className="px-5 py-3 text-white/80">{inv.email}</td>
+                    <tr key={inv.id} className="border-b border-fg/5 last:border-0">
+                      <td className="px-5 py-3 text-fg/80">{inv.email}</td>
                       <td className="px-5 py-3"><Badge value={inv.role} /></td>
-                      <td className="px-5 py-3 text-white/40">
+                      <td className="px-5 py-3 text-fg/40">
                         invited by {inv.invitedByEmail}
                       </td>
                       <td className="px-5 py-3 text-right">
@@ -186,8 +186,8 @@ function InviteDialog({
           <Alert tone="success">
             Invitation created for <span className="font-medium">{sentTo}</span>.
           </Alert>
-          <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-            <p className="flex items-center gap-2 font-medium text-white">
+          <div className="rounded-lg border border-fg/10 bg-fg/5 p-4 text-sm text-fg/70">
+            <p className="flex items-center gap-2 font-medium text-fg">
               <Mail className="h-4 w-4 text-aqua" /> No email server in local dev
             </p>
             <p className="mt-1.5">
@@ -218,10 +218,10 @@ function InviteDialog({
             id="invite-role"
             value={role}
             onChange={(e) => setRole(e.target.value as "ADMIN" | "MEMBER")}
-            className="h-11 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+            className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
           >
-            <option value="MEMBER" className="bg-ink">Member</option>
-            <option value="ADMIN" className="bg-ink">Admin</option>
+            <option value="MEMBER" className="bg-surface">Member</option>
+            <option value="ADMIN" className="bg-surface">Admin</option>
           </select>
         </Field>
         <div className="mt-2 flex justify-end gap-2">

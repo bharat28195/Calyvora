@@ -63,9 +63,9 @@ export default function OrgPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Org structure</h1>
-          <p className="mt-1 text-white/50">Departments and reporting lines.</p>
+          <p className="mt-1 text-fg/50">Departments and reporting lines.</p>
         </div>
-        <Link href="/people" className="text-sm text-white/60 hover:text-white">← Directory</Link>
+        <Link href="/people" className="text-sm text-fg/60 hover:text-fg">← Directory</Link>
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
@@ -76,7 +76,7 @@ export default function OrgPage() {
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           {/* Departments */}
           <div>
-            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-white/40">
+            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-fg/40">
               <Building2 className="h-4 w-4" /> Departments
             </h2>
             {isAdmin && (
@@ -89,20 +89,20 @@ export default function OrgPage() {
             )}
             <div className="mt-3 flex flex-col gap-2">
               {departments!.length === 0 ? (
-                <Card className="text-sm text-white/50">No departments yet.</Card>
+                <Card className="text-sm text-fg/50">No departments yet.</Card>
               ) : (
                 departments!.map((d) => (
                   <Card key={d.id} className="flex items-center justify-between p-4">
                     <div>
                       <p className="font-medium">{d.name}</p>
-                      <p className="text-xs text-white/50">
+                      <p className="text-xs text-fg/50">
                         <Users className="mr-1 inline h-3 w-3" />{d.memberCount} member{d.memberCount === 1 ? "" : "s"}
                         {d.leadName && <> · led by {d.leadName}</>}
                       </p>
                     </div>
                     {isAdmin && (
                       <button onClick={() => removeDept(d.id)} aria-label={`Delete ${d.name}`}
-                        className="rounded-md p-1.5 text-red-400/70 hover:bg-white/5 hover:text-red-300">
+                        className="rounded-md p-1.5 text-red-400/70 hover:bg-fg/5 hover:text-red-300">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
@@ -114,7 +114,7 @@ export default function OrgPage() {
 
           {/* Reporting tree */}
           <div>
-            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-white/40">
+            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-fg/40">
               <Users className="h-4 w-4" /> Reporting structure
             </h2>
             <Card className="mt-3">
@@ -142,7 +142,7 @@ function OrgTree({ employees, departments }: { employees: Employee[]; department
   const roots = childrenOf.get(null) ?? [];
 
   if (roots.length === employees.length) {
-    return <p className="text-sm text-white/50">No reporting lines set yet. Assign managers on the directory to build the chart.</p>;
+    return <p className="text-sm text-fg/50">No reporting lines set yet. Assign managers on the directory to build the chart.</p>;
   }
 
   return (
@@ -169,12 +169,12 @@ function OrgNode({
   return (
     <li>
       <div className="flex items-center gap-2 rounded-md py-1" style={{ paddingLeft: depth * 20 }}>
-        {reports.length > 0 ? <ChevronRight className="h-3.5 w-3.5 text-white/30" /> : <span className="w-3.5" />}
+        {reports.length > 0 ? <ChevronRight className="h-3.5 w-3.5 text-fg/30" /> : <span className="w-3.5" />}
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet/20 text-[10px] font-semibold text-violet">
           {employee.firstName[0]}{employee.lastName[0]}
         </span>
         <span className="text-sm">{employee.firstName} {employee.lastName}</span>
-        <span className="text-xs text-white/40">
+        <span className="text-xs text-fg/40">
           {employee.jobTitle ?? "—"}{deptName(employee.departmentId) ? ` · ${deptName(employee.departmentId)}` : ""}
         </span>
       </div>

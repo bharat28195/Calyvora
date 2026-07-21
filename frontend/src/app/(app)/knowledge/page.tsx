@@ -37,7 +37,7 @@ export default function KnowledgePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Knowledge</h1>
-          <p className="mt-1 text-white/50">
+          <p className="mt-1 text-fg/50">
             Docs &amp; wiki, linked to people and work. <Link href="/knowledge/mine" className="text-violet hover:underline">My pages →</Link>
           </p>
         </div>
@@ -52,23 +52,23 @@ export default function KnowledgePage() {
         <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
       ) : active.length === 0 ? (
         <Card className="mt-8 flex flex-col items-center gap-3 py-12 text-center">
-          <BookOpen className="h-8 w-8 text-white/30" />
+          <BookOpen className="h-8 w-8 text-fg/30" />
           <CardTitle>No spaces yet</CardTitle>
-          <p className="text-sm text-white/50">Create a space to start writing docs — a runbook, a handbook, meeting notes.</p>
+          <p className="text-sm text-fg/50">Create a space to start writing docs — a runbook, a handbook, meeting notes.</p>
           <Button onClick={() => setOpen(true)} className="mt-2"><Plus className="h-4 w-4" /> New space</Button>
         </Card>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {active.map((s) => (
             <Link key={s.id} href={`/knowledge/${s.id}`}>
-              <Card className="group h-full transition-colors hover:border-white/20">
+              <Card className="group h-full transition-colors hover:border-fg/20">
                 <div className="flex items-center justify-between">
                   <span className="rounded-md bg-violet/20 px-2 py-0.5 text-xs font-semibold text-violet">{s.key}</span>
-                  <ArrowRight className="h-4 w-4 text-white/20 transition-colors group-hover:text-white/60" />
+                  <ArrowRight className="h-4 w-4 text-fg/20 transition-colors group-hover:text-fg/60" />
                 </div>
                 <h3 className="mt-3 font-medium">{s.name}</h3>
-                {s.description && <p className="mt-1 line-clamp-2 text-sm text-white/50">{s.description}</p>}
-                <p className="mt-4 flex items-center gap-1.5 text-xs text-white/40">
+                {s.description && <p className="mt-1 line-clamp-2 text-sm text-fg/50">{s.description}</p>}
+                <p className="mt-4 flex items-center gap-1.5 text-xs text-fg/40">
                   <FileText className="h-3.5 w-3.5" />
                   {s.pageCount} {s.pageCount === 1 ? "page" : "pages"}
                 </p>
@@ -113,29 +113,29 @@ function SearchBar() {
 
   return (
     <div className="relative mt-6">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search all pages…"
-        className="w-full rounded-lg border border-white/10 bg-white/5 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:border-violet focus:outline-none"
+        className="w-full rounded-lg border border-fg/10 bg-fg/5 py-2.5 pl-10 pr-4 text-sm text-fg placeholder:text-fg/30 focus:border-violet focus:outline-none"
       />
       {results !== null && (
-        <div className="absolute z-10 mt-2 w-full rounded-lg border border-white/10 bg-ink shadow-xl">
+        <div className="absolute z-10 mt-2 w-full rounded-lg border border-fg/10 bg-surface shadow-xl">
           {busy && results.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-white/40">Searching…</p>
+            <p className="px-4 py-3 text-sm text-fg/40">Searching…</p>
           ) : results.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-white/40">No pages match “{q.trim()}”.</p>
+            <p className="px-4 py-3 text-sm text-fg/40">No pages match “{q.trim()}”.</p>
           ) : (
             results.map((r) => (
               <Link key={r.id} href={`/knowledge/${r.spaceId}?page=${r.id}`} onClick={() => setQ("")}
-                className="block border-b border-white/5 px-4 py-3 last:border-0 hover:bg-white/5">
+                className="block border-b border-fg/5 px-4 py-3 last:border-0 hover:bg-fg/5">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-3.5 w-3.5 text-white/30" />
+                  <FileText className="h-3.5 w-3.5 text-fg/30" />
                   <span className="text-sm font-medium">{r.title}</span>
-                  <span className="text-xs text-white/30">· {r.spaceName}</span>
+                  <span className="text-xs text-fg/30">· {r.spaceName}</span>
                 </div>
-                {r.snippet && <p className="mt-1 line-clamp-1 pl-5 text-xs text-white/40">{r.snippet}</p>}
+                {r.snippet && <p className="mt-1 line-clamp-1 pl-5 text-xs text-fg/40">{r.snippet}</p>}
               </Link>
             ))
           )}

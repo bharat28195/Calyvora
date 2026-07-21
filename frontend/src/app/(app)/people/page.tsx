@@ -67,14 +67,14 @@ export default function PeoplePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">People</h1>
-          <p className="mt-1 flex flex-wrap gap-x-3 text-white/50">
+          <p className="mt-1 flex flex-wrap gap-x-3 text-fg/50">
             Your company directory.
             <a href="/people/org" className="text-violet hover:underline">Org chart →</a>
             <a href="/people/time-off" className="text-violet hover:underline">Time off →</a>
           </p>
         </div>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
           <Input
             className="w-64 pl-9"
             placeholder="Search name, email, title…"
@@ -90,11 +90,11 @@ export default function PeoplePage() {
       {employees === null ? (
         <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
       ) : filtered.length === 0 ? (
-        <Card className="mt-8 text-center text-white/50">No people match &ldquo;{query}&rdquo;.</Card>
+        <Card className="mt-8 text-center text-fg/50">No people match &ldquo;{query}&rdquo;.</Card>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((e) => (
-            <Card key={e.id} className="flex cursor-pointer flex-col gap-3 transition-colors hover:border-white/20"
+            <Card key={e.id} className="flex cursor-pointer flex-col gap-3 transition-colors hover:border-fg/20"
               onClick={() => setViewing(e)}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3">
@@ -103,12 +103,12 @@ export default function PeoplePage() {
                   </div>
                   <div>
                     <p className="font-medium leading-tight">{e.firstName} {e.lastName}</p>
-                    <p className="text-xs text-white/50">{e.jobTitle ?? "No title yet"}</p>
+                    <p className="text-xs text-fg/50">{e.jobTitle ?? "No title yet"}</p>
                   </div>
                 </div>
                 {canEdit(e) && (
                   <button onClick={(ev) => { ev.stopPropagation(); setEditing(e); }} aria-label={`Edit ${e.firstName}`}
-                    className="rounded-md p-1.5 text-white/40 hover:bg-white/5 hover:text-white">
+                    className="rounded-md p-1.5 text-fg/40 hover:bg-fg/5 hover:text-fg">
                     <Pencil className="h-4 w-4" />
                   </button>
                 )}
@@ -118,18 +118,18 @@ export default function PeoplePage() {
                 <Badge value={e.role} />
                 <Badge value={e.employmentStatus} />
                 {e.employmentType && (
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs capitalize text-white/70">
+                  <span className="rounded-full bg-fg/10 px-2 py-0.5 text-xs capitalize text-fg/70">
                     {typeLabel(e.employmentType)}
                   </span>
                 )}
               </div>
 
-              <dl className="flex flex-col gap-1.5 text-sm text-white/60">
-                <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-white/30" />{e.email}</div>
-                {deptName(e.departmentId) && <div className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5 text-white/30" />{deptName(e.departmentId)}</div>}
-                {e.phone && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-white/30" />{e.phone}</div>}
-                {e.workLocation && <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-white/30" />{e.workLocation}</div>}
-                {e.startDate && <div className="flex items-center gap-2"><Briefcase className="h-3.5 w-3.5 text-white/30" />Started {e.startDate}</div>}
+              <dl className="flex flex-col gap-1.5 text-sm text-fg/60">
+                <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-fg/30" />{e.email}</div>
+                {deptName(e.departmentId) && <div className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5 text-fg/30" />{deptName(e.departmentId)}</div>}
+                {e.phone && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-fg/30" />{e.phone}</div>}
+                {e.workLocation && <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-fg/30" />{e.workLocation}</div>}
+                {e.startDate && <div className="flex items-center gap-2"><Briefcase className="h-3.5 w-3.5 text-fg/30" />Started {e.startDate}</div>}
               </dl>
             </Card>
           ))}
@@ -229,17 +229,17 @@ function EmployeeDetailModal({
 
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h3 className="flex items-center gap-1.5 text-sm font-medium text-white/80">
+          <h3 className="flex items-center gap-1.5 text-sm font-medium text-fg/80">
             <ListChecks className="h-4 w-4 text-aqua" /> Onboarding
           </h3>
-          {total > 0 && <span className="text-xs text-white/40">{done}/{total} done</span>}
+          {total > 0 && <span className="text-xs text-fg/40">{done}/{total} done</span>}
         </div>
         {error && <Alert tone="error" className="mt-2">{error}</Alert>}
 
         {tasks === null ? (
           <Loader2 className="mt-3 h-5 w-5 animate-spin text-violet" />
         ) : tasks.length === 0 ? (
-          <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/50">
+          <div className="mt-3 rounded-lg border border-fg/10 bg-fg/5 p-3 text-sm text-fg/50">
             No onboarding tasks yet.
             {canManage && (
               <button onClick={() => api.seedOnboardingDefaults(employee.id).then(load)}
@@ -251,12 +251,12 @@ function EmployeeDetailModal({
             {tasks.map((t) => (
               <li key={t.id} className="flex items-center gap-2">
                 <button disabled={!canToggle} onClick={() => toggle(t)} className="disabled:opacity-40">
-                  {t.completed ? <CheckCircle2 className="h-5 w-5 text-emerald-400" /> : <Circle className="h-5 w-5 text-white/30" />}
+                  {t.completed ? <CheckCircle2 className="h-5 w-5 text-emerald-400" /> : <Circle className="h-5 w-5 text-fg/30" />}
                 </button>
-                <span className={`flex-1 text-sm ${t.completed ? "text-white/40 line-through" : "text-white/80"}`}>{t.title}</span>
+                <span className={`flex-1 text-sm ${t.completed ? "text-fg/40 line-through" : "text-fg/80"}`}>{t.title}</span>
                 {canManage && (
                   <button onClick={() => api.deleteOnboardingTask(t.id).then(load)} aria-label="Delete task"
-                    className="text-white/30 hover:text-red-300">
+                    className="text-fg/30 hover:text-red-300">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
@@ -279,8 +279,8 @@ function EmployeeDetailModal({
 function Detail({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-xs text-white/40">{label}</dt>
-      <dd className="text-white/80">{value || "—"}</dd>
+      <dt className="text-xs text-fg/40">{label}</dt>
+      <dd className="text-fg/80">{value || "—"}</dd>
     </div>
   );
 }
@@ -345,7 +345,7 @@ function EditEmployeeDialog({
   }
 
   const selectCls =
-    "h-11 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
+    "h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
 
   return (
     <Modal open onClose={onClose} title={`Edit ${employee.firstName} ${employee.lastName}`}>
@@ -369,28 +369,28 @@ function EditEmployeeDialog({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Employment type" htmlFor="employmentType">
                 <select id="employmentType" className={selectCls} value={form.employmentType} onChange={set("employmentType")}>
-                  <option value="" className="bg-ink">—</option>
-                  {TYPES.map((t) => <option key={t} value={t} className="bg-ink">{typeLabel(t)}</option>)}
+                  <option value="" className="bg-surface">—</option>
+                  {TYPES.map((t) => <option key={t} value={t} className="bg-surface">{typeLabel(t)}</option>)}
                 </select>
               </Field>
               <Field label="Status" htmlFor="employmentStatus">
                 <select id="employmentStatus" className={selectCls} value={form.employmentStatus} onChange={set("employmentStatus")}>
-                  {STATUSES.map((s) => <option key={s} value={s} className="bg-ink">{s.toLowerCase()}</option>)}
+                  {STATUSES.map((s) => <option key={s} value={s} className="bg-surface">{s.toLowerCase()}</option>)}
                 </select>
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Department" htmlFor="departmentId">
                 <select id="departmentId" className={selectCls} value={form.departmentId} onChange={set("departmentId")}>
-                  <option value="" className="bg-ink">—</option>
-                  {departments.map((d) => <option key={d.id} value={d.id} className="bg-ink">{d.name}</option>)}
+                  <option value="" className="bg-surface">—</option>
+                  {departments.map((d) => <option key={d.id} value={d.id} className="bg-surface">{d.name}</option>)}
                 </select>
               </Field>
               <Field label="Manager" htmlFor="managerId">
                 <select id="managerId" className={selectCls} value={form.managerId} onChange={set("managerId")}>
-                  <option value="" className="bg-ink">—</option>
+                  <option value="" className="bg-surface">—</option>
                   {coworkers.map((c) => (
-                    <option key={c.id} value={c.id} className="bg-ink">{c.firstName} {c.lastName}</option>
+                    <option key={c.id} value={c.id} className="bg-surface">{c.firstName} {c.lastName}</option>
                   ))}
                 </select>
               </Field>

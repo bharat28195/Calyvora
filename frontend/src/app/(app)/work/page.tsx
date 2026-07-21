@@ -37,7 +37,7 @@ export default function WorkPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Work</h1>
-          <p className="mt-1 text-white/50">
+          <p className="mt-1 text-fg/50">
             Projects and tasks. <Link href="/work/mine" className="text-violet hover:underline">My work →</Link>
           </p>
         </div>
@@ -50,23 +50,23 @@ export default function WorkPage() {
         <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
       ) : active.length === 0 ? (
         <Card className="mt-8 flex flex-col items-center gap-3 py-12 text-center">
-          <FolderKanban className="h-8 w-8 text-white/30" />
+          <FolderKanban className="h-8 w-8 text-fg/30" />
           <CardTitle>No projects yet</CardTitle>
-          <p className="text-sm text-white/50">Create your first project to start tracking work.</p>
+          <p className="text-sm text-fg/50">Create your first project to start tracking work.</p>
           <Button onClick={() => setOpen(true)} className="mt-2"><Plus className="h-4 w-4" /> New project</Button>
         </Card>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {active.map((p) => (
             <Link key={p.id} href={`/work/${p.id}`}>
-              <Card className="group h-full transition-colors hover:border-white/20">
+              <Card className="group h-full transition-colors hover:border-fg/20">
                 <div className="flex items-center justify-between">
                   <span className="rounded-md bg-violet/20 px-2 py-0.5 text-xs font-semibold text-violet">{p.key}</span>
-                  <ArrowRight className="h-4 w-4 text-white/20 transition-colors group-hover:text-white/60" />
+                  <ArrowRight className="h-4 w-4 text-fg/20 transition-colors group-hover:text-fg/60" />
                 </div>
                 <h3 className="mt-3 font-medium">{p.name}</h3>
-                {p.description && <p className="mt-1 line-clamp-2 text-sm text-white/50">{p.description}</p>}
-                <p className="mt-4 flex items-center gap-1.5 text-xs text-white/40">
+                {p.description && <p className="mt-1 line-clamp-2 text-sm text-fg/50">{p.description}</p>}
+                <p className="mt-4 flex items-center gap-1.5 text-xs text-fg/40">
                   <ListTodo className="h-3.5 w-3.5" />
                   {p.openTaskCount} open · {p.taskCount} total
                 </p>

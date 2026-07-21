@@ -6,7 +6,7 @@ type Tone = "error" | "success" | "info";
 const tones: Record<Tone, string> = {
   error: "border-red-500/30 bg-red-500/10 text-red-200",
   success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-  info: "border-white/15 bg-white/5 text-white/80",
+  info: "border-fg/15 bg-fg/5 text-fg/80",
 };
 
 export function Alert({

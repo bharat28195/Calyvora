@@ -85,10 +85,10 @@ function LoginInner() {
 
       {isLive && (
         <div className="mt-5">
-          <div className="flex items-center gap-3 text-xs text-white/30">
-            <span className="h-px flex-1 bg-white/10" />
+          <div className="flex items-center gap-3 text-xs text-fg/30">
+            <span className="h-px flex-1 bg-fg/10" />
             or
-            <span className="h-px flex-1 bg-white/10" />
+            <span className="h-px flex-1 bg-fg/10" />
           </div>
           <Button
             type="button"
@@ -101,15 +101,15 @@ function LoginInner() {
             {seeding && <Loader2 className="h-4 w-4 animate-spin" />}
             {seeding ? "Preparing your demo…" : "✨ Explore the live demo"}
           </Button>
-          <p className="mt-2 text-center text-xs text-white/40">
+          <p className="mt-2 text-center text-xs text-fg/40">
             Loads a fully populated company — no signup. One click.
           </p>
         </div>
       )}
 
-      <p className="mt-5 text-center text-sm text-white/50">
+      <p className="mt-5 text-center text-sm text-fg/50">
         New here?{" "}
-        <Link href="/register" className="text-white hover:underline">
+        <Link href="/register" className="text-fg hover:underline">
           Create a workspace
         </Link>
       </p>

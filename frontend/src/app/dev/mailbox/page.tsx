@@ -26,7 +26,7 @@ export default function MailboxPage() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <Mail className="h-6 w-6 text-aqua" /> Dev mailbox
           </h1>
-          <p className="mt-1 text-sm text-white/50">Mock emails (local dev only).</p>
+          <p className="mt-1 text-sm text-fg/50">Mock emails (local dev only).</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={refresh}>
@@ -53,7 +53,7 @@ export default function MailboxPage() {
         <div className="flex flex-col gap-3">
           {messages.map((m, i) => (
             <Card key={i} className="p-4">
-              <div className="flex items-center justify-between text-xs text-white/40">
+              <div className="flex items-center justify-between text-xs text-fg/40">
                 <span>To: {m.to}</span>
                 <span>{new Date(m.sentAt).toLocaleTimeString()}</span>
               </div>

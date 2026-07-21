@@ -66,7 +66,7 @@ export default function RegisterPage() {
         <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
         <CardTitle className="mt-4">Check your email</CardTitle>
         <CardDescription>
-          We sent a verification link to <span className="text-white">{values.email}</span>. Click it
+          We sent a verification link to <span className="text-fg">{values.email}</span>. Click it
           to activate your account, then log in.
         </CardDescription>
         <div className="mt-6 flex flex-col gap-2">
@@ -77,7 +77,7 @@ export default function RegisterPage() {
             </Link>{" "}
             to click your verification link.
           </Alert>
-          <Link href="/login" className="text-sm text-white/60 hover:text-white">
+          <Link href="/login" className="text-sm text-fg/60 hover:text-fg">
             Back to log in
           </Link>
         </div>
@@ -127,10 +127,10 @@ export default function RegisterPage() {
             <div className="flex h-1.5 flex-1 gap-1">
               {[0, 1, 2, 3].map((i) => (
                 <div key={i}
-                  className={`flex-1 rounded-full ${i < strength ? "bg-violet" : "bg-white/10"}`} />
+                  className={`flex-1 rounded-full ${i < strength ? "bg-violet" : "bg-fg/10"}`} />
               ))}
             </div>
-            <span className="w-16 text-right text-xs text-white/50">{STRENGTH_LABELS[strength]}</span>
+            <span className="w-16 text-right text-xs text-fg/50">{STRENGTH_LABELS[strength]}</span>
           </div>
         )}
 
@@ -140,9 +140,9 @@ export default function RegisterPage() {
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-white/50">
+      <p className="mt-5 text-center text-sm text-fg/50">
         Already have an account?{" "}
-        <Link href="/login" className="text-white hover:underline">
+        <Link href="/login" className="text-fg hover:underline">
           Log in
         </Link>
       </p>

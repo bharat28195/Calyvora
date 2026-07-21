@@ -34,13 +34,13 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="flex flex-col items-center gap-6 py-20 text-center sm:py-28">
-        <span className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-medium text-white/70">
+        <span className="rounded-full border border-fg/15 bg-fg/5 px-4 py-1.5 text-xs font-medium text-fg/70">
           The AI-Native Enterprise Operating System
         </span>
         <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
           Run your entire company on <span className="text-gradient">one platform</span>.
         </h1>
-        <p className="max-w-2xl text-lg text-white/70">
+        <p className="max-w-2xl text-lg text-fg/70">
           Replace the 20–40 disconnected tools you run for HR, work, and knowledge with a single
           system — one identity, one data fabric, one AI layer. Each app works independently, yet
           integrates natively.
@@ -58,10 +58,10 @@ export default function LandingPage() {
       {/* Pillars */}
       <section className="grid gap-6 py-12 sm:grid-cols-3">
         {pillars.map((p) => (
-          <div key={p.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <div key={p.title} className="rounded-2xl border border-fg/10 bg-fg/[0.03] p-6">
             <p.icon className="h-6 w-6 text-aqua" />
             <h3 className="mt-4 text-lg font-semibold">{p.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-white/60">{p.body}</p>
+            <p className="mt-2 text-sm leading-relaxed text-fg/60">{p.body}</p>
           </div>
         ))}
       </section>
@@ -71,26 +71,26 @@ export default function LandingPage() {
         <h2 className="text-center text-2xl font-semibold tracking-tight sm:text-3xl">
           Phase 1 ships three connected apps
         </h2>
-        <p className="mx-auto mt-3 max-w-xl text-center text-white/60">
+        <p className="mx-auto mt-3 max-w-xl text-center text-fg/60">
           Depth-first, not breadth-first. Each is excellent on its own — and multiplies when combined.
         </p>
         <div className="mt-10 grid gap-6 sm:grid-cols-3">
           {apps.map((a) => (
-            <div key={a.name} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <div key={a.name} className="rounded-2xl border border-fg/10 bg-fg/[0.03] p-6">
               <a.icon className="h-6 w-6 text-violet" />
               <h3 className="mt-4 text-lg font-semibold">{a.name}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/60">{a.desc}</p>
+              <p className="mt-2 text-sm leading-relaxed text-fg/60">{a.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="my-12 rounded-3xl border border-white/10 bg-gradient-to-br from-violet/20 to-aqua/10 p-10 text-center sm:p-16">
+      <section className="my-12 rounded-3xl border border-fg/10 bg-gradient-to-br from-violet/20 to-aqua/10 p-10 text-center sm:p-16">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           Create your company workspace
         </h2>
-        <p className="mx-auto mt-3 max-w-lg text-white/70">
+        <p className="mx-auto mt-3 max-w-lg text-fg/70">
           Register in under a minute, verify your email, and invite your team.
         </p>
         <div className="mt-8">
@@ -101,7 +101,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="mt-auto flex flex-col items-center justify-between gap-2 border-t border-white/10 py-8 text-sm text-white/40 sm:flex-row">
+      <footer className="mt-auto flex flex-col items-center justify-between gap-2 border-t border-fg/10 py-8 text-sm text-fg/40 sm:flex-row">
         <span>© {new Date().getFullYear()} Calyvora</span>
         <span>One platform · one identity · one AI layer</span>
       </footer>

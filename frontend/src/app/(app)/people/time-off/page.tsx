@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 
 const TYPES = ["VACATION", "SICK", "PERSONAL", "UNPAID"] as const;
 const selectCls =
-  "h-11 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
+  "h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
 
 export default function TimeOffPage() {
   const { me } = useSession();
@@ -61,9 +61,9 @@ export default function TimeOffPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Time off</h1>
-          <p className="mt-1 text-white/50">Request leave and track your balance.</p>
+          <p className="mt-1 text-fg/50">Request leave and track your balance.</p>
         </div>
-        <Link href="/people" className="text-sm text-white/60 hover:text-white">← Directory</Link>
+        <Link href="/people" className="text-sm text-fg/60 hover:text-fg">← Directory</Link>
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
@@ -80,12 +80,12 @@ export default function TimeOffPage() {
         <RequestForm onSubmitted={load} onError={setError} />
 
         <div>
-          <h2 className="text-sm font-medium uppercase tracking-wide text-white/40">My requests</h2>
+          <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">My requests</h2>
           <div className="mt-3 flex flex-col gap-2">
             {mine === null ? (
               <Card><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></Card>
             ) : mine.length === 0 ? (
-              <Card className="text-sm text-white/50">No requests yet.</Card>
+              <Card className="text-sm text-fg/50">No requests yet.</Card>
             ) : (
               mine.map((r) => (
                 <Card key={r.id} className="flex items-center justify-between p-4">
@@ -93,12 +93,12 @@ export default function TimeOffPage() {
                     <p className="text-sm">
                       <span className="capitalize">{r.type.toLowerCase()}</span> · {r.days}d
                     </p>
-                    <p className="text-xs text-white/50">{r.startDate} → {r.endDate}</p>
+                    <p className="text-xs text-fg/50">{r.startDate} → {r.endDate}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge value={r.status} />
                     {r.status === "PENDING" && (
-                      <button onClick={() => cancel(r.id)} className="text-xs text-white/40 hover:text-white">
+                      <button onClick={() => cancel(r.id)} className="text-xs text-fg/40 hover:text-fg">
                         Cancel
                       </button>
                     )}
@@ -113,16 +113,16 @@ export default function TimeOffPage() {
       {/* Admin approvals inbox */}
       {isAdmin && (
         <div className="mt-10">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-white/40">Approvals</h2>
+          <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Approvals</h2>
           <div className="mt-3 flex flex-col gap-2">
             {inbox.filter((r) => r.status === "PENDING").length === 0 ? (
-              <Card className="text-sm text-white/50">No requests waiting for approval.</Card>
+              <Card className="text-sm text-fg/50">No requests waiting for approval.</Card>
             ) : (
               inbox.filter((r) => r.status === "PENDING").map((r) => (
                 <Card key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div>
                     <p className="text-sm font-medium">{r.employeeName}</p>
-                    <p className="text-xs text-white/50">
+                    <p className="text-xs text-fg/50">
                       <span className="capitalize">{r.type.toLowerCase()}</span> · {r.days}d · {r.startDate} → {r.endDate}
                     </p>
                   </div>
@@ -147,9 +147,9 @@ export default function TimeOffPage() {
 function Stat({ label, value, highlight }: { label: string; value: string | null; highlight?: boolean }) {
   return (
     <Card>
-      <p className="text-sm text-white/50">{label}</p>
+      <p className="text-sm text-fg/50">{label}</p>
       {value === null ? (
-        <div className="mt-2 h-7 w-16 animate-pulse rounded bg-white/10" />
+        <div className="mt-2 h-7 w-16 animate-pulse rounded bg-fg/10" />
       ) : (
         <p className={`mt-1 text-2xl font-semibold ${highlight ? "text-violet" : ""}`}>{value}</p>
       )}
@@ -187,7 +187,7 @@ function RequestForm({ onSubmitted, onError }: { onSubmitted: () => void; onErro
       <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
         <Field label="Type" htmlFor="type">
           <select id="type" className={selectCls} value={type} onChange={(e) => setType(e.target.value as (typeof TYPES)[number])}>
-            {TYPES.map((t) => <option key={t} value={t} className="bg-ink">{t.toLowerCase()}</option>)}
+            {TYPES.map((t) => <option key={t} value={t} className="bg-surface">{t.toLowerCase()}</option>)}
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-3">

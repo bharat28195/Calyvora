@@ -64,7 +64,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-xl">
       <h1 className="text-2xl font-semibold tracking-tight">Company settings</h1>
-      <p className="mt-1 text-white/50">Configure your workspace.</p>
+      <p className="mt-1 text-fg/50">Configure your workspace.</p>
 
       <Card className="mt-8">
         <CardTitle>{me?.company.name}</CardTitle>
@@ -76,15 +76,15 @@ export default function SettingsPage() {
 
           <Field label="Timezone" htmlFor="timezone">
             <select id="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)}
-              className="h-11 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
-              {TIMEZONES.map((tz) => <option key={tz} value={tz} className="bg-ink">{tz}</option>)}
+              className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
+              {TIMEZONES.map((tz) => <option key={tz} value={tz} className="bg-surface">{tz}</option>)}
             </select>
           </Field>
 
           <Field label="Locale" htmlFor="locale">
             <select id="locale" value={locale} onChange={(e) => setLocale(e.target.value as (typeof LOCALES)[number])}
-              className="h-11 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
-              {LOCALES.map((l) => <option key={l} value={l} className="bg-ink">{l}</option>)}
+              className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
+              {LOCALES.map((l) => <option key={l} value={l} className="bg-surface">{l}</option>)}
             </select>
           </Field>
 
