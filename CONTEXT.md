@@ -145,7 +145,14 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
   full-text/tsvector search); People (payroll/comp, performance, accruals); Work (comments, subtasks,
   filters, sprints, notifications).
 - **Docs polish:** API.md, Database.md, Playwright happy-path E2E.
-- **Platform:** universal AI assistant across the three apps (RAG over Knowledge pages is a natural first target).
+- **Platform:** ~~universal AI assistant across the three apps~~ **SHIPPED 2026-07-21** (`com.calyvora.assistant`,
+  `POST /api/v1/assistant/ask`) — RAG over People/Work/Knowledge; offline grounded provider by default,
+  Claude when `ANTHROPIC_API_KEY` set. **Closes the Phase-1 exit criterion** (working cross-app assistant).
+
+## Demo features (2026-07-21) — make it demoable
+- **One-click seed:** `POST /api/v1/dev/seed-demo` (dev only) → "Northwind Robotics"; login page has an
+  **"Explore the live demo"** button (live mode) that seeds + signs in. Owner: `ava.chen@northwind.demo` / `demopass123`.
+- **Command center dashboard**, **global ⌘K search** (`/api/v1/search`), **AI assistant panel** (floating "Ask AI").
 
 ## 6. Key decisions (see DECISIONS.md / FOUNDER.md for full)
 - **SD-9**: build tool = **Maven** (was Gradle SD-7). Founder directive.

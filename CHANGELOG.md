@@ -4,6 +4,22 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-21 — Demo experience: seed data, command center, global search, AI assistant
+Four features to make the product demoable — a client should open onto a living, intelligent product.
+**8 new backend tests** (69 total), full suite green; frontend typechecks clean.
+
+- **One-click demo seed** (`POST /api/v1/dev/seed-demo`, disabled in prod): provisions "Northwind
+  Robotics" — 6 employees across 4 departments, an Atlas project with an active sprint (tasks spread
+  TODO/IN_PROGRESS/DONE) + backlog + 3 tickets, and an Engineering Handbook whose pages link back to
+  Work tasks. An "Explore the live demo" button on the login page seeds + signs in in one click.
+- **Cross-app command-center dashboard**: one summary call spanning People/Work/Knowledge KPIs + active
+  sprint progress, composed with the user's open tasks and recent pages.
+- **Global ⌘K search** (`GET /api/v1/search`): people, projects, tasks, tickets, spaces, and pages in
+  one grouped, tenant-scoped result; a debounced command palette in the app header.
+- **Cross-app AI assistant** (`POST /api/v1/assistant/ask`): plain-English questions answered from the
+  tenant's own data (RAG). Offline grounded provider by default (never fabricates); upgrades to Claude
+  automatically when `ANTHROPIC_API_KEY` is set. A floating "Ask AI" panel with grounded page sources.
+
 ### 2026-07-21 — Foundation hardening: Postgres Row-Level Security (SD-2a..d)
 Added a **database-enforced** tenant-isolation layer beneath the app's `TenantContext` checks, so a
 missed `company_id` filter (or an injection) can no longer leak another tenant's data. **1 new test**
