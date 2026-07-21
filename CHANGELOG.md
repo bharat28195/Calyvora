@@ -4,6 +4,14 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-21 — Light/dark theming
+The frontend was dark-only. Added semantic color tokens (`--app`/`--surface`/`--fg`) as CSS variables
+wired into Tailwind via `rgb(var(--x) / <alpha-value>)`, so every opacity modifier keeps working, and
+migrated all 28 components off hardcoded `text-white`/`bg-white`/`bg-ink`. Dark stays default; a light
+theme flips to a soft off-white canvas with crisp white surfaces. Sun/moon toggle in the header + auth
+pages, persisted in localStorage, with a no-flash script so light users never see a dark flash. White
+text is preserved on accent buttons for contrast. `next build` + `tsc` clean.
+
 ### 2026-07-21 — Demo experience: seed data, command center, global search, AI assistant
 Four features to make the product demoable — a client should open onto a living, intelligent product.
 **8 new backend tests** (69 total), full suite green; frontend typechecks clean.

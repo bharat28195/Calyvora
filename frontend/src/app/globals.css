@@ -27,7 +27,9 @@ html {
 }
 
 body {
-  @apply bg-app text-fg antialiased;
+  background-color: rgb(var(--app));
+  color: rgb(var(--fg));
+  -webkit-font-smoothing: antialiased;
   background-image:
     radial-gradient(60rem 40rem at 70% -10%, rgba(124, 92, 255, var(--glow-violet)), transparent 60%),
     radial-gradient(50rem 40rem at 10% 10%, rgba(34, 211, 238, var(--glow-aqua)), transparent 55%);
