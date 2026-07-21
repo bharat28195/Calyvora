@@ -30,6 +30,12 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     List<Task> findByAssigneeIdAndStatusNotOrderByDueDateAscCreatedAtAsc(UUID assigneeId, TaskStatus status);
 
+    long countByCompanyId(UUID companyId);
+
+    long countByCompanyIdAndStatus(UUID companyId, TaskStatus status);
+
+    long countByCompanyIdAndStatusNot(UUID companyId, TaskStatus status);
+
     @Query("select coalesce(max(t.number), 0) from Task t where t.projectId = :projectId")
     int maxNumberForProject(@Param("projectId") UUID projectId);
 }

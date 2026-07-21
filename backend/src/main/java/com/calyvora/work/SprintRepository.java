@@ -13,4 +13,6 @@ public interface SprintRepository extends JpaRepository<Sprint, UUID> {
     Optional<Sprint> findByIdAndCompanyId(UUID id, UUID companyId);
 
     Optional<Sprint> findByProjectIdAndStatus(UUID projectId, SprintStatus status);
+
+    List<Sprint> findByCompanyIdAndStatusOrderByStartDateAsc(UUID companyId, SprintStatus status);
 }

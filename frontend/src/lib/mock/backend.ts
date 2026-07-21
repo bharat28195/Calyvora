@@ -433,13 +433,31 @@ export const mockBackend = {
     const db = load();
     const user = requireSession(db, accessToken);
     const company = db.companies.find((c) => c.id === user.companyId)!;
+    const cid = user.companyId;
+    const mine = <T extends { companyId: string }>(rows: T[]) => rows.filter((r) => r.companyId === cid);
+    const activeSprintRow = mine(db.sprints).find((s) => s.status === "ACTIVE") ?? null;
+    const activeSprint = activeSprintRow
+      ? {
+          name: activeSprintRow.name,
+          total: db.tasks.filter((t) => t.sprintId === activeSprintRow.id).length,
+          done: db.tasks.filter((t) => t.sprintId === activeSprintRow.id && t.status === "DONE").length,
+        }
+      : null;
     return {
       companyName: company.name,
-      memberCount: db.users.filter((u) => u.companyId === user.companyId && u.status === "ACTIVE").length,
-      pendingInviteCount: db.invitations.filter(
-        (i) => i.status === "PENDING" && companyOfInvite(db, i.id) === user.companyId,
-      ).length,
       yourRole: user.role,
+      memberCount: db.users.filter((u) => u.companyId === cid && u.status === "ACTIVE").length,
+      pendingInviteCount: db.invitations.filter(
+        (i) => i.status === "PENDING" && companyOfInvite(db, i.id) === cid,
+      ).length,
+      departmentCount: mine(db.departments).length,
+      projectCount: mine(db.projects).length,
+      openTaskCount: mine(db.tasks).filter((t) => t.status !== "DONE").length,
+      doneTaskCount: mine(db.tasks).filter((t) => t.status === "DONE").length,
+      openTicketCount: mine(db.tickets).filter((t) => t.status === "OPEN" || t.status === "PENDING").length,
+      spaceCount: mine(db.spaces).length,
+      pageCount: mine(db.pages).length,
+      activeSprint,
     };
   },
 

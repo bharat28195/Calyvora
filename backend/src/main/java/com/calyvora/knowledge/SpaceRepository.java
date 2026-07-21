@@ -12,5 +12,7 @@ public interface SpaceRepository extends JpaRepository<Space, UUID> {
 
     Optional<Space> findByIdAndCompanyId(UUID id, UUID companyId);
 
+    long countByCompanyId(UUID companyId);
+
     boolean existsByCompanyIdAndKeyIgnoreCase(UUID companyId, String key);
 }

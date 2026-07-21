@@ -227,9 +227,21 @@ export interface Department {
 
 export interface DashboardSummary {
   companyName: string;
+  yourRole: Role;
+  // People
   memberCount: number;
   pendingInviteCount: number;
-  yourRole: Role;
+  departmentCount: number;
+  // Work
+  projectCount: number;
+  openTaskCount: number;
+  doneTaskCount: number;
+  openTicketCount: number;
+  // Knowledge
+  spaceCount: number;
+  pageCount: number;
+  // Active sprint progress (null when none running)
+  activeSprint: { name: string; total: number; done: number } | null;
 }
 
 export interface LoginResult {

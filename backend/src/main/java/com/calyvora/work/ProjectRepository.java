@@ -12,5 +12,7 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     Optional<Project> findByIdAndCompanyId(UUID id, UUID companyId);
 
+    long countByCompanyId(UUID companyId);
+
     boolean existsByCompanyIdAndKeyIgnoreCase(UUID companyId, String key);
 }

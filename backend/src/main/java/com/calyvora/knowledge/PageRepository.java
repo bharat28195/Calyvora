@@ -20,6 +20,8 @@ public interface PageRepository extends JpaRepository<Page, UUID> {
 
     long countBySpaceId(UUID spaceId);
 
+    long countByCompanyId(UUID companyId);
+
     /** Tenant-wide search over title + body (case-insensitive). */
     @Query("""
             select p from Page p

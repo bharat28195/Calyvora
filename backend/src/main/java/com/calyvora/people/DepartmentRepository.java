@@ -12,6 +12,8 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
 
     Optional<Department> findByIdAndCompanyId(UUID id, UUID companyId);
 
+    long countByCompanyId(UUID companyId);
+
     long countByParentId(UUID parentId);
 
     List<Department> findByParentId(UUID parentId);
