@@ -28,7 +28,12 @@ import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
 // Frontend-first: mock is the default. Set NEXT_PUBLIC_API_MODE=live to hit the real backend.
 const LIVE = process.env.NEXT_PUBLIC_API_MODE === "live";
+/** True when the app is wired to the real backend (enables demo seeding, dev mailbox, etc.). */
+export const isLive = LIVE;
 const BASE = "/api/v1";
+
+/** Credentials returned by the one-click demo seed. */
+export type DemoCredentials = { companyName: string; email: string; password: string; alreadySeeded: boolean };
 
 // Access token lives in memory only (Sprint1 §10) — never localStorage.
 let accessToken: string | null = null;
@@ -83,6 +88,21 @@ export const api = {
       : await mockBackend.refresh();
     auth.set(result.accessToken);
     return result;
+  },
+  /** One-click demo: provision a populated company (live backend), then sign in as its owner. */
+  async seedDemo(): Promise<DemoCredentials> {
+    if (!LIVE) {
+      throw new ApiError({
+        timestamp: "", status: 400, code: "VALIDATION_ERROR",
+        message: "Demo data needs the live backend. Set NEXT_PUBLIC_API_MODE=live and start the backend.",
+      });
+    }
+    const creds = await http<DemoCredentials>("/dev/seed-demo", { method: "POST" });
+    const result = await http<LoginResult>("/auth/login", {
+      method: "POST", body: JSON.stringify({ email: creds.email, password: creds.password }),
+    });
+    auth.set(result.accessToken);
+    return creds;
   },
   async logout() {
     try {
