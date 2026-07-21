@@ -10,7 +10,7 @@
 > (ISO `YYYY-MM-DD`) and a stable ID (`PD-##` product, `ADR-##` architecture) so we can
 > cross-reference. Dates are absolute, never "last week."
 
-**Last updated:** 2026-07-21 · **Stage:** **Sprint 1 ✅ · People OS ✅ · Work OS ✅ (+depth) · Knowledge OS ✅ · Foundation hardening ✅** — the Phase-1 trio on one platform, plus the deferred Sprint-1 security debt now cleared (Postgres RLS + RS256 JWT with rotation); 61 tests, verified live
+**Last updated:** 2026-07-22 · **Product: Orbit (by Calyvora)** · **Branch:** `feature/orbit` · **Stage:** Phase-1 trio ✅ · Work OS depth ✅ · Foundation hardening (RLS + RS256) ✅ · Demo suite (seed/dashboard/⌘K search/AI assistant) ✅ · Theming ✅ · **Founder-feedback buckets A + B + C.1 ✅** (in progress, see [docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)) — 74 backend tests, verified live
 
 ---
 
@@ -59,6 +59,27 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > Running log of the founder's and co-founder's thinking — ideas, observed problems, competitor
 > inspiration, opportunities, and open questions. Newest first.
+
+**2026-07-22 (The product gets a name — "Orbit" — and the founder's feedback becomes the roadmap)**
+- **Named the product: Orbit; Calyvora is the parent company.** The founder decided the OS itself needs
+  its own brand distinct from the company. We shortlisted Orbit / Nexus / Cortex / Meridian and the
+  founder chose **Orbit** — everything revolves around one platform. Wired it as a one-line switch
+  (`frontend/src/lib/brand.ts`) so the whole UI reads "Orbit by Calyvora". This also unlocks the
+  packaging idea below (a named product a client can buy in whole or in part).
+- **Turned 8 pages of handwritten notes into a tracked, living backlog.** The founder handed over
+  detailed product feedback; rather than cherry-pick, we transcribed every item into
+  [docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md) with per-item status, so no idea
+  is lost and any session can resume. Sequenced into buckets A (quick wins), B (role dashboards +
+  attendance), C (People OS depth), D (new modules). **Discipline over speed: capture everything, ship
+  in reviewable slices.**
+- **Shipped A + B + C.1 already, each tested and live.** Fixed the real bug (members dropdown → a
+  searchable picker that scales to ~1k), moved navigation to a left sidebar, made attendance *derived
+  from leave* first (a phased, low-regret call the founder approved) before committing to a full daily
+  attendance model, and built the most-emphasized item — **salary, yearly hikes, and payslips** — as
+  Owner/Admin-only compensation with real hike-% history.
+- **A phasing decision worth remembering (attendance).** The founder asked for present/on-leave and a
+  leave calendar. Rather than model daily attendance up front, we derive it from approved leave now and
+  deferred the full daily-attendance record to Bucket C — the founder explicitly chose "both, phased."
 
 **2026-07-21 (Foundation debt cleared — RLS + RS256 before more features)**
 - **The database now enforces tenant isolation itself (SD-2).** Until today, one tenant not seeing
@@ -228,6 +249,14 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 ## 3. Product Decisions
 
 > One entry per major product decision. Newest first.
+
+### PD-08 · 2026-07-22 · Product named "Orbit"; Calyvora becomes the parent company
+- **Decision:** the Enterprise OS product is branded **Orbit**; **Calyvora** is the parent company. UI
+  reads "Orbit by Calyvora". Implemented as a single switch in `frontend/src/lib/brand.ts`.
+- **Why:** the founder wants a product identity distinct from the company, and a named product a client
+  can license in whole or in part (the modular-packaging idea, BR3 in the feedback backlog).
+- **Alternatives considered:** Nexus, Cortex, Meridian (shortlist offered); founder chose Orbit.
+- **Related open item:** BR3 modular packaging / per-tenant module entitlements — not yet built.
 
 ### PD-06 · 2026-07-20 · Knowledge OS is the third app; it closes the task↔doc↔person graph
 - **Decision:** Build **Knowledge OS** (spaces + Markdown pages + search) as the third Phase-1 app,

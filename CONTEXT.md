@@ -5,7 +5,20 @@
 > Binding architecture = [/docs](docs/README.md). Narrative/decisions = [FOUNDER.md](FOUNDER.md) /
 > [DECISIONS.md](DECISIONS.md). This file = practical "how to pick up where we left off."
 
-**Last updated:** 2026-07-20 · **Current focus:** **Phase-1 trio COMPLETE** (People/Work/Knowledge) **+ Work OS deepened** into a Sprints/Backlog/Tickets workspace (Sprint 5). Three full apps on the platform, **58 backend tests**, all verified live. Cross-app graph proven end-to-end: a Knowledge page's author is a People employee and links a Work task (task ↔ doc ↔ person); Work task & ticket assignees are People employees.
+**Last updated:** 2026-07-22 · **Branch:** `feature/orbit` · **Product name: "Orbit" (by Calyvora — parent co.).**
+
+**Current focus — Founder feedback buckets (see [docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)):**
+Working through the founder's 8-page handwritten notes (2026-07-22). Done so far: **Bucket A** (quick wins:
+searchable member picker, always-on Knowledge search, selectable sprint types, **left sidebar nav**, wordmark),
+**branding** (product = **Orbit**), **Bucket B** (role-based dashboard + team overview: headcount, present vs
+on-leave, leave reasons, **leave calendar** — attendance *derived from leave*, phase 1), **Bucket C.1**
+(**salary + hike history + payslips**, Owner/Admin-only, V13). **74 backend tests, all live & verified.**
+**Next:** C.2 richer employee profile (working-on / start-end / skills / ratings) → C.3 performance+goals →
+C.4 full daily attendance (phase 2) → Bucket D (Clients ⭐, Documents+templates, Notifications, Inbox).
+
+**Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
+RS256 SD-5) + **demo suite** (one-click seed, cross-app dashboard, ⌘K global search, AI assistant) +
+**light/dark theming**. Cross-app graph proven (task ↔ doc ↔ person).
 
 ---
 

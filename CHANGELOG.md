@@ -4,6 +4,32 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-22 — Product named **Orbit** (by Calyvora)
+The product now has its own name — **Orbit** — with **Calyvora as the parent company**. Central
+`frontend/src/lib/brand.ts` drives a `Wordmark` ("Orbit by Calyvora") across the sidebar + auth pages;
+page `<title>` updated. Switching the name later is a one-line change.
+
+### 2026-07-22 — Founder feedback: Bucket C.1 — salary, hikes & payslips (Owner/Admin)
+Compensation for People OS. `compensation_records` (Flyway **V13**, RLS-protected) stores point-in-time
+salary; the latest is current pay. `GET/POST /api/v1/people/employees/{id}/compensation` returns current
+pay + full history with per-record **hike %** ("how much hike we've provided"); `GET .../payslip?month=`
+generates a payslip (basic/HRA/special · PF/tax · net) from current salary. All Owner/Admin-only. Employee
+detail gains a **Compensation** section (salary, hike-history badges, add-raise, payslip w/ month picker).
+Demo seeds an initial salary + review hike per employee. 3 new tests.
+
+### 2026-07-22 — Founder feedback: Bucket B — role-based dashboard + team overview
+Dashboard is now role-aware: company KPIs + a **Team overview** are Owner/Admin-only (members get the
+personal view). `GET /api/v1/dashboard/team` returns total employees, present vs on-leave today (**derived
+from approved leave** — attendance phase 1), who's out + reason, and month leaves for a **leave calendar**.
+2 new tests.
+
+### 2026-07-22 — Founder feedback: Bucket A — quick wins + members bug
+- **Left sidebar navigation** ("put all tabs on the left") with icons + active state; mobile fallback.
+- **Searchable member picker** (`MemberSelect`) replaces the plain assignee dropdown on tasks & tickets —
+  filters all company members, usable at ~1k people (fixes "members dropdown not working").
+- **Always-on Knowledge search** — reusable `KnowledgeSearch` on the index **and** inside every space.
+- **Selectable sprint types** (1 week / 2 weeks / 1 month / custom) auto-fill the sprint end date.
+
 ### 2026-07-21 — Light/dark theming
 The frontend was dark-only. Added semantic color tokens (`--app`/`--surface`/`--fg`) as CSS variables
 wired into Tailwind via `rgb(var(--x) / <alpha-value>)`, so every opacity modifier keeps working, and
