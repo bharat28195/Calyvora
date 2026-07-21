@@ -4,7 +4,7 @@
  * "<Product> by Calyvora" everywhere. Until a name is picked, product === parent.
  */
 export const brand = {
-  product: "Calyvora",
+  product: "Orbit",
   parent: "Calyvora",
 };
 

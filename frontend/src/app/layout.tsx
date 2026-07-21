@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Calyvora — The AI-Native Enterprise OS",
+  title: "Orbit — The AI-Native Enterprise OS · by Calyvora",
   description:
-    "One platform, one identity, one data fabric, one AI layer. Replace the 20–40 disconnected tools you run with a single AI-native Enterprise Operating System.",
+    "Orbit by Calyvora — one platform, one identity, one data fabric, one AI layer. Replace the 20–40 disconnected tools you run with a single AI-native Enterprise Operating System.",
 };
 
 // Runs before first paint so a light-theme preference doesn't flash dark.

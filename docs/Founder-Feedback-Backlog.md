@@ -70,11 +70,11 @@
 
 | # | Item | Source | Status | Notes |
 |---|------|--------|--------|-------|
-| BR1 | **Product name** — the OS gets its own name; **Calyvora = parent company** | p5 | 🔜 | Founder wants **name suggestions**. Wired `brand.ts` (`product`/`parent`) + `Wordmark` so it flips in one place once chosen. |
-| BR2 | **Add product name** to the UI | p5 | 🔜 | Same as BR1; wordmark shows "<Product> by Calyvora" once product ≠ parent. |
+| BR1 | **Product name** — the OS gets its own name; **Calyvora = parent company** | p5 | ✅ | **Product = "Orbit", parent = "Calyvora"** (founder pick 2026-07-22). Set in `frontend/src/lib/brand.ts`. |
+| BR2 | **Add product name** to the UI | p5 | ✅ | Wordmark shows "**Orbit** by Calyvora" (sidebar + auth pages); page `<title>` updated. |
 | BR3 | **Modular packaging / presets** — let a client buy just one module; a preset/selector so modules can be toggled per customer; "if user goes to that tab he can select" | p5–6 | ⬜ | Per-tenant module entitlements + a selection UI. Larger platform work. |
 
-**Product-name shortlist (proposed 2026-07-22 — awaiting founder pick):** _to be recorded here once presented._
+**Product name (decided 2026-07-22):** **Orbit** — by Calyvora. Shortlist offered: Orbit ✓, Nexus, Cortex, Meridian.
 
 ---
 
