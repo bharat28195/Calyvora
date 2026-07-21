@@ -12,6 +12,7 @@ import {
   type SearchGroup,
   type SearchHit,
   type AssistantResponse,
+  type TeamOverview,
   type Department,
   type Employee,
   type Invitation,
@@ -462,6 +463,37 @@ export const mockBackend = {
       spaceCount: mine(db.spaces).length,
       pageCount: mine(db.pages).length,
       activeSprint,
+    };
+  },
+
+  async teamOverview(accessToken: string | null): Promise<TeamOverview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const cid = user.companyId;
+    const headcount = db.users.filter((u) => u.companyId === cid && u.status === "ACTIVE").length;
+    const nameOf = (employeeId: string) => {
+      const emp = db.employees.find((e) => e.id === employeeId);
+      const u = emp && db.users.find((x) => x.id === emp.userId);
+      return u ? `${u.firstName} ${u.lastName}` : "Someone";
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    const first = today.slice(0, 8) + "01";
+    const lastDay = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0).getDate();
+    const last = `${today.slice(0, 8)}${String(lastDay).padStart(2, "0")}`;
+    const leaves = db.leave.filter((l) => l.companyId === cid);
+    const outToday = leaves
+      .filter((l) => l.status === "APPROVED" && l.startDate <= today && l.endDate >= today)
+      .map((l) => ({ employeeName: nameOf(l.employeeId), type: l.type, reason: l.reason, startDate: l.startDate, endDate: l.endDate }));
+    const monthLeaves = leaves
+      .filter((l) => (l.status === "APPROVED" || l.status === "PENDING") && l.startDate <= last && l.endDate >= first)
+      .map((l) => ({ employeeName: nameOf(l.employeeId), type: l.type, status: l.status, startDate: l.startDate, endDate: l.endDate }));
+    return {
+      headcount,
+      onLeaveToday: outToday.length,
+      presentToday: Math.max(0, headcount - outToday.length),
+      outToday,
+      monthLeaves,
     };
   },
 

@@ -276,6 +276,28 @@ export interface AssistantResponse {
   sources: AssistantSource[];
 }
 
+export interface LeaveTodayEntry {
+  employeeName: string;
+  type: string;
+  reason: string | null;
+  startDate: string;
+  endDate: string;
+}
+export interface CalendarLeave {
+  employeeName: string;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+export interface TeamOverview {
+  headcount: number;
+  presentToday: number;
+  onLeaveToday: number;
+  outToday: LeaveTodayEntry[];
+  monthLeaves: CalendarLeave[];
+}
+
 /** Shape of the one API error envelope (Sprint1 §13). */
 export interface ApiErrorBody {
   timestamp: string;

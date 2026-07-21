@@ -11,6 +11,7 @@ import { useSession } from "@/hooks/useSession";
 import type { DashboardSummary, Task, PageSummary } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { TeamOverviewSection } from "@/components/dashboard/team-overview";
 
 export default function DashboardPage() {
   const { me } = useSession();
@@ -45,17 +46,21 @@ export default function DashboardPage() {
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
-      {/* Cross-app KPI tiles */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={<Users className="h-5 w-5 text-violet" />} label="People" value={summary?.memberCount}
-          sub={`${summary?.departmentCount ?? 0} departments`} href="/people" loading={loading} />
-        <Stat icon={<CircleDot className="h-5 w-5 text-aqua" />} label="Open tasks" value={summary?.openTaskCount}
-          sub={`${summary?.doneTaskCount ?? 0} done`} href="/work" loading={loading} />
-        <Stat icon={<LifeBuoy className="h-5 w-5 text-amber-400" />} label="Open tickets" value={summary?.openTicketCount}
-          sub={`${summary?.projectCount ?? 0} projects`} href="/work" loading={loading} />
-        <Stat icon={<BookOpen className="h-5 w-5 text-emerald-400" />} label="Knowledge pages" value={summary?.pageCount}
-          sub={`${summary?.spaceCount ?? 0} spaces`} href="/knowledge" loading={loading} />
-      </div>
+      {/* Company-wide KPIs + team overview are Owner/Admin only (founder feedback B1). */}
+      {isAdmin && (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat icon={<Users className="h-5 w-5 text-violet" />} label="People" value={summary?.memberCount}
+            sub={`${summary?.departmentCount ?? 0} departments`} href="/people" loading={loading} />
+          <Stat icon={<CircleDot className="h-5 w-5 text-aqua" />} label="Open tasks" value={summary?.openTaskCount}
+            sub={`${summary?.doneTaskCount ?? 0} done`} href="/work" loading={loading} />
+          <Stat icon={<LifeBuoy className="h-5 w-5 text-amber-400" />} label="Open tickets" value={summary?.openTicketCount}
+            sub={`${summary?.projectCount ?? 0} projects`} href="/work" loading={loading} />
+          <Stat icon={<BookOpen className="h-5 w-5 text-emerald-400" />} label="Knowledge pages" value={summary?.pageCount}
+            sub={`${summary?.spaceCount ?? 0} spaces`} href="/knowledge" loading={loading} />
+        </div>
+      )}
+
+      {isAdmin && <TeamOverviewSection />}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* My open work */}

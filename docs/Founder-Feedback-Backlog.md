@@ -28,12 +28,12 @@
 
 | # | Item | Source | Status | Notes |
 |---|------|--------|--------|-------|
-| B1 | **Different dashboards for member/employee vs admin/owner** | p4 | ⬜ | Role-aware dashboard content. |
-| B2 | **Owner: total employees count** | p1 | ⬜ | Headcount tile (have `memberCount` already — surface prominently in owner view). |
-| B3 | **Owner: on-leave vs present count** | p1 | ⬜ | Needs attendance/leave-today aggregation. |
-| B4 | **Owner: reason for leave** | p1 | ⬜ | Surface leave reasons (leave requests already store type/reason). |
-| B5 | **Leave days shown on a calendar** ("how many days in calendar") | p1 | ⬜ | Calendar view of leave/attendance. |
-| B6 | **Attendance option** (present as a feature/preset) | p6 | ⬜ | New Attendance concept (present/absent/on-leave per day). Likely People OS. |
+| B1 | **Different dashboards for member/employee vs admin/owner** | p4 | ✅ | Company KPIs + Team overview are Owner/Admin-only; members get the personal view. |
+| B2 | **Owner: total employees count** | p1 | ✅ | "Total employees" tile in Team overview. |
+| B3 | **Owner: on-leave vs present count** | p1 | ✅ | Present vs on-leave-today tiles, derived from approved leave (`GET /dashboard/team`). |
+| B4 | **Owner: reason for leave** | p1 | ✅ | "Out today" list shows name + leave type + reason. |
+| B5 | **Leave days shown on a calendar** ("how many days in calendar") | p1 | ✅ | Month leave calendar (amber days = someone on leave, ring = today). |
+| B6 | **Attendance option** (present as a feature/preset) | p6 | 🔜 (phase 1) | **Decision: "both, phased."** Phase 1 shipped = attendance *derived from leave*. Phase 2 (full daily attendance record + marking UI) deferred to Bucket C alongside payroll. |
 
 ---
 

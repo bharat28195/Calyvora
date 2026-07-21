@@ -5,6 +5,7 @@ import {
   type ApiErrorBody,
   type CompanySettings,
   type DashboardSummary,
+  type TeamOverview,
   type Department,
   type Employee,
   type Invitation,
@@ -121,6 +122,9 @@ export const api = {
   // --- dashboard ---
   dashboardSummary(): Promise<DashboardSummary> {
     return LIVE ? http<DashboardSummary>("/dashboard/summary") : mockBackend.dashboardSummary(accessToken);
+  },
+  teamOverview(): Promise<TeamOverview> {
+    return LIVE ? http<TeamOverview>("/dashboard/team") : mockBackend.teamOverview(accessToken);
   },
 
   // --- company / settings ---
