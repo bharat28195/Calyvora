@@ -13,6 +13,8 @@ import {
   type SearchHit,
   type AssistantResponse,
   type TeamOverview,
+  type Compensation,
+  type Payslip,
   type Department,
   type Employee,
   type Invitation,
@@ -463,6 +465,49 @@ export const mockBackend = {
       spaceCount: mine(db.spaces).length,
       pageCount: mine(db.pages).length,
       activeSprint,
+    };
+  },
+
+  async compensation(accessToken: string | null, employeeId: string): Promise<Compensation> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    return buildCompensation(db, employeeId);
+  },
+
+  async addCompensation(accessToken: string | null, employeeId: string,
+    input: { annualAmount: number; effectiveDate?: string; currency?: string; reason?: string }): Promise<Compensation> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    const existing = mockComp[employeeId] ?? [];
+    const type = existing.length === 0 ? "INITIAL" : input.annualAmount > existing[0].annualAmount ? "HIKE" : "ADJUSTMENT";
+    existing.unshift({
+      id: crypto.randomUUID(),
+      effectiveDate: input.effectiveDate || new Date().toISOString().slice(0, 10),
+      annualAmount: input.annualAmount,
+      changeType: type,
+      reason: input.reason || null,
+      currency: (input.currency || "USD").toUpperCase(),
+    });
+    mockComp[employeeId] = existing.sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
+    return buildCompensation(db, employeeId);
+  },
+
+  async payslip(accessToken: string | null, employeeId: string, month?: string): Promise<Payslip> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    const comp = buildCompensation(db, employeeId);
+    if (comp.currentAnnual == null) throw new ApiError({ timestamp: "", status: 404, code: "NOT_FOUND", message: "No salary on record" });
+    const gross = round2(comp.currentAnnual / 12);
+    const basic = round2(gross * 0.5), hra = round2(gross * 0.25), special = round2(gross - basic - hra);
+    const pf = round2(basic * 0.12), tax = round2(gross * 0.1);
+    return {
+      employeeId, employeeName: comp.employeeName, month: month || new Date().toISOString().slice(0, 7), currency: comp.currency,
+      earnings: [{ label: "Basic", amount: basic }, { label: "House rent allowance", amount: hra }, { label: "Special allowance", amount: special }],
+      deductions: [{ label: "Provident fund", amount: pf }, { label: "Income tax", amount: tax }],
+      gross, totalDeductions: round2(pf + tax), net: round2(gross - pf - tax),
     };
   },
 
@@ -1660,4 +1705,36 @@ function applyPatch(row: EmployeeRow, patch: Partial<Employee>): void {
       row[f] = patch[f] === "" ? null : patch[f];
     }
   }
+}
+
+// --- compensation (mock, in-memory; resets on reload) -----------------------
+type MockCompEntry = {
+  id: string; effectiveDate: string; annualAmount: number;
+  changeType: string; reason: string | null; currency: string;
+};
+const mockComp: Record<string, MockCompEntry[]> = {};
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function buildCompensation(db: DB, employeeId: string): Compensation {
+  const emp = db.employees.find((e) => e.id === employeeId);
+  const u = emp && db.users.find((x) => x.id === emp.userId);
+  const name = u ? `${u.firstName} ${u.lastName}` : "Employee";
+  const records = (mockComp[employeeId] ?? []).slice().sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
+  const history = records.map((r, i) => {
+    const older = records[i + 1];
+    const hikeAmount = older ? round2(r.annualAmount - older.annualAmount) : null;
+    const hikePercent = older && older.annualAmount > 0 ? round2(((r.annualAmount - older.annualAmount) / older.annualAmount) * 100) : null;
+    return { id: r.id, effectiveDate: r.effectiveDate, annualAmount: r.annualAmount, changeType: r.changeType, reason: r.reason, hikeAmount, hikePercent };
+  });
+  const current = records[0] ?? null;
+  return {
+    employeeId, employeeName: name, currency: current?.currency ?? "USD",
+    currentAnnual: current?.annualAmount ?? null,
+    currentMonthly: current ? round2(current.annualAmount / 12) : null,
+    effectiveDate: current?.effectiveDate ?? null,
+    history,
+  };
 }

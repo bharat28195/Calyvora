@@ -298,6 +298,40 @@ export interface TeamOverview {
   monthLeaves: CalendarLeave[];
 }
 
+export interface CompensationEntry {
+  id: string;
+  effectiveDate: string;
+  annualAmount: number;
+  changeType: string;
+  reason: string | null;
+  hikeAmount: number | null;
+  hikePercent: number | null;
+}
+export interface Compensation {
+  employeeId: string;
+  employeeName: string;
+  currency: string;
+  currentAnnual: number | null;
+  currentMonthly: number | null;
+  effectiveDate: string | null;
+  history: CompensationEntry[];
+}
+export interface PayslipLine {
+  label: string;
+  amount: number;
+}
+export interface Payslip {
+  employeeId: string;
+  employeeName: string;
+  month: string;
+  currency: string;
+  earnings: PayslipLine[];
+  deductions: PayslipLine[];
+  gross: number;
+  totalDeductions: number;
+  net: number;
+}
+
 /** Shape of the one API error envelope (Sprint1 §13). */
 export interface ApiErrorBody {
   timestamp: string;

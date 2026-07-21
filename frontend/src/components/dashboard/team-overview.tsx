@@ -48,7 +48,7 @@ export function TeamOverviewSection() {
                 </div>
               ))
             ) : (
-              <p className="py-6 text-sm text-fg/40">Everyone's present today. 🎉</p>
+              <p className="py-6 text-sm text-fg/40">Everyone is present today. 🎉</p>
             )}
           </div>
         </Card>

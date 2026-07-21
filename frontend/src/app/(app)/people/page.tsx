@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Pencil, Search, Mail, Phone, MapPin, Briefcase, Building2, ListChecks, Plus, Trash2, CheckCircle2, Circle } from "lucide-react";
+import { Loader2, Pencil, Search, Mail, Phone, MapPin, Briefcase, Building2, ListChecks, Plus, Trash2, CheckCircle2, Circle, Wallet } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import type { Department, Employee, OnboardingTask } from "@/lib/types";
@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { EmployeeCompensation } from "@/components/people/employee-compensation";
 
 const TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"] as const;
 const STATUSES = ["ONBOARDING", "ACTIVE", "TERMINATED"] as const;
@@ -226,6 +227,15 @@ function EmployeeDetailModal({
         <Detail label="Type" value={employee.employmentType ? typeLabel(employee.employmentType) : null} />
         <Detail label="Started" value={employee.startDate} />
       </dl>
+
+      {admin && (
+        <div className="mt-6">
+          <h3 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-fg/80">
+            <Wallet className="h-4 w-4 text-emerald-400" /> Compensation
+          </h3>
+          <EmployeeCompensation employeeId={employee.id} />
+        </div>
+      )}
 
       <div className="mt-6">
         <div className="flex items-center justify-between">

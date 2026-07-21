@@ -80,6 +80,7 @@ public class DemoSeedService {
     private final TicketService ticketService;
     private final SpaceService spaceService;
     private final PageService pageService;
+    private final com.calyvora.people.CompensationRepository compensationRepository;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -87,7 +88,9 @@ public class DemoSeedService {
                            DepartmentService departmentService, EmployeeService employeeService,
                            ProjectService projectService, SprintService sprintService,
                            TaskService taskService, TicketService ticketService,
-                           SpaceService spaceService, PageService pageService) {
+                           SpaceService spaceService, PageService pageService,
+                           com.calyvora.people.CompensationRepository compensationRepository) {
+        this.compensationRepository = compensationRepository;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
         this.userRepository = userRepository;
@@ -147,6 +150,14 @@ public class DemoSeedService {
         profile(emp, leo.getEmail(), "Product Designer", design.id(), null, "2022-09-12");
         profile(emp, sara.getEmail(), "Support Specialist", support.id(), null, "2023-02-20");
         profile(emp, tom.getEmail(), "Sales Manager", sales.id(), null, "2021-11-08");
+
+        // Compensation history (initial salary + a review hike) so salary/hikes/payslips look real.
+        seedComp(emp, OWNER_EMAIL, 220000, owner);
+        seedComp(emp, marcus.getEmail(), 180000, owner);
+        seedComp(emp, priya.getEmail(), 145000, owner);
+        seedComp(emp, leo.getEmail(), 120000, owner);
+        seedComp(emp, sara.getEmail(), 92000, owner);
+        seedComp(emp, tom.getEmail(), 135000, owner);
 
         // --- Work: project, active sprint, tasks, tickets -------------------
         ProjectResponse atlas = projectService.create(new CreateProjectRequest(
@@ -239,6 +250,19 @@ public class DemoSeedService {
         EmployeeResponse e = emp.get(email);
         employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
                 null, title, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate));
+    }
+
+    private void seedComp(Map<String, EmployeeResponse> emp, String email, long currentAnnual, AuthPrincipal owner) {
+        UUID employeeId = UUID.fromString(emp.get(email).id());
+        long initial = Math.round(currentAnnual / 1.11);   // ~11% review hike a year ago
+        compensationRepository.save(new com.calyvora.people.CompensationRecord(
+                UUID.randomUUID(), owner.companyId(), employeeId, LocalDate.now().minusYears(2),
+                java.math.BigDecimal.valueOf(initial), "USD",
+                com.calyvora.people.CompensationChangeType.INITIAL, "Starting salary", owner.userId()));
+        compensationRepository.save(new com.calyvora.people.CompensationRecord(
+                UUID.randomUUID(), owner.companyId(), employeeId, LocalDate.now().minusYears(1),
+                java.math.BigDecimal.valueOf(currentAnnual), "USD",
+                com.calyvora.people.CompensationChangeType.HIKE, "Annual review raise", owner.userId()));
     }
 
     private static CreateDepartmentRequest dept(String name, UUID leadUserId) {

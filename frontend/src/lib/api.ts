@@ -6,6 +6,8 @@ import {
   type CompanySettings,
   type DashboardSummary,
   type TeamOverview,
+  type Compensation,
+  type Payslip,
   type Department,
   type Employee,
   type Invitation,
@@ -381,6 +383,22 @@ export const api = {
   },
   myPages(): Promise<PageSummary[]> {
     return LIVE ? http<PageSummary[]>("/knowledge/pages/mine") : mockBackend.myPages(accessToken);
+  },
+
+  // --- compensation & payslips (People OS; admin only) ---
+  compensation(employeeId: string): Promise<Compensation> {
+    return LIVE ? http<Compensation>(`/people/employees/${employeeId}/compensation`)
+      : mockBackend.compensation(accessToken, employeeId);
+  },
+  addCompensation(employeeId: string, input: { annualAmount: number; effectiveDate?: string; currency?: string; reason?: string }): Promise<Compensation> {
+    return LIVE
+      ? http<Compensation>(`/people/employees/${employeeId}/compensation`, { method: "POST", body: JSON.stringify(input) })
+      : mockBackend.addCompensation(accessToken, employeeId, input);
+  },
+  payslip(employeeId: string, month?: string): Promise<Payslip> {
+    const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+    return LIVE ? http<Payslip>(`/people/employees/${employeeId}/payslip${qs}`)
+      : mockBackend.payslip(accessToken, employeeId, month);
   },
   searchPages(q: string): Promise<PageSummary[]> {
     return LIVE

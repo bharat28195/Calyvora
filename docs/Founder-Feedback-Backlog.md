@@ -41,9 +41,9 @@
 
 | # | Item | Source | Status | Notes |
 |---|------|--------|--------|-------|
-| C1 | **Salary tab** — full salary, all salary details | p1–2 | ⬜ | New salary/compensation area (People OS). Sensitive — RBAC (owner/admin only). |
-| C2 | **Yearly hike / hike history** ("how much hike we have provided") | p1–2 | ⬜ | Comp history with raises over time. |
-| C3 | **Employee payslip** — salary everything in one place | p7 | ⬜ | Generate/view payslips. |
+| C1 | **Salary tab** — full salary, all salary details | p1–2 | ✅ | `compensation_records` (V13, RLS) + `GET/POST /people/employees/{id}/compensation`; Compensation section on the employee detail (Owner/Admin only). Add-raise inline form. |
+| C2 | **Yearly hike / hike history** ("how much hike we have provided") | p1–2 | ✅ | Full history with per-record **hike %** badges (derived from consecutive records). Demo seeded with initial + review hike. |
+| C3 | **Employee payslip** — salary everything in one place | p7 | ✅ | `GET /people/employees/{id}/payslip?month=` — computed breakdown (basic/HRA/special · PF/tax · net). Payslip card with month picker. |
 | C4 | **Richer employee profile**: what he/she is working on · when started / end date · delay vs advance · how they're performing | p2 | ⬜ | Extend employee profile + link to current Work items. |
 | C5 | **Full employee details + skills** | p3 | ⬜ | Skills list on profile. |
 | C6 | **Ratings** | p3 | ⬜ | Employee ratings. |
