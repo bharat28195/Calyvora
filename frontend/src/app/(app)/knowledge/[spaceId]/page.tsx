@@ -12,6 +12,7 @@ import { Field } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
+import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
 import { cn } from "@/lib/utils";
 
 export default function SpacePageRoute() {
@@ -77,6 +78,8 @@ function SpacePage() {
       {space?.description && <p className="mt-1 text-fg/50">{space.description}</p>}
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
+
+      <KnowledgeSearch className="mt-6" />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
         {/* page tree */}

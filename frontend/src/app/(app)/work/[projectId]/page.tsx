@@ -15,6 +15,7 @@ import { Field } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
+import { MemberSelect } from "@/components/ui/member-select";
 import { cn } from "@/lib/utils";
 
 type View = "board" | "backlog" | "sprints" | "tickets";
@@ -406,8 +407,22 @@ function SprintDialog({ projectId, onClose, onCreated }: { projectId: string; on
   const [goal, setGoal] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [cadence, setCadence] = useState("2w"); // sprint type: 1 week / 2 weeks / month (founder feedback A3)
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Selecting a sprint type auto-fills the end date from the start (default today).
+  function applyCadence(c: string, startArg?: string) {
+    setCadence(c);
+    if (c === "custom") return;
+    const start = startArg || startDate || new Date().toISOString().slice(0, 10);
+    if (!startDate) setStartDate(start);
+    const d = new Date(start + "T00:00:00");
+    if (c === "1w") d.setDate(d.getDate() + 7);
+    else if (c === "2w") d.setDate(d.getDate() + 14);
+    else if (c === "month") d.setMonth(d.getMonth() + 1);
+    setEndDate(d.toISOString().slice(0, 10));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -428,9 +443,22 @@ function SprintDialog({ projectId, onClose, onCreated }: { projectId: string; on
         {error && <Alert tone="error">{error}</Alert>}
         <Field label="Name" htmlFor="sp-name"><Input id="sp-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Sprint 1" autoFocus /></Field>
         <Field label="Goal (optional)" htmlFor="sp-goal"><Input id="sp-goal" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="What should this sprint achieve?" /></Field>
+        <Field label="Sprint length" htmlFor="sp-cadence">
+          <div className="flex flex-wrap gap-2">
+            {[["1w", "1 week"], ["2w", "2 weeks"], ["month", "1 month"], ["custom", "Custom"]].map(([val, lbl]) => (
+              <button key={val} type="button" onClick={() => applyCadence(val)}
+                className={cn(
+                  "rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                  cadence === val ? "border-violet bg-violet/10 text-violet" : "border-fg/15 text-fg/70 hover:bg-fg/5",
+                )}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Start (optional)" htmlFor="sp-start"><Input id="sp-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
-          <Field label="End (optional)" htmlFor="sp-end"><Input id="sp-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
+          <Field label="Start" htmlFor="sp-start"><Input id="sp-start" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); if (cadence !== "custom") applyCadence(cadence, e.target.value); }} /></Field>
+          <Field label="End" htmlFor="sp-end"><Input id="sp-end" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setCadence("custom"); }} /></Field>
         </div>
         <div className="mt-2 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
@@ -569,10 +597,8 @@ function TicketDialog({
           </Field>
         </div>
         <Field label="Assignee" htmlFor="tk-assignee">
-          <select id="tk-assignee" className={selectCls} value={form.assigneeId} onChange={set("assigneeId")}>
-            <option value="" className="bg-surface">Unassigned</option>
-            {employees.map((e) => <option key={e.id} value={e.id} className="bg-surface">{e.firstName} {e.lastName}</option>)}
-          </select>
+          <MemberSelect employees={employees} value={form.assigneeId}
+            onChange={(id) => setForm((f) => ({ ...f, assigneeId: id }))} />
         </Field>
         <div className="mt-2 flex items-center justify-between gap-2">
           {onDelete ? (
@@ -651,10 +677,8 @@ function TaskDialog({
         </div>
         <div className={cn("grid gap-3", showSprint ? "grid-cols-2" : "grid-cols-1")}>
           <Field label="Assignee" htmlFor="t-assignee">
-            <select id="t-assignee" className={selectCls} value={form.assigneeId} onChange={set("assigneeId")}>
-              <option value="" className="bg-surface">Unassigned</option>
-              {employees.map((e) => <option key={e.id} value={e.id} className="bg-surface">{e.firstName} {e.lastName}</option>)}
-            </select>
+            <MemberSelect employees={employees} value={form.assigneeId}
+              onChange={(id) => setForm((f) => ({ ...f, assigneeId: id }))} />
           </Field>
           {showSprint && (
             <Field label="Sprint" htmlFor="t-sprint">

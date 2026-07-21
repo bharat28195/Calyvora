@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Plus, BookOpen, FileText, ArrowRight, Search } from "lucide-react";
+import { Loader2, Plus, BookOpen, FileText, ArrowRight } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { Space, PageSummary } from "@/lib/types";
+import type { Space } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
+import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
 
 export default function KnowledgePage() {
   const [spaces, setSpaces] = useState<Space[] | null>(null);
@@ -44,7 +45,7 @@ export default function KnowledgePage() {
         <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> New space</Button>
       </div>
 
-      <SearchBar />
+      <KnowledgeSearch className="mt-6" />
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
@@ -83,67 +84,6 @@ export default function KnowledgePage() {
   );
 }
 
-function SearchBar() {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<PageSummary[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (timer.current) clearTimeout(timer.current);
-    const term = q.trim();
-    if (term.length < 2) {
-      setResults(null);
-      return;
-    }
-    timer.current = setTimeout(async () => {
-      setBusy(true);
-      try {
-        setResults(await api.searchPages(term));
-      } catch {
-        setResults([]);
-      } finally {
-        setBusy(false);
-      }
-    }, 250);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
-  }, [q]);
-
-  return (
-    <div className="relative mt-6">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search all pages…"
-        className="w-full rounded-lg border border-fg/10 bg-fg/5 py-2.5 pl-10 pr-4 text-sm text-fg placeholder:text-fg/30 focus:border-violet focus:outline-none"
-      />
-      {results !== null && (
-        <div className="absolute z-10 mt-2 w-full rounded-lg border border-fg/10 bg-surface shadow-xl">
-          {busy && results.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-fg/40">Searching…</p>
-          ) : results.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-fg/40">No pages match “{q.trim()}”.</p>
-          ) : (
-            results.map((r) => (
-              <Link key={r.id} href={`/knowledge/${r.spaceId}?page=${r.id}`} onClick={() => setQ("")}
-                className="block border-b border-fg/5 px-4 py-3 last:border-0 hover:bg-fg/5">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-3.5 w-3.5 text-fg/30" />
-                  <span className="text-sm font-medium">{r.title}</span>
-                  <span className="text-xs text-fg/30">· {r.spaceName}</span>
-                </div>
-                {r.snippet && <p className="mt-1 line-clamp-1 pl-5 text-xs text-fg/40">{r.snippet}</p>}
-              </Link>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function NewSpaceDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");

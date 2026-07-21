@@ -14,11 +14,13 @@
 
 | # | Item | Source | Status | Notes |
 |---|------|--------|--------|-------|
-| A1 | **Members/assignee dropdown "not working"; must show all company members and scale to ~1k people** ("from user/member's parent node") | p6 | 🔜 | Fix = searchable **MemberSelect** combobox pulling all company members; replaces the plain `<select>` on task & ticket assignee (and reuse for manager/lead pickers). |
-| A2 | **Knowledge search should be present at all times** | p4 | ⬜ | Persistent search box on Knowledge screens (in addition to global ⌘K). |
-| A3 | **Selectable sprint types** — 1 week / 2 weeks / month | p4 | ⬜ | Add sprint cadence/type on sprint create; optionally auto-fill end date from start + cadence. |
+| A1 | **Members/assignee dropdown "not working"; must show all company members and scale to ~1k people** ("from user/member's parent node") | p6 | ✅ | `MemberSelect` searchable combobox (`components/ui/member-select.tsx`) lists all company members, filters by name/email/title; wired into task + ticket assignee. |
+| A2 | **Knowledge search should be present at all times** | p4 | ✅ | Extracted reusable `KnowledgeSearch` (`components/knowledge/knowledge-search.tsx`); now on the Knowledge index **and** inside every space. |
+| A3 | **Selectable sprint types** — 1 week / 2 weeks / month | p4 | ✅ | Sprint-length picker (1w/2w/1month/custom) auto-fills end date from start; frontend-only, no migration. |
 | A4 | **Put all tabs on the left** (left sidebar nav) so a tab can be selected there | p5–6 | ✅ | Left sidebar with icons + active state; mobile fallback nav. `app-shell.tsx`. |
 | A5 | **Nicer logo / make company name look good** | p5 | ✅ (partial) | Gradient app-mark + `Wordmark` component + central `brand.ts`. Full logo art still open. |
+
+**Bucket A complete** (2026-07-22) — pending only the product-name pick (BR1) to finish the wordmark.
 
 ---
 
