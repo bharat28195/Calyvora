@@ -23,6 +23,7 @@ import {
   type Me,
   type Member,
   type Role,
+  type SearchResponse,
 } from "@/lib/types";
 import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
@@ -380,6 +381,13 @@ export const api = {
     return LIVE
       ? http<PageSummary[]>(`/knowledge/search?q=${encodeURIComponent(q)}`)
       : mockBackend.searchPages(accessToken, q);
+  },
+
+  // --- global search (across all three apps) ---
+  search(q: string): Promise<SearchResponse> {
+    return LIVE
+      ? http<SearchResponse>(`/search?q=${encodeURIComponent(q)}`)
+      : mockBackend.globalSearch(accessToken, q);
   },
 
   // --- dev mailbox (local dev only: verification/invite links, no SMTP needed) ---

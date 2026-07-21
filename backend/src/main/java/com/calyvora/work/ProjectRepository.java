@@ -14,5 +14,16 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     long countByCompanyId(UUID companyId);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select p from Project p
+            where p.companyId = :companyId
+              and (lower(p.name) like lower(concat('%', :q, '%'))
+                   or lower(p.key) like lower(concat('%', :q, '%')))
+            order by p.createdAt desc
+            """)
+    java.util.List<Project> search(@org.springframework.data.repository.query.Param("companyId") UUID companyId,
+                                   @org.springframework.data.repository.query.Param("q") String q,
+                                   org.springframework.data.domain.Pageable pageable);
+
     boolean existsByCompanyIdAndKeyIgnoreCase(UUID companyId, String key);
 }

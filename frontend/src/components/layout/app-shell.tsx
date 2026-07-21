@@ -7,6 +7,7 @@ import { Loader2, LogOut } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
+import { CommandBar } from "@/components/layout/command-bar";
 
 interface NavItem {
   href: string;
@@ -67,6 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-4">
+            <CommandBar />
             <div className="hidden text-right sm:block">
               <p className="text-sm text-white">
                 {user.firstName} {user.lastName}

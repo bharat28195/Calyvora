@@ -18,6 +18,14 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
 
     long countByCompanyIdAndStatusIn(UUID companyId, List<TicketStatus> statuses);
 
+    @Query("""
+            select t from Ticket t
+            where t.companyId = :companyId and lower(t.subject) like lower(concat('%', :q, '%'))
+            order by t.number desc
+            """)
+    List<Ticket> search(@Param("companyId") UUID companyId, @Param("q") String q,
+                        org.springframework.data.domain.Pageable pageable);
+
     @Query("select coalesce(max(t.number), 0) from Ticket t where t.projectId = :projectId")
     int maxNumberForProject(@Param("projectId") UUID projectId);
 }

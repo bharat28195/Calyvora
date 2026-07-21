@@ -36,6 +36,15 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     long countByCompanyIdAndStatusNot(UUID companyId, TaskStatus status);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select t from Task t
+            where t.companyId = :companyId and lower(t.title) like lower(concat('%', :q, '%'))
+            order by t.createdAt desc
+            """)
+    List<Task> search(@org.springframework.data.repository.query.Param("companyId") UUID companyId,
+                      @org.springframework.data.repository.query.Param("q") String q,
+                      org.springframework.data.domain.Pageable pageable);
+
     @Query("select coalesce(max(t.number), 0) from Task t where t.projectId = :projectId")
     int maxNumberForProject(@Param("projectId") UUID projectId);
 }

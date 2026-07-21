@@ -8,6 +8,9 @@ import {
   type ApiErrorBody,
   type CompanySettings,
   type DashboardSummary,
+  type SearchResponse,
+  type SearchGroup,
+  type SearchHit,
   type Department,
   type Employee,
   type Invitation,
@@ -1087,6 +1090,53 @@ export const mockBackend = {
       .filter((p) => p.companyId === user.companyId && (p.title.toLowerCase().includes(query) || (p.body || "").toLowerCase().includes(query)))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .map((p) => toPageSummary(db, p, knowledgeSnippet(p.body, query)));
+  },
+
+  async globalSearch(accessToken: string | null, q: string): Promise<SearchResponse> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const query = (q || "").trim().toLowerCase();
+    if (query.length < 2) return { query, total: 0, groups: [] };
+    const cid = user.companyId;
+    const has = (s: string | null | undefined) => (s || "").toLowerCase().includes(query);
+    const projects = db.projects.filter((p) => p.companyId === cid);
+    const projOf = (id: string) => projects.find((p) => p.id === id);
+    const spaces = db.spaces.filter((s) => s.companyId === cid);
+    const spaceOf = (id: string) => spaces.find((s) => s.id === id);
+
+    const people: SearchHit[] = db.users
+      .filter((u) => u.companyId === cid && u.status !== "DISABLED" && (has(u.firstName) || has(u.lastName) || has(u.email)))
+      .slice(0, 5)
+      .map((u) => ({ kind: "person", title: `${u.firstName} ${u.lastName}`, subtitle: u.email, href: "/people" }));
+
+    const work: SearchHit[] = [
+      ...projects.filter((p) => has(p.name) || has(p.key)).slice(0, 5)
+        .map((p): SearchHit => ({ kind: "project", title: p.name, subtitle: `Project · ${p.key}`, href: `/work/${p.id}` })),
+      ...db.tasks.filter((t) => t.companyId === cid && has(t.title)).slice(0, 5).map((t): SearchHit => {
+        const p = projOf(t.projectId);
+        return { kind: "task", title: t.title, subtitle: p ? `${p.key}-${t.number} · ${p.name}` : "Task", href: `/work/${t.projectId}` };
+      }),
+      ...db.tickets.filter((t) => t.companyId === cid && has(t.subject)).slice(0, 5).map((t): SearchHit => {
+        const p = projOf(t.projectId);
+        return { kind: "ticket", title: t.subject, subtitle: p ? `${p.key}-T${t.number}` : "Ticket", href: `/work/${t.projectId}` };
+      }),
+    ];
+
+    const knowledge: SearchHit[] = [
+      ...spaces.filter((s) => has(s.name) || has(s.key)).slice(0, 5)
+        .map((s): SearchHit => ({ kind: "space", title: s.name, subtitle: `Space · ${s.key}`, href: `/knowledge/${s.id}` })),
+      ...db.pages.filter((p) => p.companyId === cid && (has(p.title) || has(p.body))).slice(0, 5).map((p): SearchHit => {
+        const s = spaceOf(p.spaceId);
+        return { kind: "page", title: p.title, subtitle: s ? s.name : "Page", href: `/knowledge/${p.spaceId}` };
+      }),
+    ];
+
+    const groups: SearchGroup[] = [];
+    if (people.length) groups.push({ label: "People", hits: people });
+    if (work.length) groups.push({ label: "Work", hits: work });
+    if (knowledge.length) groups.push({ label: "Knowledge", hits: knowledge });
+    return { query, total: people.length + work.length + knowledge.length, groups };
   },
 
   // --- Work OS (board & backlog) ---

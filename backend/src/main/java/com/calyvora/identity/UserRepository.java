@@ -19,5 +19,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countByCompanyIdAndStatus(UUID companyId, UserStatus status);
 
+    /** Tenant-scoped directory search over name + email (for global search). */
+    @org.springframework.data.jpa.repository.Query("""
+            select u from User u
+            where u.companyId = :companyId and u.status <> com.calyvora.identity.UserStatus.DISABLED
+              and (lower(u.firstName) like lower(concat('%', :q, '%'))
+                   or lower(u.lastName) like lower(concat('%', :q, '%'))
+                   or lower(u.email) like lower(concat('%', :q, '%')))
+            order by u.firstName asc
+            """)
+    List<User> search(@org.springframework.data.repository.query.Param("companyId") UUID companyId,
+                      @org.springframework.data.repository.query.Param("q") String q,
+                      org.springframework.data.domain.Pageable pageable);
+
     boolean existsByCompanyIdAndEmail(UUID companyId, String email);
 }

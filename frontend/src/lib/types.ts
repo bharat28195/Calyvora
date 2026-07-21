@@ -249,6 +249,22 @@ export interface LoginResult {
   me: Me;
 }
 
+export interface SearchHit {
+  kind: "person" | "project" | "task" | "ticket" | "space" | "page";
+  title: string;
+  subtitle: string;
+  href: string;
+}
+export interface SearchGroup {
+  label: string;
+  hits: SearchHit[];
+}
+export interface SearchResponse {
+  query: string;
+  total: number;
+  groups: SearchGroup[];
+}
+
 /** Shape of the one API error envelope (Sprint1 §13). */
 export interface ApiErrorBody {
   timestamp: string;
