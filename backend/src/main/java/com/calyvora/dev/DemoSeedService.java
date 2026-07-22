@@ -84,6 +84,7 @@ public class DemoSeedService {
     private final com.calyvora.people.GoalRepository goalRepository;
     private final com.calyvora.client.ClientService clientService;
     private final com.calyvora.document.DocumentService documentService;
+    private final com.calyvora.people.AttendanceService attendanceService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -95,7 +96,9 @@ public class DemoSeedService {
                            com.calyvora.people.CompensationRepository compensationRepository,
                            com.calyvora.people.GoalRepository goalRepository,
                            com.calyvora.client.ClientService clientService,
-                           com.calyvora.document.DocumentService documentService) {
+                           com.calyvora.document.DocumentService documentService,
+                           com.calyvora.people.AttendanceService attendanceService) {
+        this.attendanceService = attendanceService;
         this.compensationRepository = compensationRepository;
         this.goalRepository = goalRepository;
         this.clientService = clientService;
@@ -254,6 +257,42 @@ public class DemoSeedService {
 
         // --- Documents: the starter template library + a couple of issued letters ---
         seedDocuments(owner, emp, List.of(leo.getEmail(), sara.getEmail()));
+
+        // --- Attendance: the last two weeks, so the day sheet and month grid have history ---
+        seedAttendance(owner, emp);
+    }
+
+    /**
+     * Marks the last 14 days for everyone. Mostly present with a believable scatter of WFH, a half
+     * day and one absence — a demo where everybody is perfectly present looks fake, and the month
+     * summary needs variety to show anything.
+     */
+    private void seedAttendance(AuthPrincipal owner, Map<String, EmployeeResponse> emp) {
+        LocalDate today = LocalDate.now();
+        int person = 0;
+        for (EmployeeResponse e : emp.values()) {
+            person++;
+            for (int back = 14; back >= 0; back--) {
+                LocalDate date = today.minusDays(back);
+                if (date.getDayOfWeek() == java.time.DayOfWeek.SATURDAY
+                        || date.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+                    continue;   // weekends resolve to WEEK_OFF on their own
+                }
+                int mix = (person * 7 + back) % 11;
+                String status = switch (mix) {
+                    case 0, 1 -> "WORK_FROM_HOME";
+                    case 2 -> back == 3 ? "HALF_DAY" : "PRESENT";
+                    case 5 -> back == 6 ? "ABSENT" : "PRESENT";
+                    default -> "PRESENT";
+                };
+                String in = status.equals("HALF_DAY") ? "09:15" : (mix % 2 == 0 ? "09:05" : "09:40");
+                String out = status.equals("HALF_DAY") ? "13:30" : (mix % 2 == 0 ? "18:10" : "18:45");
+                boolean off = status.equals("ABSENT");
+                attendanceService.mark(new com.calyvora.people.dto.MarkAttendanceRequest(
+                        e.id(), date.toString(), status, off ? null : in, off ? null : out,
+                        off ? "Unplanned absence" : null), owner);
+            }
+        }
     }
 
     /**

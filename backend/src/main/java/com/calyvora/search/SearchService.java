@@ -62,8 +62,12 @@ public class SearchService {
         this.documentRepository = documentRepository;
     }
 
+    /**
+     * @param admin whether the caller may see Owner/Admin-only modules (Clients, Documents). Search
+     *              must not become a side door around the role gates on those APIs.
+     */
     @Transactional(readOnly = true)
-    public SearchResponse search(String rawQuery) {
+    public SearchResponse search(String rawQuery, boolean admin) {
         String q = rawQuery == null ? "" : rawQuery.trim();
         if (q.length() < 2) {
             return new SearchResponse(q, 0, List.of());
@@ -108,15 +112,16 @@ public class SearchService {
         });
 
         List<SearchHit> clients = new ArrayList<>();
-        for (com.calyvora.client.Client c : clientRepository.search(companyId, q, LIMIT)) {
-            clients.add(new SearchHit("client", c.getName(),
-                    c.getContactName() == null ? "Client" : c.getContactName(), "/clients/" + c.getId()));
-        }
-
         List<SearchHit> documents = new ArrayList<>();
-        for (com.calyvora.document.GeneratedDocument d : documentRepository.search(companyId, q, LIMIT)) {
-            documents.add(new SearchHit("document", d.getTitle(),
-                    d.getKind().name().replace('_', ' ').toLowerCase(), "/documents/" + d.getId()));
+        if (admin) {
+            for (com.calyvora.client.Client c : clientRepository.search(companyId, q, LIMIT)) {
+                clients.add(new SearchHit("client", c.getName(),
+                        c.getContactName() == null ? "Client" : c.getContactName(), "/clients/" + c.getId()));
+            }
+            for (com.calyvora.document.GeneratedDocument d : documentRepository.search(companyId, q, LIMIT)) {
+                documents.add(new SearchHit("document", d.getTitle(),
+                        d.getKind().name().replace('_', ' ').toLowerCase(), "/documents/" + d.getId()));
+            }
         }
 
         List<SearchGroup> groups = new ArrayList<>();

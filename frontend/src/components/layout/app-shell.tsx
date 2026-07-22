@@ -33,12 +33,25 @@ const NAV: NavItem[] = [
     children: [
       { href: "/people", label: "Directory" },
       { href: "/people/org", label: "Org chart" },
+      { href: "/people/attendance", label: "Attendance" },
       { href: "/people/time-off", label: "Time off" },
     ],
   },
-  { href: "/work", label: "Work", icon: FolderKanban },
-  { href: "/knowledge", label: "Knowledge", icon: BookOpen },
-  { href: "/clients", label: "Clients", icon: Handshake },
+  {
+    href: "/work", label: "Work", icon: FolderKanban,
+    children: [
+      { href: "/work", label: "Projects" },
+      { href: "/work/mine", label: "My work" },
+    ],
+  },
+  {
+    href: "/knowledge", label: "Knowledge", icon: BookOpen,
+    children: [
+      { href: "/knowledge", label: "Spaces" },
+      { href: "/knowledge/mine", label: "My pages" },
+    ],
+  },
+  { href: "/clients", label: "Clients", icon: Handshake, roles: ["OWNER", "ADMIN"] },
   {
     href: "/documents", label: "Documents", icon: FileText, roles: ["OWNER", "ADMIN"],
     children: [

@@ -26,12 +26,9 @@ export default function MyWorkPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My work</h1>
-          <p className="mt-1 text-fg/50">Open tasks assigned to you across all projects.</p>
-        </div>
-        <Link href="/work" className="text-sm text-fg/60 hover:text-fg">← Projects</Link>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">My work</h1>
+        <p className="mt-1 text-fg/50">Open tasks assigned to you across all projects.</p>
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Users, UserCheck, CalendarOff, Palmtree } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TeamOverview } from "@/lib/types";
@@ -22,10 +23,15 @@ export function TeamOverviewSection() {
     <section className="mt-8">
       <h2 className="mb-4 text-lg font-semibold">Team overview</h2>
 
+      {/* Each tile opens the attendance day sheet, where the count can be drilled into by person. */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Tile icon={<Users className="h-5 w-5 text-violet" />} label="Total employees" value={data?.headcount} loading={loading} />
-        <Tile icon={<UserCheck className="h-5 w-5 text-emerald-400" />} label="Present today" value={data?.presentToday} loading={loading} />
-        <Tile icon={<CalendarOff className="h-5 w-5 text-amber-400" />} label="On leave today" value={data?.onLeaveToday} loading={loading} />
+        <Tile icon={<Users className="h-5 w-5 text-violet" />} label="Total employees" value={data?.headcount}
+          loading={loading} href="/people" />
+        <Tile icon={<UserCheck className="h-5 w-5 text-emerald-400" />} label="Present today" value={data?.presentToday}
+          loading={loading} href="/people/attendance"
+          hint={data && data.unmarkedToday > 0 ? `${data.unmarkedToday} not marked yet` : undefined} />
+        <Tile icon={<CalendarOff className="h-5 w-5 text-amber-400" />} label="On leave today" value={data?.onLeaveToday}
+          loading={loading} href="/people/attendance" hint="See who" />
       </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
@@ -62,14 +68,18 @@ export function TeamOverviewSection() {
   );
 }
 
-function Tile({ icon, label, value, loading }: { icon: React.ReactNode; label: string; value?: number; loading: boolean }) {
-  return (
-    <Card>
+function Tile({
+  icon, label, value, loading, href, hint,
+}: { icon: React.ReactNode; label: string; value?: number; loading: boolean; href?: string; hint?: string }) {
+  const card = (
+    <Card className={href ? "h-full transition-colors hover:border-fg/25" : undefined}>
       <div className="flex items-center gap-2 text-sm text-fg/50">{icon}{label}</div>
       {loading ? <div className="mt-3 h-7 w-14 animate-pulse rounded bg-fg/10" />
         : <p className="mt-2 text-3xl font-semibold tabular-nums">{value ?? 0}</p>}
+      {hint && !loading && <p className="mt-1 text-xs text-fg/40">{hint}</p>}
     </Card>
   );
+  return href ? <Link href={href}>{card}</Link> : card;
 }
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];

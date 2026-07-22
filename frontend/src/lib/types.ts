@@ -96,6 +96,57 @@ export interface ClientDetail {
   requests: ClientRequestItem[];
 }
 
+/** Daily attendance (feedback C.4). `status` is null when nobody has marked the day yet. */
+export type AttendanceStatus =
+  | "PRESENT"
+  | "WORK_FROM_HOME"
+  | "HALF_DAY"
+  | "ABSENT"
+  | "ON_LEAVE"
+  | "HOLIDAY"
+  | "WEEK_OFF";
+
+export interface AttendanceEntry {
+  employeeId: string;
+  employeeName: string;
+  jobTitle: string | null;
+  department: string | null;
+  date: string;
+  status: AttendanceStatus | null;
+  checkIn: string | null;
+  checkOut: string | null;
+  note: string | null;
+  /** True when the status was inferred (approved leave or a weekend) rather than marked. */
+  derived: boolean;
+}
+export interface AttendanceDay {
+  date: string;
+  headcount: number;
+  present: number;
+  onLeave: number;
+  absent: number;
+  unmarked: number;
+  entries: AttendanceEntry[];
+}
+export interface AttendanceMonth {
+  employeeId: string;
+  employeeName: string;
+  month: string;
+  days: AttendanceEntry[];
+  counts: Record<string, number>;
+  workedDays: number;
+  expectedDays: number;
+  attendanceRate: number | null;
+}
+export interface MarkAttendanceInput {
+  employeeId: string;
+  date?: string;
+  status: AttendanceStatus;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  note?: string | null;
+}
+
 /** Documents module (feedback D2/D3) — a template library and the letters generated from it. */
 export type DocumentKind =
   | "OFFER_LETTER"
@@ -391,6 +442,8 @@ export interface TeamOverview {
   headcount: number;
   presentToday: number;
   onLeaveToday: number;
+  /** How many of `presentToday` are assumed rather than recorded (nobody marked them). */
+  unmarkedToday: number;
   outToday: LeaveTodayEntry[];
   monthLeaves: CalendarLeave[];
 }

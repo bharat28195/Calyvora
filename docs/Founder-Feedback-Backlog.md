@@ -33,7 +33,7 @@
 | B3 | **Owner: on-leave vs present count** | p1 | ✅ | Present vs on-leave-today tiles, derived from approved leave (`GET /dashboard/team`). |
 | B4 | **Owner: reason for leave** | p1 | ✅ | "Out today" list shows name + leave type + reason. |
 | B5 | **Leave days shown on a calendar** ("how many days in calendar") | p1 | ✅ | Month leave calendar (amber days = someone on leave, ring = today). |
-| B6 | **Attendance option** (present as a feature/preset) | p6 | 🔜 (phase 1) | **Decision: "both, phased."** Phase 1 shipped = attendance *derived from leave*. Phase 2 (full daily attendance record + marking UI) deferred to Bucket C alongside payroll. |
+| B6 | **Attendance option** (present as a feature/preset) | p6 | ✅ | **Decision: "both, phased."** Phase 1 = derived from leave. **Phase 2 shipped** — see C.4. |
 
 ---
 
@@ -50,6 +50,7 @@
 | C7 | **Performance** | p3 | 🔜 (partial) | Covered for now by the **rating** (C6) + **goals progress** (C8). A fuller review-cycle module (periodic reviews, reviewer, cycle) is future. |
 | C8 | **Goals** | p3 | ✅ | `goals` table (V15, RLS) + `GET/POST/PATCH/DELETE /people/employees/{id}/goals`. Editable by admin or the goal owner (self-service). Progress bar + status; 100% → auto-ACHIEVED. Demo seeds goals. |
 | C9 | **Kanban-like section in employee tab** ("look on kanban like it has one section") | p3 | ⬜ | *Ambiguous* — confirm intent (employee view laid out like a board?). |
+| C.4b | **Full daily attendance (phase 2)** | p6 | ✅ | `attendance_records` (V18, RLS, unique per employee+day). Self **check-in/check-out**, Owner/Admin **team day sheet** with one-click marking (present · WFH · half day · absent · on leave · holiday), and a **month grid** with worked-days + attendance %. **Approved leave auto-fills the day** so nobody enters time off twice; a marked row always wins. Weekends resolve to week-off. Clickable counts drill into *who*, plus a **per-team breakdown**. Dashboard now reports how many of "present" are unmarked (assumed vs recorded). Demo seeds 14 days. |
 
 ---
 
@@ -93,5 +94,12 @@
   (2 joining letters + employee numbers and reporting lines so letters read complete). Left-pane **Documents**
   sub-panes (Issued / Generate / Templates), Owner/Admin-only. **95 backend tests green.**
 
-**Remaining:** C.4 (full daily attendance, phase 2) · C.7 (fuller review cycle) · C.9 (*needs confirmation*) ·
-D4 Notifications · D5 Inbox · D6 Organization (*confirm scope*) · BR3 modular packaging.
+- **2026-07-22** — **C.4 / B6 phase 2 shipped: full daily attendance** (V18, RLS). Plus three founder asks
+  from the same session: **Clients is now Owner/Admin-only** (API + nav + search, test-covered),
+  **Work and Knowledge gained left-pane sub-panes** (Projects/My work · Spaces/My pages) with the on-page
+  links removed, and the team counts are **clickable drill-downs** with a per-team breakdown.
+  **105 backend tests green.**
+
+**Remaining:** C.7 (fuller review cycle) · C.9 (*needs confirmation*) · **D4 Notifications + D5 Inbox
+(next up — leave request must notify the approving manager)** · D6 Organization (*confirm scope*) ·
+BR3 modular packaging.

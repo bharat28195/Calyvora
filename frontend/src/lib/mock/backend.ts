@@ -20,6 +20,11 @@ import {
   type Client,
   type ClientDetail,
   type ClientRequestItem,
+  type AttendanceDay,
+  type AttendanceEntry,
+  type AttendanceMonth,
+  type AttendanceStatus,
+  type MarkAttendanceInput,
   type DocumentTemplate,
   type DocumentPreview,
   type GeneratedDoc,
@@ -45,7 +50,7 @@ import {
   type Role,
 } from "@/lib/types";
 import {
-  MERGE_FIELDS, STARTER_TEMPLATES, letterDate, placeholdersIn, renderTemplate, tenure,
+  KIND_LABELS, MERGE_FIELDS, STARTER_TEMPLATES, letterDate, placeholdersIn, renderTemplate, tenure,
 } from "@/lib/documents";
 
 const KEY = "calyvora_mock_db_v1";
@@ -531,12 +536,14 @@ export const mockBackend = {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
+    requireAdmin(user);
     return (mockClients[user.companyId] ?? []).map((c) => withOpen(user.companyId, c));
   },
   async createClient(accessToken: string | null, input: Partial<Client> & { name: string }): Promise<Client> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
+    requireAdmin(user);
     const c: Client = {
       id: crypto.randomUUID(), name: input.name, contactName: input.contactName ?? null,
       contactEmail: input.contactEmail ?? null, phone: input.phone ?? null, website: input.website ?? null,
@@ -549,6 +556,7 @@ export const mockBackend = {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
+    requireAdmin(user);
     const c = (mockClients[user.companyId] ?? []).find((x) => x.id === id);
     if (!c) throw err(404, "NOT_FOUND", "Client not found");
     return { client: withOpen(user.companyId, c), requests: (mockClientReqs[id] ?? []).slice() };
@@ -557,6 +565,7 @@ export const mockBackend = {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
+    requireAdmin(user);
     const c = (mockClients[user.companyId] ?? []).find((x) => x.id === id);
     if (!c) throw err(404, "NOT_FOUND", "Client not found");
     Object.assign(c, patch);
@@ -566,13 +575,14 @@ export const mockBackend = {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
+    requireAdmin(user);
     mockClients[user.companyId] = (mockClients[user.companyId] ?? []).filter((x) => x.id !== id);
     delete mockClientReqs[id];
   },
   async addClientRequest(accessToken: string | null, clientId: string, input: { title: string; description?: string }): Promise<ClientRequestItem> {
     await delay();
     const db = load();
-    requireSession(db, accessToken);
+    requireAdmin(requireSession(db, accessToken));
     const r: ClientRequestItem = { id: crypto.randomUUID(), title: input.title, description: input.description ?? null, status: "REQUESTED", createdAt: new Date().toISOString() };
     mockClientReqs[clientId] = [r, ...(mockClientReqs[clientId] ?? [])];
     return r;
@@ -580,7 +590,7 @@ export const mockBackend = {
   async updateClientRequest(accessToken: string | null, clientId: string, requestId: string, patch: Partial<ClientRequestItem>): Promise<ClientRequestItem> {
     await delay();
     const db = load();
-    requireSession(db, accessToken);
+    requireAdmin(requireSession(db, accessToken));
     const r = (mockClientReqs[clientId] ?? []).find((x) => x.id === requestId);
     if (!r) throw err(404, "NOT_FOUND", "Request not found");
     Object.assign(r, patch);
@@ -589,8 +599,87 @@ export const mockBackend = {
   async deleteClientRequest(accessToken: string | null, clientId: string, requestId: string): Promise<void> {
     await delay();
     const db = load();
-    requireSession(db, accessToken);
+    requireAdmin(requireSession(db, accessToken));
     mockClientReqs[clientId] = (mockClientReqs[clientId] ?? []).filter((x) => x.id !== requestId);
+  },
+
+  // --- attendance: the daily record (feedback C.4) ---
+  async attendanceToday(accessToken: string | null): Promise<AttendanceEntry> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const employeeId = myEmployeeId(db, user);
+    return resolveAttendance(db, employeeId, todayIso());
+  },
+  async checkIn(accessToken: string | null): Promise<AttendanceEntry> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const employeeId = myEmployeeId(db, user);
+    const row = attendanceRow(employeeId, todayIso(), "PRESENT");
+    if (!row.checkIn) {
+      row.checkIn = nowTime();
+      if (row.status === "ABSENT") row.status = "PRESENT";
+    }
+    return resolveAttendance(db, employeeId, todayIso());
+  },
+  async checkOut(accessToken: string | null): Promise<AttendanceEntry> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const employeeId = myEmployeeId(db, user);
+    const existing = mockAttendance[`${employeeId}|${todayIso()}`];
+    if (!existing) throw err(400, "VALIDATION_ERROR", "Check in first");
+    existing.checkOut = nowTime();
+    return resolveAttendance(db, employeeId, todayIso());
+  },
+  async myAttendance(accessToken: string | null, month?: string): Promise<AttendanceMonth> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    return buildAttendanceMonth(db, myEmployeeId(db, user), month);
+  },
+  async employeeAttendance(accessToken: string | null, employeeId: string, month?: string): Promise<AttendanceMonth> {
+    await delay();
+    const db = load();
+    requireAdmin(requireSession(db, accessToken));
+    return buildAttendanceMonth(db, employeeId, month);
+  },
+  async attendanceDay(accessToken: string | null, date?: string): Promise<AttendanceDay> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const on = date || todayIso();
+    const entries = db.employees
+      .filter((e) => e.companyId === user.companyId)
+      .map((e) => resolveAttendance(db, e.id, on))
+      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+    const count = (p: (s: AttendanceStatus) => boolean) =>
+      entries.filter((e) => e.status && p(e.status)).length;
+    return {
+      date: on,
+      headcount: entries.length,
+      present: count((s) => s === "PRESENT" || s === "WORK_FROM_HOME" || s === "HALF_DAY"),
+      onLeave: count((s) => s === "ON_LEAVE"),
+      absent: count((s) => s === "ABSENT"),
+      unmarked: entries.filter((e) => e.status === null).length,
+      entries,
+    };
+  },
+  async markAttendance(accessToken: string | null, input: MarkAttendanceInput): Promise<AttendanceEntry> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const date = input.date || todayIso();
+    if (date > todayIso()) throw err(400, "VALIDATION_ERROR", "Attendance can't be marked for a future date");
+    const row = attendanceRow(input.employeeId, date, input.status);
+    row.status = input.status;
+    if (input.checkIn !== undefined) row.checkIn = input.checkIn || null;
+    if (input.checkOut !== undefined) row.checkOut = input.checkOut || null;
+    if (input.note !== undefined) row.note = input.note || null;
+    return resolveAttendance(db, input.employeeId, date);
   },
 
   // --- documents: templates + generated letters (feedback D2/D3) ---
@@ -725,6 +814,9 @@ export const mockBackend = {
       headcount,
       onLeaveToday: outToday.length,
       presentToday: Math.max(0, headcount - outToday.length),
+      unmarkedToday: db.employees.filter(
+        (e) => e.companyId === cid && !mockAttendance[`${e.id}|${todayIso()}`],
+      ).length,
       outToday,
       monthLeaves,
     };
@@ -1453,11 +1545,28 @@ export const mockBackend = {
       }),
     ];
 
+    // Owner/Admin-only modules must not leak through the search box either.
+    const admin = user.role === "OWNER" || user.role === "ADMIN";
+    const clients: SearchHit[] = !admin ? [] : (mockClients[cid] ?? [])
+      .filter((c) => has(c.name) || has(c.contactName) || has(c.contactEmail))
+      .slice(0, 5)
+      .map((c): SearchHit => ({ kind: "client", title: c.name, subtitle: c.contactName ?? "Client", href: `/clients/${c.id}` }));
+    const documents: SearchHit[] = !admin ? [] : (mockDocs[cid] ?? [])
+      .filter((d) => has(d.title))
+      .slice(0, 5)
+      .map((d): SearchHit => ({ kind: "document", title: d.title, subtitle: KIND_LABELS[d.kind], href: `/documents/${d.id}` }));
+
     const groups: SearchGroup[] = [];
     if (people.length) groups.push({ label: "People", hits: people });
     if (work.length) groups.push({ label: "Work", hits: work });
     if (knowledge.length) groups.push({ label: "Knowledge", hits: knowledge });
-    return { query, total: people.length + work.length + knowledge.length, groups };
+    if (clients.length) groups.push({ label: "Clients", hits: clients });
+    if (documents.length) groups.push({ label: "Documents", hits: documents });
+    return {
+      query,
+      total: people.length + work.length + knowledge.length + clients.length + documents.length,
+      groups,
+    };
   },
 
   async askAssistant(accessToken: string | null, question: string): Promise<AssistantResponse> {
@@ -1988,6 +2097,104 @@ function buildCompensation(db: DB, employeeId: string): Compensation {
 
 // --- goals (mock, in-memory; resets on reload) ------------------------------
 const mockGoals: Record<string, Goal[]> = {};
+
+// --- attendance (mock, in-memory; resets on reload) -------------------------
+type MockAttendance = {
+  employeeId: string; date: string; status: AttendanceStatus;
+  checkIn: string | null; checkOut: string | null; note: string | null;
+};
+/** Keyed "employeeId|date" — the same uniqueness the real table enforces. */
+const mockAttendance: Record<string, MockAttendance> = {};
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function nowTime(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function attendanceRow(employeeId: string, date: string, fallback: AttendanceStatus): MockAttendance {
+  const key = `${employeeId}|${date}`;
+  return (mockAttendance[key] ??= {
+    employeeId, date, status: fallback, checkIn: null, checkOut: null, note: null,
+  });
+}
+function myEmployeeId(db: DB, user: User): string {
+  const emp = db.employees.find((e) => e.userId === user.id && e.companyId === user.companyId);
+  if (!emp) throw err(404, "NOT_FOUND", "No employee profile for this user");
+  return emp.id;
+}
+
+/**
+ * Mirrors `AttendanceService.resolve`: a marked row wins, then approved leave, then weekends,
+ * else unmarked (null status).
+ */
+function resolveAttendance(db: DB, employeeId: string, date: string): AttendanceEntry {
+  const emp = db.employees.find((e) => e.id === employeeId);
+  const u = emp && db.users.find((x) => x.id === emp.userId);
+  const base = {
+    employeeId,
+    employeeName: u ? `${u.firstName} ${u.lastName}` : "Employee",
+    jobTitle: emp?.jobTitle ?? null,
+    department: db.departments.find((d) => d.id === emp?.departmentId)?.name ?? null,
+    date,
+  };
+  const marked = mockAttendance[`${employeeId}|${date}`];
+  if (marked) {
+    return { ...base, status: marked.status, checkIn: marked.checkIn, checkOut: marked.checkOut, note: marked.note, derived: false };
+  }
+  const leave = db.leave.find(
+    (l) => l.employeeId === employeeId && l.status === "APPROVED" && l.startDate <= date && l.endDate >= date,
+  );
+  if (leave) {
+    return {
+      ...base, status: "ON_LEAVE", checkIn: null, checkOut: null,
+      note: leave.type.toLowerCase() + (leave.reason ? ` · ${leave.reason}` : ""), derived: true,
+    };
+  }
+  const dow = new Date(`${date}T00:00:00`).getDay();
+  if (dow === 0 || dow === 6) {
+    return { ...base, status: "WEEK_OFF", checkIn: null, checkOut: null, note: null, derived: true };
+  }
+  return { ...base, status: null, checkIn: null, checkOut: null, note: null, derived: true };
+}
+
+function buildAttendanceMonth(db: DB, employeeId: string, month?: string): AttendanceMonth {
+  const ym = month || todayIso().slice(0, 7);
+  const [year, mon] = ym.split("-").map(Number);
+  const length = new Date(year, mon, 0).getDate();
+  const today = todayIso();
+
+  const days: AttendanceEntry[] = [];
+  const counts: Record<string, number> = {};
+  let worked = 0;
+  let expected = 0;
+  for (let d = 1; d <= length; d++) {
+    const date = `${ym}-${String(d).padStart(2, "0")}`;
+    const entry = resolveAttendance(db, employeeId, date);
+    days.push(entry);
+    if (!entry.status) continue;
+    counts[entry.status] = (counts[entry.status] ?? 0) + 1;
+    const nonWorkingDay = entry.status === "HOLIDAY" || entry.status === "WEEK_OFF";
+    if (!nonWorkingDay && date <= today) {
+      expected++;
+      if (entry.status === "HALF_DAY") worked += 0.5;
+      else if (entry.status === "PRESENT" || entry.status === "WORK_FROM_HOME") worked += 1;
+    }
+  }
+  const emp = db.employees.find((e) => e.id === employeeId);
+  const u = emp && db.users.find((x) => x.id === emp.userId);
+  return {
+    employeeId,
+    employeeName: u ? `${u.firstName} ${u.lastName}` : "Employee",
+    month: ym,
+    days,
+    counts,
+    workedDays: Math.round(worked * 10) / 10,
+    expectedDays: expected,
+    attendanceRate: expected === 0 ? null : Math.round((worked * 1000) / expected) / 10,
+  };
+}
 
 // --- documents (mock, in-memory; resets on reload) --------------------------
 const mockTemplates: Record<string, DocumentTemplate[]> = {};

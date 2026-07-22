@@ -9,6 +9,7 @@ import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.CurrentUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,9 +23,13 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/** Clients + their requests (feedback D1 ⭐). Tenant-scoped; auth required. */
+/**
+ * Clients + their requests (feedback D1 ⭐). Tenant-scoped and **Owner/Admin only** — the customer
+ * list, contacts and commercial asks are not something every member should browse.
+ */
 @RestController
 @RequestMapping("/api/v1/clients")
+@PreAuthorize("hasAnyRole('OWNER','ADMIN')")
 public class ClientController {
 
     private final ClientService clientService;

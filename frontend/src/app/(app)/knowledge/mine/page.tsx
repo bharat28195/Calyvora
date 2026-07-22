@@ -18,10 +18,7 @@ export default function MyPagesPage() {
 
   return (
     <div>
-      <Link href="/knowledge" className="inline-flex items-center gap-1.5 text-sm text-fg/50 hover:text-fg">
-        <ArrowLeft className="h-4 w-4" /> Knowledge
-      </Link>
-      <h1 className="mt-3 text-2xl font-semibold tracking-tight">My pages</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">My pages</h1>
       <p className="mt-1 text-fg/50">Everything you&apos;ve authored, across every space.</p>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}

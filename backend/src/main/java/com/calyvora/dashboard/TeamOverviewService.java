@@ -6,8 +6,10 @@ import com.calyvora.dashboard.dto.TeamOverviewResponse.CalendarLeave;
 import com.calyvora.dashboard.dto.TeamOverviewResponse.LeaveToday;
 import com.calyvora.identity.UserRepository;
 import com.calyvora.identity.UserStatus;
+import com.calyvora.people.AttendanceService;
 import com.calyvora.people.EmployeeService;
 import com.calyvora.people.LeaveRequest;
+import com.calyvora.people.dto.AttendanceDayResponse;
 import com.calyvora.people.LeaveRequestRepository;
 import com.calyvora.people.LeaveStatus;
 import com.calyvora.people.dto.EmployeeResponse;
@@ -30,12 +32,14 @@ public class TeamOverviewService {
     private final UserRepository userRepository;
     private final LeaveRequestRepository leaveRepository;
     private final EmployeeService employeeService;
+    private final AttendanceService attendanceService;
 
     public TeamOverviewService(UserRepository userRepository, LeaveRequestRepository leaveRepository,
-                               EmployeeService employeeService) {
+                               EmployeeService employeeService, AttendanceService attendanceService) {
         this.userRepository = userRepository;
         this.leaveRepository = leaveRepository;
         this.employeeService = employeeService;
+        this.attendanceService = attendanceService;
     }
 
     @Transactional(readOnly = true)
@@ -77,8 +81,11 @@ public class TeamOverviewService {
             }
         }
 
-        long onLeaveToday = outToday.size();
-        long present = Math.max(0, headcount - onLeaveToday);
-        return new TeamOverviewResponse(headcount, present, onLeaveToday, outToday, monthLeaves);
+        // The day sheet already resolves each person: a marked row wins, an unmarked day falls back to
+        // approved leave. Unmarked people are still counted as in (the phase-1 assumption), but we
+        // report how many that is — so the owner can see how much of "present" is assumed.
+        AttendanceDayResponse sheet = attendanceService.day(today);
+        return new TeamOverviewResponse(headcount, sheet.present() + sheet.unmarked(), sheet.onLeave(),
+                sheet.unmarked(), outToday, monthLeaves);
     }
 }

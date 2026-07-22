@@ -65,6 +65,26 @@ class ClientIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    void clients_are_owner_admin_only_and_dont_leak_through_search() throws Exception {
+        mockMvc.perform(post("/api/v1/dev/seed-demo")).andExpect(status().isOk());
+        Session member = login("priya.nair@northwind.demo", "demopass123");   // MEMBER
+        String auth = "Bearer " + member.accessToken();
+
+        mockMvc.perform(get("/api/v1/clients").header("Authorization", auth)).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/clients").header("Authorization", auth)
+                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("name", "Sneaky"))))
+                .andExpect(status().isForbidden());
+
+        // the search box must not become a side door around the role gate
+        JsonNode search = getJson("/api/v1/search?q=globex", member);
+        for (JsonNode g : search.get("groups")) {
+            for (JsonNode hit : g.get("hits")) {
+                assertThat(hit.get("kind").asText()).isNotEqualTo("client");
+            }
+        }
+    }
+
+    @Test
     void seeded_demo_has_clients_and_they_are_searchable() throws Exception {
         mockMvc.perform(post("/api/v1/dev/seed-demo")).andExpect(status().isOk());
         Session owner = login("ava.chen@northwind.demo", "demopass123");

@@ -4,6 +4,36 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-22 — Founder feedback: C.4 / B6 phase 2 — **daily attendance**
+Phase 1 inferred "present vs on leave" from approved leave. This is the real record: one row per
+employee per day (`attendance_records`, Flyway **V18**, RLS, unique on employee+day). **10 new tests
+(105 total).**
+
+- **Two rules keep it from becoming double data entry:** approved leave **auto-fills** the day (so time
+  off is never entered twice) and a **marked row always wins** over anything derived. Weekends resolve
+  to week-off; a day nobody marked reports as *unmarked* rather than inventing a value.
+- **Self-service:** `POST /people/attendance/me/check-in` (idempotent — clocking in twice doesn't move
+  the time) and `/check-out`, plus `GET /people/attendance/me?month=`.
+- **Owner/Admin:** `GET /people/attendance/day?date=` is the team sheet; `POST /people/attendance/mark`
+  marks or corrects anyone's day (future dates rejected); `GET /people/attendance/employees/{id}?month=`.
+- **Month summary** counts worked days (half days as 0.5) over *expected* days — holidays, week-offs and
+  future dates excluded — so the attendance % means something.
+- **UI:** People → **Attendance** sub-pane. Check in/out card, team day sheet with one-click marking,
+  and a month grid. Counts are **clickable drill-downs** ("on leave" → exactly who), with a **per-team
+  breakdown**. Demo seeds 14 days with a believable mix of WFH, a half day and an absence.
+- Dashboard tiles now link into the day sheet and disclose how many of "present today" are merely
+  unmarked — the number is honest about what's recorded vs assumed.
+
+### 2026-07-22 — Clients restricted to Owner/Admin
+The customer list, contacts and commercial asks were visible to every member. `ClientController` is now
+role-gated, the sidebar tab is hidden for members, and **global search filters Clients and Documents for
+non-admins** so the search box can't become a side door around the role gate. Test-covered.
+
+### 2026-07-22 — Work & Knowledge get left-pane sub-panes
+Matching the People pattern the founder asked for: **Work → Projects / My work** and **Knowledge →
+Spaces / My pages** now live in the left pane, and the on-page "My work →" / "My pages →" links and
+back-links were removed.
+
 ### 2026-07-22 — Founder feedback: Bucket D2 + D3 — **Documents & templates**
 "Fill in a name → a proper document is generated." A new `com.calyvora.document` module: a per-company
 **template library** and the letters generated from it. **12 new tests (95 total), all green.**

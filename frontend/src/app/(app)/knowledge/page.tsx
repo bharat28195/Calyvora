@@ -38,9 +38,7 @@ export default function KnowledgePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Knowledge</h1>
-          <p className="mt-1 text-fg/50">
-            Docs &amp; wiki, linked to people and work. <Link href="/knowledge/mine" className="text-violet hover:underline">My pages →</Link>
-          </p>
+          <p className="mt-1 text-fg/50">Docs &amp; wiki, linked to the people and work they&apos;re about.</p>
         </div>
         <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> New space</Button>
       </div>

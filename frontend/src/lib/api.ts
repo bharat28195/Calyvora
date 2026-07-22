@@ -15,6 +15,10 @@ import {
   type Client,
   type ClientDetail,
   type ClientRequestItem,
+  type AttendanceDay,
+  type AttendanceEntry,
+  type AttendanceMonth,
+  type MarkAttendanceInput,
   type DocumentTemplate,
   type DocumentPreview,
   type GeneratedDoc,
@@ -465,6 +469,32 @@ export const api = {
   },
   deleteClientRequest(clientId: string, requestId: string): Promise<void> {
     return LIVE ? http<void>(`/clients/${clientId}/requests/${requestId}`, { method: "DELETE" }) : mockBackend.deleteClientRequest(accessToken, clientId, requestId);
+  },
+
+  // --- attendance (daily record) ---
+  attendanceToday(): Promise<AttendanceEntry> {
+    return LIVE ? http<AttendanceEntry>("/people/attendance/me/today") : mockBackend.attendanceToday(accessToken);
+  },
+  checkIn(): Promise<AttendanceEntry> {
+    return LIVE ? http<AttendanceEntry>("/people/attendance/me/check-in", { method: "POST" }) : mockBackend.checkIn(accessToken);
+  },
+  checkOut(): Promise<AttendanceEntry> {
+    return LIVE ? http<AttendanceEntry>("/people/attendance/me/check-out", { method: "POST" }) : mockBackend.checkOut(accessToken);
+  },
+  myAttendance(month?: string): Promise<AttendanceMonth> {
+    const qs = month ? `?month=${month}` : "";
+    return LIVE ? http<AttendanceMonth>(`/people/attendance/me${qs}`) : mockBackend.myAttendance(accessToken, month);
+  },
+  attendanceDay(date?: string): Promise<AttendanceDay> {
+    const qs = date ? `?date=${date}` : "";
+    return LIVE ? http<AttendanceDay>(`/people/attendance/day${qs}`) : mockBackend.attendanceDay(accessToken, date);
+  },
+  markAttendance(input: MarkAttendanceInput): Promise<AttendanceEntry> {
+    return LIVE ? http<AttendanceEntry>("/people/attendance/mark", { method: "POST", body: JSON.stringify(input) }) : mockBackend.markAttendance(accessToken, input);
+  },
+  employeeAttendance(employeeId: string, month?: string): Promise<AttendanceMonth> {
+    const qs = month ? `?month=${month}` : "";
+    return LIVE ? http<AttendanceMonth>(`/people/attendance/employees/${employeeId}${qs}`) : mockBackend.employeeAttendance(accessToken, employeeId, month);
   },
 
   // --- documents (templates + generated letters) ---

@@ -13,8 +13,9 @@ searchable member picker, always-on Knowledge search, selectable sprint types, *
 **branding** (product = **Orbit**), **Bucket B** (role-based dashboard + team overview: headcount, present vs
 on-leave, leave reasons, **leave calendar** — attendance *derived from leave*, phase 1), **Bucket C**
 (salary + hike history + payslips V13 · richer profiles/skills/ratings V14 · goals V15), **D1 Clients ⭐**
-(V16), and **D2+D3 Documents & templates** (V17). People and Documents both have **left-pane sub-panes**.
-**95 backend tests, all live & verified.**
+(V16), **D2+D3 Documents & templates** (V17), and **C.4 daily attendance** (V18). People, Documents,
+Work and Knowledge all have **left-pane sub-panes**; Clients + Documents are **Owner/Admin-only**.
+**105 backend tests, all live & verified.**
 **Next:** C.4 full daily attendance (phase 2) → C.7 fuller review cycle → D4 Notifications → D5 Inbox →
 BR3 modular packaging. (C.9 and D6 need the founder to confirm scope.)
 
@@ -151,7 +152,19 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
 - **S3 Tickets** — `Ticket` (subject/requester/status/priority, ref `KEY-T{n}`, assignee = People employee);
   `/work/projects/{id}/tickets`, `PATCH/DELETE /work/tickets/{id}`. **Debt: graduates to Service OS (SD-22b).**
 
-## 6d. Clients module (founder D1 ⭐) — ✅ COMPLETE
+## 6f. Attendance (founder C.4 / B6 phase 2) — ✅ COMPLETE
+`com.calyvora.people` Attendance*, Flyway **V18** (`attendance_records`, RLS, unique employee+day).
+- **Resolution order:** marked row → approved leave (auto-filled, flagged `derived`) → weekend
+  (`WEEK_OFF`) → unmarked (`status: null`). A marked row always wins, so corrections stick.
+- **Self:** `GET/POST /people/attendance/me/today|check-in|check-out`, `GET /people/attendance/me?month=`.
+  Check-in is idempotent. **Admin:** `/attendance/day?date=`, `/attendance/mark`, `/attendance/employees/{id}`.
+- **Month summary:** worked days (half = 0.5) ÷ expected days (excludes holidays, week-offs, future).
+- **UI:** People → **Attendance**. Check in/out, team day sheet with one-click marking, month grid.
+  Counts are clickable drill-downs + per-team breakdown. Dashboard tiles link here and disclose the
+  unmarked count. Demo seeds 14 days.
+- **Debt:** the work-week is hardcoded Mon–Fri and there's no holiday calendar; both need policy config.
+
+## 6d. Clients module (founder D1 ⭐, Owner/Admin-only) — ✅ COMPLETE
 Backend `com.calyvora.client`, Flyway **V16** (`clients` + `client_requests`, both RLS). `/api/v1/clients`
 CRUD + `/{id}/requests` CRUD with open-request rollups; sidebar **Clients** tab (list + detail); global
 search returns client hits; demo seeds 3 clients with requests.
@@ -179,8 +192,9 @@ Backend `com.calyvora.document`, Flyway **V17** (`document_templates` + `generat
 - **★ Founder feedback backlog (2026-07-22) — the active roadmap:** all handwritten notes transcribed &
   status-tracked in **[docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)**. Buckets A, B
   (phase 1), C (except C.4/C.7/C.9), **D1 Clients ⭐** and **D2+D3 Documents & templates** are shipped.
-  **Still open:** C.4 full daily attendance (phase 2) · C.7 fuller review cycle · D4 Notifications ·
-  D5 Inbox · BR3 modular packaging/entitlements · (C.9 + D6 need scope confirmation from the founder).
+  **Still open:** C.7 fuller review cycle · **D4 Notifications + D5 Inbox (next — a leave request must
+  notify the approving manager)** · BR3 modular packaging/entitlements · (C.9 + D6 need scope
+  confirmation from the founder).
   Branding done: product = **Orbit**, via `frontend/src/lib/brand.ts` + `Wordmark`.
 - **Foundation hardening (deferred Sprint-1 debt — CLEARED 2026-07-21):**
   ~~Postgres RLS (SD-2)~~ **DONE** (SD-2a..d — RLS `ENABLE`+`FORCE` on all 11 tenant tables, V12,

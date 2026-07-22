@@ -37,9 +37,7 @@ export default function WorkPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Work</h1>
-          <p className="mt-1 text-fg/50">
-            Projects and tasks. <Link href="/work/mine" className="text-violet hover:underline">My work →</Link>
-          </p>
+          <p className="mt-1 text-fg/50">Projects, sprints and the work in flight.</p>
         </div>
         <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> New project</Button>
       </div>
