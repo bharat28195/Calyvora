@@ -16,6 +16,7 @@ import {
   type Compensation,
   type Payslip,
   type WorkItem,
+  type Goal,
   type Department,
   type Employee,
   type Invitation,
@@ -716,6 +717,42 @@ export const mockBackend = {
         };
       })
       .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+  },
+
+  async employeeGoals(accessToken: string | null, employeeId: string): Promise<Goal[]> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    return (mockGoals[employeeId] ?? []).slice();
+  },
+  async createGoal(accessToken: string | null, employeeId: string, input: { title: string; description?: string; targetDate?: string }): Promise<Goal> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    const goal: Goal = {
+      id: crypto.randomUUID(), title: input.title, description: input.description || null,
+      status: "OPEN", progress: 0, targetDate: input.targetDate || null, createdAt: new Date().toISOString(),
+    };
+    mockGoals[employeeId] = [goal, ...(mockGoals[employeeId] ?? [])];
+    return goal;
+  },
+  async updateGoal(accessToken: string | null, employeeId: string, goalId: string, patch: Partial<Goal>): Promise<Goal> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    const list = mockGoals[employeeId] ?? [];
+    const g = list.find((x) => x.id === goalId);
+    if (!g) throw err(404, "NOT_FOUND", "Goal not found");
+    Object.assign(g, patch);
+    if (patch.progress === 100 && g.status === "OPEN") g.status = "ACHIEVED";
+    if (patch.status === "ACHIEVED") g.progress = 100;
+    return g;
+  },
+  async deleteGoal(accessToken: string | null, employeeId: string, goalId: string): Promise<void> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    mockGoals[employeeId] = (mockGoals[employeeId] ?? []).filter((x) => x.id !== goalId);
   },
 
   async listEmployees(accessToken: string | null): Promise<Employee[]> {
@@ -1765,3 +1802,6 @@ function buildCompensation(db: DB, employeeId: string): Compensation {
     history,
   };
 }
+
+// --- goals (mock, in-memory; resets on reload) ------------------------------
+const mockGoals: Record<string, Goal[]> = {};

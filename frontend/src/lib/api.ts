@@ -11,6 +11,7 @@ import {
   type Department,
   type Employee,
   type WorkItem,
+  type Goal,
   type Invitation,
   type LeaveBalance,
   type LeaveRequest,
@@ -169,6 +170,21 @@ export const api = {
   // --- People OS (employees) ---
   employeeWork(employeeId: string): Promise<WorkItem[]> {
     return LIVE ? http<WorkItem[]>(`/people/employees/${employeeId}/work`) : mockBackend.employeeWork(accessToken, employeeId);
+  },
+  employeeGoals(employeeId: string): Promise<Goal[]> {
+    return LIVE ? http<Goal[]>(`/people/employees/${employeeId}/goals`) : mockBackend.employeeGoals(accessToken, employeeId);
+  },
+  createGoal(employeeId: string, input: { title: string; description?: string; targetDate?: string }): Promise<Goal> {
+    return LIVE ? http<Goal>(`/people/employees/${employeeId}/goals`, { method: "POST", body: JSON.stringify(input) })
+      : mockBackend.createGoal(accessToken, employeeId, input);
+  },
+  updateGoal(employeeId: string, goalId: string, patch: Partial<Pick<Goal, "title" | "description" | "status" | "progress" | "targetDate">>): Promise<Goal> {
+    return LIVE ? http<Goal>(`/people/employees/${employeeId}/goals/${goalId}`, { method: "PATCH", body: JSON.stringify(patch) })
+      : mockBackend.updateGoal(accessToken, employeeId, goalId, patch);
+  },
+  deleteGoal(employeeId: string, goalId: string): Promise<void> {
+    return LIVE ? http<void>(`/people/employees/${employeeId}/goals/${goalId}`, { method: "DELETE" })
+      : mockBackend.deleteGoal(accessToken, employeeId, goalId);
   },
   listEmployees(): Promise<Employee[]> {
     return LIVE ? http<Employee[]>("/people/employees") : mockBackend.listEmployees(accessToken);

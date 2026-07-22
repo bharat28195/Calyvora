@@ -47,8 +47,8 @@
 | C4 | **Richer employee profile**: what he/she is working on · when started / end date · delay vs advance · how they're performing | p2 | ✅ | **Working on** = open tasks assigned to them (`GET /people/employees/{id}/work`, in `work` pkg to avoid a cycle) with **overdue** flag (= "delay"). **End date** added (V14). "How performing" = the rating (C6). |
 | C5 | **Full employee details + skills** | p3 | ✅ | `skills` (comma-sep, V14) as editable chips on the profile + edit dialog. |
 | C6 | **Ratings** | p3 | ✅ | 1–5 star `rating` (V14), shown on profile, editable by admin. (Deeper "performance" = C7.) |
-| C7 | **Performance** | p3 | ⬜ | Performance module. |
-| C8 | **Goals** | p3 | ⬜ | Goals/OKRs. |
+| C7 | **Performance** | p3 | 🔜 (partial) | Covered for now by the **rating** (C6) + **goals progress** (C8). A fuller review-cycle module (periodic reviews, reviewer, cycle) is future. |
+| C8 | **Goals** | p3 | ✅ | `goals` table (V15, RLS) + `GET/POST/PATCH/DELETE /people/employees/{id}/goals`. Editable by admin or the goal owner (self-service). Progress bar + status; 100% → auto-ACHIEVED. Demo seeds goals. |
 | C9 | **Kanban-like section in employee tab** ("look on kanban like it has one section") | p3 | ⬜ | *Ambiguous* — confirm intent (employee view laid out like a board?). |
 
 ---

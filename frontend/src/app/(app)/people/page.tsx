@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmployeeCompensation } from "@/components/people/employee-compensation";
 import { EmployeeProfileExtras } from "@/components/people/employee-profile-extras";
+import { EmployeeGoals } from "@/components/people/employee-goals";
 
 const TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"] as const;
 const STATUSES = ["ONBOARDING", "ACTIVE", "TERMINATED"] as const;
@@ -231,6 +232,8 @@ function EmployeeDetailModal({
       </dl>
 
       <EmployeeProfileExtras employee={employee} />
+
+      <EmployeeGoals employeeId={employee.id} canEdit={admin || isSelf} />
 
       {admin && (
         <div className="mt-6">

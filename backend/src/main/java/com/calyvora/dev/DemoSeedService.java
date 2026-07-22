@@ -81,6 +81,7 @@ public class DemoSeedService {
     private final SpaceService spaceService;
     private final PageService pageService;
     private final com.calyvora.people.CompensationRepository compensationRepository;
+    private final com.calyvora.people.GoalRepository goalRepository;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -89,8 +90,10 @@ public class DemoSeedService {
                            ProjectService projectService, SprintService sprintService,
                            TaskService taskService, TicketService ticketService,
                            SpaceService spaceService, PageService pageService,
-                           com.calyvora.people.CompensationRepository compensationRepository) {
+                           com.calyvora.people.CompensationRepository compensationRepository,
+                           com.calyvora.people.GoalRepository goalRepository) {
         this.compensationRepository = compensationRepository;
+        this.goalRepository = goalRepository;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
         this.userRepository = userRepository;
@@ -164,6 +167,12 @@ public class DemoSeedService {
         seedComp(emp, leo.getEmail(), 120000, owner);
         seedComp(emp, sara.getEmail(), 92000, owner);
         seedComp(emp, tom.getEmail(), 135000, owner);
+
+        // A few goals so Performance/Goals looks real.
+        seedGoal(emp, marcus.getEmail(), "Complete the RLS rollout across all tenant tables", 80, owner);
+        seedGoal(emp, priya.getEmail(), "Ship RS256 key-rotation runbook", 60, owner);
+        seedGoal(emp, priya.getEmail(), "Mentor one junior engineer this quarter", 30, owner);
+        seedGoal(emp, sara.getEmail(), "Cut average ticket response time to under 2 hours", 45, owner);
 
         // --- Work: project, active sprint, tasks, tickets -------------------
         ProjectResponse atlas = projectService.create(new CreateProjectRequest(
@@ -271,6 +280,15 @@ public class DemoSeedService {
                 UUID.randomUUID(), owner.companyId(), employeeId, LocalDate.now().minusYears(1),
                 java.math.BigDecimal.valueOf(currentAnnual), "USD",
                 com.calyvora.people.CompensationChangeType.HIKE, "Annual review raise", owner.userId()));
+    }
+
+    private void seedGoal(Map<String, EmployeeResponse> emp, String email, String title, int progress, AuthPrincipal owner) {
+        UUID employeeId = UUID.fromString(emp.get(email).id());
+        com.calyvora.people.Goal g = new com.calyvora.people.Goal(
+                UUID.randomUUID(), owner.companyId(), employeeId, title, null,
+                LocalDate.now().plusMonths(2), owner.userId());
+        g.setProgress(progress);
+        goalRepository.save(g);
     }
 
     private static CreateDepartmentRequest dept(String name, UUID leadUserId) {

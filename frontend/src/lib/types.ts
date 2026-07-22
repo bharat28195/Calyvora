@@ -72,6 +72,16 @@ export interface Employee {
   rating: number | null;
 }
 
+export interface Goal {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "OPEN" | "ACHIEVED" | "MISSED";
+  progress: number;
+  targetDate: string | null;
+  createdAt: string;
+}
+
 export interface WorkItem {
   ref: string;
   title: string;
