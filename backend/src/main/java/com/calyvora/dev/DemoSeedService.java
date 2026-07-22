@@ -83,6 +83,7 @@ public class DemoSeedService {
     private final com.calyvora.people.CompensationRepository compensationRepository;
     private final com.calyvora.people.GoalRepository goalRepository;
     private final com.calyvora.client.ClientService clientService;
+    private final com.calyvora.document.DocumentService documentService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -93,10 +94,12 @@ public class DemoSeedService {
                            SpaceService spaceService, PageService pageService,
                            com.calyvora.people.CompensationRepository compensationRepository,
                            com.calyvora.people.GoalRepository goalRepository,
-                           com.calyvora.client.ClientService clientService) {
+                           com.calyvora.client.ClientService clientService,
+                           com.calyvora.document.DocumentService documentService) {
         this.compensationRepository = compensationRepository;
         this.goalRepository = goalRepository;
         this.clientService = clientService;
+        this.documentService = documentService;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
         this.userRepository = userRepository;
@@ -150,17 +153,20 @@ public class DemoSeedService {
         Map<String, EmployeeResponse> emp = employeesByEmail();
         String mgrMarcus = emp.get(marcus.getEmail()).id();
         String mgrTom = emp.get(tom.getEmail()).id();
-        profile(emp, OWNER_EMAIL, "Founder & CEO", engineering.id(), null, "2021-01-04",
+        String mgrAva = emp.get(OWNER_EMAIL).id();
+        // Employee numbers and reporting lines are filled in so generated letters (Documents) read
+        // like real paperwork rather than a form with gaps.
+        profile(emp, OWNER_EMAIL, "NR-001", "Founder & CEO", engineering.id(), null, "2021-01-04",
                 java.util.List.of("Leadership", "Product Strategy", "Fundraising"), 5);
-        profile(emp, marcus.getEmail(), "Engineering Lead", engineering.id(), null, "2021-03-15",
+        profile(emp, marcus.getEmail(), "NR-002", "Engineering Lead", engineering.id(), mgrAva, "2021-03-15",
                 java.util.List.of("Java", "Spring Boot", "System Design", "Postgres"), 5);
-        profile(emp, priya.getEmail(), "Senior Software Engineer", engineering.id(), mgrMarcus, "2022-06-01",
+        profile(emp, priya.getEmail(), "NR-003", "Senior Software Engineer", engineering.id(), mgrMarcus, "2022-06-01",
                 java.util.List.of("TypeScript", "React", "Security", "RS256"), 4);
-        profile(emp, leo.getEmail(), "Product Designer", design.id(), null, "2022-09-12",
+        profile(emp, leo.getEmail(), "NR-004", "Product Designer", design.id(), mgrAva, "2022-09-12",
                 java.util.List.of("Figma", "Design Systems", "Prototyping"), 4);
-        profile(emp, sara.getEmail(), "Support Specialist", support.id(), null, "2023-02-20",
+        profile(emp, sara.getEmail(), "NR-005", "Support Specialist", support.id(), mgrTom, "2023-02-20",
                 java.util.List.of("Customer Success", "Zendesk", "Troubleshooting"), 4);
-        profile(emp, tom.getEmail(), "Sales Manager", sales.id(), null, "2021-11-08",
+        profile(emp, tom.getEmail(), "NR-006", "Sales Manager", sales.id(), mgrAva, "2021-11-08",
                 java.util.List.of("B2B Sales", "Negotiation", "CRM"), 3);
 
         // Compensation history (initial salary + a review hike) so salary/hikes/payslips look real.
@@ -245,6 +251,30 @@ public class DemoSeedService {
                 new String[]{"Trial extension to 30 days:DELIVERED", "Bulk CSV employee import:REQUESTED"});
         seedClient(owner, "Umbrella Inc", "Ada Wong", "ada@umbrella.com", "ACTIVE",
                 new String[]{"Custom SLA (99.9%):IN_PROGRESS", "Data residency in EU:REQUESTED", "Quarterly business review:DELIVERED"});
+
+        // --- Documents: the starter template library + a couple of issued letters ---
+        seedDocuments(owner, emp, List.of(leo.getEmail(), sara.getEmail()));
+    }
+
+    /**
+     * Seeds the starter templates (by listing them — the same first-open path a real company takes)
+     * and issues a joining letter for a couple of recent hires, so the module opens with history.
+     */
+    private void seedDocuments(AuthPrincipal owner, Map<String, EmployeeResponse> emp, List<String> emails) {
+        var templates = documentService.listTemplates(owner);
+        var joining = templates.stream()
+                .filter(t -> "JOINING_LETTER".equals(t.kind())).findFirst().orElse(null);
+        if (joining == null) {
+            return;
+        }
+        for (String email : emails) {
+            EmployeeResponse e = emp.get(email);
+            if (e == null) {
+                continue;
+            }
+            documentService.generate(new com.calyvora.document.dto.GenerateRequest(
+                    joining.id(), e.id(), null, Map.of()), owner);
+        }
     }
 
     private void seedClient(AuthPrincipal owner, String name, String contact, String email, String status, String[] requests) {
@@ -282,12 +312,12 @@ public class DemoSeedService {
         return byEmail;
     }
 
-    private void profile(Map<String, EmployeeResponse> emp, String email, String title,
+    private void profile(Map<String, EmployeeResponse> emp, String email, String employeeNo, String title,
                          String departmentId, String managerId, String startDate,
                          java.util.List<String> skills, Integer rating) {
         EmployeeResponse e = emp.get(email);
         employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
-                null, title, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate,
+                employeeNo, title, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate,
                 null, skills, rating));
     }
 

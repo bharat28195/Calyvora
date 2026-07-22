@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Loader2, LogOut, LayoutDashboard, Users, FolderKanban, BookOpen, UserCog, Settings, Handshake,
+  Loader2, LogOut, LayoutDashboard, Users, FolderKanban, BookOpen, UserCog, Settings, Handshake, FileText,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,14 @@ const NAV: NavItem[] = [
   { href: "/work", label: "Work", icon: FolderKanban },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
   { href: "/clients", label: "Clients", icon: Handshake },
+  {
+    href: "/documents", label: "Documents", icon: FileText, roles: ["OWNER", "ADMIN"],
+    children: [
+      { href: "/documents", label: "Issued" },
+      { href: "/documents/new", label: "Generate" },
+      { href: "/documents/templates", label: "Templates" },
+    ],
+  },
   { href: "/members", label: "Members", icon: UserCog, roles: ["OWNER", "ADMIN"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["OWNER", "ADMIN"] },
 ];

@@ -45,11 +45,13 @@ public class SearchService {
     private final SpaceRepository spaceRepository;
     private final PageRepository pageRepository;
     private final com.calyvora.client.ClientRepository clientRepository;
+    private final com.calyvora.document.GeneratedDocumentRepository documentRepository;
 
     public SearchService(UserRepository userRepository, ProjectRepository projectRepository,
                          TaskRepository taskRepository, TicketRepository ticketRepository,
                          SpaceRepository spaceRepository, PageRepository pageRepository,
-                         com.calyvora.client.ClientRepository clientRepository) {
+                         com.calyvora.client.ClientRepository clientRepository,
+                         com.calyvora.document.GeneratedDocumentRepository documentRepository) {
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
         this.taskRepository = taskRepository;
@@ -57,6 +59,7 @@ public class SearchService {
         this.spaceRepository = spaceRepository;
         this.pageRepository = pageRepository;
         this.clientRepository = clientRepository;
+        this.documentRepository = documentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -110,13 +113,20 @@ public class SearchService {
                     c.getContactName() == null ? "Client" : c.getContactName(), "/clients/" + c.getId()));
         }
 
+        List<SearchHit> documents = new ArrayList<>();
+        for (com.calyvora.document.GeneratedDocument d : documentRepository.search(companyId, q, LIMIT)) {
+            documents.add(new SearchHit("document", d.getTitle(),
+                    d.getKind().name().replace('_', ' ').toLowerCase(), "/documents/" + d.getId()));
+        }
+
         List<SearchGroup> groups = new ArrayList<>();
         if (!people.isEmpty()) groups.add(new SearchGroup("People", people));
         if (!work.isEmpty()) groups.add(new SearchGroup("Work", work));
         if (!knowledge.isEmpty()) groups.add(new SearchGroup("Knowledge", knowledge));
         if (!clients.isEmpty()) groups.add(new SearchGroup("Clients", clients));
+        if (!documents.isEmpty()) groups.add(new SearchGroup("Documents", documents));
 
-        int total = people.size() + work.size() + knowledge.size() + clients.size();
+        int total = people.size() + work.size() + knowledge.size() + clients.size() + documents.size();
         return new SearchResponse(q, total, groups);
     }
 }

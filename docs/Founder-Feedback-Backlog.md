@@ -58,8 +58,8 @@
 | # | Item | Source | Status | Notes |
 |---|------|--------|--------|-------|
 | D1 | ⭐ **Clients tab** — client details: what each client requested + all their info | p8 (starred) | ✅ | New `com.calyvora.client` module (V16, clients + client_requests, RLS). `/api/v1/clients` CRUD + `/{id}/requests` CRUD; open-request rollups. Sidebar **Clients** tab, list + detail (requests with status), global-search integration ("client" hits). Demo seeds 3 clients w/ requests. |
-| D2 | **Documentation tab** — auto-generate joining/resigning letters: fill in name → a proper document is generated | p7 | ⬜ | Document generation from templates. |
-| D3 | **Document templates** should be present | p7 | ⬜ | Template library backing D2. |
+| D2 | **Documentation tab** — auto-generate joining/resigning letters: fill in name → a proper document is generated | p7 | ✅ | New `com.calyvora.document` module (V17, `document_templates` + `generated_documents`, RLS). Pick a template + a person → every `{{merge.field}}` fills from the People profile (name, ID, title, department, manager, dates, tenure, **salary**), live preview, **unfilled fields flagged** with inline overrides. Issued letters are **frozen** (later template edits can't rewrite them), print/PDF + copy, and appear on the employee's profile. Owner/Admin-only. |
+| D3 | **Document templates** should be present | p7 | ✅ | Starter library seeded per company on first open — **offer · joining · relieving · experience · promotion** — all editable (click a merge field to insert at the cursor; live sample preview). Custom templates supported. |
 | D4 | **Notifications** | p3 | ⬜ | Notification system. |
 | D5 | **Inbox** | p3 | ⬜ | In-app inbox/messages. |
 | D6 | **Organization** | p3 | ⬜ | Org view (already have People → Org chart; confirm if this means more). |
@@ -86,3 +86,12 @@
 
 ## Change log for this backlog
 - **2026-07-22** — Created from the 8-page handwritten notes. Bucket A started: A4 (left nav) + A5 (wordmark) done; A1/A2/A3 in progress/next. Branding wiring (BR1/BR2) scaffolded via `brand.ts` + `Wordmark`.
+- **2026-07-22** — Buckets A, B (phase 1), C.1–C.3, C.5–C.6, C.8 and **D1 Clients ⭐** shipped. People got left-pane
+  sub-panes (Directory / Org chart / Time off).
+- **2026-07-22** — **D2 + D3 Documents & templates shipped.** Backend `document` module (V17, RLS), merge-field
+  engine, starter template library, generation + freezing, print/PDF, global-search integration, demo seeding
+  (2 joining letters + employee numbers and reporting lines so letters read complete). Left-pane **Documents**
+  sub-panes (Issued / Generate / Templates), Owner/Admin-only. **95 backend tests green.**
+
+**Remaining:** C.4 (full daily attendance, phase 2) · C.7 (fuller review cycle) · C.9 (*needs confirmation*) ·
+D4 Notifications · D5 Inbox · D6 Organization (*confirm scope*) · BR3 modular packaging.

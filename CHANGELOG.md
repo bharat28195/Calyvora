@@ -4,6 +4,35 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-22 — Founder feedback: Bucket D2 + D3 — **Documents & templates**
+"Fill in a name → a proper document is generated." A new `com.calyvora.document` module: a per-company
+**template library** and the letters generated from it. **12 new tests (95 total), all green.**
+
+- **Schema** (Flyway **V17**, both RLS-protected): `document_templates` (name, kind, body with
+  `{{merge.fields}}`, `built_in`) and `generated_documents` (frozen rendered body, kind, employee, issuer).
+- **Starter library** seeded per company on first open — **offer · joining · relieving · experience ·
+  promotion** — and fully editable afterwards, because a company's letters should read like theirs. We
+  never overwrite an edited template.
+- **Merge engine** (`MergeFields`, pure + unit-tested): named substitution only — no expressions. Values
+  resolve from the People profile (name, employee ID, title, department, **manager**, location, dates,
+  computed **tenure**) plus **compensation** and company/signatory context. A field with no value renders
+  as `—`, never a leftover `{{token}}`.
+- **Generation** — `POST /api/v1/documents/preview` is a dry run that reports **which fields came back
+  empty** so gaps are fixed *before* a letter goes out; `POST /api/v1/documents` issues it. Caller
+  `overrides` win over derived values, so the issuer can always correct what the profile got wrong.
+- **Issued letters are frozen** at generation time: editing a template afterwards cannot rewrite a
+  document someone already signed. (Covered by a test.)
+- **API**: `/api/v1/documents/templates` CRUD, `/documents/fields` (merge-field catalogue),
+  `/documents/preview`, `/documents` (issue/list, `?employeeId=`), `/documents/{id}` (get/delete).
+  Whole surface is **Owner/Admin-only** — these letters carry salary and exit details.
+- **UI**: left-pane **Documents** section with sub-panes **Issued / Generate / Templates**. Generate shows
+  a live paper-like preview, flags unfilled fields with inline override inputs, and issues in one click.
+  The template editor inserts merge fields at the cursor and previews with sample values. A letter view
+  offers **Print / PDF** (print CSS isolates the sheet) and copy. Employee profiles gain a **Documents**
+  section listing their letters + a "Generate" deep link.
+- **Global search** now returns issued documents; the demo seeds two joining letters, plus employee
+  numbers and reporting lines so the generated letters read complete.
+
 ### 2026-07-22 — Product named **Orbit** (by Calyvora)
 The product now has its own name — **Orbit** — with **Calyvora as the parent company**. Central
 `frontend/src/lib/brand.ts` drives a `Wordmark` ("Orbit by Calyvora") across the sidebar + auth pages;

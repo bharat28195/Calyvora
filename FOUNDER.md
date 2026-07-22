@@ -250,6 +250,24 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-09 · 2026-07-22 · Documents are generated from templates and then frozen
+- **Decision:** the Documents module (founder notes D2/D3) is a **per-company template library** plus
+  **immutable generated letters**. Starter templates (offer · joining · relieving · experience ·
+  promotion) are seeded on a company's first open and then belong to the company — we never overwrite an
+  edited template. A generated letter's body is **rendered once and frozen**; editing the template
+  afterwards cannot change a document that has already been issued.
+- **Why frozen:** an issued letter is a record, not a view. If a template edit rewrote history, no
+  employee could trust a letter we gave them, and we'd have no defensible answer to "what did you
+  actually issue me in March?" The cost is duplicated text; the benefit is that the record is real.
+- **Why a merge engine, not a document editor:** `{{named.substitution}}` with no expressions or logic.
+  The value comes from the data already in People (profile, manager, dates, salary) filling itself in —
+  not from another rich-text editor. A field with no value renders as `—` and the generate screen
+  **names the empty fields before you issue**, so a letter never goes out with visible plumbing in it.
+- **Owner/Admin-only:** these letters carry salary and exit details, so the whole surface is role-gated
+  rather than per-endpoint.
+- **Open:** e-signature, letterhead/branding upload, and DOCX export are deliberately not built yet;
+  print-to-PDF covers the demo and most real use.
+
 ### PD-08 · 2026-07-22 · Product named "Orbit"; Calyvora becomes the parent company
 - **Decision:** the Enterprise OS product is branded **Orbit**; **Calyvora** is the parent company. UI
   reads "Orbit by Calyvora". Implemented as a single switch in `frontend/src/lib/brand.ts`.
@@ -447,6 +465,31 @@ progressive delivery, OpenTelemetry observability. See [docs/06 §6.10–6.13](d
 ## 5. Weekly Progress Log
 
 > Auto-summarized at the end of each development week. Newest first.
+
+### Week of 2026-07-20 → 2026-07-22 (founder-feedback week)
+- **Features completed:** the founder's 8-page handwritten notes were transcribed into a living tracker
+  ([docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)) and worked in bucket order.
+  Shipped: **Bucket A** (searchable member picker fixing the "dropdown not working" bug, always-on
+  Knowledge search, sprint-length picker, **left sidebar nav**, wordmark), **branding → Orbit** (PD-08),
+  **Bucket B** (role-aware dashboard + team overview, present vs on-leave, leave calendar),
+  **Bucket C** (salary + hike history + payslips V13, richer profiles/skills/ratings V14, goals V15,
+  assigned-work with overdue flags), **D1 Clients ⭐** (V16), and **D2+D3 Documents & templates** (V17).
+  People and Documents both gained **left-pane sub-panes** at the founder's request.
+- **Decisions made:** **PD-08** (product = Orbit, Calyvora = parent), **PD-09** (documents generated from
+  templates then **frozen**; merge-substitution, not a document editor). Attendance settled as
+  *"both, phased"* — derived from leave now, full daily records later (C.4).
+- **In progress / next:** C.4 full daily attendance, C.7 fuller review cycle, D4 Notifications, D5 Inbox,
+  BR3 modular packaging. C.9 ("kanban in the employee tab") and D6 ("Organization") need scope
+  confirmation from the founder before building.
+- **Blockers:** none technical. Business blockers unchanged (design partners, pricing).
+- **Bugs discovered/fixed:** members dropdown unusable at scale (→ `MemberSelect`); `Goal` NPE on
+  create (assigned-id insert defers `@PrePersist` — initialize timestamps in the constructor);
+  schema-validation mismatch `smallint` vs `Integer` (V14 uses `integer`).
+- **Technical debt created:** the frontend mock now mirrors the merge engine + starter templates
+  (`frontend/src/lib/documents.ts`) — two copies to keep in sync, accepted so the mock demo doesn't lie.
+- **Lessons learned:** shipping in the founder's stated bucket order — and keeping the tracker updated as
+  each item lands — made "what's left?" answerable at any moment without re-reading the notes.
+- **Customer feedback:** the notes themselves (the founder acting as first customer).
 
 ### Week of 2026-06-30 → 2026-07-05
 - **Features completed:** none (pre-build). Foundational **architecture constitution** authored:

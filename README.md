@@ -4,11 +4,16 @@ The **AI-Native Enterprise Operating System** — one platform, one identity, on
 layer. This repository is a monorepo; the binding architecture lives in [`/docs`](docs/README.md) and
 the narrative decision log in [`FOUNDER.md`](FOUNDER.md).
 
+The product is branded **Orbit** (Calyvora is the parent company).
+
 The **Phase-1 trio is complete**: the Platform Foundation (Sprint 1) plus three full apps on it —
 **People OS**, **Work OS**, and **Knowledge OS** — all verified live, integrated by construction
-(a Knowledge page's author is a People employee and links a Work task). Sprint plans:
+(a Knowledge page's author is a People employee and links a Work task). Since then, founder feedback has
+added **Clients** and **Documents** (template-driven joining/relieving/offer letters that fill themselves
+in from People profiles). Sprint plans:
 [Sprint 1](docs/Sprint1.md) · [People OS](docs/Sprint2-PeopleOS.md) · [Work OS](docs/Sprint3-WorkOS.md) ·
-[Knowledge OS](docs/Sprint4-KnowledgeOS.md). Practical build/run state: [`CONTEXT.md`](CONTEXT.md).
+[Knowledge OS](docs/Sprint4-KnowledgeOS.md) · [Founder feedback backlog](docs/Founder-Feedback-Backlog.md).
+Practical build/run state: [`CONTEXT.md`](CONTEXT.md).
 
 ## Layout
 

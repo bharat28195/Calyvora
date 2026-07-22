@@ -20,6 +20,11 @@ import {
   type Client,
   type ClientDetail,
   type ClientRequestItem,
+  type DocumentTemplate,
+  type DocumentPreview,
+  type GeneratedDoc,
+  type GenerateDocInput,
+  type MergeField,
   type Department,
   type Employee,
   type Invitation,
@@ -39,6 +44,9 @@ import {
   type Member,
   type Role,
 } from "@/lib/types";
+import {
+  MERGE_FIELDS, STARTER_TEMPLATES, letterDate, placeholdersIn, renderTemplate, tenure,
+} from "@/lib/documents";
 
 const KEY = "calyvora_mock_db_v1";
 const SESSION_COOKIE = "calyvora_session";
@@ -583,6 +591,112 @@ export const mockBackend = {
     const db = load();
     requireSession(db, accessToken);
     mockClientReqs[clientId] = (mockClientReqs[clientId] ?? []).filter((x) => x.id !== requestId);
+  },
+
+  // --- documents: templates + generated letters (feedback D2/D3) ---
+  async docTemplates(accessToken: string | null): Promise<DocumentTemplate[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    if (!mockTemplates[user.companyId]) {
+      // Same first-open path as the real backend: seed the starter library once.
+      mockTemplates[user.companyId] = STARTER_TEMPLATES.map((s) => ({
+        id: crypto.randomUUID(), name: s.name, kind: s.kind, description: s.description,
+        body: s.body, builtIn: true, placeholders: placeholdersIn(s.body),
+        updatedAt: new Date().toISOString(),
+      }));
+    }
+    return mockTemplates[user.companyId].slice().sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async createDocTemplate(accessToken: string | null, input: { name: string; kind: string; description?: string; body: string }): Promise<DocumentTemplate> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const t: DocumentTemplate = {
+      id: crypto.randomUUID(), name: input.name, kind: (input.kind as DocumentTemplate["kind"]) ?? "CUSTOM",
+      description: input.description ?? null, body: input.body, builtIn: false,
+      placeholders: placeholdersIn(input.body), updatedAt: new Date().toISOString(),
+    };
+    mockTemplates[user.companyId] = [...(mockTemplates[user.companyId] ?? []), t];
+    return t;
+  },
+  async updateDocTemplate(accessToken: string | null, id: string, patch: Partial<DocumentTemplate>): Promise<DocumentTemplate> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const t = (mockTemplates[user.companyId] ?? []).find((x) => x.id === id);
+    if (!t) throw err(404, "NOT_FOUND", "Template not found");
+    Object.assign(t, patch);
+    t.placeholders = placeholdersIn(t.body);
+    t.updatedAt = new Date().toISOString();
+    return t;
+  },
+  async deleteDocTemplate(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    mockTemplates[user.companyId] = (mockTemplates[user.companyId] ?? []).filter((x) => x.id !== id);
+  },
+  async mergeFields(accessToken: string | null): Promise<MergeField[]> {
+    await delay();
+    requireAdmin(requireSession(load(), accessToken));
+    return MERGE_FIELDS.slice();
+  },
+  async previewDoc(accessToken: string | null, input: GenerateDocInput): Promise<DocumentPreview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const t = (mockTemplates[user.companyId] ?? []).find((x) => x.id === input.templateId);
+    if (!t) throw err(404, "NOT_FOUND", "Template not found");
+    const values = resolveMergeValues(db, user, input);
+    const missing = placeholdersIn(t.body).filter((k) => !values[k] || !values[k].trim());
+    return { title: docTitle(t.name, input, values), body: renderTemplate(t.body, values), values, missing };
+  },
+  async generateDoc(accessToken: string | null, input: GenerateDocInput): Promise<GeneratedDoc> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const t = (mockTemplates[user.companyId] ?? []).find((x) => x.id === input.templateId);
+    if (!t) throw err(404, "NOT_FOUND", "Template not found");
+    const values = resolveMergeValues(db, user, input);
+    const doc: GeneratedDoc = {
+      id: crypto.randomUUID(), title: docTitle(t.name, input, values), kind: t.kind,
+      employeeId: input.employeeId ?? null, employeeName: values["employee.fullName"] ?? null,
+      templateId: t.id, body: renderTemplate(t.body, values),   // frozen at issue time
+      generatedBy: values["signatory.name"] ?? null, createdAt: new Date().toISOString(),
+    };
+    mockDocs[user.companyId] = [doc, ...(mockDocs[user.companyId] ?? [])];
+    return doc;
+  },
+  async documents(accessToken: string | null, employeeId?: string): Promise<GeneratedDoc[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const all = mockDocs[user.companyId] ?? [];
+    return employeeId ? all.filter((d) => d.employeeId === employeeId) : all.slice();
+  },
+  async document(accessToken: string | null, id: string): Promise<GeneratedDoc> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const doc = (mockDocs[user.companyId] ?? []).find((d) => d.id === id);
+    if (!doc) throw err(404, "NOT_FOUND", "Document not found");
+    return doc;
+  },
+  async deleteDocument(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    mockDocs[user.companyId] = (mockDocs[user.companyId] ?? []).filter((d) => d.id !== id);
   },
 
   async teamOverview(accessToken: string | null): Promise<TeamOverview> {
@@ -1874,6 +1988,74 @@ function buildCompensation(db: DB, employeeId: string): Compensation {
 
 // --- goals (mock, in-memory; resets on reload) ------------------------------
 const mockGoals: Record<string, Goal[]> = {};
+
+// --- documents (mock, in-memory; resets on reload) --------------------------
+const mockTemplates: Record<string, DocumentTemplate[]> = {};
+const mockDocs: Record<string, GeneratedDoc[]> = {};
+
+/** Title falls back to "<template> — <person>", matching the backend. */
+function docTitle(templateName: string, input: GenerateDocInput, values: Record<string, string>): string {
+  if (input.title && input.title.trim()) return input.title.trim();
+  const who = values["employee.fullName"];
+  return who ? `${templateName} — ${who}` : templateName;
+}
+
+/**
+ * Builds every merge value for a render (mirrors `DocumentService.resolve`): derived values first,
+ * caller overrides last, so the issuer can always correct what the profile got wrong.
+ */
+function resolveMergeValues(db: DB, user: User, input: GenerateDocInput): Record<string, string> {
+  const v: Record<string, string> = {};
+  const put = (k: string, value: string | null | undefined) => {
+    if (value != null && String(value).trim() !== "") v[k] = String(value);
+  };
+
+  put("today", letterDate(new Date().toISOString().slice(0, 10)));
+  put("company.name", db.companies.find((c) => c.id === user.companyId)?.name);
+  put("signatory.name", `${user.firstName} ${user.lastName}`);
+  put("signatory.title", user.role === "OWNER" ? "Founder" : "People Operations");
+
+  if (input.employeeId) {
+    const e = db.employees.find((x) => x.id === input.employeeId && x.companyId === user.companyId);
+    if (!e) throw err(404, "NOT_FOUND", "Employee not found");
+    const u = db.users.find((x) => x.id === e.userId);
+    if (u) {
+      put("employee.fullName", `${u.firstName} ${u.lastName}`);
+      put("employee.firstName", u.firstName);
+      put("employee.lastName", u.lastName);
+      put("employee.email", u.email);
+    }
+    put("employee.employeeNo", e.employeeNo);
+    put("employee.jobTitle", e.jobTitle);
+    put("employee.workLocation", e.workLocation);
+    put("employee.phone", e.phone);
+    put("employee.employmentType", e.employmentType ? prettyEnum(e.employmentType) : null);
+    put("employee.startDate", letterDate(e.startDate));
+    put("employee.endDate", letterDate(e.endDate ?? null));
+    put("employee.tenure", tenure(e.startDate, e.endDate ?? null));
+    put("employee.department", db.departments.find((d) => d.id === e.departmentId)?.name);
+    const mgr = db.employees.find((x) => x.id === e.managerId);
+    const mgrUser = mgr && db.users.find((x) => x.id === mgr.userId);
+    if (mgrUser) put("employee.manager", `${mgrUser.firstName} ${mgrUser.lastName}`);
+
+    const comp = buildCompensation(db, e.id);
+    if (comp.currentAnnual != null) {
+      put("salary.currency", comp.currency);
+      put("salary.annual", comp.currentAnnual.toLocaleString("en-US"));
+      put("salary.monthly", (comp.currentMonthly ?? 0).toLocaleString("en-US"));
+      put("salary.effectiveDate", letterDate(comp.effectiveDate));
+    }
+  }
+
+  for (const [k, value] of Object.entries(input.overrides ?? {})) put(k, value);
+  return v;
+}
+
+/** FULL_TIME -> Full time. */
+function prettyEnum(name: string): string {
+  const s = name.replace(/_/g, " ").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 // --- clients (mock, in-memory; resets on reload) ----------------------------
 const mockClients: Record<string, Client[]> = {};

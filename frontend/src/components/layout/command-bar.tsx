@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, User, FolderKanban, CircleDot, LifeBuoy, BookOpen, FileText, Loader2, Building2 } from "lucide-react";
+import { Search, User, FolderKanban, CircleDot, LifeBuoy, BookOpen, FileText, Loader2, Building2, FileSignature } from "lucide-react";
 import { api } from "@/lib/api";
 import type { SearchHit, SearchResponse } from "@/lib/types";
 
@@ -14,6 +14,7 @@ const ICON: Record<SearchHit["kind"], React.ReactNode> = {
   space: <BookOpen className="h-4 w-4 text-emerald-400" />,
   page: <FileText className="h-4 w-4 text-emerald-400" />,
   client: <Building2 className="h-4 w-4 text-violet" />,
+  document: <FileSignature className="h-4 w-4 text-amber-400" />,
 };
 
 export function CommandBar() {

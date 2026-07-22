@@ -33,3 +33,4 @@ secrets/
 # ---- Misc ----
 calyvora-site.zip
 *.log
+frontend/.next-build/

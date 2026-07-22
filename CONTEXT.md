@@ -11,10 +11,12 @@
 Working through the founder's 8-page handwritten notes (2026-07-22). Done so far: **Bucket A** (quick wins:
 searchable member picker, always-on Knowledge search, selectable sprint types, **left sidebar nav**, wordmark),
 **branding** (product = **Orbit**), **Bucket B** (role-based dashboard + team overview: headcount, present vs
-on-leave, leave reasons, **leave calendar** — attendance *derived from leave*, phase 1), **Bucket C.1**
-(**salary + hike history + payslips**, Owner/Admin-only, V13). **74 backend tests, all live & verified.**
-**Next:** C.2 richer employee profile (working-on / start-end / skills / ratings) → C.3 performance+goals →
-C.4 full daily attendance (phase 2) → Bucket D (Clients ⭐, Documents+templates, Notifications, Inbox).
+on-leave, leave reasons, **leave calendar** — attendance *derived from leave*, phase 1), **Bucket C**
+(salary + hike history + payslips V13 · richer profiles/skills/ratings V14 · goals V15), **D1 Clients ⭐**
+(V16), and **D2+D3 Documents & templates** (V17). People and Documents both have **left-pane sub-panes**.
+**95 backend tests, all live & verified.**
+**Next:** C.4 full daily attendance (phase 2) → C.7 fuller review cycle → D4 Notifications → D5 Inbox →
+BR3 modular packaging. (C.9 and D6 need the founder to confirm scope.)
 
 **Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
 RS256 SD-5) + **demo suite** (one-click seed, cross-app dashboard, ⌘K global search, AI assistant) +
@@ -149,12 +151,37 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
 - **S3 Tickets** — `Ticket` (subject/requester/status/priority, ref `KEY-T{n}`, assignee = People employee);
   `/work/projects/{id}/tickets`, `PATCH/DELETE /work/tickets/{id}`. **Debt: graduates to Service OS (SD-22b).**
 
+## 6d. Clients module (founder D1 ⭐) — ✅ COMPLETE
+Backend `com.calyvora.client`, Flyway **V16** (`clients` + `client_requests`, both RLS). `/api/v1/clients`
+CRUD + `/{id}/requests` CRUD with open-request rollups; sidebar **Clients** tab (list + detail); global
+search returns client hits; demo seeds 3 clients with requests.
+
+## 6e. Documents module (founder D2 + D3) — ✅ COMPLETE
+Backend `com.calyvora.document`, Flyway **V17** (`document_templates` + `generated_documents`, both RLS).
+**Owner/Admin-only** (letters carry salary + exit details). 12 tests.
+- **Templates:** starter library (offer · joining · relieving · experience · promotion) seeded per company
+  on **first open** of `/documents/templates`, then owned and editable by the company — we never overwrite
+  an edited template. `/api/v1/documents/templates` CRUD; `/documents/fields` = merge-field catalogue.
+- **Merge engine** (`MergeFields`, pure + unit-tested): `{{named.substitution}}` only — no expressions.
+  Resolves from the People profile (name/ID/title/department/manager/location/dates/**tenure**) +
+  **compensation** + company/signatory. Missing value ⇒ `—`, never a raw `{{token}}`. Caller `overrides`
+  win over derived values.
+- **Generation:** `POST /documents/preview` (dry run; reports **which fields are empty**) then
+  `POST /documents` to issue. **Bodies are frozen at issue time** — later template edits can't rewrite an
+  already-signed letter (test-covered). `GET /documents?employeeId=`, `GET/DELETE /documents/{id}`.
+- **UI:** left-pane **Documents** → **Issued / Generate / Templates**. Live paper-like preview, unfilled
+  fields flagged with inline overrides, **Print / PDF** (print CSS isolates `.letter-sheet`), copy. The
+  employee profile shows their letters + a "Generate" deep link (`/documents/new?employee=…`).
+- **Mock parity:** `frontend/src/lib/documents.ts` mirrors the engine + starter library so the mock backend
+  produces the same letter the real one would.
+
 ## 7. What's next (open)
 - **★ Founder feedback backlog (2026-07-22) — the active roadmap:** all handwritten notes transcribed &
-  status-tracked in **[docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)**. Order:
-  A) quick wins + members-dropdown bug → B) role-based dashboards + attendance → C) People OS depth
-  (salary/payslip/profile/perf/goals) → D) new modules (Clients ⭐, Documents, Notifications/Inbox).
-  Branding: product name pending (Calyvora = parent); wired via `frontend/src/lib/brand.ts` + `Wordmark`.
+  status-tracked in **[docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)**. Buckets A, B
+  (phase 1), C (except C.4/C.7/C.9), **D1 Clients ⭐** and **D2+D3 Documents & templates** are shipped.
+  **Still open:** C.4 full daily attendance (phase 2) · C.7 fuller review cycle · D4 Notifications ·
+  D5 Inbox · BR3 modular packaging/entitlements · (C.9 + D6 need scope confirmation from the founder).
+  Branding done: product = **Orbit**, via `frontend/src/lib/brand.ts` + `Wordmark`.
 - **Foundation hardening (deferred Sprint-1 debt — CLEARED 2026-07-21):**
   ~~Postgres RLS (SD-2)~~ **DONE** (SD-2a..d — RLS `ENABLE`+`FORCE` on all 11 tenant tables, V12,
   bound per-connection via `TenantAwareDataSource` GUC; app DB role must be `NOSUPERUSER` in prod).

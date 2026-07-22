@@ -15,6 +15,11 @@ import {
   type Client,
   type ClientDetail,
   type ClientRequestItem,
+  type DocumentTemplate,
+  type DocumentPreview,
+  type GeneratedDoc,
+  type GenerateDocInput,
+  type MergeField,
   type Invitation,
   type LeaveBalance,
   type LeaveRequest,
@@ -460,6 +465,39 @@ export const api = {
   },
   deleteClientRequest(clientId: string, requestId: string): Promise<void> {
     return LIVE ? http<void>(`/clients/${clientId}/requests/${requestId}`, { method: "DELETE" }) : mockBackend.deleteClientRequest(accessToken, clientId, requestId);
+  },
+
+  // --- documents (templates + generated letters) ---
+  docTemplates(): Promise<DocumentTemplate[]> {
+    return LIVE ? http<DocumentTemplate[]>("/documents/templates") : mockBackend.docTemplates(accessToken);
+  },
+  createDocTemplate(input: { name: string; kind: string; description?: string; body: string }): Promise<DocumentTemplate> {
+    return LIVE ? http<DocumentTemplate>("/documents/templates", { method: "POST", body: JSON.stringify(input) }) : mockBackend.createDocTemplate(accessToken, input);
+  },
+  updateDocTemplate(id: string, patch: Partial<DocumentTemplate>): Promise<DocumentTemplate> {
+    return LIVE ? http<DocumentTemplate>(`/documents/templates/${id}`, { method: "PATCH", body: JSON.stringify(patch) }) : mockBackend.updateDocTemplate(accessToken, id, patch);
+  },
+  deleteDocTemplate(id: string): Promise<void> {
+    return LIVE ? http<void>(`/documents/templates/${id}`, { method: "DELETE" }) : mockBackend.deleteDocTemplate(accessToken, id);
+  },
+  mergeFields(): Promise<MergeField[]> {
+    return LIVE ? http<MergeField[]>("/documents/fields") : mockBackend.mergeFields(accessToken);
+  },
+  previewDoc(input: GenerateDocInput): Promise<DocumentPreview> {
+    return LIVE ? http<DocumentPreview>("/documents/preview", { method: "POST", body: JSON.stringify(input) }) : mockBackend.previewDoc(accessToken, input);
+  },
+  generateDoc(input: GenerateDocInput): Promise<GeneratedDoc> {
+    return LIVE ? http<GeneratedDoc>("/documents", { method: "POST", body: JSON.stringify(input) }) : mockBackend.generateDoc(accessToken, input);
+  },
+  documents(employeeId?: string): Promise<GeneratedDoc[]> {
+    const qs = employeeId ? `?employeeId=${employeeId}` : "";
+    return LIVE ? http<GeneratedDoc[]>(`/documents${qs}`) : mockBackend.documents(accessToken, employeeId);
+  },
+  document(id: string): Promise<GeneratedDoc> {
+    return LIVE ? http<GeneratedDoc>(`/documents/${id}`) : mockBackend.document(accessToken, id);
+  },
+  deleteDocument(id: string): Promise<void> {
+    return LIVE ? http<void>(`/documents/${id}`, { method: "DELETE" }) : mockBackend.deleteDocument(accessToken, id);
   },
 
   // --- cross-app AI assistant ---

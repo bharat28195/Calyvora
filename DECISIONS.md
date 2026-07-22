@@ -5,6 +5,17 @@
 > narrative lives in [FOUNDER.md](FOUNDER.md). IDs: `ADR-##` architecture, `PD-##` product,
 > `SD-##` Sprint-scoped implementation decision.
 
+## Founder feedback — Documents & templates (2026-07-22)
+
+| ID | Decision | Rationale (short) | Alternatives rejected | Status |
+|----|----------|-------------------|-----------------------|--------|
+| SD-26 | **Generated letters are frozen** — the rendered body is stored, and later template edits never rewrite an issued document | An issued letter is a record, not a view; if a template edit could rewrite history no one could trust a letter we gave them | Render on read from the live template (cheaper storage, mutable history) | Accepted |
+| SD-27 | **Starter templates are seeded per company on first open, then owned by the company** (`built_in` flag is a label, not a lock) | A company's letters should read like theirs; we must never overwrite an edit | Ship read-only system templates; seed at registration (dead rows for tenants who never use Documents) | Accepted |
+| SD-28 | **Merge engine = named `{{substitution}}` only** — no expressions, conditionals or loops | Value comes from People data filling itself in, not from a second template language to learn and secure | A real template engine (Freemarker/Handlebars — injection surface, needs sandboxing) | Accepted |
+| SD-29 | **Unresolved fields render as `—`, and preview lists them before issuing** | A letter must never go out showing `{{employee.name}}`; naming the gaps up front is better than silently blanking them | Fail the render; leave the raw token visible | Accepted |
+| SD-30 | **Whole Documents surface is Owner/Admin (`@PreAuthorize` on the controller)** | Letters carry salary and exit details — role-gate the module, not each endpoint | Per-endpoint gating (easy to miss one) | Accepted |
+| SD-31 | **The frontend mock mirrors the merge engine + starter library** (`frontend/src/lib/documents.ts`) | The mock demo must produce the same letter the real backend would, or it lies about the product | Mock returns canned strings (demo diverges from reality) | Accepted (duplication is the known cost) |
+
 ## Foundation hardening — Postgres RLS + RS256 JWT (2026-07-21)
 
 ### Row-Level Security (fulfils the deferred half of SD-2)

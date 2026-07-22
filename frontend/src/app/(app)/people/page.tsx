@@ -15,6 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmployeeCompensation } from "@/components/people/employee-compensation";
 import { EmployeeProfileExtras } from "@/components/people/employee-profile-extras";
 import { EmployeeGoals } from "@/components/people/employee-goals";
+import { EmployeeDocuments } from "@/components/people/employee-documents";
 
 const TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"] as const;
 const STATUSES = ["ONBOARDING", "ACTIVE", "TERMINATED"] as const;
@@ -239,6 +240,8 @@ function EmployeeDetailModal({
           <EmployeeCompensation employeeId={employee.id} />
         </div>
       )}
+
+      {admin && <EmployeeDocuments employeeId={employee.id} />}
 
       <div className="mt-6">
         <div className="flex items-center justify-between">

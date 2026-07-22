@@ -96,6 +96,55 @@ export interface ClientDetail {
   requests: ClientRequestItem[];
 }
 
+/** Documents module (feedback D2/D3) — a template library and the letters generated from it. */
+export type DocumentKind =
+  | "OFFER_LETTER"
+  | "JOINING_LETTER"
+  | "RELIEVING_LETTER"
+  | "EXPERIENCE_LETTER"
+  | "PROMOTION_LETTER"
+  | "CUSTOM";
+
+export interface DocumentTemplate {
+  id: string;
+  name: string;
+  kind: DocumentKind;
+  description: string | null;
+  body: string;
+  builtIn: boolean;
+  /** The merge fields this body actually references. */
+  placeholders: string[];
+  updatedAt: string;
+}
+export interface MergeField {
+  key: string;
+  label: string;
+}
+export interface GeneratedDoc {
+  id: string;
+  title: string;
+  kind: DocumentKind;
+  employeeId: string | null;
+  employeeName: string | null;
+  templateId: string | null;
+  body: string;
+  generatedBy: string | null;
+  createdAt: string;
+}
+export interface DocumentPreview {
+  title: string;
+  body: string;
+  values: Record<string, string>;
+  /** Fields the profile couldn't fill — fix or override before issuing. */
+  missing: string[];
+}
+export interface GenerateDocInput {
+  templateId: string;
+  employeeId?: string | null;
+  title?: string;
+  overrides?: Record<string, string>;
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -298,7 +347,7 @@ export interface LoginResult {
 }
 
 export interface SearchHit {
-  kind: "person" | "project" | "task" | "ticket" | "space" | "page" | "client";
+  kind: "person" | "project" | "task" | "ticket" | "space" | "page" | "client" | "document";
   title: string;
   subtitle: string;
   href: string;

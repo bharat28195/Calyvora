@@ -36,6 +36,31 @@ body {
   background-attachment: fixed;
 }
 
+/*
+ * Printing a letter (Documents module) should produce the document, not the app around it.
+ * Everything is hidden and the letter sheet alone is promoted to the page.
+ */
+@media print {
+  body {
+    background: #fff;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .letter-sheet,
+  .letter-sheet * {
+    visibility: visible;
+  }
+  .letter-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+}
+
 /* Brand gradient text helper */
 .text-gradient {
   @apply bg-clip-text text-transparent;
