@@ -13,6 +13,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmployeeCompensation } from "@/components/people/employee-compensation";
+import { EmployeeProfileExtras } from "@/components/people/employee-profile-extras";
 
 const TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"] as const;
 const STATUSES = ["ONBOARDING", "ACTIVE", "TERMINATED"] as const;
@@ -226,7 +227,10 @@ function EmployeeDetailModal({
         <Detail label="Employee no." value={employee.employeeNo} />
         <Detail label="Type" value={employee.employmentType ? typeLabel(employee.employmentType) : null} />
         <Detail label="Started" value={employee.startDate} />
+        <Detail label="Ends" value={employee.endDate} />
       </dl>
+
+      <EmployeeProfileExtras employee={employee} />
 
       {admin && (
         <div className="mt-6">
@@ -318,6 +322,9 @@ function EditEmployeeDialog({
     workLocation: employee.workLocation ?? "",
     phone: employee.phone ?? "",
     startDate: employee.startDate ?? "",
+    endDate: employee.endDate ?? "",
+    skills: employee.skills.join(", "),
+    rating: employee.rating ? String(employee.rating) : "0",
     departmentId: employee.departmentId ?? "",
     managerId: employee.managerId ?? "",
   });
@@ -340,6 +347,9 @@ function EditEmployeeDialog({
           workLocation: form.workLocation,
           phone: form.phone,
           startDate: form.startDate,
+          endDate: form.endDate,
+          skills: form.skills.split(",").map((s) => s.trim()).filter(Boolean),
+          rating: form.rating ? Number(form.rating) : null,
           departmentId: form.departmentId,
           managerId: form.managerId,
         });
@@ -376,6 +386,20 @@ function EditEmployeeDialog({
                 <Input id="startDate" type="date" value={form.startDate} onChange={set("startDate")} />
               </Field>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="End date" htmlFor="endDate">
+                <Input id="endDate" type="date" value={form.endDate} onChange={set("endDate")} />
+              </Field>
+              <Field label="Rating" htmlFor="rating">
+                <select id="rating" className={selectCls} value={form.rating} onChange={set("rating")}>
+                  <option value="0" className="bg-surface">Not rated</option>
+                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={String(n)} className="bg-surface">{n} / 5</option>)}
+                </select>
+              </Field>
+            </div>
+            <Field label="Skills (comma-separated)" htmlFor="skills">
+              <Input id="skills" value={form.skills} onChange={set("skills")} placeholder="e.g. React, TypeScript, Design" />
+            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Employment type" htmlFor="employmentType">
                 <select id="employmentType" className={selectCls} value={form.employmentType} onChange={set("employmentType")}>

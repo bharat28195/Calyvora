@@ -55,6 +55,17 @@ public class Employee {
     @Column(name = "start_date")
     private LocalDate startDate;
 
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    /** Comma-separated skills (People OS C.2). Small set per employee; kept denormalized for simplicity. */
+    @Column(length = 500)
+    private String skills;
+
+    /** Performance rating 1–5 (People OS C.2), nullable until set. */
+    @Column
+    private Integer rating;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "employment_status", nullable = false, length = 24)
     private EmploymentStatus employmentStatus = EmploymentStatus.ACTIVE;
@@ -160,6 +171,30 @@ public class Employee {
 
     public void setStartDate(LocalDate startDate) {
         this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public String getSkills() {
+        return skills;
+    }
+
+    public void setSkills(String skills) {
+        this.skills = skills;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public void setRating(Integer rating) {
+        this.rating = rating;
     }
 
     public EmploymentStatus getEmploymentStatus() {

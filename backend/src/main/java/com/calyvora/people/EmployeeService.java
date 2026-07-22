@@ -88,6 +88,18 @@ public class EmployeeService {
         if (request.startDate() != null) {
             employee.setStartDate(request.startDate().isBlank() ? null : LocalDate.parse(request.startDate()));
         }
+        if (request.endDate() != null) {
+            employee.setEndDate(request.endDate().isBlank() ? null : LocalDate.parse(request.endDate()));
+        }
+        if (request.skills() != null) {
+            String joined = request.skills().stream()
+                    .map(String::trim).filter(s -> !s.isBlank()).distinct()
+                    .reduce((a, b) -> a + ", " + b).orElse(null);
+            employee.setSkills(joined);
+        }
+        if (request.rating() != null) {
+            employee.setRating(request.rating() == 0 ? null : request.rating());
+        }
         if (request.managerId() != null) {
             employee.setManagerId(resolveManager(companyId, employeeId, request.managerId()));
         }

@@ -15,6 +15,7 @@ import {
   type TeamOverview,
   type Compensation,
   type Payslip,
+  type WorkItem,
   type Department,
   type Employee,
   type Invitation,
@@ -85,6 +86,9 @@ interface EmployeeRow {
   workLocation: string | null;
   phone: string | null;
   startDate: string | null;
+  endDate?: string | null;
+  skills?: string[];
+  rating?: number | null;
 }
 interface DeptRow {
   id: string;
@@ -695,6 +699,25 @@ export const mockBackend = {
   },
 
   // --- People OS (employees) ---
+  async employeeWork(accessToken: string | null, employeeId: string): Promise<WorkItem[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const today = new Date().toISOString().slice(0, 10);
+    const projects = db.projects.filter((p) => p.companyId === user.companyId);
+    return db.tasks
+      .filter((t) => t.companyId === user.companyId && t.assigneeId === employeeId && t.status !== "DONE")
+      .map((t) => {
+        const p = projects.find((pr) => pr.id === t.projectId);
+        return {
+          ref: p ? `${p.key}-${t.number}` : `#${t.number}`, title: t.title, status: t.status, priority: t.priority,
+          projectId: t.projectId, projectName: p?.name ?? null, dueDate: t.dueDate,
+          overdue: !!t.dueDate && t.dueDate < today,
+        };
+      })
+      .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+  },
+
   async listEmployees(accessToken: string | null): Promise<Employee[]> {
     await delay();
     const db = load();
@@ -1483,6 +1506,9 @@ function toEmployee(db: DB, user: User): Employee {
     workLocation: row.workLocation,
     phone: row.phone,
     startDate: row.startDate,
+    endDate: row.endDate ?? null,
+    skills: row.skills ?? [],
+    rating: row.rating ?? null,
   };
 }
 
@@ -1698,6 +1724,7 @@ function applyPatch(row: EmployeeRow, patch: Partial<Employee>): void {
   const fields: (keyof EmployeeRow & keyof Employee)[] = [
     "employeeNo", "jobTitle", "employmentType", "employmentStatus",
     "workLocation", "phone", "startDate", "managerId", "departmentId",
+    "endDate", "skills", "rating",
   ];
   for (const f of fields) {
     if (patch[f] !== undefined) {

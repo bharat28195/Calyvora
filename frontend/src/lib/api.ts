@@ -10,6 +10,7 @@ import {
   type Payslip,
   type Department,
   type Employee,
+  type WorkItem,
   type Invitation,
   type LeaveBalance,
   type LeaveRequest,
@@ -166,6 +167,9 @@ export const api = {
   },
 
   // --- People OS (employees) ---
+  employeeWork(employeeId: string): Promise<WorkItem[]> {
+    return LIVE ? http<WorkItem[]>(`/people/employees/${employeeId}/work`) : mockBackend.employeeWork(accessToken, employeeId);
+  },
   listEmployees(): Promise<Employee[]> {
     return LIVE ? http<Employee[]>("/people/employees") : mockBackend.listEmployees(accessToken);
   },

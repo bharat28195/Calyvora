@@ -44,9 +44,9 @@
 | C1 | **Salary tab** — full salary, all salary details | p1–2 | ✅ | `compensation_records` (V13, RLS) + `GET/POST /people/employees/{id}/compensation`; Compensation section on the employee detail (Owner/Admin only). Add-raise inline form. |
 | C2 | **Yearly hike / hike history** ("how much hike we have provided") | p1–2 | ✅ | Full history with per-record **hike %** badges (derived from consecutive records). Demo seeded with initial + review hike. |
 | C3 | **Employee payslip** — salary everything in one place | p7 | ✅ | `GET /people/employees/{id}/payslip?month=` — computed breakdown (basic/HRA/special · PF/tax · net). Payslip card with month picker. |
-| C4 | **Richer employee profile**: what he/she is working on · when started / end date · delay vs advance · how they're performing | p2 | ⬜ | Extend employee profile + link to current Work items. |
-| C5 | **Full employee details + skills** | p3 | ⬜ | Skills list on profile. |
-| C6 | **Ratings** | p3 | ⬜ | Employee ratings. |
+| C4 | **Richer employee profile**: what he/she is working on · when started / end date · delay vs advance · how they're performing | p2 | ✅ | **Working on** = open tasks assigned to them (`GET /people/employees/{id}/work`, in `work` pkg to avoid a cycle) with **overdue** flag (= "delay"). **End date** added (V14). "How performing" = the rating (C6). |
+| C5 | **Full employee details + skills** | p3 | ✅ | `skills` (comma-sep, V14) as editable chips on the profile + edit dialog. |
+| C6 | **Ratings** | p3 | ✅ | 1–5 star `rating` (V14), shown on profile, editable by admin. (Deeper "performance" = C7.) |
 | C7 | **Performance** | p3 | ⬜ | Performance module. |
 | C8 | **Goals** | p3 | ⬜ | Goals/OKRs. |
 | C9 | **Kanban-like section in employee tab** ("look on kanban like it has one section") | p3 | ⬜ | *Ambiguous* — confirm intent (employee view laid out like a board?). |

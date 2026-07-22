@@ -67,6 +67,20 @@ export interface Employee {
   workLocation: string | null;
   phone: string | null;
   startDate: string | null;
+  endDate: string | null;
+  skills: string[];
+  rating: number | null;
+}
+
+export interface WorkItem {
+  ref: string;
+  title: string;
+  status: TaskStatusT;
+  priority: TaskPriorityT;
+  projectId: string;
+  projectName: string | null;
+  dueDate: string | null;
+  overdue: boolean;
 }
 
 export type LeaveTypeT = "VACATION" | "SICK" | "PERSONAL" | "UNPAID";

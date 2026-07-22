@@ -144,12 +144,18 @@ public class DemoSeedService {
         Map<String, EmployeeResponse> emp = employeesByEmail();
         String mgrMarcus = emp.get(marcus.getEmail()).id();
         String mgrTom = emp.get(tom.getEmail()).id();
-        profile(emp, OWNER_EMAIL, "Founder & CEO", engineering.id(), null, "2021-01-04");
-        profile(emp, marcus.getEmail(), "Engineering Lead", engineering.id(), null, "2021-03-15");
-        profile(emp, priya.getEmail(), "Senior Software Engineer", engineering.id(), mgrMarcus, "2022-06-01");
-        profile(emp, leo.getEmail(), "Product Designer", design.id(), null, "2022-09-12");
-        profile(emp, sara.getEmail(), "Support Specialist", support.id(), null, "2023-02-20");
-        profile(emp, tom.getEmail(), "Sales Manager", sales.id(), null, "2021-11-08");
+        profile(emp, OWNER_EMAIL, "Founder & CEO", engineering.id(), null, "2021-01-04",
+                java.util.List.of("Leadership", "Product Strategy", "Fundraising"), 5);
+        profile(emp, marcus.getEmail(), "Engineering Lead", engineering.id(), null, "2021-03-15",
+                java.util.List.of("Java", "Spring Boot", "System Design", "Postgres"), 5);
+        profile(emp, priya.getEmail(), "Senior Software Engineer", engineering.id(), mgrMarcus, "2022-06-01",
+                java.util.List.of("TypeScript", "React", "Security", "RS256"), 4);
+        profile(emp, leo.getEmail(), "Product Designer", design.id(), null, "2022-09-12",
+                java.util.List.of("Figma", "Design Systems", "Prototyping"), 4);
+        profile(emp, sara.getEmail(), "Support Specialist", support.id(), null, "2023-02-20",
+                java.util.List.of("Customer Success", "Zendesk", "Troubleshooting"), 4);
+        profile(emp, tom.getEmail(), "Sales Manager", sales.id(), null, "2021-11-08",
+                java.util.List.of("B2B Sales", "Negotiation", "CRM"), 3);
 
         // Compensation history (initial salary + a review hike) so salary/hikes/payslips look real.
         seedComp(emp, OWNER_EMAIL, 220000, owner);
@@ -246,10 +252,12 @@ public class DemoSeedService {
     }
 
     private void profile(Map<String, EmployeeResponse> emp, String email, String title,
-                         String departmentId, String managerId, String startDate) {
+                         String departmentId, String managerId, String startDate,
+                         java.util.List<String> skills, Integer rating) {
         EmployeeResponse e = emp.get(email);
         employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
-                null, title, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate));
+                null, title, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate,
+                null, skills, rating));
     }
 
     private void seedComp(Map<String, EmployeeResponse> emp, String email, long currentAnnual, AuthPrincipal owner) {
