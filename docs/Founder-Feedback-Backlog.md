@@ -57,7 +57,7 @@
 
 | # | Item | Source | Status | Notes |
 |---|------|--------|--------|-------|
-| D1 | ⭐ **Clients tab** — client details: what each client requested + all their info | p8 (starred) | ⬜ | New Clients module. Founder starred it = high priority within D. |
+| D1 | ⭐ **Clients tab** — client details: what each client requested + all their info | p8 (starred) | ✅ | New `com.calyvora.client` module (V16, clients + client_requests, RLS). `/api/v1/clients` CRUD + `/{id}/requests` CRUD; open-request rollups. Sidebar **Clients** tab, list + detail (requests with status), global-search integration ("client" hits). Demo seeds 3 clients w/ requests. |
 | D2 | **Documentation tab** — auto-generate joining/resigning letters: fill in name → a proper document is generated | p7 | ⬜ | Document generation from templates. |
 | D3 | **Document templates** should be present | p7 | ⬜ | Template library backing D2. |
 | D4 | **Notifications** | p3 | ⬜ | Notification system. |

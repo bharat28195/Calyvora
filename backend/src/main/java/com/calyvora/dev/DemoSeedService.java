@@ -82,6 +82,7 @@ public class DemoSeedService {
     private final PageService pageService;
     private final com.calyvora.people.CompensationRepository compensationRepository;
     private final com.calyvora.people.GoalRepository goalRepository;
+    private final com.calyvora.client.ClientService clientService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -91,9 +92,11 @@ public class DemoSeedService {
                            TaskService taskService, TicketService ticketService,
                            SpaceService spaceService, PageService pageService,
                            com.calyvora.people.CompensationRepository compensationRepository,
-                           com.calyvora.people.GoalRepository goalRepository) {
+                           com.calyvora.people.GoalRepository goalRepository,
+                           com.calyvora.client.ClientService clientService) {
         this.compensationRepository = compensationRepository;
         this.goalRepository = goalRepository;
+        this.clientService = clientService;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
         this.userRepository = userRepository;
@@ -234,6 +237,25 @@ public class DemoSeedService {
                 rlsDocBody());
         page(spaceId, owner, "Incident Response Runbook", null,
                 runbookBody());
+
+        // --- Clients: a few customers + what they've requested --------------
+        seedClient(owner, "Globex Corporation", "Hank Scorpio", "hank@globex.com", "ACTIVE",
+                new String[]{"SAML SSO with Okta:IN_PROGRESS", "White-label the customer portal:REQUESTED"});
+        seedClient(owner, "Initech", "Bill Lumbergh", "bill@initech.com", "LEAD",
+                new String[]{"Trial extension to 30 days:DELIVERED", "Bulk CSV employee import:REQUESTED"});
+        seedClient(owner, "Umbrella Inc", "Ada Wong", "ada@umbrella.com", "ACTIVE",
+                new String[]{"Custom SLA (99.9%):IN_PROGRESS", "Data residency in EU:REQUESTED", "Quarterly business review:DELIVERED"});
+    }
+
+    private void seedClient(AuthPrincipal owner, String name, String contact, String email, String status, String[] requests) {
+        var client = clientService.create(
+                new com.calyvora.client.dto.ClientPayload(name, contact, email, null, null, status, null), owner);
+        UUID clientId = UUID.fromString(client.id());
+        for (String r : requests) {
+            int i = r.lastIndexOf(':');
+            clientService.addRequest(clientId, new com.calyvora.client.dto.ClientRequestPayload(
+                    r.substring(0, i), null, r.substring(i + 1)));
+        }
     }
 
     // ---- provisioning primitives ------------------------------------------

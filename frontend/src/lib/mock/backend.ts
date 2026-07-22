@@ -17,6 +17,9 @@ import {
   type Payslip,
   type WorkItem,
   type Goal,
+  type Client,
+  type ClientDetail,
+  type ClientRequestItem,
   type Department,
   type Employee,
   type Invitation,
@@ -514,6 +517,72 @@ export const mockBackend = {
       deductions: [{ label: "Provident fund", amount: pf }, { label: "Income tax", amount: tax }],
       gross, totalDeductions: round2(pf + tax), net: round2(gross - pf - tax),
     };
+  },
+
+  async clients(accessToken: string | null): Promise<Client[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    return (mockClients[user.companyId] ?? []).map((c) => withOpen(user.companyId, c));
+  },
+  async createClient(accessToken: string | null, input: Partial<Client> & { name: string }): Promise<Client> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const c: Client = {
+      id: crypto.randomUUID(), name: input.name, contactName: input.contactName ?? null,
+      contactEmail: input.contactEmail ?? null, phone: input.phone ?? null, website: input.website ?? null,
+      status: input.status ?? "LEAD", notes: input.notes ?? null, createdAt: new Date().toISOString(), openRequests: 0,
+    };
+    mockClients[user.companyId] = [c, ...(mockClients[user.companyId] ?? [])];
+    return c;
+  },
+  async client(accessToken: string | null, id: string): Promise<ClientDetail> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const c = (mockClients[user.companyId] ?? []).find((x) => x.id === id);
+    if (!c) throw err(404, "NOT_FOUND", "Client not found");
+    return { client: withOpen(user.companyId, c), requests: (mockClientReqs[id] ?? []).slice() };
+  },
+  async updateClient(accessToken: string | null, id: string, patch: Partial<Client>): Promise<Client> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const c = (mockClients[user.companyId] ?? []).find((x) => x.id === id);
+    if (!c) throw err(404, "NOT_FOUND", "Client not found");
+    Object.assign(c, patch);
+    return withOpen(user.companyId, c);
+  },
+  async deleteClient(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    mockClients[user.companyId] = (mockClients[user.companyId] ?? []).filter((x) => x.id !== id);
+    delete mockClientReqs[id];
+  },
+  async addClientRequest(accessToken: string | null, clientId: string, input: { title: string; description?: string }): Promise<ClientRequestItem> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    const r: ClientRequestItem = { id: crypto.randomUUID(), title: input.title, description: input.description ?? null, status: "REQUESTED", createdAt: new Date().toISOString() };
+    mockClientReqs[clientId] = [r, ...(mockClientReqs[clientId] ?? [])];
+    return r;
+  },
+  async updateClientRequest(accessToken: string | null, clientId: string, requestId: string, patch: Partial<ClientRequestItem>): Promise<ClientRequestItem> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    const r = (mockClientReqs[clientId] ?? []).find((x) => x.id === requestId);
+    if (!r) throw err(404, "NOT_FOUND", "Request not found");
+    Object.assign(r, patch);
+    return r;
+  },
+  async deleteClientRequest(accessToken: string | null, clientId: string, requestId: string): Promise<void> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    mockClientReqs[clientId] = (mockClientReqs[clientId] ?? []).filter((x) => x.id !== requestId);
   },
 
   async teamOverview(accessToken: string | null): Promise<TeamOverview> {
@@ -1805,3 +1874,13 @@ function buildCompensation(db: DB, employeeId: string): Compensation {
 
 // --- goals (mock, in-memory; resets on reload) ------------------------------
 const mockGoals: Record<string, Goal[]> = {};
+
+// --- clients (mock, in-memory; resets on reload) ----------------------------
+const mockClients: Record<string, Client[]> = {};
+const mockClientReqs: Record<string, ClientRequestItem[]> = {};
+
+function withOpen(companyId: string, c: Client): Client {
+  void companyId;
+  const reqs = mockClientReqs[c.id] ?? [];
+  return { ...c, openRequests: reqs.filter((r) => r.status !== "DELIVERED" && r.status !== "DECLINED").length };
+}

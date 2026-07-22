@@ -72,6 +72,30 @@ export interface Employee {
   rating: number | null;
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  phone: string | null;
+  website: string | null;
+  status: "LEAD" | "ACTIVE" | "CHURNED";
+  notes: string | null;
+  createdAt: string;
+  openRequests: number;
+}
+export interface ClientRequestItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "REQUESTED" | "IN_PROGRESS" | "DELIVERED" | "DECLINED";
+  createdAt: string;
+}
+export interface ClientDetail {
+  client: Client;
+  requests: ClientRequestItem[];
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -274,7 +298,7 @@ export interface LoginResult {
 }
 
 export interface SearchHit {
-  kind: "person" | "project" | "task" | "ticket" | "space" | "page";
+  kind: "person" | "project" | "task" | "ticket" | "space" | "page" | "client";
   title: string;
   subtitle: string;
   href: string;

@@ -44,16 +44,19 @@ public class SearchService {
     private final TicketRepository ticketRepository;
     private final SpaceRepository spaceRepository;
     private final PageRepository pageRepository;
+    private final com.calyvora.client.ClientRepository clientRepository;
 
     public SearchService(UserRepository userRepository, ProjectRepository projectRepository,
                          TaskRepository taskRepository, TicketRepository ticketRepository,
-                         SpaceRepository spaceRepository, PageRepository pageRepository) {
+                         SpaceRepository spaceRepository, PageRepository pageRepository,
+                         com.calyvora.client.ClientRepository clientRepository) {
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
         this.taskRepository = taskRepository;
         this.ticketRepository = ticketRepository;
         this.spaceRepository = spaceRepository;
         this.pageRepository = pageRepository;
+        this.clientRepository = clientRepository;
     }
 
     @Transactional(readOnly = true)
@@ -101,12 +104,19 @@ public class SearchService {
                     s == null ? "Page" : s.getName(), "/knowledge/" + page.getSpaceId()));
         });
 
+        List<SearchHit> clients = new ArrayList<>();
+        for (com.calyvora.client.Client c : clientRepository.search(companyId, q, LIMIT)) {
+            clients.add(new SearchHit("client", c.getName(),
+                    c.getContactName() == null ? "Client" : c.getContactName(), "/clients/" + c.getId()));
+        }
+
         List<SearchGroup> groups = new ArrayList<>();
         if (!people.isEmpty()) groups.add(new SearchGroup("People", people));
         if (!work.isEmpty()) groups.add(new SearchGroup("Work", work));
         if (!knowledge.isEmpty()) groups.add(new SearchGroup("Knowledge", knowledge));
+        if (!clients.isEmpty()) groups.add(new SearchGroup("Clients", clients));
 
-        int total = people.size() + work.size() + knowledge.size();
+        int total = people.size() + work.size() + knowledge.size() + clients.size();
         return new SearchResponse(q, total, groups);
     }
 }

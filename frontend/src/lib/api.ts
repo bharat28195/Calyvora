@@ -12,6 +12,9 @@ import {
   type Employee,
   type WorkItem,
   type Goal,
+  type Client,
+  type ClientDetail,
+  type ClientRequestItem,
   type Invitation,
   type LeaveBalance,
   type LeaveRequest,
@@ -431,6 +434,32 @@ export const api = {
     return LIVE
       ? http<SearchResponse>(`/search?q=${encodeURIComponent(q)}`)
       : mockBackend.globalSearch(accessToken, q);
+  },
+
+  // --- clients (CRM module) ---
+  clients(): Promise<Client[]> {
+    return LIVE ? http<Client[]>("/clients") : mockBackend.clients(accessToken);
+  },
+  createClient(input: Partial<Client> & { name: string }): Promise<Client> {
+    return LIVE ? http<Client>("/clients", { method: "POST", body: JSON.stringify(input) }) : mockBackend.createClient(accessToken, input);
+  },
+  client(id: string): Promise<ClientDetail> {
+    return LIVE ? http<ClientDetail>(`/clients/${id}`) : mockBackend.client(accessToken, id);
+  },
+  updateClient(id: string, patch: Partial<Client>): Promise<Client> {
+    return LIVE ? http<Client>(`/clients/${id}`, { method: "PATCH", body: JSON.stringify(patch) }) : mockBackend.updateClient(accessToken, id, patch);
+  },
+  deleteClient(id: string): Promise<void> {
+    return LIVE ? http<void>(`/clients/${id}`, { method: "DELETE" }) : mockBackend.deleteClient(accessToken, id);
+  },
+  addClientRequest(clientId: string, input: { title: string; description?: string }): Promise<ClientRequestItem> {
+    return LIVE ? http<ClientRequestItem>(`/clients/${clientId}/requests`, { method: "POST", body: JSON.stringify(input) }) : mockBackend.addClientRequest(accessToken, clientId, input);
+  },
+  updateClientRequest(clientId: string, requestId: string, patch: Partial<ClientRequestItem>): Promise<ClientRequestItem> {
+    return LIVE ? http<ClientRequestItem>(`/clients/${clientId}/requests/${requestId}`, { method: "PATCH", body: JSON.stringify(patch) }) : mockBackend.updateClientRequest(accessToken, clientId, requestId, patch);
+  },
+  deleteClientRequest(clientId: string, requestId: string): Promise<void> {
+    return LIVE ? http<void>(`/clients/${clientId}/requests/${requestId}`, { method: "DELETE" }) : mockBackend.deleteClientRequest(accessToken, clientId, requestId);
   },
 
   // --- cross-app AI assistant ---
