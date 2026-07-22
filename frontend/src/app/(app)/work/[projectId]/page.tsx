@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   Loader2, Plus, ChevronLeft, ChevronRight, Trash2, CalendarDays, LayoutGrid, ListTodo,
-  Rocket, LifeBuoy, ArrowRight, Play, CheckCircle2,
+  Rocket, LifeBuoy, ArrowRight, Play, CheckCircle2, BarChart3,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { Employee, Project, Task, Sprint, Ticket, Board, TaskStatusT } from "@/lib/types";
@@ -16,9 +16,10 @@ import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
 import { MemberSelect } from "@/components/ui/member-select";
+import { SprintReportView } from "@/components/work/sprint-report";
 import { cn } from "@/lib/utils";
 
-type View = "board" | "backlog" | "sprints" | "tickets";
+type View = "board" | "backlog" | "sprints" | "report" | "tickets";
 
 const COLUMNS: { status: TaskStatusT; label: string }[] = [
   { status: "TODO", label: "To do" },
@@ -52,8 +53,16 @@ const NAV: { view: View; label: string; icon: typeof LayoutGrid }[] = [
   { view: "board", label: "Board", icon: LayoutGrid },
   { view: "backlog", label: "Backlog", icon: ListTodo },
   { view: "sprints", label: "Sprints", icon: Rocket },
+  { view: "report", label: "Report", icon: BarChart3 },
   { view: "tickets", label: "Tickets", icon: LifeBuoy },
 ];
+
+/** Blank means "not sized"; -1 tells the API to clear an existing estimate. */
+function parsePoints(raw: string): number | undefined {
+  if (raw.trim() === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
 
 function initials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2);
@@ -104,6 +113,7 @@ export default function WorkspacePage() {
           {view === "board" && <BoardView projectId={projectId} employees={employees} />}
           {view === "backlog" && <BacklogView projectId={projectId} employees={employees} />}
           {view === "sprints" && <SprintsView projectId={projectId} />}
+          {view === "report" && <ReportView projectId={projectId} />}
           {view === "tickets" && <TicketsView projectId={projectId} employees={employees} />}
         </section>
       </div>
@@ -179,8 +189,16 @@ function BoardView({ projectId, employees }: { projectId: string; employees: Emp
                   <Card key={t.id} className="cursor-pointer p-3 hover:border-fg/20" onClick={() => setDetail(t)}>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-fg/40">{t.ref}</span>
-                      <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", priorityChip[t.priority])}>
-                        {t.priority.toLowerCase()}
+                      <span className="flex items-center gap-1.5">
+                        {t.storyPoints != null && (
+                          <span className="rounded-full bg-violet/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet"
+                            title={`${t.storyPoints} story points`}>
+                            {t.storyPoints}
+                          </span>
+                        )}
+                        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", priorityChip[t.priority])}>
+                          {t.priority.toLowerCase()}
+                        </span>
                       </span>
                     </div>
                     <p className={cn("mt-1.5 text-sm", t.status === "DONE" && "text-fg/50 line-through")}>{t.title}</p>
@@ -217,8 +235,8 @@ function BoardView({ projectId, employees }: { projectId: string; employees: Emp
         <TaskDialog title="Add task" employees={employees} sprints={sprints}
           onClose={() => setAdding(false)}
           onSubmit={async (data) => {
-            const { sprintId, ...create } = data;
-            const task = await api.createTask(projectId, create);
+            const { sprintId, storyPoints, ...create } = data;
+            const task = await api.createTask(projectId, { ...create, storyPoints: parsePoints(storyPoints) });
             if (sprintId) await api.updateTask(task.id, { sprintId });
             setAdding(false); void load();
           }} />
@@ -301,9 +319,9 @@ function BacklogView({ projectId, employees }: { projectId: string; employees: E
         <TaskDialog title="Add to backlog" employees={employees} sprints={[]}
           onClose={() => setAdding(false)}
           onSubmit={async (data) => {
-            const { sprintId: _drop, ...create } = data;
+            const { sprintId: _drop, storyPoints, ...create } = data;
             void _drop;
-            await api.createTask(projectId, create);
+            await api.createTask(projectId, { ...create, storyPoints: parsePoints(storyPoints) });
             setAdding(false); void load();
           }} />
       )}
@@ -625,6 +643,8 @@ interface TaskForm {
   assigneeId: string;
   sprintId: string;
   dueDate: string;
+  /** Kept as a string because it comes from an <input>; parsed on submit. */
+  storyPoints: string;
 }
 
 function TaskDialog({
@@ -645,6 +665,7 @@ function TaskDialog({
     assigneeId: initial?.assigneeId ?? "",
     sprintId: initial?.sprintId ?? "",
     dueDate: initial?.dueDate ?? "",
+    storyPoints: initial?.storyPoints == null ? "" : String(initial.storyPoints),
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -675,6 +696,10 @@ function TaskDialog({
           </Field>
           <Field label="Due date" htmlFor="t-due"><Input id="t-due" type="date" value={form.dueDate} onChange={set("dueDate")} /></Field>
         </div>
+        <Field label="Story points" htmlFor="t-points" >
+          <Input id="t-points" type="number" min="0" value={form.storyPoints} onChange={set("storyPoints")}
+            placeholder="Leave blank if not sized yet" />
+        </Field>
         <div className={cn("grid gap-3", showSprint ? "grid-cols-2" : "grid-cols-1")}>
           <Field label="Assignee" htmlFor="t-assignee">
             <MemberSelect employees={employees} value={form.assigneeId}
@@ -729,8 +754,61 @@ function TaskDetailDialog({
         dueDate: task.dueDate ?? "",
       }}
       onClose={onClose}
-      onSubmit={async (data) => { await api.updateTask(task.id, data); onSaved(); }}
+      onSubmit={async (data) => {
+        const { storyPoints, ...rest } = data;
+        // -1 clears the estimate; blank leaves it untouched.
+        await api.updateTask(task.id, {
+          ...rest,
+          storyPoints: storyPoints.trim() === "" ? (task.storyPoints == null ? undefined : -1) : parsePoints(storyPoints),
+        });
+        onSaved();
+      }}
       onDelete={async () => { await api.deleteTask(task.id); onDeleted(); }}
     />
+  );
+}
+
+/* ---------------- report: burndown, velocity, capacity ---------------- */
+
+function ReportView({ projectId }: { projectId: string }) {
+  const [sprints, setSprints] = useState<Sprint[] | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.listSprints(projectId).then((s) => {
+      setSprints(s);
+      // Default to the sprint people care about: the active one, else the most recent.
+      const active = s.find((x) => x.status === "ACTIVE") ?? s[0] ?? null;
+      setSelected(active?.id ?? null);
+    }).catch(() => setSprints([]));
+  }, [projectId]);
+
+  if (sprints === null) {
+    return <Card><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></Card>;
+  }
+
+  return (
+    <div>
+      {sprints.length > 1 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {sprints.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSelected(s.id)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm transition-colors",
+                selected === s.id
+                  ? "bg-violet/10 font-medium text-violet"
+                  : "text-fg/50 hover:bg-fg/5 hover:text-fg",
+              )}
+            >
+              {s.name}
+              {s.status === "ACTIVE" && <span className="ml-1.5 text-[10px] text-emerald-400">live</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      <SprintReportView projectId={projectId} sprintId={selected} />
+    </div>
   );
 }

@@ -79,8 +79,8 @@
 | E4 | **Dashboard: upcoming leaves & holidays** | ✅ | "What's coming up" card merges the next holidays with your own approved/pending leave. |
 | E5 | **Notification to the manager for leave approval** | ✅ | Covered by D4 — routes to the manager, falls back to admins. |
 | E6 | **Absence view with counts + drill-down** ("how many in this team are absent today", click to see who) | ✅ | Attendance day sheet: clickable counts + per-team breakdown; dashboard tiles link into it. |
-| E7 | **Social feed / posts** — birthday and other posts, with visibility options | ⬜ | **Next.** Company/team visibility, reactions. |
-| E8 | **More sprint functionality** (industry-standard) | ⬜ | **Next.** Story points, velocity, burndown, capacity, sprint report. |
+| E7 | **Social feed / posts** — birthday and other posts, with visibility options | ✅ | `posts` + `post_reactions` + `post_comments` (V22, RLS). Company-wide or **one-team** visibility, enforced on read. Reactions toggle, comments, Owner/Admin pinning. Kinds: update · announcement · **celebration** (birthdays) · question. Left-pane **Feed**. |
+| E8 | **More sprint functionality** (industry-standard) | ✅ | **Story points** on tasks, **capacity** on sprints, recorded **daily snapshots** (V23). New **Report** tab: commitment vs capacity (over-commitment flagged), completed/remaining, unestimated count, **burndown** (actual vs ideal), per-person load, and **velocity** across completed sprints with a suggested next commitment. |
 
 ---
 

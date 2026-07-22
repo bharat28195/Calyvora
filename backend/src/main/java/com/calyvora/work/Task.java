@@ -59,6 +59,10 @@ public class Task {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    /** Estimate in story points — the unit velocity and burndown are measured in (V23). Null = unestimated. */
+    @Column(name = "story_points")
+    private Integer storyPoints;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -174,6 +178,14 @@ public class Task {
 
     public void setSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public Integer getStoryPoints() {
+        return storyPoints;
+    }
+
+    public void setStoryPoints(Integer storyPoints) {
+        this.storyPoints = storyPoints;
     }
 
     public Instant getCreatedAt() {

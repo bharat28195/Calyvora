@@ -16,6 +16,10 @@ import {
   type ClientDetail,
   type ClientRequestItem,
   type AppNotification,
+  type Post,
+  type PostInput,
+  type SprintReport,
+  type Velocity,
   type ExpenseClaim,
   type ExpenseInput,
   type ExpenseSummary,
@@ -315,12 +319,12 @@ export const api = {
   listTasks(projectId: string): Promise<Task[]> {
     return LIVE ? http<Task[]>(`/work/projects/${projectId}/tasks`) : mockBackend.listTasks(accessToken, projectId);
   },
-  createTask(projectId: string, input: { title: string; description?: string; priority?: string; assigneeId?: string; dueDate?: string }): Promise<Task> {
+  createTask(projectId: string, input: { title: string; description?: string; priority?: string; assigneeId?: string; dueDate?: string; storyPoints?: number }) : Promise<Task> {
     return LIVE
       ? http<Task>(`/work/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify(input) })
       : mockBackend.createTask(accessToken, projectId, input);
   },
-  updateTask(id: string, patch: { title?: string; description?: string; status?: string; priority?: string; assigneeId?: string; sprintId?: string; dueDate?: string }): Promise<Task> {
+  updateTask(id: string, patch: { title?: string; description?: string; status?: string; priority?: string; assigneeId?: string; sprintId?: string; dueDate?: string; storyPoints?: number }): Promise<Task> {
     return LIVE
       ? http<Task>(`/work/tasks/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
       : mockBackend.updateTask(accessToken, id, patch);
@@ -484,6 +488,37 @@ export const api = {
   async myGoals(): Promise<Goal[]> {
     const me = await this.myEmployee();
     return this.employeeGoals(me.id);
+  },
+
+  // --- sprint reporting ---
+  sprintReport(sprintId: string): Promise<SprintReport> {
+    return LIVE ? http<SprintReport>(`/work/sprints/${sprintId}/report`) : mockBackend.sprintReport(accessToken, sprintId);
+  },
+  velocity(projectId: string): Promise<Velocity> {
+    return LIVE ? http<Velocity>(`/work/projects/${projectId}/velocity`) : mockBackend.velocity(accessToken, projectId);
+  },
+
+  // --- company feed ---
+  feed(): Promise<Post[]> {
+    return LIVE ? http<Post[]>("/feed") : mockBackend.feed(accessToken);
+  },
+  createPost(input: PostInput): Promise<Post> {
+    return LIVE ? http<Post>("/feed", { method: "POST", body: JSON.stringify(input) }) : mockBackend.createPost(accessToken, input);
+  },
+  deletePost(id: string): Promise<void> {
+    return LIVE ? http<void>(`/feed/${id}`, { method: "DELETE" }) : mockBackend.deletePost(accessToken, id);
+  },
+  pinPost(id: string, pinned: boolean): Promise<Post> {
+    return LIVE ? http<Post>(`/feed/${id}/pin`, { method: "POST", body: JSON.stringify({ pinned }) }) : mockBackend.pinPost(accessToken, id, pinned);
+  },
+  reactToPost(id: string, emoji: string): Promise<Post> {
+    return LIVE ? http<Post>(`/feed/${id}/react`, { method: "POST", body: JSON.stringify({ emoji }) }) : mockBackend.reactToPost(accessToken, id, emoji);
+  },
+  commentOnPost(id: string, body: string): Promise<Post> {
+    return LIVE ? http<Post>(`/feed/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }) : mockBackend.commentOnPost(accessToken, id, body);
+  },
+  deletePostComment(commentId: string): Promise<void> {
+    return LIVE ? http<void>(`/feed/comments/${commentId}`, { method: "DELETE" }) : mockBackend.deletePostComment(accessToken, commentId);
   },
 
   // --- expense claims ---

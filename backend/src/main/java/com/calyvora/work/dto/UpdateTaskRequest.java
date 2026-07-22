@@ -11,6 +11,8 @@ public record UpdateTaskRequest(
         @Pattern(regexp = "LOW|MEDIUM|HIGH|URGENT", message = "invalid priority") String priority,
         String assigneeId,
         String sprintId,
-        String dueDate
+        String dueDate,
+        /** Story points; send -1 to clear the estimate. */
+        Integer storyPoints
 ) {
 }

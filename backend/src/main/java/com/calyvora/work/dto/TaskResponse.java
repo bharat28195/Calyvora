@@ -15,6 +15,8 @@ public record TaskResponse(
         String assigneeName,
         String sprintId,
         String dueDate,
+        /** Estimate; null when the task hasn't been sized yet. */
+        Integer storyPoints,
         String createdAt
 ) {
     public static TaskResponse of(Task t, String projectKey, String assigneeName) {
@@ -25,6 +27,7 @@ public record TaskResponse(
                 t.getAssigneeId() == null ? null : t.getAssigneeId().toString(), assigneeName,
                 t.getSprintId() == null ? null : t.getSprintId().toString(),
                 t.getDueDate() == null ? null : t.getDueDate().toString(),
+                t.getStoryPoints(),
                 t.getCreatedAt().toString());
     }
 }

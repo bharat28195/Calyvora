@@ -24,14 +24,28 @@ import java.util.UUID;
 public class SprintController {
 
     private final SprintService sprintService;
+    private final SprintReportService sprintReportService;
 
-    public SprintController(SprintService sprintService) {
+    public SprintController(SprintService sprintService, SprintReportService sprintReportService) {
         this.sprintService = sprintService;
+        this.sprintReportService = sprintReportService;
     }
 
     @GetMapping("/projects/{projectId}/sprints")
     public List<SprintResponse> list(@PathVariable UUID projectId) {
         return sprintService.list(projectId);
+    }
+
+    /** The sprint review in one call: commitment, progress, burndown and per-person load. */
+    @GetMapping("/sprints/{id}/report")
+    public com.calyvora.work.dto.SprintReportResponse report(@PathVariable UUID id) {
+        return sprintReportService.report(id);
+    }
+
+    /** Completed points per finished sprint, and what to commit to next. */
+    @GetMapping("/projects/{projectId}/velocity")
+    public com.calyvora.work.dto.VelocityResponse velocity(@PathVariable UUID projectId) {
+        return sprintReportService.velocity(projectId);
     }
 
     @PostMapping("/projects/{projectId}/sprints")

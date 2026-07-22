@@ -7,6 +7,8 @@ public record UpdateSprintRequest(
         @Size(min = 1, max = 120) String name,
         @Size(max = 500) String goal,
         String startDate,
-        String endDate
+        String endDate,
+        /** What the team believes it can take on this sprint. */
+        Integer capacityPoints
 ) {
 }

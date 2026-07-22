@@ -152,6 +152,22 @@ Flyway `V10`/`V11`. **5 new integration tests** (58 total), verified live end-to
 - **S3 Tickets** — `Ticket` (subject/requester/status/priority, ref `KEY-T{n}`, assignee = People employee);
   `/work/projects/{id}/tickets`, `PATCH/DELETE /work/tickets/{id}`. **Debt: graduates to Service OS (SD-22b).**
 
+## 6g. Second founder round (2026-07-22/23) — ✅ COMPLETE
+- **Notifications + Inbox** (`com.calyvora.notification`, **V19**): leave → the requester's **manager**
+  (fallback: all admins); decisions back to the requester; manager-set goals; expense claims. Never
+  self-notifies; text frozen at send. Header bell + `/inbox`.
+- **Holidays** (`people.Holiday`, **V20**): everyone reads, admins edit, starter calendar. Fills the
+  attendance day for everyone (optional holidays don't). Dashboard **What's coming up**.
+- **Me hub** (`/me`): Overview · Attendance · Time off · Performance · Expenses, sharing components
+  with People rather than duplicating them (`components/attendance/self.tsx`, `components/leave/my-leave.tsx`).
+- **Expenses** (`com.calyvora.expense`, **V21**): submit → approve → **reimburse** (separate states);
+  editable only until decided; Owner/Admin queue with totals.
+- **Feed** (`com.calyvora.feed`, **V22**): posts with company/team visibility **enforced on read**,
+  reactions (toggle), comments, admin pinning; kinds incl. CELEBRATION for birthdays.
+- **Sprint depth** (**V23**): story points, sprint capacity, daily `sprint_snapshots`;
+  `/work/sprints/{id}/report` (burndown, capacity check, unestimated count, per-person load) and
+  `/work/projects/{id}/velocity`. **Report** tab in the workspace.
+
 ## 6f. Attendance (founder C.4 / B6 phase 2) — ✅ COMPLETE
 `com.calyvora.people` Attendance*, Flyway **V18** (`attendance_records`, RLS, unique employee+day).
 - **Resolution order:** marked row → approved leave (auto-filled, flagged `derived`) → weekend

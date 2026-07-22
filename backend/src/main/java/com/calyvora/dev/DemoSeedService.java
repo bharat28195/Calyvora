@@ -11,6 +11,8 @@ import com.calyvora.company.CompanyStatus;
 import com.calyvora.expense.ExpenseService;
 import com.calyvora.expense.dto.ExpensePayload;
 import com.calyvora.expense.dto.ExpenseResponse;
+import com.calyvora.feed.FeedService;
+import com.calyvora.feed.dto.PostPayload;
 import com.calyvora.identity.Role;
 import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
@@ -91,6 +93,7 @@ public class DemoSeedService {
     private final com.calyvora.people.HolidayService holidayService;
     private final com.calyvora.people.HolidayRepository holidayRepository;
     private final ExpenseService expenseService;
+    private final FeedService feedService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -106,7 +109,8 @@ public class DemoSeedService {
                            com.calyvora.people.AttendanceService attendanceService,
                            com.calyvora.people.HolidayService holidayService,
                            com.calyvora.people.HolidayRepository holidayRepository,
-                           ExpenseService expenseService) {
+                           ExpenseService expenseService, FeedService feedService) {
+        this.feedService = feedService;
         this.attendanceService = attendanceService;
         this.holidayService = holidayService;
         this.holidayRepository = holidayRepository;
@@ -208,7 +212,7 @@ public class DemoSeedService {
         SprintResponse sprint = sprintService.create(atlasId, new CreateSprintRequest(
                 "Sprint 12 — Security hardening",
                 "Ship RS256 tokens and tenant Row-Level Security; polish onboarding.",
-                LocalDate.now().minusDays(4).toString(), LocalDate.now().plusDays(10).toString()));
+                LocalDate.now().minusDays(4).toString(), LocalDate.now().plusDays(10).toString(), 34));
         sprintService.start(UUID.fromString(sprint.id()));
 
         String eMarcus = emp.get(marcus.getEmail()).id();
@@ -218,23 +222,23 @@ public class DemoSeedService {
 
         // In-sprint work, with realistic progress spread.
         TaskResponse t1 = task(atlasId, owner, "RS256 JWT signing with key rotation", ePriya, "HIGH",
-                "Replace the HS256 shared secret with asymmetric RS256 + a JWKS endpoint.");
+                "Replace the HS256 shared secret with asymmetric RS256 + a JWKS endpoint.", 8);
         inSprint(t1, sprint.id(), "DONE");
         TaskResponse t2 = task(atlasId, owner, "Postgres Row-Level Security for tenant isolation", eMarcus, "URGENT",
-                "Enable + force RLS on all tenant tables; bind the tenant per connection.");
+                "Enable + force RLS on all tenant tables; bind the tenant per connection.", 13);
         inSprint(t2, sprint.id(), "IN_PROGRESS");
         TaskResponse t3 = task(atlasId, owner, "Onboarding wizard polish", eLeo, "MEDIUM",
-                "Tighten the empty states and first-run experience for new tenants.");
+                "Tighten the empty states and first-run experience for new tenants.", 5);
         inSprint(t3, sprint.id(), "IN_PROGRESS");
         TaskResponse t4 = task(atlasId, owner, "Rotate signing keys without downtime", ePriya, "MEDIUM",
-                "Document and test the kid-based rotation flow.");
+                "Document and test the kid-based rotation flow.", 5);
         inSprint(t4, sprint.id(), "TODO");
 
         // Backlog (no sprint) — proves the backlog view.
         task(atlasId, owner, "Full-text search across Knowledge pages", eMarcus, "MEDIUM",
-                "tsvector-based search as the retrieval layer for the assistant.");
+                "tsvector-based search as the retrieval layer for the assistant.", 8);
         task(atlasId, owner, "Universal AI assistant (RAG over the org graph)", eMarcus, "HIGH",
-                "Ask questions in plain English, answered from People/Work/Knowledge data.");
+                "Ask questions in plain English, answered from People/Work/Knowledge data.", 13);
         task(atlasId, owner, "Audit log for admin actions", null, "LOW", null);
 
         ticketService.create(atlasId, ticket("Cannot reset my password", "Priya", eSara, "HIGH",
@@ -287,6 +291,36 @@ public class DemoSeedService {
         seedExpense(owner, emp, leo.getEmail(), "Figma annual seat", "SUPPLIES", 13800, "reimburse");
         seedExpense(owner, emp, sara.getEmail(), "Support conference ticket", "TRAINING", 22000, null);
         seedExpense(owner, emp, tom.getEmail(), "Hotel — customer QBR", "ACCOMMODATION", 9400, "approve");
+
+        // --- Feed: a few posts so the wall has a voice, including a team-only one ---
+        seedFeed(owner, emp, marcus, priya, engineering.id());
+    }
+
+    /** A short, believable wall: an announcement, a birthday, a question, and one team-only post. */
+    private void seedFeed(AuthPrincipal owner, Map<String, EmployeeResponse> emp, User marcus, User priya,
+                          String engineeringId) {
+        var pinned = feedService.create(new PostPayload(
+                "We hit 100 customers this month. Thank you, all of you — this is the whole team's win. 🎉",
+                "ANNOUNCEMENT", "COMPANY", null), owner);
+        feedService.setPinned(UUID.fromString(pinned.id()), true, owner);
+
+        feedService.create(new PostPayload(
+                "Happy birthday, Sara! Cake in the kitchen at 4pm 🎂", "CELEBRATION", "COMPANY", null),
+                principalFor(owner, emp, marcus.getEmail()));
+
+        feedService.create(new PostPayload(
+                "Does anyone have the latest customer onboarding deck? Can't find it in Knowledge.",
+                "QUESTION", "COMPANY", null), principalFor(owner, emp, priya.getEmail()));
+
+        feedService.create(new PostPayload(
+                "Engineering only: RLS rollout is done on all tenant tables. Please re-run your local migrations.",
+                "UPDATE", "DEPARTMENT", engineeringId), principalFor(owner, emp, marcus.getEmail()));
+    }
+
+    /** Acts as another member — services read the principal to decide authorship. */
+    private AuthPrincipal principalFor(AuthPrincipal owner, Map<String, EmployeeResponse> emp, String email) {
+        EmployeeResponse e = emp.get(email);
+        return new AuthPrincipal(UUID.fromString(e.userId()), owner.companyId(), e.role(), e.email());
     }
 
     /**
@@ -440,13 +474,19 @@ public class DemoSeedService {
 
     private TaskResponse task(UUID projectId, AuthPrincipal owner, String title, String assigneeId,
                               String priority, String description) {
+        return task(projectId, owner, title, assigneeId, priority, description, null);
+    }
+
+    /** Overload that sizes the task, so velocity and the burndown have real numbers to work with. */
+    private TaskResponse task(UUID projectId, AuthPrincipal owner, String title, String assigneeId,
+                              String priority, String description, Integer storyPoints) {
         return taskService.create(projectId,
-                new CreateTaskRequest(title, description, priority, assigneeId, null), owner);
+                new CreateTaskRequest(title, description, priority, assigneeId, null, storyPoints), owner);
     }
 
     private void inSprint(TaskResponse task, String sprintId, String status) {
         taskService.update(UUID.fromString(task.id()),
-                new UpdateTaskRequest(null, null, status, null, null, sprintId, null));
+                new UpdateTaskRequest(null, null, status, null, null, sprintId, null, null));
     }
 
     private static CreateTicketRequest ticket(String subject, String requester, String assigneeId,

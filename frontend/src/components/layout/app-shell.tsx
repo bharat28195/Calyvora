@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Loader2, LogOut, LayoutDashboard, Users, FolderKanban, BookOpen, UserCog, Settings, Handshake, FileText,
-  CircleUser, Inbox, Receipt,
+  CircleUser, Inbox, Receipt, MessagesSquare,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,7 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/feed", label: "Feed", icon: MessagesSquare },
   {
     href: "/people", label: "People", icon: Users,
     children: [

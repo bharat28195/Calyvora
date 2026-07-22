@@ -4,6 +4,27 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-23 — Company feed (E7) and sprint depth (E8)
+**14 new tests (138 total).**
+
+- **Feed (Flyway V22, RLS):** posts with **per-post visibility** — company-wide or one team — plus
+  reactions (toggling: the same emoji twice removes it), comments, and Owner/Admin pinning. The
+  visibility rule is enforced **on read**, not hidden in the UI: a team post is returned only to that
+  team, its author, and admins. Visibility is stored **on the post**, not derived from the author's
+  team, so moving department never retroactively changes who could see something. Post kinds
+  (update · announcement · **celebration** · question) drive the icon; the demo seeds a pinned
+  announcement, a birthday post, a question and a team-only update.
+- **Sprint depth (Flyway V23):** **story points** on tasks, a **capacity** figure on sprints, and a
+  **daily snapshot** table. `GET /work/sprints/{id}/report` returns commitment vs capacity (flagging
+  over-commitment), completed/remaining, **how many tasks are unestimated** — a burndown lies if half
+  the board has no numbers — the day-by-day burndown, and per-person load sorted heaviest-first.
+  `GET /work/projects/{id}/velocity` averages **completed sprints only** and suggests the next
+  commitment. New **Report** tab in the project workspace with an SVG burndown (actual vs ideal) and
+  a velocity chart; points show on board cards.
+- **Why snapshots:** a burndown computed from current state can only ever draw *today*. Remaining
+  work is recorded once per sprint per day (and re-recorded on every board change), so the line
+  reflects what actually happened.
+
 ### 2026-07-23 — Notifications & Inbox (D4/D5), holiday calendar, the **Me** hub, and expense claims
 Four modules from the founder's 2026-07-22 session, built in one pass. **19 new tests (124 total).**
 

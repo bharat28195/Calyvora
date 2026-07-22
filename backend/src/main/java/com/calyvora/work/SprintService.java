@@ -42,6 +42,7 @@ public class SprintService {
         Sprint sprint = new Sprint(UUID.randomUUID(), project.getCompanyId(), projectId,
                 request.name().trim(), blankToNull(request.goal()),
                 parseDate(request.startDate()), parseDate(request.endDate()));
+        sprint.setCapacityPoints(request.capacityPoints());
         sprintRepository.save(sprint);
         return toResponse(sprint);
     }
@@ -60,6 +61,10 @@ public class SprintService {
         }
         if (request.endDate() != null) {
             sprint.setEndDate(parseDate(request.endDate()));
+        }
+        if (request.capacityPoints() != null) {
+            // -1 clears it; anything else is taken at face value.
+            sprint.setCapacityPoints(request.capacityPoints() < 0 ? null : request.capacityPoints());
         }
         return toResponse(sprint);
     }

@@ -35,10 +35,12 @@ public class TaskService {
     private final SprintRepository sprintRepository;
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
+    private final SprintReportService sprintReportService;
 
     public TaskService(TaskRepository taskRepository, ProjectRepository projectRepository,
                        SprintRepository sprintRepository, EmployeeRepository employeeRepository,
-                       UserRepository userRepository) {
+                       UserRepository userRepository, SprintReportService sprintReportService) {
+        this.sprintReportService = sprintReportService;
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.sprintRepository = sprintRepository;
@@ -96,6 +98,7 @@ public class TaskService {
         if (request.priority() != null) task.setPriority(TaskPriority.valueOf(request.priority()));
         if (request.assigneeId() != null) task.setAssigneeId(resolveAssignee(project.getCompanyId(), request.assigneeId()));
         if (request.dueDate() != null && !request.dueDate().isBlank()) task.setDueDate(LocalDate.parse(request.dueDate()));
+        if (request.storyPoints() != null) task.setStoryPoints(sanitizePoints(request.storyPoints()));
         task.setSortOrder(number);
         taskRepository.save(task);
         return TaskResponse.of(task, project.getKey(), assigneeName(new HashMap<>(), task.getAssigneeId()));
@@ -116,7 +119,15 @@ public class TaskService {
         if (request.dueDate() != null) {
             task.setDueDate(request.dueDate().isBlank() ? null : LocalDate.parse(request.dueDate()));
         }
+        if (request.storyPoints() != null) {
+            task.setStoryPoints(sanitizePoints(request.storyPoints()));
+        }
         Project project = projectRepository.findById(task.getProjectId()).orElseThrow();
+
+        // Keep the burndown honest: any change to a sprint task re-records today's remaining work.
+        if (task.getSprintId() != null) {
+            sprintReportService.snapshotSprint(task.getSprintId());
+        }
         return TaskResponse.of(task, project.getKey(), assigneeName(new HashMap<>(), task.getAssigneeId()));
     }
 
@@ -197,6 +208,14 @@ public class TaskService {
 
     private String projectKey(UUID projectId) {
         return projectRepository.findById(projectId).map(Project::getKey).orElse("");
+    }
+
+    /** Story points: negative clears the estimate, and we cap the top end so a typo can't skew a burndown. */
+    private static Integer sanitizePoints(Integer points) {
+        if (points == null || points < 0) {
+            return null;
+        }
+        return Math.min(points, 200);
     }
 
     private static String blankToNull(String s) {

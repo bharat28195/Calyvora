@@ -43,6 +43,10 @@ public class Sprint {
     @Column(nullable = false, length = 24)
     private SprintStatus status = SprintStatus.PLANNED;
 
+    /** What the team believes it can take on, so over-commitment shows at planning time (V23). */
+    @Column(name = "capacity_points")
+    private Integer capacityPoints;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -128,6 +132,14 @@ public class Sprint {
 
     public void setStatus(SprintStatus status) {
         this.status = status;
+    }
+
+    public Integer getCapacityPoints() {
+        return capacityPoints;
+    }
+
+    public void setCapacityPoints(Integer capacityPoints) {
+        this.capacityPoints = capacityPoints;
     }
 
     public Instant getCreatedAt() {

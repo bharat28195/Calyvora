@@ -22,6 +22,14 @@ import {
   type ClientRequestItem,
   type AppNotification,
   type NotificationType,
+  type Post,
+  type PostInput,
+  type SprintReport,
+  type Velocity,
+  type BurndownPoint,
+  type MemberLoad,
+  type PostKind,
+  type PostVisibility,
   type ExpenseClaim,
   type ExpenseInput,
   type ExpenseSummary,
@@ -166,6 +174,8 @@ interface TaskRow {
   dueDate: string | null;
   sortOrder: number;
   createdAt: string;
+  /** Estimate; null when unsized (V23). */
+  storyPoints?: number | null;
 }
 interface SprintRow {
   id: string;
@@ -177,6 +187,8 @@ interface SprintRow {
   endDate: string | null;
   status: Sprint["status"];
   createdAt: string;
+  /** What the team believes it can take on (V23). */
+  capacityPoints?: number | null;
 }
 interface TicketRow {
   id: string;
@@ -615,6 +627,176 @@ export const mockBackend = {
     const user = requireSession(db, accessToken);
     employeeForUser(db, user);   // auto-provisions, matching the real endpoint
     return toEmployee(db, user);
+  },
+
+  // --- sprint reporting (mirrors SprintReportService) ---
+  async sprintReport(accessToken: string | null, sprintId: string): Promise<SprintReport> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const sprint = db.sprints.find((s) => s.id === sprintId && s.companyId === user.companyId);
+    if (!sprint) throw err(404, "NOT_FOUND", "Sprint not found");
+    const tasks = db.tasks.filter((t) => t.sprintId === sprintId);
+
+    let committed = 0, completed = 0, unestimated = 0, done = 0;
+    for (const t of tasks) {
+      const points = t.storyPoints ?? 0;
+      if (t.storyPoints == null) unestimated++;
+      committed += points;
+      if (t.status === "DONE") { completed += points; done++; }
+    }
+
+    const start = sprint.startDate, end = sprint.endDate;
+    const burndown: BurndownPoint[] = [];
+    if (start && end) {
+      const startMs = new Date(`${start}T00:00:00`).getTime();
+      const endMs = new Date(`${end}T00:00:00`).getTime();
+      const span = Math.max(1, Math.round((endMs - startMs) / 86_400_000));
+      const today = todayIso();
+      for (let i = 0; i <= span; i++) {
+        const date = new Date(startMs + i * 86_400_000).toISOString().slice(0, 10);
+        const ideal = Math.round((committed - (committed * i) / span) * 10) / 10;
+        // The mock has no snapshot history, so the actual line is only drawn for today.
+        const remaining = date === today ? committed - completed : null;
+        burndown.push({ date, remainingPoints: remaining, ideal, projected: date > today });
+      }
+    }
+
+    const loads = new Map<string, MemberLoad>();
+    for (const t of tasks) {
+      if (!t.assigneeId) continue;
+      const emp = db.employees.find((e) => e.id === t.assigneeId);
+      const u = emp && db.users.find((x) => x.id === emp.userId);
+      const row = loads.get(t.assigneeId) ?? {
+        employeeId: t.assigneeId, name: u ? `${u.firstName} ${u.lastName}` : "Unassigned",
+        points: 0, tasks: 0, donePoints: 0,
+      };
+      row.points += t.storyPoints ?? 0;
+      row.tasks += 1;
+      if (t.status === "DONE") row.donePoints += t.storyPoints ?? 0;
+      loads.set(t.assigneeId, row);
+    }
+
+    const daysTotal = burndown.length;
+    return {
+      sprintId, name: sprint.name, goal: sprint.goal, status: sprint.status,
+      startDate: start, endDate: end, capacityPoints: sprint.capacityPoints ?? null,
+      committedPoints: committed, completedPoints: completed, remainingPoints: committed - completed,
+      totalTasks: tasks.length, doneTasks: done, unestimatedTasks: unestimated,
+      daysTotal,
+      daysElapsed: burndown.filter((p) => !p.projected).length,
+      burndown,
+      byAssignee: [...loads.values()].sort((a, b) => b.points - a.points),
+    };
+  },
+  async velocity(accessToken: string | null, projectId: string): Promise<Velocity> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const sprints = db.sprints
+      .filter((s) => s.projectId === projectId && s.companyId === user.companyId && s.status === "COMPLETED")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+    const rows = sprints.map((s) => {
+      let committed = 0, completed = 0;
+      for (const t of db.tasks.filter((t) => t.sprintId === s.id)) {
+        const points = t.storyPoints ?? 0;
+        committed += points;
+        if (t.status === "DONE") completed += points;
+      }
+      return { sprintId: s.id, name: s.name, endDate: s.endDate, committedPoints: committed, completedPoints: completed };
+    });
+    const average = rows.length
+      ? Math.round((rows.reduce((sum, r) => sum + r.completedPoints, 0) / rows.length) * 10) / 10
+      : 0;
+    return { sprints: rows, averageVelocity: average, suggestedCommitment: Math.round(average) };
+  },
+
+  // --- company feed ---
+  async feed(accessToken: string | null): Promise<Post[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const myDept = db.employees.find((e) => e.userId === user.id)?.departmentId ?? null;
+    const admin = user.role === "OWNER" || user.role === "ADMIN";
+    return (mockPosts[user.companyId] ?? [])
+      .filter((p) => canSeePost(p, user.id, myDept, admin))
+      .map((p) => renderPost(db, p, user))
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt.localeCompare(a.createdAt));
+  },
+  async createPost(accessToken: string | null, input: PostInput): Promise<Post> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    if (!input.body?.trim()) throw err(400, "VALIDATION_ERROR", "Write something first");
+    const visibility = input.visibility ?? "COMPANY";
+    if (visibility === "DEPARTMENT" && !input.departmentId) {
+      throw err(400, "VALIDATION_ERROR", "Pick a team for a team-only post");
+    }
+    const row: MockPost = {
+      id: crypto.randomUUID(), authorId: user.id, kind: input.kind ?? "UPDATE",
+      body: input.body.trim(), visibility, departmentId: input.departmentId ?? null,
+      pinned: false, reactions: [], comments: [], createdAt: new Date().toISOString(),
+    };
+    mockPosts[user.companyId] = [row, ...(mockPosts[user.companyId] ?? [])];
+    return renderPost(db, row, user);
+  },
+  async deletePost(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const post = (mockPosts[user.companyId] ?? []).find((p) => p.id === id);
+    if (!post) throw err(404, "NOT_FOUND", "Post not found");
+    const admin = user.role === "OWNER" || user.role === "ADMIN";
+    if (post.authorId !== user.id && !admin) throw err(403, "FORBIDDEN", "You can only delete your own posts");
+    mockPosts[user.companyId] = (mockPosts[user.companyId] ?? []).filter((p) => p.id !== id);
+  },
+  async pinPost(accessToken: string | null, id: string, pinned: boolean): Promise<Post> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const post = (mockPosts[user.companyId] ?? []).find((p) => p.id === id);
+    if (!post) throw err(404, "NOT_FOUND", "Post not found");
+    post.pinned = pinned;
+    return renderPost(db, post, user);
+  },
+  async reactToPost(accessToken: string | null, id: string, emoji: string): Promise<Post> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const post = (mockPosts[user.companyId] ?? []).find((p) => p.id === id);
+    if (!post) throw err(404, "NOT_FOUND", "Post not found");
+    const existing = post.reactions.findIndex((r) => r.userId === user.id && r.emoji === emoji);
+    if (existing >= 0) post.reactions.splice(existing, 1);
+    else post.reactions.push({ userId: user.id, emoji });
+    return renderPost(db, post, user);
+  },
+  async commentOnPost(accessToken: string | null, id: string, body: string): Promise<Post> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const post = (mockPosts[user.companyId] ?? []).find((p) => p.id === id);
+    if (!post) throw err(404, "NOT_FOUND", "Post not found");
+    if (!body?.trim()) throw err(400, "VALIDATION_ERROR", "Write something first");
+    post.comments.push({
+      id: crypto.randomUUID(), authorId: user.id, body: body.trim(), createdAt: new Date().toISOString(),
+    });
+    return renderPost(db, post, user);
+  },
+  async deletePostComment(accessToken: string | null, commentId: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const admin = user.role === "OWNER" || user.role === "ADMIN";
+    for (const post of mockPosts[user.companyId] ?? []) {
+      const c = post.comments.find((x) => x.id === commentId);
+      if (!c) continue;
+      if (c.authorId !== user.id && !admin) throw err(403, "FORBIDDEN", "You can only delete your own comments");
+      post.comments = post.comments.filter((x) => x.id !== commentId);
+      return;
+    }
+    throw err(404, "NOT_FOUND", "Comment not found");
   },
 
   // --- expense claims ---
@@ -2122,6 +2304,7 @@ function toTask(db: DB, t: TaskRow, project: ProjectRow): Task {
     assigneeName,
     sprintId: t.sprintId,
     dueDate: t.dueDate,
+    storyPoints: t.storyPoints ?? null,
     createdAt: t.createdAt,
   };
 }
@@ -2136,6 +2319,7 @@ function toSprint(db: DB, s: SprintRow): Sprint {
     startDate: s.startDate,
     endDate: s.endDate,
     status: s.status,
+    capacityPoints: s.capacityPoints ?? null,
     taskCount: tasks.length,
     doneCount: tasks.filter((t) => t.status === "DONE").length,
     createdAt: s.createdAt,
@@ -2297,6 +2481,57 @@ function buildCompensation(db: DB, employeeId: string): Compensation {
 
 // --- goals (mock, in-memory; resets on reload) ------------------------------
 const mockGoals: Record<string, Goal[]> = {};
+
+// --- feed (mock, in-memory; resets on reload) -------------------------------
+interface MockPost {
+  id: string; authorId: string; kind: PostKind; body: string;
+  visibility: PostVisibility; departmentId: string | null; pinned: boolean;
+  reactions: { userId: string; emoji: string }[];
+  comments: { id: string; authorId: string; body: string; createdAt: string }[];
+  createdAt: string;
+}
+const mockPosts: Record<string, MockPost[]> = {};
+
+/** Mirrors FeedService.canSee: company posts are open; team posts are for that team, the author and admins. */
+function canSeePost(p: MockPost, userId: string, myDept: string | null, admin: boolean): boolean {
+  if (p.visibility === "COMPANY") return true;
+  return admin || p.authorId === userId || (myDept != null && myDept === p.departmentId);
+}
+
+function renderPost(db: DB, p: MockPost, viewer: User): Post {
+  const nameOf = (userId: string) => {
+    const u = db.users.find((x) => x.id === userId);
+    return u ? `${u.firstName} ${u.lastName}` : "Someone";
+  };
+  const admin = viewer.role === "OWNER" || viewer.role === "ADMIN";
+  const reactions: Record<string, number> = {};
+  const myReactions: string[] = [];
+  for (const r of p.reactions) {
+    reactions[r.emoji] = (reactions[r.emoji] ?? 0) + 1;
+    if (r.userId === viewer.id) myReactions.push(r.emoji);
+  }
+  const authorEmployee = db.employees.find((e) => e.userId === p.authorId);
+  return {
+    id: p.id,
+    authorId: p.authorId,
+    authorName: nameOf(p.authorId),
+    authorTitle: authorEmployee?.jobTitle ?? null,
+    kind: p.kind,
+    body: p.body,
+    visibility: p.visibility,
+    departmentId: p.departmentId,
+    departmentName: db.departments.find((d) => d.id === p.departmentId)?.name ?? null,
+    pinned: p.pinned,
+    reactions,
+    myReactions,
+    comments: p.comments.map((c) => ({
+      id: c.id, authorId: c.authorId, authorName: nameOf(c.authorId), body: c.body,
+      canDelete: c.authorId === viewer.id || admin, createdAt: c.createdAt,
+    })),
+    canManage: p.authorId === viewer.id || admin,
+    createdAt: p.createdAt,
+  };
+}
 
 // --- expenses (mock, in-memory; resets on reload) ---------------------------
 const mockExpenses: Record<string, ExpenseClaim[]> = {};

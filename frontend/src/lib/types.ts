@@ -96,6 +96,91 @@ export interface ClientDetail {
   requests: ClientRequestItem[];
 }
 
+/** Sprint reporting — burndown, velocity, capacity and per-person load. */
+export interface BurndownPoint {
+  date: string;
+  /** Recorded remaining points; null for days with no snapshot (future days). */
+  remainingPoints: number | null;
+  ideal: number;
+  projected: boolean;
+}
+export interface MemberLoad {
+  employeeId: string;
+  name: string;
+  points: number;
+  tasks: number;
+  donePoints: number;
+}
+export interface SprintReport {
+  sprintId: string;
+  name: string;
+  goal: string | null;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  capacityPoints: number | null;
+  committedPoints: number;
+  completedPoints: number;
+  remainingPoints: number;
+  totalTasks: number;
+  doneTasks: number;
+  unestimatedTasks: number;
+  daysTotal: number;
+  daysElapsed: number;
+  burndown: BurndownPoint[];
+  byAssignee: MemberLoad[];
+}
+export interface SprintVelocity {
+  sprintId: string;
+  name: string;
+  endDate: string | null;
+  committedPoints: number;
+  completedPoints: number;
+}
+export interface Velocity {
+  sprints: SprintVelocity[];
+  averageVelocity: number;
+  suggestedCommitment: number;
+}
+
+/** Company feed — posts with per-post visibility, reactions and comments. */
+export type PostKind = "UPDATE" | "ANNOUNCEMENT" | "CELEBRATION" | "QUESTION";
+export type PostVisibility = "COMPANY" | "DEPARTMENT";
+
+export interface PostComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  canDelete: boolean;
+  createdAt: string;
+}
+export interface Post {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorTitle: string | null;
+  kind: PostKind;
+  body: string;
+  visibility: PostVisibility;
+  departmentId: string | null;
+  departmentName: string | null;
+  pinned: boolean;
+  /** emoji → how many people used it. */
+  reactions: Record<string, number>;
+  /** The emoji the viewer has used. */
+  myReactions: string[];
+  comments: PostComment[];
+  canManage: boolean;
+  createdAt: string;
+}
+export interface PostInput {
+  body: string;
+  kind?: PostKind;
+  visibility?: PostVisibility;
+  departmentId?: string;
+}
+
 /** Expense claims — travel and other out-of-pocket spend. */
 export type ExpenseCategory = "TRAVEL" | "ACCOMMODATION" | "MEALS" | "SUPPLIES" | "TRAINING" | "OTHER";
 export type ExpenseStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "REIMBURSED";
@@ -349,6 +434,8 @@ export interface Task {
   assigneeName: string | null;
   sprintId: string | null;
   dueDate: string | null;
+  /** Estimate; null when the task hasn't been sized. */
+  storyPoints: number | null;
   createdAt: string;
 }
 
@@ -362,6 +449,8 @@ export interface Sprint {
   startDate: string | null;
   endDate: string | null;
   status: SprintStatusT;
+  /** What the team believes it can take on this sprint. */
+  capacityPoints: number | null;
   taskCount: number;
   doneCount: number;
   createdAt: string;

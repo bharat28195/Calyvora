@@ -9,6 +9,7 @@ public record CreateTaskRequest(
         @Size(max = 4000) String description,
         @Pattern(regexp = "LOW|MEDIUM|HIGH|URGENT", message = "invalid priority") String priority,
         String assigneeId,
-        @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "due date must be YYYY-MM-DD") String dueDate
+        @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "due date must be YYYY-MM-DD") String dueDate,
+        Integer storyPoints
 ) {
 }
