@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Loader2, Plus, Trash2, Building2, Users, ChevronRight } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
@@ -65,7 +64,6 @@ export default function OrgPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Org structure</h1>
           <p className="mt-1 text-fg/50">Departments and reporting lines.</p>
         </div>
-        <Link href="/people" className="text-sm text-fg/60 hover:text-fg">← Directory</Link>
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}

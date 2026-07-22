@@ -70,11 +70,7 @@ export default function PeoplePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">People</h1>
-          <p className="mt-1 flex flex-wrap gap-x-3 text-fg/50">
-            Your company directory.
-            <a href="/people/org" className="text-violet hover:underline">Org chart →</a>
-            <a href="/people/time-off" className="text-violet hover:underline">Time off →</a>
-          </p>
+          <p className="mt-1 text-fg/50">Your company directory.</p>
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />

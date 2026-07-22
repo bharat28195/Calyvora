@@ -14,16 +14,28 @@ import { AssistantPanel } from "@/components/layout/assistant-panel";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Wordmark } from "@/components/layout/wordmark";
 
+interface NavChild {
+  href: string;
+  label: string;
+}
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: Role[]; // undefined = everyone
+  children?: NavChild[]; // sub-panes shown in the left pane when the section is active
 }
 
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/people", label: "People", icon: Users },
+  {
+    href: "/people", label: "People", icon: Users,
+    children: [
+      { href: "/people", label: "Directory" },
+      { href: "/people/org", label: "Org chart" },
+      { href: "/people/time-off", label: "Time off" },
+    ],
+  },
   { href: "/work", label: "Work", icon: FolderKanban },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
   { href: "/clients", label: "Clients", icon: Handshake },
@@ -62,21 +74,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/dashboard"><Wordmark /></Link>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                isActive(href)
-                  ? "bg-violet/10 font-medium text-violet"
-                  : "text-fg/60 hover:bg-fg/5 hover:text-fg",
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </Link>
-          ))}
+          {nav.map((item) => {
+            const Icon = item.icon;
+            const section = isActive(item.href);
+            const hasChildren = !!item.children?.length;
+            return (
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    // With children, the parent is a section header (violet text, no pill) — the active
+                    // sub-pane carries the pill. Without children it's a normal highlighted item.
+                    section
+                      ? hasChildren ? "font-medium text-violet" : "bg-violet/10 font-medium text-violet"
+                      : "text-fg/60 hover:bg-fg/5 hover:text-fg",
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </Link>
+                {hasChildren && section && (
+                  <div className="mt-1 space-y-0.5 border-l border-fg/10 pb-1 pl-3 ml-4">
+                    {item.children!.map((c) => {
+                      const active = pathname === c.href;
+                      return (
+                        <Link
+                          key={c.href}
+                          href={c.href}
+                          className={cn(
+                            "block rounded-md px-3 py-1.5 text-sm transition-colors",
+                            active ? "bg-violet/10 font-medium text-violet" : "text-fg/50 hover:bg-fg/5 hover:text-fg",
+                          )}
+                        >
+                          {c.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <div className="border-t border-fg/10 p-3">
           <div className="mb-2 px-2">
@@ -111,20 +150,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </header>
 
-        {/* Mobile nav — horizontal scroll */}
+        {/* Mobile nav — horizontal scroll; sub-panes appear after the active section */}
         <nav className="flex gap-1 overflow-x-auto border-b border-fg/10 px-4 py-2 md:hidden">
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm",
-                isActive(href) ? "bg-violet/10 text-violet" : "text-fg/60",
-              )}
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </Link>
-          ))}
+          {nav.map((item) => {
+            const Icon = item.icon;
+            const section = isActive(item.href);
+            return (
+              <span key={item.href} className="inline-flex shrink-0 gap-1">
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm",
+                    section ? "bg-violet/10 text-violet" : "text-fg/60",
+                  )}
+                >
+                  <Icon className="h-4 w-4" /> {item.label}
+                </Link>
+                {item.children?.length && section &&
+                  item.children.filter((c) => c.href !== item.href).map((c) => (
+                    <Link key={c.href} href={c.href}
+                      className={cn("inline-flex shrink-0 items-center rounded-lg px-3 py-1.5 text-sm",
+                        pathname === c.href ? "bg-violet/10 text-violet" : "text-fg/50")}>
+                      {c.label}
+                    </Link>
+                  ))}
+              </span>
+            );
+          })}
         </nav>
 
         <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>

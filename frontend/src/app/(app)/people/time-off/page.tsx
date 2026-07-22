@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { Loader2, CalendarPlus, Check, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
@@ -63,7 +62,6 @@ export default function TimeOffPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Time off</h1>
           <p className="mt-1 text-fg/50">Request leave and track your balance.</p>
         </div>
-        <Link href="/people" className="text-sm text-fg/60 hover:text-fg">← Directory</Link>
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
