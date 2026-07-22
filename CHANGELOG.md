@@ -4,6 +4,32 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-23 — Notifications & Inbox (D4/D5), holiday calendar, the **Me** hub, and expense claims
+Four modules from the founder's 2026-07-22 session, built in one pass. **19 new tests (124 total).**
+
+- **Notifications + Inbox (D4/D5, Flyway V19, RLS).** A leave request now routes to **the requester's
+  manager** — or every Owner/Admin when nobody manages them, because a request with no approver would
+  sit unseen. Decisions route back to the requester, and a goal set by a manager notifies the employee.
+  Two rules: we never notify someone about **their own action**, and the text is **frozen at send time**
+  so an entry still reads correctly after the thing it points at changes. Header **bell** with an unread
+  badge (polls the cheap count endpoint, fetches the list only when opened) + a full `/inbox`.
+- **Holiday calendar (Flyway V20, RLS).** Readable by everyone, editable by Owner/Admin, with a
+  one-click starter calendar. A holiday **fills everyone's attendance day automatically** (optional
+  holidays don't), which closes the "no holiday list" debt logged when attendance shipped. New
+  **What's coming up** dashboard card merges upcoming holidays with your own leave.
+- **The Me hub.** A left-pane **Me** section — Overview · Attendance · Time off · Performance ·
+  Expenses — so anyone, whatever their role, has one place for their own stuff. The attendance and
+  leave pieces are **shared components**, not copies: People → Attendance and Me → Attendance run the
+  same code, and People → Time off is now the shared self-service view plus the approvals queue.
+- **Expense claims (Flyway V21, RLS).** Submit a claim (travel, meals, supplies…), it routes to your
+  manager, and **approval and payment are separate states** on purpose — "approved but not yet paid"
+  is exactly what people chase, so it stays visible until money moves. A claim can only be edited while
+  still awaiting a decision; changing the amount afterwards would make the decision a lie. Owner/Admin
+  get an **Expenses** queue with running totals.
+- **Fixed:** the team day sheet and check-in returned nothing/404 for a company whose employee profiles
+  hadn't been lazily provisioned yet. `day()` also had to stop being `readOnly` — a read-only
+  transaction silently swallowed the provisioning inserts without flushing them.
+
 ### 2026-07-22 — Founder feedback: C.4 / B6 phase 2 — **daily attendance**
 Phase 1 inferred "present vs on leave" from approved leave. This is the real record: one row per
 employee per day (`attendance_records`, Flyway **V18**, RLS, unique on employee+day). **10 new tests

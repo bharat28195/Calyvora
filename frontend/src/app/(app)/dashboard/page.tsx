@@ -12,6 +12,7 @@ import type { DashboardSummary, Task, PageSummary } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { TeamOverviewSection } from "@/components/dashboard/team-overview";
+import { WhatsComingUp } from "@/components/dashboard/whats-coming-up";
 
 export default function DashboardPage() {
   const { me } = useSession();
@@ -61,6 +62,10 @@ export default function DashboardPage() {
       )}
 
       {isAdmin && <TeamOverviewSection />}
+
+      <div className="mt-6">
+        <WhatsComingUp />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* My open work */}

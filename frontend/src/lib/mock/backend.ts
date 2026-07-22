@@ -20,6 +20,12 @@ import {
   type Client,
   type ClientDetail,
   type ClientRequestItem,
+  type AppNotification,
+  type NotificationType,
+  type ExpenseClaim,
+  type ExpenseInput,
+  type ExpenseSummary,
+  type Holiday,
   type AttendanceDay,
   type AttendanceEntry,
   type AttendanceMonth,
@@ -603,6 +609,177 @@ export const mockBackend = {
     mockClientReqs[clientId] = (mockClientReqs[clientId] ?? []).filter((x) => x.id !== requestId);
   },
 
+  async myEmployee(accessToken: string | null): Promise<Employee> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    employeeForUser(db, user);   // auto-provisions, matching the real endpoint
+    return toEmployee(db, user);
+  },
+
+  // --- expense claims ---
+  async myExpenses(accessToken: string | null): Promise<ExpenseSummary> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const me = employeeForUser(db, user);
+    return summarizeExpenses(db, (mockExpenses[user.companyId] ?? []).filter((c) => c.employeeId === me.id));
+  },
+  async allExpenses(accessToken: string | null): Promise<ExpenseSummary> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return summarizeExpenses(db, mockExpenses[user.companyId] ?? []);
+  },
+  async submitExpense(accessToken: string | null, input: ExpenseInput): Promise<ExpenseClaim> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const me = employeeForUser(db, user);
+    if (!input.title?.trim()) throw err(400, "VALIDATION_ERROR", "What was the expense for?");
+    if (!(input.amount > 0)) throw err(400, "VALIDATION_ERROR", "Amount must be more than zero");
+    const spentOn = input.spentOn || todayIso();
+    if (spentOn > todayIso()) throw err(400, "VALIDATION_ERROR", "You can't claim for a future date");
+
+    const claim: ExpenseClaim = {
+      id: crypto.randomUUID(), employeeId: me.id, employeeName: `${user.firstName} ${user.lastName}`,
+      title: input.title.trim(), category: input.category ?? "OTHER", amount: input.amount,
+      currency: input.currency ?? "INR", spentOn, description: input.description ?? null,
+      receiptUrl: input.receiptUrl ?? null, status: "SUBMITTED", decisionNote: null,
+      decidedAt: null, reimbursedAt: null, createdAt: new Date().toISOString(),
+    };
+    mockExpenses[user.companyId] = [claim, ...(mockExpenses[user.companyId] ?? [])];
+
+    for (const approverId of approversFor(db, me)) {
+      notify(approverId, user.id, "ANNOUNCEMENT",
+        `${claim.employeeName} claimed ${claim.currency} ${claim.amount}`,
+        `${claim.title} · ${claim.category.toLowerCase()}`, "/expenses", "EXPENSE_CLAIM", claim.id);
+    }
+    return claim;
+  },
+  async withdrawExpense(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const me = employeeForUser(db, user);
+    const claim = (mockExpenses[user.companyId] ?? []).find((c) => c.id === id);
+    if (!claim) throw err(404, "NOT_FOUND", "Claim not found");
+    if (claim.employeeId !== me.id) throw err(403, "FORBIDDEN", "You can only withdraw your own claims");
+    if (claim.status !== "SUBMITTED") throw err(409, "CONFLICT", "This claim has already been decided");
+    mockExpenses[user.companyId] = (mockExpenses[user.companyId] ?? []).filter((c) => c.id !== id);
+  },
+  async decideExpense(accessToken: string | null, id: string, action: "approve" | "reject" | "reimburse", note?: string): Promise<ExpenseClaim> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const claim = (mockExpenses[user.companyId] ?? []).find((c) => c.id === id);
+    if (!claim) throw err(404, "NOT_FOUND", "Claim not found");
+
+    if (action === "reimburse") {
+      if (claim.status !== "APPROVED") throw err(409, "CONFLICT", "Only an approved claim can be reimbursed");
+      claim.status = "REIMBURSED";
+      claim.reimbursedAt = new Date().toISOString();
+    } else {
+      if (claim.status !== "SUBMITTED") throw err(409, "CONFLICT", "This claim has already been decided");
+      claim.status = action === "approve" ? "APPROVED" : "REJECTED";
+      claim.decidedAt = new Date().toISOString();
+      claim.decisionNote = note?.trim() || null;
+    }
+
+    const claimant = db.employees.find((e) => e.id === claim.employeeId);
+    const label = action === "reimburse" ? "reimbursed" : action === "approve" ? "approved" : "declined";
+    notify(claimant?.userId, user.id, "ANNOUNCEMENT", `Your expense claim was ${label}`,
+      `${claim.title} · ${claim.currency} ${claim.amount}`, "/me/expenses", "EXPENSE_CLAIM", claim.id);
+    return claim;
+  },
+
+  // --- inbox / notifications (feedback D4/D5) ---
+  async notifications(accessToken: string | null, unreadOnly: boolean): Promise<AppNotification[]> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    const mine = (mockNotifications[user.id] ?? []).filter((n) => !unreadOnly || !n.read);
+    return mine.slice();
+  },
+  async unreadCount(accessToken: string | null): Promise<{ count: number }> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    return { count: (mockNotifications[user.id] ?? []).filter((n) => !n.read).length };
+  },
+  async markNotificationRead(accessToken: string | null, id: string): Promise<AppNotification> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    const n = (mockNotifications[user.id] ?? []).find((x) => x.id === id);
+    if (!n) throw err(404, "NOT_FOUND", "Notification not found");
+    n.read = true;
+    return n;
+  },
+  async markAllNotificationsRead(accessToken: string | null): Promise<{ marked: number }> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    const unread = (mockNotifications[user.id] ?? []).filter((n) => !n.read);
+    unread.forEach((n) => { n.read = true; });
+    return { marked: unread.length };
+  },
+
+  // --- holiday calendar ---
+  async holidays(accessToken: string | null, year?: number): Promise<Holiday[]> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    const all = (mockHolidays[user.companyId] ?? []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    return (year ? all.filter((h) => h.date.startsWith(String(year))) : all).map(withDaysAway);
+  },
+  async upcomingHolidays(accessToken: string | null, limit: number): Promise<Holiday[]> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    const today = todayIso();
+    return (mockHolidays[user.companyId] ?? [])
+      .filter((h) => h.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, limit)
+      .map(withDaysAway);
+  },
+  async createHoliday(accessToken: string | null, input: { name: string; date: string; optional?: boolean; note?: string }): Promise<Holiday> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    requireAdmin(user);
+    const h: Holiday = {
+      id: crypto.randomUUID(), name: input.name, date: input.date,
+      optional: input.optional ?? false, note: input.note ?? null,
+      weekday: weekdayOf(input.date), daysAway: 0,
+    };
+    mockHolidays[user.companyId] = [...(mockHolidays[user.companyId] ?? []), h];
+    return withDaysAway(h);
+  },
+  async deleteHoliday(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    requireAdmin(user);
+    mockHolidays[user.companyId] = (mockHolidays[user.companyId] ?? []).filter((h) => h.id !== id);
+  },
+  async seedDefaultHolidays(accessToken: string | null): Promise<Holiday[]> {
+    await delay();
+    const user = requireSession(load(), accessToken);
+    requireAdmin(user);
+    if (!(mockHolidays[user.companyId] ?? []).length) {
+      const year = new Date().getFullYear();
+      const defaults: [string, string][] = [
+        ["New Year's Day", `${year}-01-01`],
+        ["Republic Day", `${year}-01-26`],
+        ["Labour Day", `${year}-05-01`],
+        ["Independence Day", `${year}-08-15`],
+        ["Gandhi Jayanti", `${year}-10-02`],
+        ["Christmas Day", `${year}-12-25`],
+      ];
+      mockHolidays[user.companyId] = defaults.map(([name, date]) => ({
+        id: crypto.randomUUID(), name, date, optional: false, note: null,
+        weekday: weekdayOf(date), daysAway: 0,
+      }));
+    }
+    return this.holidays(accessToken);
+  },
+
   // --- attendance: the daily record (feedback C.4) ---
   async attendanceToday(accessToken: string | null): Promise<AttendanceEntry> {
     await delay();
@@ -1009,6 +1186,12 @@ export const mockBackend = {
       status: "OPEN", progress: 0, targetDate: input.targetDate || null, createdAt: new Date().toISOString(),
     };
     mockGoals[employeeId] = [goal, ...(mockGoals[employeeId] ?? [])];
+
+    // Tell the employee their manager set them a goal (skipped when it's their own).
+    const owner = db.employees.find((e) => e.id === employeeId);
+    notify(owner?.userId, requireSession(db, accessToken).id, "GOAL_ASSIGNED",
+      `New goal: ${goal.title}`, goal.targetDate ? `Target ${goal.targetDate}` : null,
+      "/me/performance", "GOAL", goal.id);
     return goal;
   },
   async updateGoal(accessToken: string | null, employeeId: string, goalId: string, patch: Partial<Goal>): Promise<Goal> {
@@ -1221,6 +1404,15 @@ export const mockBackend = {
     };
     db.leave.push(row);
     save(db);
+
+    // Route it to whoever has to act on it (mirrors LeaveService).
+    const who = `${user.firstName} ${user.lastName}`;
+    for (const approverId of approversFor(db, emp)) {
+      notify(approverId, user.id, "LEAVE_REQUESTED",
+        `${who} requested ${days} ${days === 1 ? "day" : "days"} off`,
+        `${input.type.toLowerCase()} · ${input.startDate} → ${input.endDate}${input.reason ? ` · ${input.reason}` : ""}`,
+        "/people/time-off", "LEAVE_REQUEST", row.id);
+    }
     return toLeave(db, row);
   },
   async myLeave(accessToken: string | null): Promise<LeaveRequest[]> {
@@ -1262,6 +1454,14 @@ export const mockBackend = {
     row.status = decision;
     row.decidedAt = new Date().toISOString();
     save(db);
+
+    // Tell the requester what was decided.
+    const approved = decision === "APPROVED";
+    const requester = db.employees.find((e) => e.id === row.employeeId);
+    notify(requester?.userId, user.id, approved ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
+      `Your leave was ${approved ? "approved" : "declined"}`,
+      `${row.type.toLowerCase()} · ${row.startDate} → ${row.endDate}`,
+      "/people/time-off", "LEAVE_REQUEST", row.id);
     return toLeave(db, row);
   },
   async cancelLeave(accessToken: string | null, id: string): Promise<LeaveRequest> {
@@ -2097,6 +2297,70 @@ function buildCompensation(db: DB, employeeId: string): Compensation {
 
 // --- goals (mock, in-memory; resets on reload) ------------------------------
 const mockGoals: Record<string, Goal[]> = {};
+
+// --- expenses (mock, in-memory; resets on reload) ---------------------------
+const mockExpenses: Record<string, ExpenseClaim[]> = {};
+
+function summarizeExpenses(db: DB, claims: ExpenseClaim[]): ExpenseSummary {
+  const year = new Date().getFullYear();
+  let pending = 0, awaiting = 0, reimbursed = 0;
+  for (const c of claims) {
+    if (c.status === "SUBMITTED") pending += c.amount;
+    else if (c.status === "APPROVED") awaiting += c.amount;
+    else if (c.status === "REIMBURSED" && c.reimbursedAt && new Date(c.reimbursedAt).getFullYear() === year) {
+      reimbursed += c.amount;
+    }
+  }
+  return {
+    claims: claims.slice(),
+    pendingAmount: pending,
+    awaitingReimbursement: awaiting,
+    reimbursedThisYear: reimbursed,
+    currency: claims[0]?.currency ?? "INR",
+  };
+}
+
+// --- notifications + holidays (mock, in-memory; resets on reload) -----------
+/** Keyed by recipient user id, newest first. */
+const mockNotifications: Record<string, AppNotification[]> = {};
+const mockHolidays: Record<string, Holiday[]> = {};
+
+/** Mirrors NotificationService.send: never notify someone about their own action. */
+function notify(
+  recipientUserId: string | null | undefined,
+  actorUserId: string,
+  type: NotificationType,
+  title: string,
+  body: string | null,
+  link: string | null,
+  entityType?: string,
+  entityId?: string,
+): void {
+  if (!recipientUserId || recipientUserId === actorUserId) return;
+  const n: AppNotification = {
+    id: crypto.randomUUID(), type, title, body, link,
+    entityType: entityType ?? null, entityId: entityId ?? null,
+    read: false, createdAt: new Date().toISOString(),
+  };
+  mockNotifications[recipientUserId] = [n, ...(mockNotifications[recipientUserId] ?? [])];
+}
+
+/** Who approves this person's leave: their manager, else every Owner/Admin. */
+function approversFor(db: DB, employee: EmployeeRow): string[] {
+  const manager = db.employees.find((e) => e.id === employee.managerId);
+  if (manager) return [manager.userId];
+  return db.users
+    .filter((u) => u.companyId === employee.companyId && (u.role === "OWNER" || u.role === "ADMIN"))
+    .map((u) => u.id);
+}
+
+function weekdayOf(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en", { weekday: "short" });
+}
+function withDaysAway(h: Holiday): Holiday {
+  const ms = new Date(`${h.date}T00:00:00`).getTime() - new Date(`${todayIso()}T00:00:00`).getTime();
+  return { ...h, weekday: weekdayOf(h.date), daysAway: Math.round(ms / 86_400_000) };
+}
 
 // --- attendance (mock, in-memory; resets on reload) -------------------------
 type MockAttendance = {

@@ -61,9 +61,26 @@
 | D1 | ⭐ **Clients tab** — client details: what each client requested + all their info | p8 (starred) | ✅ | New `com.calyvora.client` module (V16, clients + client_requests, RLS). `/api/v1/clients` CRUD + `/{id}/requests` CRUD; open-request rollups. Sidebar **Clients** tab, list + detail (requests with status), global-search integration ("client" hits). Demo seeds 3 clients w/ requests. |
 | D2 | **Documentation tab** — auto-generate joining/resigning letters: fill in name → a proper document is generated | p7 | ✅ | New `com.calyvora.document` module (V17, `document_templates` + `generated_documents`, RLS). Pick a template + a person → every `{{merge.field}}` fills from the People profile (name, ID, title, department, manager, dates, tenure, **salary**), live preview, **unfilled fields flagged** with inline overrides. Issued letters are **frozen** (later template edits can't rewrite them), print/PDF + copy, and appear on the employee's profile. Owner/Admin-only. |
 | D3 | **Document templates** should be present | p7 | ✅ | Starter library seeded per company on first open — **offer · joining · relieving · experience · promotion** — all editable (click a merge field to insert at the cursor; live sample preview). Custom templates supported. |
-| D4 | **Notifications** | p3 | ⬜ | Notification system. |
-| D5 | **Inbox** | p3 | ⬜ | In-app inbox/messages. |
+| D4 | **Notifications** | p3 | ✅ | `notifications` (V20/V19, RLS). Leave requests route to the **requester's manager** (fallback: every Owner/Admin); decisions route back; manager-set goals notify the employee; expense claims notify the approver and the claimant. Never notifies you about your own action; text frozen at send time. Header **bell** with unread badge. |
+| D5 | **Inbox** | p3 | ✅ | `/inbox` with unread filter, mark-read / mark-all-read, and click-through to the thing itself. |
 | D6 | **Organization** | p3 | ⬜ | Org view (already have People → Org chart; confirm if this means more). |
+
+---
+
+---
+
+## Bucket E — Founder session 2026-07-22 (second round)
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| E1 | **Holiday calendar** | ✅ | `holidays` (V20, RLS). Everyone reads, Owner/Admin edits, starter calendar in one click. A holiday auto-fills everyone's attendance day; optional holidays don't. People → Holidays. |
+| E2 | **"Me" section in the left pane** — attendance, leaves, performance, goals assigned by a manager, expenses | ✅ | `/me` hub with sub-panes Overview · Attendance · Time off · Performance · Expenses. Shares components with People rather than duplicating them. |
+| E3 | **Expense claims for official travel** | ✅ | `expense_claims` (V21, RLS). Submit → manager approves → marked reimbursed (separate states). Owner/Admin queue with totals. |
+| E4 | **Dashboard: upcoming leaves & holidays** | ✅ | "What's coming up" card merges the next holidays with your own approved/pending leave. |
+| E5 | **Notification to the manager for leave approval** | ✅ | Covered by D4 — routes to the manager, falls back to admins. |
+| E6 | **Absence view with counts + drill-down** ("how many in this team are absent today", click to see who) | ✅ | Attendance day sheet: clickable counts + per-team breakdown; dashboard tiles link into it. |
+| E7 | **Social feed / posts** — birthday and other posts, with visibility options | ⬜ | **Next.** Company/team visibility, reactions. |
+| E8 | **More sprint functionality** (industry-standard) | ⬜ | **Next.** Story points, velocity, burndown, capacity, sprint report. |
 
 ---
 

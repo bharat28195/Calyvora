@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Loader2, LogOut, LayoutDashboard, Users, FolderKanban, BookOpen, UserCog, Settings, Handshake, FileText,
+  CircleUser, Inbox, Receipt,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ import type { Role } from "@/lib/types";
 import { CommandBar } from "@/components/layout/command-bar";
 import { AssistantPanel } from "@/components/layout/assistant-panel";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { Wordmark } from "@/components/layout/wordmark";
 
 interface NavChild {
@@ -29,12 +31,24 @@ interface NavItem {
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   {
+    href: "/me", label: "Me", icon: CircleUser,
+    children: [
+      { href: "/me", label: "Overview" },
+      { href: "/me/attendance", label: "Attendance" },
+      { href: "/me/leave", label: "Time off" },
+      { href: "/me/performance", label: "Performance" },
+      { href: "/me/expenses", label: "Expenses" },
+    ],
+  },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
+  {
     href: "/people", label: "People", icon: Users,
     children: [
       { href: "/people", label: "Directory" },
       { href: "/people/org", label: "Org chart" },
       { href: "/people/attendance", label: "Attendance" },
       { href: "/people/time-off", label: "Time off" },
+      { href: "/people/holidays", label: "Holidays" },
     ],
   },
   {
@@ -52,6 +66,7 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/clients", label: "Clients", icon: Handshake, roles: ["OWNER", "ADMIN"] },
+  { href: "/expenses", label: "Expenses", icon: Receipt, roles: ["OWNER", "ADMIN"] },
   {
     href: "/documents", label: "Documents", icon: FileText, roles: ["OWNER", "ADMIN"],
     children: [
@@ -160,6 +175,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/dashboard" className="md:hidden"><Wordmark /></Link>
           <div className="flex-1" />
           <CommandBar />
+          <NotificationBell />
           <ThemeToggle />
           <button
             onClick={logout}

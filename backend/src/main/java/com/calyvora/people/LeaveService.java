@@ -6,8 +6,11 @@ import com.calyvora.common.error.ForbiddenException;
 import com.calyvora.common.error.NotFoundException;
 import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.TenantContext;
+import com.calyvora.identity.Role;
 import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
+import com.calyvora.notification.NotificationService;
+import com.calyvora.notification.NotificationType;
 import com.calyvora.people.dto.CreateLeaveRequest;
 import com.calyvora.people.dto.LeaveBalanceResponse;
 import com.calyvora.people.dto.LeaveRequestResponse;
@@ -20,6 +23,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -35,12 +39,14 @@ public class LeaveService {
     private final LeaveRequestRepository leaveRepository;
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public LeaveService(LeaveRequestRepository leaveRepository, EmployeeRepository employeeRepository,
-                        UserRepository userRepository) {
+                        UserRepository userRepository, NotificationService notificationService) {
         this.leaveRepository = leaveRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -59,7 +65,36 @@ public class LeaveService {
                 LeaveType.valueOf(dto.type()), start, end, days,
                 dto.reason() == null || dto.reason().isBlank() ? null : dto.reason().trim());
         leaveRepository.save(req);
-        return LeaveRequestResponse.of(req, nameOf(employee));
+
+        // Route it to whoever has to act on it (D4): the requester's manager, or every Owner/Admin
+        // when nobody manages them — a request with no approver would just sit there unseen.
+        String who = nameOf(employee);
+        notificationService.sendAll(companyId, approversFor(companyId, employee), principal.userId(),
+                NotificationType.LEAVE_REQUESTED,
+                who + " requested " + days + (days == 1 ? " day" : " days") + " off",
+                dto.type().toLowerCase() + " · " + start + " → " + end
+                        + (req.getReason() == null ? "" : " · " + req.getReason()),
+                "/people/time-off", "LEAVE_REQUEST", req.getId());
+
+        return LeaveRequestResponse.of(req, who);
+    }
+
+    /**
+     * Who should approve this person's leave: their manager if they have one, otherwise every
+     * Owner/Admin in the company. The org chart lives in People, so the routing rule does too.
+     */
+    private List<UUID> approversFor(UUID companyId, Employee employee) {
+        if (employee.getManagerId() != null) {
+            Optional<UUID> manager = employeeRepository.findByIdAndCompanyId(employee.getManagerId(), companyId)
+                    .map(Employee::getUserId);
+            if (manager.isPresent()) {
+                return List.of(manager.get());
+            }
+        }
+        return userRepository.findByCompanyIdOrderByCreatedAtAsc(companyId).stream()
+                .filter(u -> u.getRole() == Role.OWNER || u.getRole() == Role.ADMIN)
+                .map(User::getId)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -140,6 +175,16 @@ public class LeaveService {
             throw new ApiException(ErrorCode.CONFLICT, "This request has already been decided");
         }
         req.decide(decision, principal.userId());
+
+        // Tell the requester what was decided.
+        boolean approved = decision == LeaveStatus.APPROVED;
+        employeeRepository.findById(req.getEmployeeId()).ifPresent(employee ->
+                notificationService.send(companyId, employee.getUserId(), principal.userId(),
+                        approved ? NotificationType.LEAVE_APPROVED : NotificationType.LEAVE_REJECTED,
+                        "Your leave was " + (approved ? "approved" : "declined"),
+                        req.getType().name().toLowerCase() + " · " + req.getStartDate() + " → " + req.getEndDate(),
+                        "/people/time-off", "LEAVE_REQUEST", req.getId()));
+
         return LeaveRequestResponse.of(req, nameOfEmployeeId(req.getEmployeeId()));
     }
 

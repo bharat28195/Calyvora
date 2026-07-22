@@ -8,6 +8,9 @@ import com.calyvora.company.CompanyRepository;
 import com.calyvora.company.CompanySettings;
 import com.calyvora.company.CompanySettingsRepository;
 import com.calyvora.company.CompanyStatus;
+import com.calyvora.expense.ExpenseService;
+import com.calyvora.expense.dto.ExpensePayload;
+import com.calyvora.expense.dto.ExpenseResponse;
 import com.calyvora.identity.Role;
 import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
@@ -85,6 +88,9 @@ public class DemoSeedService {
     private final com.calyvora.client.ClientService clientService;
     private final com.calyvora.document.DocumentService documentService;
     private final com.calyvora.people.AttendanceService attendanceService;
+    private final com.calyvora.people.HolidayService holidayService;
+    private final com.calyvora.people.HolidayRepository holidayRepository;
+    private final ExpenseService expenseService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -97,8 +103,14 @@ public class DemoSeedService {
                            com.calyvora.people.GoalRepository goalRepository,
                            com.calyvora.client.ClientService clientService,
                            com.calyvora.document.DocumentService documentService,
-                           com.calyvora.people.AttendanceService attendanceService) {
+                           com.calyvora.people.AttendanceService attendanceService,
+                           com.calyvora.people.HolidayService holidayService,
+                           com.calyvora.people.HolidayRepository holidayRepository,
+                           ExpenseService expenseService) {
         this.attendanceService = attendanceService;
+        this.holidayService = holidayService;
+        this.holidayRepository = holidayRepository;
+        this.expenseService = expenseService;
         this.compensationRepository = compensationRepository;
         this.goalRepository = goalRepository;
         this.clientService = clientService;
@@ -260,6 +272,46 @@ public class DemoSeedService {
 
         // --- Attendance: the last two weeks, so the day sheet and month grid have history ---
         seedAttendance(owner, emp);
+
+        // --- Holidays: a starter calendar plus a couple of near-term ones, so "upcoming" isn't empty ---
+        holidayService.seedDefaults(owner);
+        holidayRepository.save(new com.calyvora.people.Holiday(UUID.randomUUID(), owner.companyId(),
+                "Founders' Day", LocalDate.now().plusDays(9), false, "Offices closed", owner.userId()));
+        holidayRepository.save(new com.calyvora.people.Holiday(UUID.randomUUID(), owner.companyId(),
+                "Volunteering Day (optional)", LocalDate.now().plusDays(24), true,
+                "Take it if you'd like to", owner.userId()));
+
+        // --- Expenses: claims in every state, so the queue and the totals both have something to say ---
+        seedExpense(owner, emp, priya.getEmail(), "Client visit — flights to Berlin", "TRAVEL", 48500, null);
+        seedExpense(owner, emp, priya.getEmail(), "Team dinner after the launch", "MEALS", 6200, "approve");
+        seedExpense(owner, emp, leo.getEmail(), "Figma annual seat", "SUPPLIES", 13800, "reimburse");
+        seedExpense(owner, emp, sara.getEmail(), "Support conference ticket", "TRAINING", 22000, null);
+        seedExpense(owner, emp, tom.getEmail(), "Hotel — customer QBR", "ACCOMMODATION", 9400, "approve");
+    }
+
+    /**
+     * Submits a claim <em>as the employee</em> — the service reads the principal to decide whose claim
+     * it is — then optionally walks it forward to approved or reimbursed as the owner.
+     */
+    private void seedExpense(AuthPrincipal owner, Map<String, EmployeeResponse> emp, String email,
+                             String title, String category, long amount, String advanceTo) {
+        EmployeeResponse e = emp.get(email);
+        if (e == null) {
+            return;
+        }
+        AuthPrincipal claimant = new AuthPrincipal(UUID.fromString(e.userId()), owner.companyId(),
+                e.role(), e.email());
+        ExpenseResponse claim = expenseService.submit(new ExpensePayload(
+                title, category, java.math.BigDecimal.valueOf(amount), "INR",
+                LocalDate.now().minusDays(5).toString(), null, null), claimant);
+
+        if (advanceTo == null) {
+            return;
+        }
+        expenseService.decide(UUID.fromString(claim.id()), true, null, owner);
+        if ("reimburse".equals(advanceTo)) {
+            expenseService.reimburse(UUID.fromString(claim.id()), owner);
+        }
     }
 
     /**

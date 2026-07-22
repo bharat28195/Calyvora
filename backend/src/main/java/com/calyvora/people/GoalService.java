@@ -5,6 +5,8 @@ import com.calyvora.common.error.ErrorCode;
 import com.calyvora.common.error.NotFoundException;
 import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.TenantContext;
+import com.calyvora.notification.NotificationService;
+import com.calyvora.notification.NotificationType;
 import com.calyvora.people.dto.CreateGoalRequest;
 import com.calyvora.people.dto.GoalResponse;
 import com.calyvora.people.dto.UpdateGoalRequest;
@@ -24,10 +26,13 @@ public class GoalService {
 
     private final GoalRepository goalRepository;
     private final EmployeeRepository employeeRepository;
+    private final NotificationService notificationService;
 
-    public GoalService(GoalRepository goalRepository, EmployeeRepository employeeRepository) {
+    public GoalService(GoalRepository goalRepository, EmployeeRepository employeeRepository,
+                       NotificationService notificationService) {
         this.goalRepository = goalRepository;
         this.employeeRepository = employeeRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -46,6 +51,14 @@ public class GoalService {
         Goal goal = new Goal(UUID.randomUUID(), companyId, employeeId, req.title().trim(),
                 blankToNull(req.description()), parseDate(req.targetDate()), principal.userId());
         goalRepository.save(goal);
+
+        // Tell the employee their manager set them a goal (D4). `send` skips self-notification, so
+        // someone writing their own goal doesn't get mail about it.
+        notificationService.send(companyId, employee.getUserId(), principal.userId(),
+                NotificationType.GOAL_ASSIGNED, "New goal: " + goal.getTitle(),
+                goal.getTargetDate() == null ? null : "Target " + goal.getTargetDate(),
+                "/me/performance", "GOAL", goal.getId());
+
         return GoalResponse.of(goal);
     }
 

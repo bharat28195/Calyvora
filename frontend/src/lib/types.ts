@@ -96,6 +96,76 @@ export interface ClientDetail {
   requests: ClientRequestItem[];
 }
 
+/** Expense claims — travel and other out-of-pocket spend. */
+export type ExpenseCategory = "TRAVEL" | "ACCOMMODATION" | "MEALS" | "SUPPLIES" | "TRAINING" | "OTHER";
+export type ExpenseStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "REIMBURSED";
+
+export interface ExpenseClaim {
+  id: string;
+  employeeId: string;
+  employeeName: string | null;
+  title: string;
+  category: ExpenseCategory;
+  amount: number;
+  currency: string;
+  spentOn: string;
+  description: string | null;
+  receiptUrl: string | null;
+  status: ExpenseStatus;
+  decisionNote: string | null;
+  decidedAt: string | null;
+  reimbursedAt: string | null;
+  createdAt: string;
+}
+export interface ExpenseSummary {
+  claims: ExpenseClaim[];
+  pendingAmount: number;
+  awaitingReimbursement: number;
+  reimbursedThisYear: number;
+  currency: string;
+}
+export interface ExpenseInput {
+  title: string;
+  category?: ExpenseCategory;
+  amount: number;
+  currency?: string;
+  spentOn?: string;
+  description?: string;
+  receiptUrl?: string;
+}
+
+/** Inbox notifications (feedback D4/D5). */
+export type NotificationType =
+  | "LEAVE_REQUESTED"
+  | "LEAVE_APPROVED"
+  | "LEAVE_REJECTED"
+  | "GOAL_ASSIGNED"
+  | "DOCUMENT_ISSUED"
+  | "ANNOUNCEMENT";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  link: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+/** Company holiday calendar. */
+export interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  optional: boolean;
+  note: string | null;
+  weekday: string;
+  daysAway: number;
+}
+
 /** Daily attendance (feedback C.4). `status` is null when nobody has marked the day yet. */
 export type AttendanceStatus =
   | "PRESENT"

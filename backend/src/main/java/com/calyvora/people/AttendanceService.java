@@ -36,8 +36,8 @@ import java.util.UUID;
  *       unmarked day covered by approved leave resolves to {@code ON_LEAVE} (flagged {@code derived}).</li>
  *   <li><b>A marked row always wins</b> over anything derived, so a correction sticks.</li>
  * </ul>
- * Weekends resolve to {@code WEEK_OFF} unless someone marked otherwise — a placeholder until
- * configurable work-week policy exists (logged as debt).
+ * Company holidays fill the day the same way; weekends resolve to {@code WEEK_OFF}. The work-week
+ * itself is still hardcoded Mon–Fri — configurable work-week policy is the remaining debt here.
  */
 @Service
 public class AttendanceService {
@@ -46,12 +46,15 @@ public class AttendanceService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;
     private final DepartmentRepository departmentRepository;
+    private final HolidayRepository holidayRepository;
     private final UserRepository userRepository;
     private final LeaveRequestRepository leaveRepository;
 
     public AttendanceService(AttendanceRepository attendanceRepository, EmployeeRepository employeeRepository,
                              EmployeeService employeeService, DepartmentRepository departmentRepository,
+                             HolidayRepository holidayRepository,
                              UserRepository userRepository, LeaveRequestRepository leaveRepository) {
+        this.holidayRepository = holidayRepository;
         this.attendanceRepository = attendanceRepository;
         this.employeeRepository = employeeRepository;
         this.employeeService = employeeService;
@@ -62,10 +65,18 @@ public class AttendanceService {
 
     // ---- team day sheet ----
 
-    /** Every employee's status for one day. Owner/Admin (enforced in the controller). */
-    @Transactional(readOnly = true)
+    /**
+     * Every employee's status for one day. Owner/Admin (enforced in the controller).
+     *
+     * <p>Not {@code readOnly}: asking People for the directory may provision missing profiles, and a
+     * read-only transaction would swallow those inserts without flushing them.
+     */
+    @Transactional
     public AttendanceDayResponse day(LocalDate date) {
         UUID companyId = TenantContext.getCompanyId();
+        // Profiles are provisioned lazily by People; ask for the directory first so a company that
+        // has never opened it still gets a full day sheet instead of an empty one.
+        employeeService.directory();
         List<Employee> employees = employeeRepository.findByCompanyId(companyId);
         Map<UUID, User> users = usersById(companyId);
         Map<UUID, AttendanceRecord> marked = new HashMap<>();
@@ -241,6 +252,15 @@ public class AttendanceService {
                         lr.getType().name().toLowerCase() + (lr.getReason() == null ? "" : " · " + lr.getReason()),
                         true);
             }
+        }
+        // A company holiday closes the day for everyone (unless someone marked otherwise above).
+        Optional<Holiday> holiday = holidayRepository
+                .findByCompanyIdAndDateBetweenOrderByDateAsc(employee.getCompanyId(), date, date).stream()
+                .filter(h -> !h.isOptional())
+                .findFirst();
+        if (holiday.isPresent()) {
+            return entry(employee, user, date, AttendanceStatus.HOLIDAY.name(), null, null,
+                    holiday.get().getName(), true);
         }
         if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
             return entry(employee, user, date, AttendanceStatus.WEEK_OFF.name(), null, null, null, true);

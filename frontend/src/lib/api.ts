@@ -15,6 +15,11 @@ import {
   type Client,
   type ClientDetail,
   type ClientRequestItem,
+  type AppNotification,
+  type ExpenseClaim,
+  type ExpenseInput,
+  type ExpenseSummary,
+  type Holiday,
   type AttendanceDay,
   type AttendanceEntry,
   type AttendanceMonth,
@@ -469,6 +474,68 @@ export const api = {
   },
   deleteClientRequest(clientId: string, requestId: string): Promise<void> {
     return LIVE ? http<void>(`/clients/${clientId}/requests/${requestId}`, { method: "DELETE" }) : mockBackend.deleteClientRequest(accessToken, clientId, requestId);
+  },
+
+  /** My own employee profile (auto-provisioned if missing) — the Me hub's anchor. */
+  myEmployee(): Promise<Employee> {
+    return LIVE ? http<Employee>("/people/employees/me") : mockBackend.myEmployee(accessToken);
+  },
+  /** My goals, resolved through my own employee id. */
+  async myGoals(): Promise<Goal[]> {
+    const me = await this.myEmployee();
+    return this.employeeGoals(me.id);
+  },
+
+  // --- expense claims ---
+  myExpenses(): Promise<ExpenseSummary> {
+    return LIVE ? http<ExpenseSummary>("/expenses/me") : mockBackend.myExpenses(accessToken);
+  },
+  allExpenses(): Promise<ExpenseSummary> {
+    return LIVE ? http<ExpenseSummary>("/expenses") : mockBackend.allExpenses(accessToken);
+  },
+  submitExpense(input: ExpenseInput): Promise<ExpenseClaim> {
+    return LIVE ? http<ExpenseClaim>("/expenses", { method: "POST", body: JSON.stringify(input) }) : mockBackend.submitExpense(accessToken, input);
+  },
+  withdrawExpense(id: string): Promise<void> {
+    return LIVE ? http<void>(`/expenses/${id}`, { method: "DELETE" }) : mockBackend.withdrawExpense(accessToken, id);
+  },
+  decideExpense(id: string, action: "approve" | "reject" | "reimburse", note?: string): Promise<ExpenseClaim> {
+    return LIVE
+      ? http<ExpenseClaim>(`/expenses/${id}/${action}`, { method: "POST", body: JSON.stringify({ note: note ?? "" }) })
+      : mockBackend.decideExpense(accessToken, id, action, note);
+  },
+
+  // --- inbox / notifications ---
+  notifications(unreadOnly = false): Promise<AppNotification[]> {
+    const qs = unreadOnly ? "?unreadOnly=true" : "";
+    return LIVE ? http<AppNotification[]>(`/notifications${qs}`) : mockBackend.notifications(accessToken, unreadOnly);
+  },
+  unreadCount(): Promise<{ count: number }> {
+    return LIVE ? http<{ count: number }>("/notifications/unread-count") : mockBackend.unreadCount(accessToken);
+  },
+  markNotificationRead(id: string): Promise<AppNotification> {
+    return LIVE ? http<AppNotification>(`/notifications/${id}/read`, { method: "POST" }) : mockBackend.markNotificationRead(accessToken, id);
+  },
+  markAllNotificationsRead(): Promise<{ marked: number }> {
+    return LIVE ? http<{ marked: number }>("/notifications/read-all", { method: "POST" }) : mockBackend.markAllNotificationsRead(accessToken);
+  },
+
+  // --- holiday calendar ---
+  holidays(year?: number): Promise<Holiday[]> {
+    const qs = year ? `?year=${year}` : "";
+    return LIVE ? http<Holiday[]>(`/people/holidays${qs}`) : mockBackend.holidays(accessToken, year);
+  },
+  upcomingHolidays(limit = 5): Promise<Holiday[]> {
+    return LIVE ? http<Holiday[]>(`/people/holidays/upcoming?limit=${limit}`) : mockBackend.upcomingHolidays(accessToken, limit);
+  },
+  createHoliday(input: { name: string; date: string; optional?: boolean; note?: string }): Promise<Holiday> {
+    return LIVE ? http<Holiday>("/people/holidays", { method: "POST", body: JSON.stringify(input) }) : mockBackend.createHoliday(accessToken, input);
+  },
+  deleteHoliday(id: string): Promise<void> {
+    return LIVE ? http<void>(`/people/holidays/${id}`, { method: "DELETE" }) : mockBackend.deleteHoliday(accessToken, id);
+  },
+  seedDefaultHolidays(): Promise<Holiday[]> {
+    return LIVE ? http<Holiday[]>("/people/holidays/defaults", { method: "POST" }) : mockBackend.seedDefaultHolidays(accessToken);
   },
 
   // --- attendance (daily record) ---
