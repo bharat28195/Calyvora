@@ -16,6 +16,7 @@ import {
   type Compensation,
   type Payslip,
   type WorkItem,
+  type AnalyticsOverview,
   type Goal,
   type ReviewCycle,
   type ReviewStatus,
@@ -1185,6 +1186,130 @@ export const mockBackend = {
       ).length,
       outToday,
       monthLeaves,
+    };
+  },
+
+  // --- analytics (mirrors AnalyticsService) ---------------------------------
+  async analyticsOverview(accessToken: string | null): Promise<AnalyticsOverview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const cid = user.companyId;
+    const title = (s: string) => { const t = s.replace(/_/g, " ").toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+    const today = new Date();
+    const year = today.getFullYear();
+
+    const employees = db.employees.filter((e) => e.companyId === cid && e.employmentStatus === "ACTIVE");
+
+    // People — by department
+    const deptName = (id: string | null) => db.departments.find((d) => d.id === id)?.name ?? "Unassigned";
+    const byDept = new Map<string, number>();
+    employees.forEach((e) => byDept.set(deptName(e.departmentId), (byDept.get(deptName(e.departmentId)) ?? 0) + 1));
+
+    // Headcount growth (12 months, cumulative by startDate)
+    const headcountGrowth = Array.from({ length: 12 }, (_, k) => {
+      const d = new Date(today.getFullYear(), today.getMonth() - (11 - k) + 1, 0); // month-end
+      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const count = employees.filter((e) => e.startDate && e.startDate <= d.toISOString().slice(0, 10)).length;
+      return { label, value: count };
+    });
+    let newJoiners = 0, tenureSum = 0, tenured = 0;
+    employees.forEach((e) => {
+      if (!e.startDate) return;
+      if (Number(e.startDate.slice(0, 4)) === year) newJoiners++;
+      const start = new Date(e.startDate);
+      tenureSum += (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
+      tenured++;
+    });
+
+    const ratingDistribution = [1, 2, 3, 4, 5].map((r) => ({
+      label: `${r}★`, value: employees.filter((e) => e.rating === r).length,
+    }));
+
+    // Leave by type (approved days this year) + on leave today
+    const leaves = db.leave.filter((l) => l.companyId === cid);
+    const todayIsoStr = today.toISOString().slice(0, 10);
+    const leaveDays = new Map<string, number>();
+    let onLeaveToday = 0;
+    leaves.forEach((l) => {
+      if (l.status === "APPROVED") {
+        if (l.startDate.slice(0, 4) === String(year) || l.endDate.slice(0, 4) === String(year)) {
+          leaveDays.set(l.type, (leaveDays.get(l.type) ?? 0) + l.days);
+        }
+        if (l.startDate <= todayIsoStr && l.endDate >= todayIsoStr) onLeaveToday++;
+      }
+    });
+    const leaveByType = ["VACATION", "SICK", "PERSONAL", "UNPAID"].map((t) => ({ label: title(t), value: leaveDays.get(t) ?? 0 }));
+
+    // Goals across the company
+    const empIds = new Set(employees.map((e) => e.id));
+    const goals = Object.entries(mockGoals).filter(([eid]) => empIds.has(eid)).flatMap(([, gs]) => gs);
+    const goalsOpen = goals.filter((g) => g.status === "OPEN").length;
+    const goalsAchieved = goals.filter((g) => g.status === "ACHIEVED").length;
+    const goalsMissed = goals.filter((g) => g.status === "MISSED").length;
+    const avgGoalProgress = goals.length === 0 ? 0 : Math.round((goals.reduce((s, g) => s + g.progress, 0) / goals.length) * 10) / 10;
+
+    // Work
+    const tasks = db.tasks.filter((t) => t.companyId === cid);
+    const tasksByStatus = ["TODO", "IN_PROGRESS", "DONE"].map((s) => ({ label: title(s), value: tasks.filter((t) => t.status === s).length }));
+    const tasksByPriority = ["LOW", "MEDIUM", "HIGH", "URGENT"].map((p) => ({ label: title(p), value: tasks.filter((t) => t.priority === p).length }));
+    const tickets = db.tickets.filter((t) => t.companyId === cid);
+    const ticketsByStatus = ["OPEN", "PENDING", "RESOLVED", "CLOSED"].map((s) => ({ label: title(s), value: tickets.filter((t) => t.status === s).length }));
+
+    const sprints = db.sprints.filter((s) => s.companyId === cid);
+    const activeSprintRow = sprints.find((s) => s.status === "ACTIVE");
+    let activeSprint: AnalyticsOverview["work"]["activeSprint"] = null;
+    if (activeSprintRow) {
+      const st = tasks.filter((t) => t.sprintId === activeSprintRow.id);
+      let committed = 0, done = 0, unestimated = 0;
+      st.forEach((t) => {
+        const pts = t.storyPoints ?? 0;
+        if (t.storyPoints == null) unestimated++;
+        committed += pts;
+        if (t.status === "DONE") done += pts;
+      });
+      activeSprint = { name: activeSprintRow.name, committed, done, remaining: committed - done, unestimated };
+    }
+    const velocity = sprints
+      .filter((s) => s.status === "COMPLETED")
+      .sort((a, b) => (a.startDate ?? "").localeCompare(b.startDate ?? ""))
+      .map((s) => ({
+        label: (s.name.split("—")[0] ?? s.name).trim(),
+        value: tasks.filter((t) => t.sprintId === s.id && t.status === "DONE" && t.storyPoints != null)
+          .reduce((sum, t) => sum + (t.storyPoints ?? 0), 0),
+      }));
+
+    // Finance
+    const claims = mockExpenses[cid] ?? [];
+    let pending = 0, awaiting = 0, reimbursed = 0, currency = "INR";
+    const byCategory = new Map<string, number>();
+    claims.forEach((c) => {
+      currency = c.currency;
+      if (c.status === "SUBMITTED") pending += c.amount;
+      else if (c.status === "APPROVED") awaiting += c.amount;
+      else if (c.status === "REIMBURSED" && c.reimbursedAt && new Date(c.reimbursedAt).getFullYear() === year) reimbursed += c.amount;
+      if (c.status !== "REJECTED") byCategory.set(title(c.category), (byCategory.get(title(c.category)) ?? 0) + c.amount);
+    });
+
+    return {
+      people: {
+        headcount: employees.length, newJoinersThisYear: newJoiners,
+        avgTenureMonths: tenured === 0 ? 0 : Math.round((tenureSum / tenured) * 10) / 10,
+        onLeaveToday, goalsOpen, goalsAchieved, goalsMissed, avgGoalProgress,
+        byDepartment: [...byDept].map(([label, value]) => ({ label, value })),
+        headcountGrowth, ratingDistribution, leaveByType,
+      },
+      work: {
+        projects: db.projects.filter((p) => p.companyId === cid).length,
+        tasksByStatus, tasksByPriority, ticketsByStatus, activeSprint, velocity,
+      },
+      finance: {
+        currency, pending: Math.round(pending * 100) / 100,
+        awaitingReimbursement: Math.round(awaiting * 100) / 100,
+        reimbursedThisYear: Math.round(reimbursed * 100) / 100,
+        byCategory: [...byCategory].map(([label, value]) => ({ label, value })),
+      },
     };
   },
 

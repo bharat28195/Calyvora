@@ -6,6 +6,7 @@ import {
   type CompanySettings,
   type DashboardSummary,
   type TeamOverview,
+  type AnalyticsOverview,
   type Compensation,
   type Payslip,
   type Department,
@@ -155,6 +156,9 @@ export const api = {
   },
   teamOverview(): Promise<TeamOverview> {
     return LIVE ? http<TeamOverview>("/dashboard/team") : mockBackend.teamOverview(accessToken);
+  },
+  analyticsOverview(): Promise<AnalyticsOverview> {
+    return LIVE ? http<AnalyticsOverview>("/analytics/overview") : mockBackend.analyticsOverview(accessToken);
   },
 
   // --- company / settings ---

@@ -30,6 +30,8 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     List<Task> findByAssigneeIdAndStatusNotOrderByDueDateAscCreatedAtAsc(UUID assigneeId, TaskStatus status);
 
+    List<Task> findByCompanyId(UUID companyId);
+
     long countByCompanyId(UUID companyId);
 
     long countByCompanyIdAndStatus(UUID companyId, TaskStatus status);

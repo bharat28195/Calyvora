@@ -10,5 +10,7 @@ public interface GoalRepository extends JpaRepository<Goal, UUID> {
 
     List<Goal> findByEmployeeIdOrderByCreatedAtDesc(UUID employeeId);
 
+    List<Goal> findByCompanyId(UUID companyId);
+
     Optional<Goal> findByIdAndCompanyId(UUID id, UUID companyId);
 }

@@ -4,6 +4,25 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-23 — Insights: a company analytics dashboard (charts across all three apps)
+**2 new tests. Founder ask: "an analytics dashboard with charts/graphs — sprint burnouts and industry things."**
+
+- **Analytics module (`com.calyvora.analytics`, Owner/Admin).** `GET /analytics/overview` returns
+  chart-ready series reaching across **People, Work and Finance** — every figure computed from data we
+  actually hold, so an empty company yields empty series rather than invented numbers:
+  - **People:** headcount, **12-month headcount growth** (from employee start dates), headcount by
+    department, **rating distribution**, approved **leave days by type**, goals (open/achieved/missed +
+    avg progress), new joiners this year, average tenure, on-leave-today.
+  - **Work:** tasks by status and by priority, tickets by status, the **active sprint** (committed /
+    done / remaining / unestimated points), and **velocity** — completed story points per finished
+    sprint (drawn from the tasks actually done in each).
+  - **Finance:** expenses by category and the reimbursement pipeline (pending → approved → paid this year).
+- **Charts, no library.** A small set of dependency-free, theme-aware **SVG** primitives
+  (`components/charts`): donut, horizontal bar list, vertical bars (velocity), and an area/line trend
+  (headcount). Keeps the strict-CSP artifact model and the bundle lean.
+- **New "Insights" nav** (Owner/Admin) with a KPI strip + a grid of chart cards. Mock-backend parity so
+  it works in offline mode too.
+
 ### 2026-07-23 — Performance review cycles (C.7) + Performance-tab fix
 **4 new tests. Fixes the "something went wrong" the founder hit on the Performance tab.**
 

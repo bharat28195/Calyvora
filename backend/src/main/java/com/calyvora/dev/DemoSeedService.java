@@ -212,6 +212,15 @@ public class DemoSeedService {
                 marcus.getId().toString()));
         UUID atlasId = UUID.fromString(atlas.id());
 
+        // Two finished sprints before the current one, so the velocity chart has real history. These
+        // must be created and completed before Sprint 12 starts (a project has one active sprint at a time).
+        seedCompletedSprint(atlasId, owner, "Sprint 10 — Onboarding revamp",
+                LocalDate.now().minusDays(46), LocalDate.now().minusDays(32),
+                emp.get(priya.getEmail()).id(), 8, 5, 8);
+        seedCompletedSprint(atlasId, owner, "Sprint 11 — Billing & invoices",
+                LocalDate.now().minusDays(32), LocalDate.now().minusDays(18),
+                emp.get(marcus.getEmail()).id(), 13, 8, 5, 3);
+
         SprintResponse sprint = sprintService.create(atlasId, new CreateSprintRequest(
                 "Sprint 12 — Security hardening",
                 "Ship RS256 tokens and tenant Row-Level Security; polish onboarding.",
@@ -543,6 +552,22 @@ public class DemoSeedService {
     private void inSprint(TaskResponse task, String sprintId, String status) {
         taskService.update(UUID.fromString(task.id()),
                 new UpdateTaskRequest(null, null, status, null, null, sprintId, null, null));
+    }
+
+    /** A finished sprint whose done, sized tasks give the velocity chart real bars to plot. */
+    private void seedCompletedSprint(UUID projectId, AuthPrincipal owner, String name,
+                                     LocalDate start, LocalDate end, String assigneeId, int... points) {
+        int capacity = 0;
+        for (int p : points) capacity += p;
+        SprintResponse s = sprintService.create(projectId,
+                new CreateSprintRequest(name, null, start.toString(), end.toString(), capacity));
+        sprintService.start(UUID.fromString(s.id()));
+        int i = 1;
+        for (int p : points) {
+            TaskResponse t = task(projectId, owner, name + " · task " + i++, assigneeId, "MEDIUM", null, p);
+            inSprint(t, s.id(), "DONE");
+        }
+        sprintService.complete(UUID.fromString(s.id()));
     }
 
     private static CreateTicketRequest ticket(String subject, String requester, String assigneeId,

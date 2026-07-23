@@ -16,10 +16,13 @@ on-leave, leave reasons, **leave calendar** — attendance *derived from leave*,
 (V16), **D2+D3 Documents & templates** (V17), and **C.4 daily attendance** (V18). People, Documents,
 Work and Knowledge all have **left-pane sub-panes**; Clients + Documents are **Owner/Admin-only**.
 **105 backend tests, all live & verified.**
-Since then: **Bucket E** (holidays, Me hub, expenses, feed, sprint depth) and **C.7 performance review
+Since then: **Bucket E** (holidays, Me hub, expenses, feed, sprint depth), **C.7 performance review
 cycles (V24)** — admin opens a cycle → self-assessment + manager rating/hike → admin approves → **raise
-applied to compensation**; a manager can now set goals for their reports. Also fixed the Performance-tab
-500 (`/people/employees/me` → `/people/me`). **Next:** C.9 / D6 (need founder scope) · BR3 modular packaging.
+applied to compensation**; a manager can now set goals for their reports; fixed the Performance-tab
+500 (`/people/employees/me` → `/people/me`). And **Insights** — a company **analytics dashboard**
+(`com.calyvora.analytics`, Owner/Admin) with SVG charts across People/Work/Finance (headcount growth,
+velocity, task/leave/expense breakdowns) — all from live data, no chart library.
+**Next:** C.9 / D6 (need founder scope) · BR3 modular packaging.
 
 **Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
 RS256 SD-5) + **demo suite** (one-click seed, cross-app dashboard, ⌘K global search, AI assistant) +

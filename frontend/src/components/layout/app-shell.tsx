@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Loader2, LogOut, LayoutDashboard, Users, FolderKanban, BookOpen, UserCog, Settings, Handshake, FileText,
-  CircleUser, Inbox, Receipt, MessagesSquare, ClipboardCheck,
+  CircleUser, Inbox, Receipt, MessagesSquare, ClipboardCheck, BarChart3,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/analytics", label: "Insights", icon: BarChart3, roles: ["OWNER", "ADMIN"] },
   {
     href: "/me", label: "Me", icon: CircleUser,
     children: [

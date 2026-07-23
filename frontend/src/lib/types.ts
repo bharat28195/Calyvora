@@ -439,6 +439,43 @@ export interface ManagerReviewInput {
   submit: boolean;
 }
 
+/** Analytics / Insights dashboard (Owner/Admin). A chart series is a list of these. */
+export interface Slice {
+  label: string;
+  value: number;
+}
+export interface AnalyticsOverview {
+  people: {
+    headcount: number;
+    newJoinersThisYear: number;
+    avgTenureMonths: number;
+    onLeaveToday: number;
+    goalsOpen: number;
+    goalsAchieved: number;
+    goalsMissed: number;
+    avgGoalProgress: number;
+    byDepartment: Slice[];
+    headcountGrowth: Slice[];
+    ratingDistribution: Slice[];
+    leaveByType: Slice[];
+  };
+  work: {
+    projects: number;
+    tasksByStatus: Slice[];
+    tasksByPriority: Slice[];
+    ticketsByStatus: Slice[];
+    activeSprint: { name: string; committed: number; done: number; remaining: number; unestimated: number } | null;
+    velocity: Slice[];
+  };
+  finance: {
+    currency: string;
+    pending: number;
+    awaitingReimbursement: number;
+    reimbursedThisYear: number;
+    byCategory: Slice[];
+  };
+}
+
 export interface WorkItem {
   ref: string;
   title: string;
