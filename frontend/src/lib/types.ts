@@ -226,6 +226,10 @@ export type NotificationType =
   | "LEAVE_REJECTED"
   | "GOAL_ASSIGNED"
   | "DOCUMENT_ISSUED"
+  | "REVIEW_STARTED"
+  | "REVIEW_SELF_SUBMITTED"
+  | "REVIEW_SUBMITTED"
+  | "REVIEW_APPROVED"
   | "ANNOUNCEMENT";
 
 export interface AppNotification {
@@ -359,6 +363,80 @@ export interface Goal {
   progress: number;
   targetDate: string | null;
   createdAt: string;
+}
+
+/** Performance review cycles (feedback C.7). */
+export type ReviewStatus =
+  | "PENDING_SELF"
+  | "PENDING_MANAGER"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "CLOSED";
+export type HikeType = "PERCENT" | "NEW_SALARY" | "NONE";
+
+export interface ReviewCycle {
+  id: string;
+  name: string;
+  periodStart: string;
+  periodEnd: string;
+  status: "OPEN" | "CLOSED";
+  reviewCount: number;
+  submittedCount: number;
+  approvedCount: number;
+  createdAt: string;
+}
+
+export interface PerformanceReview {
+  id: string;
+  cycleId: string;
+  cycleName: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  cycleStatus: "OPEN" | "CLOSED" | null;
+  employeeId: string;
+  employeeName: string;
+  jobTitle: string | null;
+  managerId: string | null;
+  managerName: string | null;
+  status: ReviewStatus;
+  selfAssessment: string | null;
+  selfSubmittedAt: string | null;
+  rating: number | null;
+  summary: string | null;
+  strengths: string | null;
+  improvements: string | null;
+  hikeType: HikeType | null;
+  hikePercent: number | null;
+  proposedSalary: number | null;
+  hikeNote: string | null;
+  managerSubmittedAt: string | null;
+  decidedAt: string | null;
+  currency: string;
+  currentSalary: number | null;
+  goalsAchieved: number;
+  goalsTotal: number;
+  goals: Goal[];
+}
+
+export interface CreateCycleInput {
+  name: string;
+  periodStart: string;
+  periodEnd: string;
+}
+export interface SelfAssessmentInput {
+  selfAssessment: string;
+  submit: boolean;
+}
+export interface ManagerReviewInput {
+  rating?: number;
+  summary?: string;
+  strengths?: string;
+  improvements?: string;
+  hikeType?: HikeType;
+  hikePercent?: number;
+  proposedSalary?: number;
+  hikeNote?: string;
+  submit: boolean;
 }
 
 export interface WorkItem {

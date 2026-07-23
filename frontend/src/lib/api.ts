@@ -12,6 +12,11 @@ import {
   type Employee,
   type WorkItem,
   type Goal,
+  type ReviewCycle,
+  type PerformanceReview,
+  type CreateCycleInput,
+  type SelfAssessmentInput,
+  type ManagerReviewInput,
   type Client,
   type ClientDetail,
   type ClientRequestItem,
@@ -206,6 +211,44 @@ export const api = {
   deleteGoal(employeeId: string, goalId: string): Promise<void> {
     return LIVE ? http<void>(`/people/employees/${employeeId}/goals/${goalId}`, { method: "DELETE" })
       : mockBackend.deleteGoal(accessToken, employeeId, goalId);
+  },
+
+  // --- Performance reviews (feedback C.7) ---
+  reviewCycles(): Promise<ReviewCycle[]> {
+    return LIVE ? http<ReviewCycle[]>("/performance/cycles") : mockBackend.reviewCycles(accessToken);
+  },
+  createReviewCycle(input: CreateCycleInput): Promise<ReviewCycle> {
+    return LIVE ? http<ReviewCycle>("/performance/cycles", { method: "POST", body: JSON.stringify(input) })
+      : mockBackend.createReviewCycle(accessToken, input);
+  },
+  cycleReviews(cycleId: string): Promise<PerformanceReview[]> {
+    return LIVE ? http<PerformanceReview[]>(`/performance/cycles/${cycleId}/reviews`)
+      : mockBackend.cycleReviews(accessToken, cycleId);
+  },
+  closeReviewCycle(cycleId: string): Promise<ReviewCycle> {
+    return LIVE ? http<ReviewCycle>(`/performance/cycles/${cycleId}/close`, { method: "POST" })
+      : mockBackend.closeReviewCycle(accessToken, cycleId);
+  },
+  myReviews(): Promise<PerformanceReview[]> {
+    return LIVE ? http<PerformanceReview[]>("/performance/me/reviews") : mockBackend.myReviews(accessToken);
+  },
+  teamReviews(): Promise<PerformanceReview[]> {
+    return LIVE ? http<PerformanceReview[]>("/performance/team/reviews") : mockBackend.teamReviews(accessToken);
+  },
+  getReview(reviewId: string): Promise<PerformanceReview> {
+    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}`) : mockBackend.getReview(accessToken, reviewId);
+  },
+  saveSelfAssessment(reviewId: string, input: SelfAssessmentInput): Promise<PerformanceReview> {
+    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/self`, { method: "PATCH", body: JSON.stringify(input) })
+      : mockBackend.saveSelfAssessment(accessToken, reviewId, input);
+  },
+  saveManagerReview(reviewId: string, input: ManagerReviewInput): Promise<PerformanceReview> {
+    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/manager`, { method: "PATCH", body: JSON.stringify(input) })
+      : mockBackend.saveManagerReview(accessToken, reviewId, input);
+  },
+  approveReview(reviewId: string): Promise<PerformanceReview> {
+    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/approve`, { method: "POST" })
+      : mockBackend.approveReview(accessToken, reviewId);
   },
   listEmployees(): Promise<Employee[]> {
     return LIVE ? http<Employee[]>("/people/employees") : mockBackend.listEmployees(accessToken);
@@ -482,7 +525,7 @@ export const api = {
 
   /** My own employee profile (auto-provisioned if missing) — the Me hub's anchor. */
   myEmployee(): Promise<Employee> {
-    return LIVE ? http<Employee>("/people/employees/me") : mockBackend.myEmployee(accessToken);
+    return LIVE ? http<Employee>("/people/me") : mockBackend.myEmployee(accessToken);
   },
   /** My goals, resolved through my own employee id. */
   async myGoals(): Promise<Goal[]> {

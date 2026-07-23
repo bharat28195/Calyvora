@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone } from "lucide-react";
+import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck } from "lucide-react";
 import { createElement, type ReactNode } from "react";
 import type { NotificationType } from "@/lib/types";
 
@@ -9,6 +9,10 @@ export const NOTIFICATION_ICON: Record<NotificationType, ReactNode> = {
   LEAVE_REJECTED: createElement(XCircle, { className: "h-4 w-4 text-red-400" }),
   GOAL_ASSIGNED: createElement(Target, { className: "h-4 w-4 text-violet" }),
   DOCUMENT_ISSUED: createElement(FileText, { className: "h-4 w-4 text-sky-400" }),
+  REVIEW_STARTED: createElement(ClipboardCheck, { className: "h-4 w-4 text-violet" }),
+  REVIEW_SELF_SUBMITTED: createElement(ClipboardCheck, { className: "h-4 w-4 text-aqua" }),
+  REVIEW_SUBMITTED: createElement(ClipboardCheck, { className: "h-4 w-4 text-amber-400" }),
+  REVIEW_APPROVED: createElement(Star, { className: "h-4 w-4 text-emerald-400" }),
   ANNOUNCEMENT: createElement(Megaphone, { className: "h-4 w-4 text-fg/50" }),
 };
 

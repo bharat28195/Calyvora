@@ -5,7 +5,7 @@
 > Binding architecture = [/docs](docs/README.md). Narrative/decisions = [FOUNDER.md](FOUNDER.md) /
 > [DECISIONS.md](DECISIONS.md). This file = practical "how to pick up where we left off."
 
-**Last updated:** 2026-07-22 · **Branch:** `feature/orbit` · **Product name: "Orbit" (by Calyvora — parent co.).**
+**Last updated:** 2026-07-23 · **Branch:** `feature/orbit` · **Product name: "Orbit" (by Calyvora — parent co.).**
 
 **Current focus — Founder feedback buckets (see [docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)):**
 Working through the founder's 8-page handwritten notes (2026-07-22). Done so far: **Bucket A** (quick wins:
@@ -16,8 +16,10 @@ on-leave, leave reasons, **leave calendar** — attendance *derived from leave*,
 (V16), **D2+D3 Documents & templates** (V17), and **C.4 daily attendance** (V18). People, Documents,
 Work and Knowledge all have **left-pane sub-panes**; Clients + Documents are **Owner/Admin-only**.
 **105 backend tests, all live & verified.**
-**Next:** C.4 full daily attendance (phase 2) → C.7 fuller review cycle → D4 Notifications → D5 Inbox →
-BR3 modular packaging. (C.9 and D6 need the founder to confirm scope.)
+Since then: **Bucket E** (holidays, Me hub, expenses, feed, sprint depth) and **C.7 performance review
+cycles (V24)** — admin opens a cycle → self-assessment + manager rating/hike → admin approves → **raise
+applied to compensation**; a manager can now set goals for their reports. Also fixed the Performance-tab
+500 (`/people/employees/me` → `/people/me`). **Next:** C.9 / D6 (need founder scope) · BR3 modular packaging.
 
 **Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
 RS256 SD-5) + **demo suite** (one-click seed, cross-app dashboard, ⌘K global search, AI assistant) +

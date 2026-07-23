@@ -47,7 +47,7 @@
 | C4 | **Richer employee profile**: what he/she is working on · when started / end date · delay vs advance · how they're performing | p2 | ✅ | **Working on** = open tasks assigned to them (`GET /people/employees/{id}/work`, in `work` pkg to avoid a cycle) with **overdue** flag (= "delay"). **End date** added (V14). "How performing" = the rating (C6). |
 | C5 | **Full employee details + skills** | p3 | ✅ | `skills` (comma-sep, V14) as editable chips on the profile + edit dialog. |
 | C6 | **Ratings** | p3 | ✅ | 1–5 star `rating` (V14), shown on profile, editable by admin. (Deeper "performance" = C7.) |
-| C7 | **Performance** | p3 | 🔜 (partial) | Covered for now by the **rating** (C6) + **goals progress** (C8). A fuller review-cycle module (periodic reviews, reviewer, cycle) is future. |
+| C7 | **Performance** | p3 | ✅ | **Review cycles** (V24): an admin opens a cycle → one review per active employee (manager snapshotted); member writes a self-assessment, manager rates 1–5 + recommends a hike (% or new salary), admin approves → **raise applied to compensation**. Goals rollup + current salary shown as context. Me → Review (self + "my team"); Performance hub (admin, approve & apply hike). Also: a **manager can now set goals for their reports** (was admin/self only). |
 | C8 | **Goals** | p3 | ✅ | `goals` table (V15, RLS) + `GET/POST/PATCH/DELETE /people/employees/{id}/goals`. Editable by admin or the goal owner (self-service). Progress bar + status; 100% → auto-ACHIEVED. Demo seeds goals. |
 | C9 | **Kanban-like section in employee tab** ("look on kanban like it has one section") | p3 | ⬜ | *Ambiguous* — confirm intent (employee view laid out like a board?). |
 | C.4b | **Full daily attendance (phase 2)** | p6 | ✅ | `attendance_records` (V18, RLS, unique per employee+day). Self **check-in/check-out**, Owner/Admin **team day sheet** with one-click marking (present · WFH · half day · absent · on leave · holiday), and a **month grid** with worked-days + attendance %. **Approved leave auto-fills the day** so nobody enters time off twice; a marked row always wins. Weekends resolve to week-off. Clickable counts drill into *who*, plus a **per-team breakdown**. Dashboard now reports how many of "present" are unmarked (assumed vs recorded). Demo seeds 14 days. |
@@ -117,6 +117,5 @@
   links removed, and the team counts are **clickable drill-downs** with a per-team breakdown.
   **105 backend tests green.**
 
-**Remaining:** C.7 (fuller review cycle) · C.9 (*needs confirmation*) · **D4 Notifications + D5 Inbox
-(next up — leave request must notify the approving manager)** · D6 Organization (*confirm scope*) ·
-BR3 modular packaging.
+**Remaining:** C.9 (*needs confirmation*) · D6 Organization (*confirm scope*) · BR3 modular packaging.
+(C.7 review cycle ✅ 2026-07-23; D4/D5 ✅.)

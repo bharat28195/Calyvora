@@ -4,6 +4,32 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-23 — Performance review cycles (C.7) + Performance-tab fix
+**4 new tests. Fixes the "something went wrong" the founder hit on the Performance tab.**
+
+- **Bug fix — Performance tab 500.** The Me → Performance page called `GET /people/employees/me`,
+  which the backend routed into `/employees/{id}` and tried to parse `"me"` as a UUID → 500
+  "Something went wrong". The frontend now calls `GET /people/me`. (One-line path fix in `api.ts`.)
+- **Managers can set goals for their downline.** `GoalService` previously let only an admin or the
+  goal's owner edit goals; now a **reporting manager** can manage their direct reports' goals too —
+  so a team lead who is a plain member can set goals for their people (founder request).
+- **Review cycles (Flyway V24, RLS on `review_cycles` + `performance_reviews`).** An Owner/Admin opens
+  a named cycle for a period; it **fans out one review per active employee**, snapshotting each
+  person's manager at open time. The **member writes a self-assessment**; their **manager writes the
+  review, a 1–5 rating, and a hike recommendation** (percent or a new salary); an **admin approves**,
+  and approval **writes the raise straight into compensation history** — one auditable flow from
+  "what they achieved" to the raise. Each review shows the person's **goals rollup** (achieved/total)
+  and **current salary** as context for the rating.
+  - Authorization is **by relationship**: a review is visible/editable by the employee (self side),
+    their manager (manager side), or an admin — mirroring goals. Cycle admin (open/close/approve) is
+    Owner/Admin-only.
+  - New notification types (review started · self submitted · submitted for approval · approved) route
+    to the right person at each step, reusing the D4/D5 inbox.
+  - **UI:** **Me → Review** (self-assessment + your manager's verdict, plus a "My team's reviews"
+    section for managers); a **Performance** hub for Owner/Admin (open a cycle, watch progress, expand
+    to review and **approve & apply hike** per person). The demo seeds an in-flight cycle — one review
+    awaiting the owner's approval, one already approved with the raise applied.
+
 ### 2026-07-23 — Company feed (E7) and sprint depth (E8)
 **14 new tests (138 total).**
 

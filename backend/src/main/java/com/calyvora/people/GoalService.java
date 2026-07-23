@@ -99,13 +99,25 @@ public class GoalService {
                 .orElseThrow(() -> new NotFoundException("Employee not found"));
     }
 
-    /** Admins manage anyone's goals; everyone else may manage only their own. */
+    /**
+     * Admins manage anyone's goals; a manager manages their direct reports' goals; everyone else may
+     * manage only their own. This is what lets a team lead set goals for their downline (founder request).
+     */
     private void requireCanManage(Employee employee, AuthPrincipal principal) {
         boolean admin = "OWNER".equals(principal.role()) || "ADMIN".equals(principal.role());
         boolean self = employee.getUserId().equals(principal.userId());
-        if (!admin && !self) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "You can only manage your own goals");
+        if (!admin && !self && !isManagerOf(employee, principal)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "You can only manage goals for yourself or your reports");
         }
+    }
+
+    /** True when {@code principal} is the reporting manager of {@code employee}. */
+    private boolean isManagerOf(Employee employee, AuthPrincipal principal) {
+        if (employee.getManagerId() == null) return false;
+        return employeeRepository.findByIdAndCompanyId(employee.getManagerId(), TenantContext.getCompanyId())
+                .map(Employee::getUserId)
+                .map(managerUserId -> managerUserId.equals(principal.userId()))
+                .orElse(false);
     }
 
     private static LocalDate parseDate(String s) {

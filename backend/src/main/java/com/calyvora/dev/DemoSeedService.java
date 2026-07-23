@@ -94,6 +94,7 @@ public class DemoSeedService {
     private final com.calyvora.people.HolidayRepository holidayRepository;
     private final ExpenseService expenseService;
     private final FeedService feedService;
+    private final com.calyvora.performance.PerformanceReviewService performanceReviewService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -109,7 +110,9 @@ public class DemoSeedService {
                            com.calyvora.people.AttendanceService attendanceService,
                            com.calyvora.people.HolidayService holidayService,
                            com.calyvora.people.HolidayRepository holidayRepository,
-                           ExpenseService expenseService, FeedService feedService) {
+                           ExpenseService expenseService, FeedService feedService,
+                           com.calyvora.performance.PerformanceReviewService performanceReviewService) {
+        this.performanceReviewService = performanceReviewService;
         this.feedService = feedService;
         this.attendanceService = attendanceService;
         this.holidayService = holidayService;
@@ -294,6 +297,59 @@ public class DemoSeedService {
 
         // --- Feed: a few posts so the wall has a voice, including a team-only one ---
         seedFeed(owner, emp, marcus, priya, engineering.id());
+
+        // --- Performance: an annual cycle mid-flight, so the review loop has something to show ---
+        seedReviews(owner, emp, priya, marcus, sara, tom);
+    }
+
+    /**
+     * An annual review cycle in progress: Priya's manager has submitted her review with a hike (it
+     * sits in the owner's approval queue), and Sara's is fully approved — the raise already landed in
+     * compensation. The rest stay pending, so the "still to do" state is visible too.
+     */
+    private void seedReviews(AuthPrincipal owner, Map<String, EmployeeResponse> emp,
+                             User priya, User marcus, User sara, User tom) {
+        LocalDate end = LocalDate.now().minusDays(1);
+        LocalDate start = end.minusYears(1).plusDays(1);
+        var cycle = performanceReviewService.createCycle(
+                new com.calyvora.performance.dto.CreateCycleRequest(
+                        "Annual Review " + start.getYear(), start.toString(), end.toString()),
+                owner);
+        UUID cycleId = UUID.fromString(cycle.id());
+
+        java.util.Map<String, String> reviewByEmployee = new java.util.HashMap<>();
+        for (var r : performanceReviewService.cycleReviews(cycleId)) {
+            reviewByEmployee.put(r.employeeId(), r.id());
+        }
+
+        // Priya (→ Marcus): self submitted, manager submitted a 12% hike → awaits owner approval.
+        UUID priyaReview = UUID.fromString(reviewByEmployee.get(emp.get(priya.getEmail()).id()));
+        performanceReviewService.saveSelf(priyaReview,
+                new com.calyvora.performance.dto.SelfAssessmentRequest(
+                        "Led the RS256 rollout and wrote the key-rotation runbook; mentored a junior engineer. "
+                                + "Shipped the security work ahead of schedule.", true),
+                principalFor(owner, emp, priya.getEmail()));
+        performanceReviewService.saveManager(priyaReview,
+                new com.calyvora.performance.dto.ManagerReviewRequest(5,
+                        "Outstanding year — owned security end to end and lifted the whole team with her.",
+                        "Security depth, ownership, mentoring", "Delegate more of the on-call load",
+                        "PERCENT", new java.math.BigDecimal("12"), null,
+                        "Top performer this cycle; strong retention case.", true),
+                principalFor(owner, emp, marcus.getEmail()));
+
+        // Sara (→ Tom): self + manager submitted, and the owner approved — an 8% raise lands in comp.
+        UUID saraReview = UUID.fromString(reviewByEmployee.get(emp.get(sara.getEmail()).id()));
+        performanceReviewService.saveSelf(saraReview,
+                new com.calyvora.performance.dto.SelfAssessmentRequest(
+                        "Cut average ticket response time and kept CSAT high through the launch spike.", true),
+                principalFor(owner, emp, sara.getEmail()));
+        performanceReviewService.saveManager(saraReview,
+                new com.calyvora.performance.dto.ManagerReviewRequest(4,
+                        "Reliable and calm under load; customers genuinely like working with Sara.",
+                        "Responsiveness, empathy", "Start owning the support knowledge base",
+                        "PERCENT", new java.math.BigDecimal("8"), null, "Steady, dependable contributor.", true),
+                principalFor(owner, emp, tom.getEmail()));
+        performanceReviewService.approve(saraReview, owner);
     }
 
     /** A short, believable wall: an announcement, a birthday, a question, and one team-only post. */

@@ -17,6 +17,13 @@ import {
   type Payslip,
   type WorkItem,
   type Goal,
+  type ReviewCycle,
+  type ReviewStatus,
+  type HikeType,
+  type PerformanceReview,
+  type CreateCycleInput,
+  type SelfAssessmentInput,
+  type ManagerReviewInput,
   type Client,
   type ClientDetail,
   type ClientRequestItem,
@@ -1395,6 +1402,200 @@ export const mockBackend = {
     mockGoals[employeeId] = (mockGoals[employeeId] ?? []).filter((x) => x.id !== goalId);
   },
 
+  // --- performance reviews (mirrors PerformanceReviewService) ---------------
+  async reviewCycles(accessToken: string | null): Promise<ReviewCycle[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return mockReviewCycles
+      .filter((c) => c.companyId === user.companyId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((c) => {
+        const rs = mockReviews.filter((r) => r.cycleId === c.id);
+        return {
+          id: c.id, name: c.name, periodStart: c.periodStart, periodEnd: c.periodEnd, status: c.status,
+          reviewCount: rs.length,
+          submittedCount: rs.filter((r) => r.status === "SUBMITTED").length,
+          approvedCount: rs.filter((r) => r.status === "APPROVED").length,
+          createdAt: c.createdAt,
+        };
+      });
+  },
+  async createReviewCycle(accessToken: string | null, input: CreateCycleInput): Promise<ReviewCycle> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    if (input.periodEnd < input.periodStart) throw err(400, "VALIDATION_ERROR", "Period end must be on or after the start");
+    const cycle: ReviewCycleRow = {
+      id: crypto.randomUUID(), companyId: user.companyId, name: input.name.trim(),
+      periodStart: input.periodStart, periodEnd: input.periodEnd, status: "OPEN",
+      createdAt: new Date().toISOString(),
+    };
+    mockReviewCycles.push(cycle);
+    // Fan out one review per active employee (auto-provision so everyone is covered).
+    ensureProfiles(db, user.companyId, db.users.filter((u) => u.companyId === user.companyId));
+    save(db);
+    for (const emp of db.employees.filter((e) => e.companyId === user.companyId && e.employmentStatus === "ACTIVE")) {
+      const review: ReviewRow = {
+        id: crypto.randomUUID(), companyId: user.companyId, cycleId: cycle.id,
+        employeeId: emp.id, managerId: emp.managerId, status: "PENDING_SELF",
+        selfAssessment: null, selfSubmittedAt: null, rating: null, summary: null,
+        strengths: null, improvements: null, hikeType: null, hikePercent: null,
+        proposedSalary: null, hikeNote: null, managerSubmittedAt: null, decidedAt: null,
+      };
+      mockReviews.push(review);
+      notify(emp.userId, user.id, "REVIEW_STARTED", `Review started: ${cycle.name}`,
+        `Add your self-assessment for ${cycle.name}`, "/me/review", "REVIEW", review.id);
+    }
+    const rs = mockReviews.filter((r) => r.cycleId === cycle.id);
+    return {
+      id: cycle.id, name: cycle.name, periodStart: cycle.periodStart, periodEnd: cycle.periodEnd,
+      status: cycle.status, reviewCount: rs.length, submittedCount: 0, approvedCount: 0, createdAt: cycle.createdAt,
+    };
+  },
+  async cycleReviews(accessToken: string | null, cycleId: string): Promise<PerformanceReview[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return mockReviews
+      .filter((r) => r.cycleId === cycleId && r.companyId === user.companyId)
+      .map((r) => renderReview(db, r));
+  },
+  async closeReviewCycle(accessToken: string | null, cycleId: string): Promise<ReviewCycle> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const cycle = mockReviewCycles.find((c) => c.id === cycleId && c.companyId === user.companyId);
+    if (!cycle) throw err(404, "NOT_FOUND", "Review cycle not found");
+    cycle.status = "CLOSED";
+    const rs = mockReviews.filter((r) => r.cycleId === cycle.id);
+    return {
+      id: cycle.id, name: cycle.name, periodStart: cycle.periodStart, periodEnd: cycle.periodEnd,
+      status: cycle.status, reviewCount: rs.length,
+      submittedCount: rs.filter((r) => r.status === "SUBMITTED").length,
+      approvedCount: rs.filter((r) => r.status === "APPROVED").length, createdAt: cycle.createdAt,
+    };
+  },
+  async myReviews(accessToken: string | null): Promise<PerformanceReview[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const me = db.employees.find((e) => e.userId === user.id && e.companyId === user.companyId);
+    if (!me) return [];
+    return mockReviews.filter((r) => r.employeeId === me.id).map((r) => renderReview(db, r));
+  },
+  async teamReviews(accessToken: string | null): Promise<PerformanceReview[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const me = db.employees.find((e) => e.userId === user.id && e.companyId === user.companyId);
+    if (!me) return [];
+    return mockReviews.filter((r) => r.managerId === me.id).map((r) => renderReview(db, r));
+  },
+  async getReview(accessToken: string | null, reviewId: string): Promise<PerformanceReview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const r = requireReview(db, user, reviewId);
+    if (!canViewReview(db, user, r)) throw err(403, "FORBIDDEN", "You can't view this review");
+    return renderReview(db, r);
+  },
+  async saveSelfAssessment(accessToken: string | null, reviewId: string, input: SelfAssessmentInput): Promise<PerformanceReview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const r = requireReview(db, user, reviewId);
+    const emp = db.employees.find((e) => e.id === r.employeeId);
+    if (!emp || emp.userId !== user.id) throw err(403, "FORBIDDEN", "Only you can write your own self-assessment");
+    requireCycleOpen(r);
+    if (r.status !== "PENDING_SELF" && r.status !== "PENDING_MANAGER") {
+      throw err(400, "VALIDATION_ERROR", "This review is no longer open for self-assessment");
+    }
+    r.selfAssessment = input.selfAssessment?.trim() || null;
+    if (input.submit) {
+      r.selfSubmittedAt = new Date().toISOString();
+      if (r.status === "PENDING_SELF") r.status = "PENDING_MANAGER";
+      if (r.managerId) {
+        const mgr = db.employees.find((e) => e.id === r.managerId);
+        notify(mgr?.userId, user.id, "REVIEW_SELF_SUBMITTED", "Self-assessment submitted",
+          `${user.firstName} ${user.lastName} submitted their self-assessment`,
+          "/performance/team", "REVIEW", r.id);
+      }
+    }
+    return renderReview(db, r);
+  },
+  async saveManagerReview(accessToken: string | null, reviewId: string, input: ManagerReviewInput): Promise<PerformanceReview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const r = requireReview(db, user, reviewId);
+    const admin = user.role === "OWNER" || user.role === "ADMIN";
+    if (!admin && !isReviewManager(db, user, r)) {
+      throw err(403, "FORBIDDEN", "Only the reporting manager or an admin can write this review");
+    }
+    requireCycleOpen(r);
+    if (r.status === "APPROVED") throw err(400, "VALIDATION_ERROR", "This review has already been approved");
+
+    if (input.rating != null) r.rating = input.rating;
+    if (input.summary != null) r.summary = input.summary.trim() || null;
+    if (input.strengths != null) r.strengths = input.strengths.trim() || null;
+    if (input.improvements != null) r.improvements = input.improvements.trim() || null;
+    if (input.hikeNote != null) r.hikeNote = input.hikeNote.trim() || null;
+    if (input.hikeType) {
+      r.hikeType = input.hikeType;
+      if (input.hikeType === "PERCENT") { r.hikePercent = input.hikePercent ?? null; r.proposedSalary = null; }
+      else if (input.hikeType === "NEW_SALARY") { r.proposedSalary = input.proposedSalary ?? null; r.hikePercent = null; }
+      else { r.hikePercent = null; r.proposedSalary = null; }
+    }
+
+    if (input.submit) {
+      if (r.rating == null) throw err(400, "VALIDATION_ERROR", "Give a rating before submitting the review");
+      r.status = "SUBMITTED";
+      r.managerSubmittedAt = new Date().toISOString();
+      const emp = db.employees.find((e) => e.id === r.employeeId);
+      notify(emp?.userId, user.id, "REVIEW_SUBMITTED", "Your review is ready",
+        "Your manager submitted your review", "/me/review", "REVIEW", r.id);
+      const empName = emp && db.users.find((u) => u.id === emp.userId);
+      const label = empName ? `${empName.firstName} ${empName.lastName}` : "An employee";
+      db.users
+        .filter((u) => u.companyId === r.companyId && (u.role === "OWNER" || u.role === "ADMIN"))
+        .forEach((u) => notify(u.id, user.id, "REVIEW_SUBMITTED", "Review awaiting approval",
+          `${label}'s review is ready to approve`, "/performance", "REVIEW", r.id));
+    }
+    return renderReview(db, r);
+  },
+  async approveReview(accessToken: string | null, reviewId: string): Promise<PerformanceReview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const r = requireReview(db, user, reviewId);
+    if (r.status !== "SUBMITTED") throw err(400, "VALIDATION_ERROR", "Only a submitted review can be approved");
+    const newAnnual = resolveReviewSalary(db, r);
+    if (newAnnual != null && newAnnual > 0) {
+      const existing = mockComp[r.employeeId] ?? [];
+      const currency = existing[0]?.currency ?? "USD";
+      const cycle = mockReviewCycles.find((c) => c.id === r.cycleId);
+      mockComp[r.employeeId] = [
+        { id: crypto.randomUUID(), effectiveDate: todayIso(), annualAmount: newAnnual,
+          changeType: "HIKE", currency,
+          reason: `Performance review: ${cycle?.name ?? "review"}${r.rating ? ` (rating ${r.rating}/5)` : ""}` },
+        ...existing,
+      ];
+    }
+    r.status = "APPROVED";
+    r.decidedAt = new Date().toISOString();
+    const emp = db.employees.find((e) => e.id === r.employeeId);
+    notify(emp?.userId, user.id, "REVIEW_APPROVED", "Review approved",
+      newAnnual == null ? "Your review is finalized" : "Your review is finalized and a raise was applied",
+      "/me/review", "REVIEW", r.id);
+    return renderReview(db, r);
+  },
+
   async listEmployees(accessToken: string | null): Promise<Employee[]> {
     await delay();
     const db = load();
@@ -2481,6 +2682,81 @@ function buildCompensation(db: DB, employeeId: string): Compensation {
 
 // --- goals (mock, in-memory; resets on reload) ------------------------------
 const mockGoals: Record<string, Goal[]> = {};
+
+// --- performance reviews (mock, in-memory; mirrors PerformanceReviewService) -
+interface ReviewCycleRow {
+  id: string; companyId: string; name: string; periodStart: string; periodEnd: string;
+  status: "OPEN" | "CLOSED"; createdAt: string;
+}
+interface ReviewRow {
+  id: string; companyId: string; cycleId: string; employeeId: string; managerId: string | null;
+  status: ReviewStatus;
+  selfAssessment: string | null; selfSubmittedAt: string | null;
+  rating: number | null; summary: string | null; strengths: string | null; improvements: string | null;
+  hikeType: HikeType | null; hikePercent: number | null; proposedSalary: number | null; hikeNote: string | null;
+  managerSubmittedAt: string | null; decidedAt: string | null;
+}
+const mockReviewCycles: ReviewCycleRow[] = [];
+const mockReviews: ReviewRow[] = [];
+
+function renderReview(db: DB, r: ReviewRow): PerformanceReview {
+  const cycle = mockReviewCycles.find((c) => c.id === r.cycleId);
+  const emp = db.employees.find((e) => e.id === r.employeeId);
+  const empUser = emp && db.users.find((u) => u.id === emp.userId);
+  const mgr = r.managerId ? db.employees.find((e) => e.id === r.managerId) : null;
+  const mgrUser = mgr && db.users.find((u) => u.id === mgr.userId);
+  const goals = mockGoals[r.employeeId] ?? [];
+  const comp = buildCompensation(db, r.employeeId);
+  return {
+    id: r.id, cycleId: r.cycleId, cycleName: cycle?.name ?? "",
+    periodStart: cycle?.periodStart ?? null, periodEnd: cycle?.periodEnd ?? null,
+    cycleStatus: cycle?.status ?? null,
+    employeeId: r.employeeId, employeeName: empUser ? `${empUser.firstName} ${empUser.lastName}` : "Employee",
+    jobTitle: emp?.jobTitle ?? null,
+    managerId: r.managerId, managerName: mgrUser ? `${mgrUser.firstName} ${mgrUser.lastName}` : null,
+    status: r.status,
+    selfAssessment: r.selfAssessment, selfSubmittedAt: r.selfSubmittedAt,
+    rating: r.rating, summary: r.summary, strengths: r.strengths, improvements: r.improvements,
+    hikeType: r.hikeType, hikePercent: r.hikePercent, proposedSalary: r.proposedSalary, hikeNote: r.hikeNote,
+    managerSubmittedAt: r.managerSubmittedAt, decidedAt: r.decidedAt,
+    currency: comp.currency, currentSalary: comp.currentAnnual,
+    goalsAchieved: goals.filter((g) => g.status === "ACHIEVED").length,
+    goalsTotal: goals.length, goals: goals.slice(),
+  };
+}
+
+function requireReview(db: DB, user: User, reviewId: string): ReviewRow {
+  const r = mockReviews.find((x) => x.id === reviewId && x.companyId === user.companyId);
+  if (!r) throw err(404, "NOT_FOUND", "Review not found");
+  return r;
+}
+function isReviewSelf(db: DB, user: User, r: ReviewRow): boolean {
+  const emp = db.employees.find((e) => e.id === r.employeeId);
+  return !!emp && emp.userId === user.id;
+}
+function isReviewManager(db: DB, user: User, r: ReviewRow): boolean {
+  if (!r.managerId) return false;
+  const mgr = db.employees.find((e) => e.id === r.managerId);
+  return !!mgr && mgr.userId === user.id;
+}
+function canViewReview(db: DB, user: User, r: ReviewRow): boolean {
+  const admin = user.role === "OWNER" || user.role === "ADMIN";
+  return admin || isReviewSelf(db, user, r) || isReviewManager(db, user, r);
+}
+function requireCycleOpen(r: ReviewRow): void {
+  const cycle = mockReviewCycles.find((c) => c.id === r.cycleId);
+  if (cycle && cycle.status === "CLOSED") throw err(400, "VALIDATION_ERROR", "This review cycle is closed");
+}
+
+/** New annual salary a hike implies, or null when there's nothing to apply. */
+function resolveReviewSalary(db: DB, r: ReviewRow): number | null {
+  if (!r.hikeType || r.hikeType === "NONE") return null;
+  if (r.hikeType === "NEW_SALARY") return r.proposedSalary ?? null;
+  if (r.hikePercent == null) return null;
+  const current = buildCompensation(db, r.employeeId).currentAnnual;
+  if (!current || current <= 0) return null;
+  return round2(current * (1 + r.hikePercent / 100));
+}
 
 // --- feed (mock, in-memory; resets on reload) -------------------------------
 interface MockPost {

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Star } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Star, ClipboardCheck, ArrowRight } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { Employee } from "@/lib/types";
+import type { Employee, PerformanceReview } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { EmployeeGoals } from "@/components/people/employee-goals";
@@ -14,12 +15,17 @@ import { EmployeeGoals } from "@/components/people/employee-goals";
  */
 export default function MyPerformancePage() {
   const [me, setMe] = useState<Employee | null>(null);
+  const [openReview, setOpenReview] = useState<PerformanceReview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.myEmployee()
       .then(setMe)
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load your profile"));
+    // Surface an open review cycle if one is waiting on the member.
+    api.myReviews()
+      .then((rs) => setOpenReview(rs.find((r) => r.cycleStatus !== "CLOSED") ?? null))
+      .catch(() => {});
   }, []);
 
   return (
@@ -30,6 +36,20 @@ export default function MyPerformancePage() {
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
+
+      {openReview && (
+        <Link href="/me/review"
+          className="mt-6 flex items-center gap-3 rounded-xl border border-violet/30 bg-violet/5 px-4 py-3 transition-colors hover:bg-violet/10">
+          <ClipboardCheck className="h-5 w-5 shrink-0 text-violet" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{openReview.cycleName} is open</p>
+            <p className="text-xs text-fg/50">
+              {openReview.status === "PENDING_SELF" ? "Write your self-assessment" : "See your review"}
+            </p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-violet" />
+        </Link>
+      )}
 
       {me === null ? (
         <div className="mt-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
