@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Loader2, LogOut, LayoutDashboard, Users, FolderKanban, BookOpen, UserCog, Settings, Handshake, FileText,
-  CircleUser, Inbox, Receipt, MessagesSquare, ClipboardCheck, BarChart3,
+  Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
+  CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,8 @@ interface NavItem {
   children?: NavChild[]; // sub-panes shown in the left pane when the section is active
 }
 
+// HR-only product surface (feature/hr-suite). Work, Knowledge, Clients and Feed are intentionally
+// omitted here — this branch presents Orbit as a focused HR suite for the demo.
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: ["OWNER", "ADMIN"] },
@@ -39,11 +41,11 @@ const NAV: NavItem[] = [
       { href: "/me/leave", label: "Time off" },
       { href: "/me/performance", label: "Performance" },
       { href: "/me/review", label: "Review" },
+      { href: "/me/payslip", label: "My pay" },
       { href: "/me/expenses", label: "Expenses" },
     ],
   },
   { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/feed", label: "Feed", icon: MessagesSquare },
   {
     href: "/people", label: "People", icon: Users,
     children: [
@@ -54,22 +56,8 @@ const NAV: NavItem[] = [
       { href: "/people/holidays", label: "Holidays" },
     ],
   },
-  {
-    href: "/work", label: "Work", icon: FolderKanban,
-    children: [
-      { href: "/work", label: "Projects" },
-      { href: "/work/mine", label: "My work" },
-    ],
-  },
-  {
-    href: "/knowledge", label: "Knowledge", icon: BookOpen,
-    children: [
-      { href: "/knowledge", label: "Spaces" },
-      { href: "/knowledge/mine", label: "My pages" },
-    ],
-  },
   { href: "/performance", label: "Performance", icon: ClipboardCheck, roles: ["OWNER", "ADMIN"] },
-  { href: "/clients", label: "Clients", icon: Handshake, roles: ["OWNER", "ADMIN"] },
+  { href: "/payroll", label: "Payroll", icon: Wallet, roles: ["OWNER", "ADMIN"] },
   { href: "/expenses", label: "Expenses", icon: Receipt, roles: ["OWNER", "ADMIN"] },
   {
     href: "/documents", label: "Documents", icon: FileText, roles: ["OWNER", "ADMIN"],

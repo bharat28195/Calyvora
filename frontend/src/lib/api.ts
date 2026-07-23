@@ -488,6 +488,14 @@ export const api = {
     return LIVE ? http<Payslip>(`/people/employees/${employeeId}/payslip${qs}`)
       : mockBackend.payslip(accessToken, employeeId, month);
   },
+  // Self-service pay: an employee's own salary + payslip.
+  myCompensation(): Promise<Compensation> {
+    return LIVE ? http<Compensation>("/people/me/compensation") : mockBackend.myCompensation(accessToken);
+  },
+  myPayslip(month?: string): Promise<Payslip> {
+    const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+    return LIVE ? http<Payslip>(`/people/me/payslip${qs}`) : mockBackend.myPayslip(accessToken, month);
+  },
   searchPages(q: string): Promise<PageSummary[]> {
     return LIVE
       ? http<PageSummary[]>(`/knowledge/search?q=${encodeURIComponent(q)}`)

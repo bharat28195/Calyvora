@@ -558,6 +558,18 @@ export const mockBackend = {
     };
   },
 
+  async myCompensation(accessToken: string | null): Promise<Compensation> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    return buildCompensation(db, myEmployeeId(db, user));
+  },
+  async myPayslip(accessToken: string | null, month?: string): Promise<Payslip> {
+    const db = load();
+    const user = requireSession(db, accessToken);
+    return this.payslip(accessToken, myEmployeeId(db, user), month);
+  },
+
   async clients(accessToken: string | null): Promise<Client[]> {
     await delay();
     const db = load();

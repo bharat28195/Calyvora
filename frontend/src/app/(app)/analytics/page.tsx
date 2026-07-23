@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Users, FolderKanban, Wallet, Gauge } from "lucide-react";
+import { Loader2, Users, Wallet, Gauge } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { AnalyticsOverview } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
-import { Donut, BarList, MiniBars, TrendLine, PALETTE } from "@/components/charts/charts";
+import { Donut, BarList, TrendLine, PALETTE } from "@/components/charts/charts";
 
 /**
- * Insights — a company-wide analytics dashboard reaching across People, Work and Finance. Every chart
- * is computed from data we hold (headcount from start dates, velocity from completed sprints), so the
- * numbers are real, not illustrative. Owner/Admin only.
+ * Insights — HR analytics for the People and Finance sides of the company. Every chart is computed
+ * from data we hold (headcount from start dates, approved leave, ratings, expenses), so the numbers
+ * are real, not illustrative. Owner/Admin only. (The HR-suite branch omits the Work/sprint charts.)
  */
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsOverview | null>(null);
@@ -25,7 +25,7 @@ export default function AnalyticsPage() {
   if (error) return <Alert tone="error" className="mt-6">{error}</Alert>;
   if (!data) return <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>;
 
-  const { people, work, finance } = data;
+  const { people, finance } = data;
   const money = (n: number) => {
     try { return new Intl.NumberFormat(undefined, { style: "currency", currency: finance.currency, maximumFractionDigits: 0 }).format(n); }
     catch { return `${finance.currency} ${Math.round(n).toLocaleString()}`; }
@@ -42,7 +42,7 @@ export default function AnalyticsPage() {
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Headcount" value={people.headcount} hint={`${people.newJoinersThisYear} joined this year`} />
         <Kpi label="Avg tenure" value={`${people.avgTenureMonths} mo`} hint={`${people.onLeaveToday} on leave today`} />
-        <Kpi label="Open work" value={openTasks(work)} hint={`${work.projects} projects`} />
+        <Kpi label="Goals achieved" value={people.goalsAchieved} hint={`avg progress ${people.avgGoalProgress}%`} />
         <Kpi label="Awaiting reimbursement" value={money(finance.awaitingReimbursement)} hint={`${money(finance.pending)} pending approval`} />
       </div>
 
@@ -73,42 +73,6 @@ export default function AnalyticsPage() {
         </Panel>
       </div>
 
-      {/* Work */}
-      <SectionTitle icon={<FolderKanban className="h-5 w-5 text-aqua" />}>Work</SectionTitle>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Tasks by status">
-          {sum(work.tasksByStatus) === 0 ? <Empty>No tasks yet.</Empty> : <Donut data={work.tasksByStatus} unit="tasks" />}
-        </Panel>
-        <Panel title="Tasks by priority">
-          <BarList data={work.tasksByPriority} color={PALETTE[4]} />
-        </Panel>
-        <Panel title="Sprint velocity" subtitle="Completed story points per finished sprint">
-          <MiniBars data={work.velocity} color={PALETTE[0]} unit="pts" />
-        </Panel>
-        <Panel title="Active sprint" subtitle={work.activeSprint?.name ?? "No sprint running"}>
-          {work.activeSprint ? (
-            <div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <Stat label="Committed" value={work.activeSprint.committed} tone="text-fg/80" />
-                <Stat label="Done" value={work.activeSprint.done} tone="text-emerald-400" />
-                <Stat label="Remaining" value={work.activeSprint.remaining} tone="text-amber-400" />
-              </div>
-              <div className="mt-3 h-3 overflow-hidden rounded-full bg-fg/10">
-                <div className="h-full rounded-full bg-gradient-to-r from-violet to-aqua"
-                  style={{ width: `${pct(work.activeSprint.done, work.activeSprint.committed)}%` }} />
-              </div>
-              <p className="mt-2 text-xs text-fg/40">
-                {pct(work.activeSprint.done, work.activeSprint.committed)}% of committed points done
-                {work.activeSprint.unestimated > 0 && ` · ${work.activeSprint.unestimated} tasks unestimated`}
-              </p>
-            </div>
-          ) : <Empty>Start a sprint to see burn-up here.</Empty>}
-        </Panel>
-        <Panel title="Support tickets by status" className="lg:col-span-2">
-          <BarList data={work.ticketsByStatus} color={PALETTE[1]} />
-        </Panel>
-      </div>
-
       {/* Finance */}
       <SectionTitle icon={<Wallet className="h-5 w-5 text-emerald-400" />}>Finance</SectionTitle>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -130,11 +94,7 @@ export default function AnalyticsPage() {
   );
 }
 
-function openTasks(work: AnalyticsOverview["work"]): number {
-  return work.tasksByStatus.filter((s) => s.label !== "Done").reduce((a, b) => a + b.value, 0);
-}
 function sum(s: { value: number }[]): number { return s.reduce((a, b) => a + b.value, 0); }
-function pct(a: number, b: number): number { return b === 0 ? 0 : Math.round((a / b) * 100); }
 
 function Kpi({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (

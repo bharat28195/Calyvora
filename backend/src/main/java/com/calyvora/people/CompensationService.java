@@ -93,6 +93,26 @@ public class CompensationService {
         return forEmployee(employeeId);
     }
 
+    /** My own compensation — self-service, so an employee can see their salary and hikes. */
+    @Transactional(readOnly = true)
+    public CompensationResponse forSelf(UUID userId) {
+        return forEmployee(selfEmployeeId(userId));
+    }
+
+    /** My own payslip — self-service. */
+    @Transactional(readOnly = true)
+    public PayslipResponse payslipForSelf(UUID userId, String month) {
+        return payslip(selfEmployeeId(userId), month);
+    }
+
+    private UUID selfEmployeeId(UUID userId) {
+        UUID companyId = TenantContext.getCompanyId();
+        return employeeRepository.findByUserId(userId)
+                .filter(e -> e.getCompanyId().equals(companyId))
+                .map(Employee::getId)
+                .orElseThrow(() -> new NotFoundException("No employee profile for this user"));
+    }
+
     @Transactional(readOnly = true)
     public PayslipResponse payslip(UUID employeeId, String month) {
         UUID companyId = TenantContext.getCompanyId();

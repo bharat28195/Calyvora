@@ -4,6 +4,22 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-23 — `feature/hr-suite`: an HR-only product surface (demo branch)
+**Branch only — presents Orbit as a focused HR suite. Adds self-service pay + a Payroll console.**
+
+- **Curated to HR.** The left nav drops Work, Knowledge, Clients and Feed; what remains is the People
+  side: Dashboard, Insights (People + Finance), Me, Inbox, People, Performance, **Payroll**, Expenses,
+  Documents, Members, Settings. (The other modules' code and pages are untouched — just unlinked — so
+  this stays a thin, reversible demo layer over `feature/orbit`.)
+- **Salary & payslips, both sides.**
+  - **Self-service (any employee):** `GET /people/me/compensation` and `/people/me/payslip` — new
+    endpoints so a member sees *their own* salary, hike history and monthly payslip. New **Me → My pay**
+    page (print-friendly).
+  - **Admin Payroll console:** a `/payroll` page listing everyone's current salary with company totals,
+    expanding per person to record a raise or pull a payslip (reuses the existing compensation panel).
+- **HR-focused Dashboard & Insights.** The dashboard now leads with attendance, time off and your own
+  day (not tasks/sprints/knowledge); Insights shows only the People and Finance charts.
+
 ### 2026-07-23 — Insights: a company analytics dashboard (charts across all three apps)
 **2 new tests. Founder ask: "an analytics dashboard with charts/graphs — sprint burnouts and industry things."**
 
