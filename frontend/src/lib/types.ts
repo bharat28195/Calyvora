@@ -439,6 +439,36 @@ export interface ManagerReviewInput {
   submit: boolean;
 }
 
+/** Subscription billing — per active employee, per month. */
+export interface BillingOverview {
+  plan: string;
+  status: "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELLED";
+  pricePerEmployee: number;
+  pricePerEmployeePerYear: number;
+  currency: string;
+  trialEndsAt: string | null;
+  trialActive: boolean;
+  billableEmployees: number;
+  monthlyCharge: number;
+  annualCharge: number;
+  currentMonth: string;
+  paidThrough: string | null;
+  invoices: { month: string; headcount: number; amount: number; status: "PAID" | "DUE" | "OVERDUE" }[];
+}
+
+/** Configurable payslip template (feedback: "add template for creating payslip"). */
+export type PayComponentKind = "EARNING" | "DEDUCTION";
+export type PayComponentCalc = "PERCENT_OF_GROSS" | "PERCENT_OF_BASIC" | "FIXED" | "REMAINDER";
+export interface PayslipComponent {
+  id?: string;
+  name: string;
+  kind: PayComponentKind;
+  calc: PayComponentCalc;
+  value: number | null;
+  basis: boolean;
+  sortOrder?: number;
+}
+
 /** Analytics / Insights dashboard (Owner/Admin). A chart series is a list of these. */
 export interface Slice {
   label: string;

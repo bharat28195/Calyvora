@@ -17,6 +17,8 @@ import {
   type Payslip,
   type WorkItem,
   type AnalyticsOverview,
+  type BillingOverview,
+  type PayslipComponent,
   type Goal,
   type ReviewCycle,
   type ReviewStatus,
@@ -1323,6 +1325,53 @@ export const mockBackend = {
         byCategory: [...byCategory].map(([label, value]) => ({ label, value })),
       },
     };
+  },
+
+  // --- billing (mirrors BillingService) -------------------------------------
+  async billingOverview(accessToken: string | null): Promise<BillingOverview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return buildBilling(db, user.companyId);
+  },
+  async activateSubscription(accessToken: string | null): Promise<BillingOverview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const sub = mockSubscription(user.companyId);
+    sub.status = "ACTIVE";
+    return buildBilling(db, user.companyId);
+  },
+  async payInvoice(accessToken: string | null, month: string): Promise<BillingOverview> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const sub = mockSubscription(user.companyId);
+    if (month > new Date().toISOString().slice(0, 7)) throw err(400, "VALIDATION_ERROR", "Can't pay a future month");
+    if (!sub.paidThrough || month > sub.paidThrough) sub.paidThrough = month;
+    if (sub.status !== "ACTIVE") sub.status = "ACTIVE";
+    return buildBilling(db, user.companyId);
+  },
+
+  // --- payslip template (mirrors PayslipTemplateService) --------------------
+  async payslipTemplate(accessToken: string | null): Promise<PayslipComponent[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return mockPayslipTemplate(user.companyId);
+  },
+  async savePayslipTemplate(accessToken: string | null, components: PayslipComponent[]): Promise<PayslipComponent[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    validatePayslipTemplate(components);
+    mockTemplates2[user.companyId] = components.map((c, i) => ({ ...c, sortOrder: i }));
+    return mockTemplates2[user.companyId];
   },
 
   async getSettings(accessToken: string | null): Promise<CompanySettings> {
@@ -2791,6 +2840,81 @@ type MockCompEntry = {
   changeType: string; reason: string | null; currency: string;
 };
 const mockComp: Record<string, MockCompEntry[]> = {};
+
+// --- billing (mock, in-memory) ---------------------------------------------
+interface MockSub { status: BillingOverview["status"]; price: number; currency: string; paidThrough: string | null; trialEndsAt: string; }
+const mockSubscriptions: Record<string, MockSub> = {};
+function mockSubscription(companyId: string): MockSub {
+  return (mockSubscriptions[companyId] ??= {
+    status: "TRIALING", price: 100, currency: "INR", paidThrough: null,
+    trialEndsAt: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+  });
+}
+function buildBilling(db: DB, companyId: string): BillingOverview {
+  const sub = mockSubscription(companyId);
+  const billable = db.users.filter((u) => u.companyId === companyId && u.status === "ACTIVE").length;
+  const monthly = sub.price * billable;
+  const now = new Date();
+  const currentMonth = now.toISOString().slice(0, 7);
+  const employees = db.employees.filter((e) => e.companyId === companyId);
+  const invoices = Array.from({ length: 6 }, (_, k) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - k) + 1, 0);
+    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const headcount = employees.filter((e) => e.startDate && e.startDate <= d.toISOString().slice(0, 10)).length;
+    const status: "PAID" | "DUE" | "OVERDUE" =
+      sub.paidThrough && month <= sub.paidThrough ? "PAID" : month < currentMonth ? "OVERDUE" : "DUE";
+    return { month, headcount, amount: sub.price * headcount, status };
+  });
+  return {
+    plan: "PER_EMPLOYEE", status: sub.status, pricePerEmployee: sub.price,
+    pricePerEmployeePerYear: sub.price * 12, currency: sub.currency,
+    trialEndsAt: sub.trialEndsAt, trialActive: sub.status === "TRIALING",
+    billableEmployees: billable, monthlyCharge: monthly, annualCharge: monthly * 12,
+    currentMonth, paidThrough: sub.paidThrough, invoices,
+  };
+}
+
+// --- payslip template (mock, in-memory) ------------------------------------
+const mockTemplates2: Record<string, PayslipComponent[]> = {};
+function mockPayslipTemplate(companyId: string): PayslipComponent[] {
+  return (mockTemplates2[companyId] ??= [
+    { name: "Basic", kind: "EARNING", calc: "PERCENT_OF_GROSS", value: 50, basis: true, sortOrder: 0 },
+    { name: "House rent allowance", kind: "EARNING", calc: "PERCENT_OF_GROSS", value: 25, basis: false, sortOrder: 1 },
+    { name: "Special allowance", kind: "EARNING", calc: "REMAINDER", value: null, basis: false, sortOrder: 2 },
+    { name: "Provident fund", kind: "DEDUCTION", calc: "PERCENT_OF_BASIC", value: 12, basis: false, sortOrder: 3 },
+    { name: "Income tax", kind: "DEDUCTION", calc: "PERCENT_OF_GROSS", value: 10, basis: false, sortOrder: 4 },
+  ]);
+}
+function validatePayslipTemplate(components: PayslipComponent[]): void {
+  if (!components || components.length === 0) throw err(400, "VALIDATION_ERROR", "A payslip template needs at least one component");
+  let earnings = 0, remainders = 0, bases = 0, usesBasis = false, earnPct = 0, dedPct = 0;
+  for (const c of components) {
+    if (!c.name?.trim()) throw err(400, "VALIDATION_ERROR", "Every component needs a name");
+    if (c.calc === "REMAINDER") {
+      if (c.kind !== "EARNING") throw err(400, "VALIDATION_ERROR", `"${c.name}": remainder is only valid on an earning`);
+      remainders++;
+    } else if (c.calc === "FIXED") {
+      if (c.value == null || c.value < 0) throw err(400, "VALIDATION_ERROR", `"${c.name}": a fixed amount must be zero or more`);
+    } else {
+      if (c.value == null || c.value < 0 || c.value > 100) throw err(400, "VALIDATION_ERROR", `"${c.name}": a percentage must be between 0 and 100`);
+    }
+    if (c.kind === "EARNING") {
+      earnings++;
+      if (c.calc === "PERCENT_OF_BASIC") throw err(400, "VALIDATION_ERROR", `"${c.name}": an earning can't be a percent of basic`);
+      if (c.calc === "PERCENT_OF_GROSS") earnPct += c.value ?? 0;
+      if (c.basis) { bases++; if (c.calc === "REMAINDER") throw err(400, "VALIDATION_ERROR", `"${c.name}": the basis earning can't be the remainder`); }
+    } else {
+      if (c.calc === "PERCENT_OF_BASIC") usesBasis = true;
+      if (c.calc === "PERCENT_OF_GROSS") dedPct += c.value ?? 0;
+    }
+  }
+  if (earnings === 0) throw err(400, "VALIDATION_ERROR", "Add at least one earning");
+  if (remainders > 1) throw err(400, "VALIDATION_ERROR", "Only one earning can be the remainder");
+  if (bases > 1) throw err(400, "VALIDATION_ERROR", "Only one earning can be the basis for deductions");
+  if (usesBasis && bases === 0) throw err(400, "VALIDATION_ERROR", "A percent-of-basic deduction needs one earning marked as the basis");
+  if (earnPct > 100) throw err(400, "VALIDATION_ERROR", "Percentage earnings add up to more than 100% of gross");
+  if (dedPct > 100) throw err(400, "VALIDATION_ERROR", "Percentage deductions add up to more than 100% of gross");
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

@@ -9,7 +9,6 @@ import com.calyvora.people.dto.AddCompensationRequest;
 import com.calyvora.people.dto.CompensationResponse;
 import com.calyvora.people.dto.CompensationResponse.Entry;
 import com.calyvora.people.dto.PayslipResponse;
-import com.calyvora.people.dto.PayslipResponse.Line;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,12 +30,15 @@ public class CompensationService {
     private final CompensationRepository compensationRepository;
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
+    private final PayslipTemplateService payslipTemplateService;
 
     public CompensationService(CompensationRepository compensationRepository,
-                               EmployeeRepository employeeRepository, UserRepository userRepository) {
+                               EmployeeRepository employeeRepository, UserRepository userRepository,
+                               PayslipTemplateService payslipTemplateService) {
         this.compensationRepository = compensationRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
+        this.payslipTemplateService = payslipTemplateService;
     }
 
     @Transactional(readOnly = true)
@@ -129,25 +131,11 @@ public class CompensationService {
         String cur = current.getCurrency();
         BigDecimal gross = current.getAnnualAmount().divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
 
-        // A simple, transparent split: earnings sum to gross; deductions are standard components.
-        BigDecimal basic = pct(gross, 50);
-        BigDecimal hra = pct(gross, 25);
-        BigDecimal special = gross.subtract(basic).subtract(hra); // remainder → no rounding drift
-        List<Line> earnings = List.of(
-                new Line("Basic", basic),
-                new Line("House rent allowance", hra),
-                new Line("Special allowance", special));
-
-        BigDecimal pf = pct(basic, 12);
-        BigDecimal tax = pct(gross, 10);
-        List<Line> deductions = List.of(
-                new Line("Provident fund", pf),
-                new Line("Income tax", tax));
-        BigDecimal totalDed = pf.add(tax);
-        BigDecimal net = gross.subtract(totalDed);
+        // Generate the lines from the company's configurable payslip template.
+        PayslipTemplateService.Computed c = payslipTemplateService.compute(companyId, gross);
 
         return new PayslipResponse(employeeId.toString(), name, ym.toString(), cur,
-                earnings, deductions, gross, totalDed, net);
+                c.earnings(), c.deductions(), c.gross(), c.totalDeductions(), c.net());
     }
 
     private Employee requireEmployee(UUID employeeId, UUID companyId) {
@@ -157,10 +145,6 @@ public class CompensationService {
 
     private String nameOf(Employee employee) {
         return userRepository.findById(employee.getUserId()).map(User::fullName).orElse("Employee");
-    }
-
-    private static BigDecimal pct(BigDecimal amount, int percent) {
-        return amount.multiply(BigDecimal.valueOf(percent)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
     private static String blankToNull(String s) {

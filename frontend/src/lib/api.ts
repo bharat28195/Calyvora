@@ -7,6 +7,8 @@ import {
   type DashboardSummary,
   type TeamOverview,
   type AnalyticsOverview,
+  type BillingOverview,
+  type PayslipComponent,
   type Compensation,
   type Payslip,
   type Department,
@@ -159,6 +161,25 @@ export const api = {
   },
   analyticsOverview(): Promise<AnalyticsOverview> {
     return LIVE ? http<AnalyticsOverview>("/analytics/overview") : mockBackend.analyticsOverview(accessToken);
+  },
+  // --- billing (subscription: per employee, per month) ---
+  billingOverview(): Promise<BillingOverview> {
+    return LIVE ? http<BillingOverview>("/billing") : mockBackend.billingOverview(accessToken);
+  },
+  activateSubscription(): Promise<BillingOverview> {
+    return LIVE ? http<BillingOverview>("/billing/activate", { method: "POST" }) : mockBackend.activateSubscription(accessToken);
+  },
+  payInvoice(month: string): Promise<BillingOverview> {
+    return LIVE ? http<BillingOverview>(`/billing/invoices/${month}/pay`, { method: "POST" }) : mockBackend.payInvoice(accessToken, month);
+  },
+  // --- payslip template ---
+  payslipTemplate(): Promise<PayslipComponent[]> {
+    return LIVE ? http<PayslipComponent[]>("/payroll/payslip-template") : mockBackend.payslipTemplate(accessToken);
+  },
+  savePayslipTemplate(components: PayslipComponent[]): Promise<PayslipComponent[]> {
+    return LIVE
+      ? http<PayslipComponent[]>("/payroll/payslip-template", { method: "PUT", body: JSON.stringify({ components }) })
+      : mockBackend.savePayslipTemplate(accessToken, components);
   },
 
   // --- company / settings ---

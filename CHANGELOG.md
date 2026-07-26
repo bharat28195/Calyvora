@@ -4,6 +4,24 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-26 — `product/hr-platform`: sellable HR product (subscription billing + payslip template)
+**One deployable HR-only branch. Full backend intact (non-HR just unlinked), so it deploys HR-only to any domain.**
+
+- **Subscription billing — per active employee, per month (Flyway V26, RLS).** `com.calyvora.billing`:
+  a company subscribes at **₹100/employee/month** (₹1,200/employee/year). The monthly charge is
+  `price × active headcount`, **metered** — a company with 5 people in January and 20 in February is
+  billed for 20 in February. `GET /billing` returns the plan, this month's charge, and a 6-month
+  invoice history (each month priced on that month's headcount, derived from employee start dates);
+  `POST /billing/activate` and `POST /billing/invoices/{month}/pay` move it through trial → active →
+  paid. Seat counting is a `count` query, so it scales to thousands of employees. New **Billing** page.
+- **Configurable payslip template (Flyway V25, RLS).** `com.calyvora.people` payslip components: each
+  company defines its payslip as an ordered set of earnings/deductions (**% of gross**, **% of basic**,
+  **fixed**, or **remainder**), seeded with a standard CTC breakdown. Payslip generation now reads the
+  template instead of a hard-coded split. **Payroll → Payslip template** editor.
+- **Payroll validation rules** (server + mirrored in the UI): percentages in 0–100, fixed amounts ≥ 0,
+  exactly one *remainder* earning, one *basis* earning when a percent-of-basic deduction exists,
+  earnings ≤ 100% of gross, and deductions that can't exceed gross (net pay ≥ 0).
+
 ### 2026-07-23 — `feature/hr-suite`: an HR-only product surface (demo branch)
 **Branch only — presents Orbit as a focused HR suite. Adds self-service pay + a Payroll console.**
 

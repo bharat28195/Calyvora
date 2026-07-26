@@ -21,10 +21,13 @@ class TeamOverviewIntegrationTest extends IntegrationTestBase {
     @Test
     void owner_sees_headcount_and_present_counts() throws Exception {
         Session owner = demo("ava.chen@northwind.demo");
+        // The seed creates no leave, so nobody is out. On a weekday everyone is "present"; on a weekend
+        // the day sheet derives WEEK_OFF for all, so present is 0 — assert the value for today.
+        boolean weekend = java.time.LocalDate.now().getDayOfWeek().getValue() >= 6;
         mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.headcount").value(6))
-                .andExpect(jsonPath("$.presentToday").value(6))   // seed creates no leave → everyone present
+                .andExpect(jsonPath("$.presentToday").value(weekend ? 0 : 6))
                 .andExpect(jsonPath("$.onLeaveToday").value(0));
     }
 
