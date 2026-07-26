@@ -25,9 +25,10 @@ deploy to any domain, scale to 1,000+ employees. It's the full app with non-HR m
 nav (not deleted). Added there: **self-service payslips** + admin **Payroll**; **configurable payslip
 template** with payroll validation (V25); **subscription billing** — ₹100/employee/month, metered on
 headcount (V26); **directory pagination** (`/people/employees/page`, scales to 1,000+); and
-**Recruitment / ATS** — job openings + candidate pipeline (V27). Plus a marketing site in
-`website/priority-hr-services/`. **~157 backend tests green.**
-**Next (HR roadmap):** shift scheduling · HR helpdesk · offboarding · PF/ESI compliance · assets · LMS.
+**Recruitment / ATS** — job openings + candidate pipeline (V27); and **Shift scheduling** — shift
+templates + a weekly roster grid, one shift per employee/day (V28). Plus a marketing site in
+`website/priority-hr-services/`. **155 backend tests green.**
+**Next (HR roadmap):** HR helpdesk · offboarding · PF/ESI compliance · assets · LMS.
 
 **Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
 RS256 SD-5) + **demo suite** (one-click seed, cross-app dashboard, ⌘K global search, AI assistant) +

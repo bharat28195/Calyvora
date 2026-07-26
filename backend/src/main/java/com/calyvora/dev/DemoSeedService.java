@@ -96,6 +96,7 @@ public class DemoSeedService {
     private final FeedService feedService;
     private final com.calyvora.performance.PerformanceReviewService performanceReviewService;
     private final com.calyvora.recruit.RecruitService recruitService;
+    private final com.calyvora.shift.ShiftService shiftService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -113,9 +114,11 @@ public class DemoSeedService {
                            com.calyvora.people.HolidayRepository holidayRepository,
                            ExpenseService expenseService, FeedService feedService,
                            com.calyvora.performance.PerformanceReviewService performanceReviewService,
-                           com.calyvora.recruit.RecruitService recruitService) {
+                           com.calyvora.recruit.RecruitService recruitService,
+                           com.calyvora.shift.ShiftService shiftService) {
         this.performanceReviewService = performanceReviewService;
         this.recruitService = recruitService;
+        this.shiftService = shiftService;
         this.feedService = feedService;
         this.attendanceService = attendanceService;
         this.holidayService = holidayService;
@@ -315,6 +318,33 @@ public class DemoSeedService {
 
         // --- Recruitment: a couple of open roles with candidates spread across the pipeline ---
         seedRecruitment(owner, engineering.id(), design.id());
+
+        // --- Shifts: a few shift templates + this week's roster for the support team ---
+        seedShifts(emp, sara, tom);
+    }
+
+    /**
+     * Shift templates plus a rostered current week for the customer-support team, so the roster grid
+     * opens with real coverage rather than an empty timetable.
+     */
+    private void seedShifts(Map<String, EmployeeResponse> emp, User sara, User tom) {
+        var morning = shiftService.createShift(
+                new com.calyvora.shift.dto.ShiftPayload("Morning", "09:00", "17:00", "#22d3ee"));
+        var evening = shiftService.createShift(
+                new com.calyvora.shift.dto.ShiftPayload("Evening", "13:00", "21:00", "#8b5cf6"));
+        shiftService.createShift(
+                new com.calyvora.shift.dto.ShiftPayload("Night", "21:00", "05:00", "#fbbf24"));
+
+        UUID saraId = UUID.fromString(emp.get(sara.getEmail()).id());
+        UUID tomId = UUID.fromString(emp.get(tom.getEmail()).id());
+        LocalDate monday = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1L);
+        // Sara covers mornings Mon–Wed; Tom the evenings Mon–Fri, so both rows and several columns fill in.
+        for (int d = 0; d < 3; d++) {
+            shiftService.assign(saraId, monday.plusDays(d), UUID.fromString(morning.id()));
+        }
+        for (int d = 0; d < 5; d++) {
+            shiftService.assign(tomId, monday.plusDays(d), UUID.fromString(evening.id()));
+        }
     }
 
     /** Two open roles with candidates at different pipeline stages, so the ATS board looks alive. */

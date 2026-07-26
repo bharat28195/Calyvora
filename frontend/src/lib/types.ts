@@ -489,6 +489,39 @@ export interface CandidateInput {
   notes?: string;
 }
 
+// --- shift scheduling / rostering ---
+export interface Shift {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  color: string | null;
+}
+export interface ShiftInput {
+  name: string;
+  startTime: string;
+  endTime: string;
+  color?: string;
+}
+export interface RosterEmployee {
+  employeeId: string;
+  name: string;
+  jobTitle: string | null;
+}
+export interface RosterEntry {
+  id: string;
+  employeeId: string;
+  shiftId: string;
+  onDate: string;
+}
+export interface Roster {
+  weekStart: string;
+  days: string[];
+  shifts: Shift[];
+  employees: RosterEmployee[];
+  assignments: RosterEntry[];
+}
+
 /** A page of results from a paginated list endpoint. */
 export interface Page<T> {
   content: T[];

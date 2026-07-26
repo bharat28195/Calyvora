@@ -14,6 +14,10 @@ import {
   type JobOpeningInput,
   type Candidate,
   type CandidateInput,
+  type Shift,
+  type ShiftInput,
+  type Roster,
+  type RosterEntry,
   type Compensation,
   type Payslip,
   type Department,
@@ -207,6 +211,32 @@ export const api = {
   },
   deleteCandidate(id: string): Promise<void> {
     return LIVE ? http<void>(`/recruit/candidates/${id}`, { method: "DELETE" }) : mockBackend.deleteCandidate(accessToken, id);
+  },
+
+  // --- shift scheduling / rostering ---
+  shifts(): Promise<Shift[]> {
+    return LIVE ? http<Shift[]>("/shifts") : mockBackend.shifts(accessToken);
+  },
+  createShift(input: ShiftInput): Promise<Shift> {
+    return LIVE ? http<Shift>("/shifts", { method: "POST", body: JSON.stringify(input) }) : mockBackend.createShift(accessToken, input);
+  },
+  updateShift(id: string, input: Partial<ShiftInput>): Promise<Shift> {
+    return LIVE ? http<Shift>(`/shifts/${id}`, { method: "PATCH", body: JSON.stringify(input) }) : mockBackend.updateShift(accessToken, id, input);
+  },
+  deleteShift(id: string): Promise<void> {
+    return LIVE ? http<void>(`/shifts/${id}`, { method: "DELETE" }) : mockBackend.deleteShift(accessToken, id);
+  },
+  roster(weekStart?: string): Promise<Roster> {
+    const qs = weekStart ? `?weekStart=${weekStart}` : "";
+    return LIVE ? http<Roster>(`/shifts/roster${qs}`) : mockBackend.roster(accessToken, weekStart);
+  },
+  assignShift(employeeId: string, onDate: string, shiftId: string): Promise<RosterEntry> {
+    return LIVE
+      ? http<RosterEntry>("/shifts/roster/assign", { method: "POST", body: JSON.stringify({ employeeId, onDate, shiftId }) })
+      : mockBackend.assignShift(accessToken, employeeId, onDate, shiftId);
+  },
+  unassignShift(id: string): Promise<void> {
+    return LIVE ? http<void>(`/shifts/roster/assign/${id}`, { method: "DELETE" }) : mockBackend.unassignShift(accessToken, id);
   },
 
   // --- payslip template ---

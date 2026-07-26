@@ -24,6 +24,10 @@ import {
   type JobOpeningInput,
   type Candidate,
   type CandidateInput,
+  type Shift,
+  type ShiftInput,
+  type Roster,
+  type RosterEntry,
   type Goal,
   type ReviewCycle,
   type ReviewStatus,
@@ -1477,6 +1481,87 @@ export const mockBackend = {
     for (const jid of Object.keys(mockCandidates)) {
       mockCandidates[jid] = (mockCandidates[jid] ?? []).filter((x) => x.id !== id);
     }
+  },
+
+  // --- shift scheduling / rostering (mirrors ShiftService) ------------------
+  async shifts(accessToken: string | null): Promise<Shift[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return (mockShifts[user.companyId] ?? []).slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
+  },
+  async createShift(accessToken: string | null, input: ShiftInput): Promise<Shift> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const s: Shift = {
+      id: crypto.randomUUID(), name: input.name.trim(),
+      startTime: input.startTime, endTime: input.endTime, color: input.color || null,
+    };
+    mockShifts[user.companyId] = [...(mockShifts[user.companyId] ?? []), s];
+    return s;
+  },
+  async updateShift(accessToken: string | null, id: string, input: Partial<ShiftInput>): Promise<Shift> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const s = (mockShifts[user.companyId] ?? []).find((x) => x.id === id);
+    if (!s) throw err(404, "NOT_FOUND", "Shift not found");
+    Object.assign(s, {
+      name: input.name?.trim() ?? s.name,
+      startTime: input.startTime ?? s.startTime,
+      endTime: input.endTime ?? s.endTime,
+      color: input.color !== undefined ? (input.color || null) : s.color,
+    });
+    return s;
+  },
+  async deleteShift(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    mockShifts[user.companyId] = (mockShifts[user.companyId] ?? []).filter((x) => x.id !== id);
+    mockAssignments[user.companyId] = (mockAssignments[user.companyId] ?? []).filter((a) => a.shiftId !== id);
+  },
+  async roster(accessToken: string | null, weekStart?: string): Promise<Roster> {
+    const employeesList = await this.listEmployees(accessToken);
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const start = mondayOf(weekStart ? new Date(weekStart) : new Date());
+    const days = Array.from({ length: 7 }, (_, i) => isoDate(addDays(start, i)));
+    const from = days[0], to = days[6];
+    const shifts = (mockShifts[user.companyId] ?? []).slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const assignments = (mockAssignments[user.companyId] ?? []).filter((a) => a.onDate >= from && a.onDate <= to);
+    return {
+      weekStart: from, days, shifts, assignments,
+      employees: employeesList.map((e) => ({
+        employeeId: e.id, name: `${e.firstName} ${e.lastName}`.trim(), jobTitle: e.jobTitle ?? null,
+      })),
+    };
+  },
+  async assignShift(accessToken: string | null, employeeId: string, onDate: string, shiftId: string): Promise<RosterEntry> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    if (!(mockShifts[user.companyId] ?? []).some((s) => s.id === shiftId)) throw err(404, "NOT_FOUND", "Shift not found");
+    const list = (mockAssignments[user.companyId] ??= []);
+    const existing = list.find((a) => a.employeeId === employeeId && a.onDate === onDate);
+    if (existing) { existing.shiftId = shiftId; return existing; }
+    const entry: RosterEntry = { id: crypto.randomUUID(), employeeId, shiftId, onDate };
+    list.push(entry);
+    return entry;
+  },
+  async unassignShift(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    mockAssignments[user.companyId] = (mockAssignments[user.companyId] ?? []).filter((a) => a.id !== id);
   },
 
   // --- payslip template (mirrors PayslipTemplateService) --------------------
@@ -3019,6 +3104,23 @@ interface MockJob {
 }
 const mockJobs: Record<string, MockJob[]> = {};
 const mockCandidates: Record<string, Candidate[]> = {};
+
+// --- shift scheduling (mock, in-memory, keyed by companyId) ----------------
+const mockShifts: Record<string, Shift[]> = {};
+const mockAssignments: Record<string, RosterEntry[]> = {};
+function addDays(d: Date, n: number): Date {
+  const c = new Date(d);
+  c.setDate(c.getDate() + n);
+  return c;
+}
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+function mondayOf(d: Date): Date {
+  const c = new Date(d);
+  const dow = (c.getDay() + 6) % 7; // Mon=0 … Sun=6
+  return addDays(c, -dow);
+}
 function renderJob(db: DB, j: MockJob): JobOpening {
   const cands = mockCandidates[j.id] ?? [];
   return {

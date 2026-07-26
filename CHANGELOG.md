@@ -4,6 +4,17 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-27 — Shift scheduling / rostering
+**Roadmap #1 from [docs/HR-Modules.md](docs/HR-Modules.md) — Keka/Zoho core for hourly & ops teams.**
+
+- **Shift scheduling ⭐ (Flyway V28, RLS).** `com.calyvora.shift`: reusable **shift templates**
+  (name + start/end time + colour) and a **weekly roster grid** (employees × 7 days). Assigning is an
+  upsert — **at most one shift per employee per day**, so re-assigning a filled cell moves the person to
+  the new shift rather than duplicating. New **Shifts** section with a templates manager and an
+  inline-editable roster (colour-coded cells, week navigation). Owner/Admin-only; the demo seeds three
+  shifts (Morning/Evening/Night) and rosters the support team across the current week. 3 integration
+  tests (155 backend tests total).
+
 ### 2026-07-26 — Recruitment/ATS, directory pagination, and a marketing site
 **Benchmarked against Keka / Zoho People / BambooHR (see [docs/HR-Modules.md](docs/HR-Modules.md)).**
 
