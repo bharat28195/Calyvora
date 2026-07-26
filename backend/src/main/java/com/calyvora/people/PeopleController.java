@@ -34,6 +34,15 @@ public class PeopleController {
         return employeeService.directory();
     }
 
+    /** Paged, searchable directory — the scalable path for large companies. */
+    @GetMapping("/employees/page")
+    public com.calyvora.common.dto.PageResponse<EmployeeResponse> directoryPage(
+            @org.springframework.web.bind.annotation.RequestParam(name = "q", required = false) String q,
+            @org.springframework.web.bind.annotation.RequestParam(name = "page", defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(name = "size", defaultValue = "25") int size) {
+        return employeeService.directoryPage(q, page, size);
+    }
+
     @GetMapping("/employees/{id}")
     public EmployeeResponse get(@PathVariable UUID id) {
         return employeeService.get(id);

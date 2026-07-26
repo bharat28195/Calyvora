@@ -50,6 +50,35 @@ public class EmployeeService {
                 .toList();
     }
 
+    /**
+     * Paged, searchable directory — the scalable path for large companies. Only the requested page of
+     * users is loaded and profile-resolved (missing profiles are provisioned for that page only), so
+     * this stays cheap whether the company has 5 employees or 5,000.
+     */
+    @Transactional
+    public com.calyvora.common.dto.PageResponse<EmployeeResponse> directoryPage(String q, int page, int size) {
+        UUID companyId = TenantContext.getCompanyId();
+        String query = q == null ? "" : q.trim();
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(page, 0), safeSize,
+                org.springframework.data.domain.Sort.by("firstName").ascending()
+                        .and(org.springframework.data.domain.Sort.by("lastName").ascending()));
+        var userPage = userRepository.directoryPage(companyId, query, pageable);
+
+        List<UUID> userIds = userPage.getContent().stream().map(User::getId).toList();
+        Map<UUID, Employee> byUser = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (Employee e : employeeRepository.findByCompanyIdAndUserIdIn(companyId, userIds)) {
+                byUser.put(e.getUserId(), e);
+            }
+            for (User u : userPage.getContent()) {
+                byUser.computeIfAbsent(u.getId(),
+                        uid -> employeeRepository.save(new Employee(UUID.randomUUID(), companyId, uid)));
+            }
+        }
+        return com.calyvora.common.dto.PageResponse.of(userPage, u -> EmployeeResponse.of(u, byUser.get(u.getId())));
+    }
+
     @Transactional
     public EmployeeResponse get(UUID employeeId) {
         UUID companyId = TenantContext.getCompanyId();

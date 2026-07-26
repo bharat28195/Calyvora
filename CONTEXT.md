@@ -5,7 +5,7 @@
 > Binding architecture = [/docs](docs/README.md). Narrative/decisions = [FOUNDER.md](FOUNDER.md) /
 > [DECISIONS.md](DECISIONS.md). This file = practical "how to pick up where we left off."
 
-**Last updated:** 2026-07-23 · **Branch:** `feature/orbit` · **Product name: "Orbit" (by Calyvora — parent co.).**
+**Last updated:** 2026-07-26 · **Branch:** `product/hr-platform` (HR SaaS) / `feature/orbit` (full product) · **Product: "Orbit" (by Calyvora).**
 
 **Current focus — Founder feedback buckets (see [docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)):**
 Working through the founder's 8-page handwritten notes (2026-07-22). Done so far: **Bucket A** (quick wins:
@@ -17,12 +17,17 @@ on-leave, leave reasons, **leave calendar** — attendance *derived from leave*,
 Work and Knowledge all have **left-pane sub-panes**; Clients + Documents are **Owner/Admin-only**.
 **105 backend tests, all live & verified.**
 Since then: **Bucket E** (holidays, Me hub, expenses, feed, sprint depth), **C.7 performance review
-cycles (V24)** — admin opens a cycle → self-assessment + manager rating/hike → admin approves → **raise
-applied to compensation**; a manager can now set goals for their reports; fixed the Performance-tab
-500 (`/people/employees/me` → `/people/me`). And **Insights** — a company **analytics dashboard**
-(`com.calyvora.analytics`, Owner/Admin) with SVG charts across People/Work/Finance (headcount growth,
-velocity, task/leave/expense breakdowns) — all from live data, no chart library.
-**Next:** C.9 / D6 (need founder scope) · BR3 modular packaging.
+cycles (V24)**, and **Insights** analytics (`com.calyvora.analytics`).
+
+**New product line — a standalone HR SaaS on branch `product/hr-platform`** (see
+[[hr-suite-branch]] memory + [docs/HR-Modules.md](docs/HR-Modules.md)). Founder wants to sell HR-only,
+deploy to any domain, scale to 1,000+ employees. It's the full app with non-HR modules unlinked from the
+nav (not deleted). Added there: **self-service payslips** + admin **Payroll**; **configurable payslip
+template** with payroll validation (V25); **subscription billing** — ₹100/employee/month, metered on
+headcount (V26); **directory pagination** (`/people/employees/page`, scales to 1,000+); and
+**Recruitment / ATS** — job openings + candidate pipeline (V27). Plus a marketing site in
+`website/priority-hr-services/`. **~157 backend tests green.**
+**Next (HR roadmap):** shift scheduling · HR helpdesk · offboarding · PF/ESI compliance · assets · LMS.
 
 **Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
 RS256 SD-5) + **demo suite** (one-click seed, cross-app dashboard, ⌘K global search, AI assistant) +

@@ -18,6 +18,21 @@ class PeopleIntegrationTest extends IntegrationTestBase {
 
     private static final String PW = "password1234";
 
+    @Test
+    void directory_is_paged_and_searchable() throws Exception {
+        mockMvc.perform(post("/api/v1/dev/seed-demo")).andExpect(status().isOk());
+        Session owner = login("ava.chen@northwind.demo", "demopass123");
+
+        JsonNode page0 = getJson("/api/v1/people/employees/page?size=2&page=0", owner);
+        assertThat(page0.get("content").size()).isEqualTo(2);
+        assertThat(page0.get("totalElements").asInt()).isEqualTo(6);
+        assertThat(page0.get("totalPages").asInt()).isEqualTo(3);
+
+        JsonNode search = getJson("/api/v1/people/employees/page?q=priya&page=0&size=25", owner);
+        assertThat(search.get("totalElements").asInt()).isEqualTo(1);
+        assertThat(search.get("content").get(0).get("firstName").asText()).isEqualTo("Priya");
+    }
+
     /** Onboard an owner, invite+accept a member, return the two sessions. */
     private Session[] companyWithMember(String owner, String member) throws Exception {
         Session ownerS = onboardOwner("Acme", owner, PW);

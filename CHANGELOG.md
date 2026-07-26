@@ -4,6 +4,25 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-26 — Recruitment/ATS, directory pagination, and a marketing site
+**Benchmarked against Keka / Zoho People / BambooHR (see [docs/HR-Modules.md](docs/HR-Modules.md)).**
+
+- **Recruitment / ATS ⭐ (Flyway V27, RLS).** `com.calyvora.recruit`: **job openings** + a **candidate
+  hiring pipeline** (applied → screening → interview → offer → hired / rejected). Each opening shows its
+  candidate and hired counts; candidates carry rating, source and a résumé link. New **Recruitment**
+  section with an openings list and a **pipeline board** (drag-free stage moves). Owner/Admin-only; the
+  demo seeds two roles with candidates across the pipeline. This is the flagship module the big suites
+  lead with, and the biggest gap we'd had.
+- **Directory pagination & server-side search (scale to 1,000+).** `GET /people/employees/page` returns
+  a paged, name/email-searched envelope; seat/page loads stay a cheap query instead of loading the whole
+  company. The People screen now searches server-side with Prev/Next. (The full-list endpoint stays for
+  pickers.)
+- **`website/priority-hr-services/`** — a self-contained marketing site (hero, services, modules,
+  pricing at ₹100/employee/month, contact). No build step; deploy the folder to any static host.
+- **[docs/HR-Modules.md](docs/HR-Modules.md)** — a module inventory (what's shipped) and a prioritized
+  roadmap (shifts, HR helpdesk, offboarding, PF/ESI compliance, assets, LMS…) drawn from the competitor
+  benchmark.
+
 ### 2026-07-26 — `product/hr-platform`: sellable HR product (subscription billing + payslip template)
 **One deployable HR-only branch. Full backend intact (non-HR just unlinked), so it deploys HR-only to any domain.**
 

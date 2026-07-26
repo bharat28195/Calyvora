@@ -95,6 +95,7 @@ public class DemoSeedService {
     private final ExpenseService expenseService;
     private final FeedService feedService;
     private final com.calyvora.performance.PerformanceReviewService performanceReviewService;
+    private final com.calyvora.recruit.RecruitService recruitService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -111,8 +112,10 @@ public class DemoSeedService {
                            com.calyvora.people.HolidayService holidayService,
                            com.calyvora.people.HolidayRepository holidayRepository,
                            ExpenseService expenseService, FeedService feedService,
-                           com.calyvora.performance.PerformanceReviewService performanceReviewService) {
+                           com.calyvora.performance.PerformanceReviewService performanceReviewService,
+                           com.calyvora.recruit.RecruitService recruitService) {
         this.performanceReviewService = performanceReviewService;
+        this.recruitService = recruitService;
         this.feedService = feedService;
         this.attendanceService = attendanceService;
         this.holidayService = holidayService;
@@ -309,6 +312,33 @@ public class DemoSeedService {
 
         // --- Performance: an annual cycle mid-flight, so the review loop has something to show ---
         seedReviews(owner, emp, priya, marcus, sara, tom);
+
+        // --- Recruitment: a couple of open roles with candidates spread across the pipeline ---
+        seedRecruitment(owner, engineering.id(), design.id());
+    }
+
+    /** Two open roles with candidates at different pipeline stages, so the ATS board looks alive. */
+    private void seedRecruitment(AuthPrincipal owner, String engineeringId, String designId) {
+        var eng = recruitService.createJob(new com.calyvora.recruit.dto.JobOpeningPayload(
+                "Senior Backend Engineer", engineeringId, "Bangalore / Remote", "FULL_TIME",
+                "Own core platform services: identity, tenancy, and the APIs every app builds on.", 2, "OPEN"), owner);
+        candidate(eng.id(), "Aditya Rao", "aditya.rao@example.com", "INTERVIEW", 4, "LinkedIn");
+        candidate(eng.id(), "Meera Krishnan", "meera.k@example.com", "SCREENING", 4, "Referral");
+        candidate(eng.id(), "Daniel Cho", "daniel.cho@example.com", "APPLIED", null, "Careers page");
+        candidate(eng.id(), "Fatima Sheikh", "fatima.s@example.com", "OFFER", 5, "Referral");
+        candidate(eng.id(), "Rohit Verma", "rohit.v@example.com", "REJECTED", 2, "Careers page");
+
+        var design = recruitService.createJob(new com.calyvora.recruit.dto.JobOpeningPayload(
+                "Product Designer", designId, "Remote (India)", "FULL_TIME",
+                "Shape the product's look and feel end to end — from flows to a polished design system.", 1, "OPEN"), owner);
+        candidate(design.id(), "Nadia Osei", "nadia.osei@example.com", "HIRED", 5, "Portfolio");
+        candidate(design.id(), "Sam Patel", "sam.patel@example.com", "INTERVIEW", 3, "Dribbble");
+        candidate(design.id(), "Grace Lin", "grace.lin@example.com", "APPLIED", null, "Careers page");
+    }
+
+    private void candidate(String jobId, String name, String email, String stage, Integer rating, String source) {
+        recruitService.addCandidate(java.util.UUID.fromString(jobId),
+                new com.calyvora.recruit.dto.CandidatePayload(name, email, null, null, source, stage, rating, null));
     }
 
     /**

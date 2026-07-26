@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
-  CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard,
+  CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -56,6 +56,7 @@ const NAV: NavItem[] = [
       { href: "/people/holidays", label: "Holidays" },
     ],
   },
+  { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: ["OWNER", "ADMIN"] },
   { href: "/performance", label: "Performance", icon: ClipboardCheck, roles: ["OWNER", "ADMIN"] },
   {
     href: "/payroll", label: "Payroll", icon: Wallet, roles: ["OWNER", "ADMIN"],

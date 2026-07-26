@@ -19,6 +19,11 @@ import {
   type AnalyticsOverview,
   type BillingOverview,
   type PayslipComponent,
+  type Page,
+  type JobOpening,
+  type JobOpeningInput,
+  type Candidate,
+  type CandidateInput,
   type Goal,
   type ReviewCycle,
   type ReviewStatus,
@@ -1356,6 +1361,124 @@ export const mockBackend = {
     return buildBilling(db, user.companyId);
   },
 
+  // --- recruitment / ATS (mirrors RecruitService) ---------------------------
+  async jobs(accessToken: string | null): Promise<JobOpening[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return (mockJobs[user.companyId] ?? []).map((j) => renderJob(db, j)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  async job(accessToken: string | null, id: string): Promise<JobOpening> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const j = (mockJobs[user.companyId] ?? []).find((x) => x.id === id);
+    if (!j) throw err(404, "NOT_FOUND", "Job opening not found");
+    return renderJob(db, j);
+  },
+  async createJob(accessToken: string | null, input: JobOpeningInput): Promise<JobOpening> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const j: MockJob = {
+      id: crypto.randomUUID(), companyId: user.companyId, title: input.title.trim(),
+      departmentId: input.departmentId || null, location: input.location || null,
+      employmentType: input.employmentType || null, description: input.description || null,
+      positions: input.positions && input.positions > 0 ? input.positions : 1,
+      status: input.status ?? "OPEN", createdAt: new Date().toISOString(),
+    };
+    mockJobs[user.companyId] = [j, ...(mockJobs[user.companyId] ?? [])];
+    return renderJob(db, j);
+  },
+  async updateJob(accessToken: string | null, id: string, input: Partial<JobOpeningInput>): Promise<JobOpening> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const j = (mockJobs[user.companyId] ?? []).find((x) => x.id === id);
+    if (!j) throw err(404, "NOT_FOUND", "Job opening not found");
+    Object.assign(j, {
+      title: input.title?.trim() ?? j.title,
+      departmentId: input.departmentId !== undefined ? (input.departmentId || null) : j.departmentId,
+      location: input.location !== undefined ? (input.location || null) : j.location,
+      employmentType: input.employmentType !== undefined ? (input.employmentType || null) : j.employmentType,
+      description: input.description !== undefined ? (input.description || null) : j.description,
+      positions: input.positions && input.positions > 0 ? input.positions : j.positions,
+      status: input.status ?? j.status,
+    });
+    return renderJob(db, j);
+  },
+  async deleteJob(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    mockJobs[user.companyId] = (mockJobs[user.companyId] ?? []).filter((x) => x.id !== id);
+    delete mockCandidates[id];
+  },
+  async candidates(accessToken: string | null, jobId: string): Promise<Candidate[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return (mockCandidates[jobId] ?? []).slice();
+  },
+  async addCandidate(accessToken: string | null, jobId: string, input: CandidateInput): Promise<Candidate> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const c: Candidate = {
+      id: crypto.randomUUID(), jobId, name: input.name.trim(), email: input.email || null,
+      phone: input.phone || null, resumeUrl: input.resumeUrl || null, source: input.source || null,
+      stage: input.stage ?? "APPLIED", rating: input.rating ?? null, notes: input.notes || null,
+      createdAt: new Date().toISOString(),
+    };
+    mockCandidates[jobId] = [...(mockCandidates[jobId] ?? []), c];
+    return c;
+  },
+  async updateCandidate(accessToken: string | null, id: string, input: Partial<CandidateInput>): Promise<Candidate> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const c = findCandidate(id);
+    if (!c) throw err(404, "NOT_FOUND", "Candidate not found");
+    Object.assign(c, {
+      name: input.name?.trim() ?? c.name,
+      email: input.email !== undefined ? (input.email || null) : c.email,
+      phone: input.phone !== undefined ? (input.phone || null) : c.phone,
+      resumeUrl: input.resumeUrl !== undefined ? (input.resumeUrl || null) : c.resumeUrl,
+      source: input.source !== undefined ? (input.source || null) : c.source,
+      stage: input.stage ?? c.stage,
+      rating: input.rating !== undefined ? input.rating : c.rating,
+      notes: input.notes !== undefined ? (input.notes || null) : c.notes,
+    });
+    return c;
+  },
+  async moveCandidate(accessToken: string | null, id: string, stage: string): Promise<Candidate> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const c = findCandidate(id);
+    if (!c) throw err(404, "NOT_FOUND", "Candidate not found");
+    c.stage = stage as Candidate["stage"];
+    return c;
+  },
+  async deleteCandidate(accessToken: string | null, id: string): Promise<void> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    for (const jid of Object.keys(mockCandidates)) {
+      mockCandidates[jid] = (mockCandidates[jid] ?? []).filter((x) => x.id !== id);
+    }
+  },
+
   // --- payslip template (mirrors PayslipTemplateService) --------------------
   async payslipTemplate(accessToken: string | null): Promise<PayslipComponent[]> {
     await delay();
@@ -1792,6 +1915,20 @@ export const mockBackend = {
     return companyUsers
       .map((u) => toEmployee(db, u))
       .sort((a, b) => a.firstName.localeCompare(b.firstName));
+  },
+
+  async directoryPage(accessToken: string | null, q: string, page: number, size: number): Promise<Page<Employee>> {
+    const all = await this.listEmployees(accessToken);
+    const needle = (q ?? "").trim().toLowerCase();
+    const filtered = !needle ? all : all.filter((e) =>
+      [`${e.firstName} ${e.lastName}`, e.email, e.jobTitle ?? ""].join(" ").toLowerCase().includes(needle));
+    const start = Math.max(page, 0) * size;
+    return {
+      content: filtered.slice(start, start + size),
+      page: Math.max(page, 0), size,
+      totalElements: filtered.length,
+      totalPages: Math.max(1, Math.ceil(filtered.length / size)),
+    };
   },
 
   async getEmployee(accessToken: string | null, id: string): Promise<Employee> {
@@ -2872,6 +3009,33 @@ function buildBilling(db: DB, companyId: string): BillingOverview {
     billableEmployees: billable, monthlyCharge: monthly, annualCharge: monthly * 12,
     currentMonth, paidThrough: sub.paidThrough, invoices,
   };
+}
+
+// --- recruitment (mock, in-memory) -----------------------------------------
+interface MockJob {
+  id: string; companyId: string; title: string; departmentId: string | null; location: string | null;
+  employmentType: string | null; description: string | null; positions: number;
+  status: JobOpening["status"]; createdAt: string;
+}
+const mockJobs: Record<string, MockJob[]> = {};
+const mockCandidates: Record<string, Candidate[]> = {};
+function renderJob(db: DB, j: MockJob): JobOpening {
+  const cands = mockCandidates[j.id] ?? [];
+  return {
+    id: j.id, title: j.title, departmentId: j.departmentId,
+    department: db.departments.find((d) => d.id === j.departmentId)?.name ?? null,
+    location: j.location, employmentType: j.employmentType, description: j.description,
+    positions: j.positions, status: j.status,
+    candidateCount: cands.length, hiredCount: cands.filter((c) => c.stage === "HIRED").length,
+    createdAt: j.createdAt,
+  };
+}
+function findCandidate(id: string): Candidate | undefined {
+  for (const jid of Object.keys(mockCandidates)) {
+    const c = (mockCandidates[jid] ?? []).find((x) => x.id === id);
+    if (c) return c;
+  }
+  return undefined;
 }
 
 // --- payslip template (mock, in-memory) ------------------------------------

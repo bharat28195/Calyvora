@@ -439,6 +439,65 @@ export interface ManagerReviewInput {
   submit: boolean;
 }
 
+/** Recruitment / ATS. */
+export type JobStatus = "OPEN" | "ON_HOLD" | "CLOSED";
+export type CandidateStage = "APPLIED" | "SCREENING" | "INTERVIEW" | "OFFER" | "HIRED" | "REJECTED";
+export interface JobOpening {
+  id: string;
+  title: string;
+  departmentId: string | null;
+  department: string | null;
+  location: string | null;
+  employmentType: string | null;
+  description: string | null;
+  positions: number;
+  status: JobStatus;
+  candidateCount: number;
+  hiredCount: number;
+  createdAt: string;
+}
+export interface Candidate {
+  id: string;
+  jobId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  resumeUrl: string | null;
+  source: string | null;
+  stage: CandidateStage;
+  rating: number | null;
+  notes: string | null;
+  createdAt: string;
+}
+export interface JobOpeningInput {
+  title: string;
+  departmentId?: string;
+  location?: string;
+  employmentType?: string;
+  description?: string;
+  positions?: number;
+  status?: JobStatus;
+}
+export interface CandidateInput {
+  name: string;
+  email?: string;
+  phone?: string;
+  resumeUrl?: string;
+  source?: string;
+  stage?: CandidateStage;
+  rating?: number | null;
+  notes?: string;
+}
+
+/** A page of results from a paginated list endpoint. */
+export interface Page<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 /** Subscription billing — per active employee, per month. */
 export interface BillingOverview {
   plan: string;

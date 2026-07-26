@@ -33,4 +33,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                       org.springframework.data.domain.Pageable pageable);
 
     boolean existsByCompanyIdAndEmail(UUID companyId, String email);
+
+    /** Paged, optionally-filtered directory listing (scales the People directory to large companies). */
+    @org.springframework.data.jpa.repository.Query("""
+            select u from User u
+            where u.companyId = :companyId
+              and (:q = ''
+                   or lower(u.firstName) like lower(concat('%', :q, '%'))
+                   or lower(u.lastName) like lower(concat('%', :q, '%'))
+                   or lower(u.email) like lower(concat('%', :q, '%')))
+            """)
+    org.springframework.data.domain.Page<User> directoryPage(
+            @org.springframework.data.repository.query.Param("companyId") UUID companyId,
+            @org.springframework.data.repository.query.Param("q") String q,
+            org.springframework.data.domain.Pageable pageable);
 }

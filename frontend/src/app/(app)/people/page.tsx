@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Search, Mail, Phone, MapPin, Briefcase, Building2, ListChecks, Plus, Trash2, CheckCircle2, Circle, Wallet } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
@@ -29,15 +29,23 @@ export default function PeoplePage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  // Full roster loaded only when the edit dialog needs a manager picker (kept off the hot path).
+  const [roster, setRoster] = useState<Employee[]>([]);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [viewing, setViewing] = useState<Employee | null>(null);
 
-  const load = useCallback(async () => {
+  // Server-side, paged + searched directory — scales to large companies.
+  const load = useCallback(async (q: string, p: number) => {
     setError(null);
     try {
-      const [emps, depts] = await Promise.all([api.listEmployees(), api.listDepartments()]);
-      setEmployees(emps);
-      setDepartments(depts);
+      const res = await api.directoryPage(q, p);
+      setEmployees(res.content);
+      setTotalPages(res.totalPages);
+      setTotal(res.totalElements);
+      setPage(res.page);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load the directory");
     }
@@ -49,20 +57,21 @@ export default function PeoplePage() {
   );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    api.listDepartments().then(setDepartments).catch(() => {});
+  }, []);
 
-  const filtered = useMemo(() => {
-    if (!employees) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return employees;
-    return employees.filter((e) =>
-      [`${e.firstName} ${e.lastName}`, e.email, e.jobTitle ?? "", e.workLocation ?? ""]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [employees, query]);
+  // Debounce search; reset to page 0 on a new query.
+  useEffect(() => {
+    const t = setTimeout(() => void load(query, 0), query ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [query, load]);
+
+  const reload = useCallback(() => load(query, page), [load, query, page]);
+
+  async function openEdit(e: Employee) {
+    setEditing(e);
+    if (roster.length === 0) api.listEmployees().then(setRoster).catch(() => {});
+  }
 
   const canEdit = (e: Employee) => isAdmin || e.userId === me?.user.id;
 
@@ -89,11 +98,13 @@ export default function PeoplePage() {
 
       {employees === null ? (
         <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
-      ) : filtered.length === 0 ? (
-        <Card className="mt-8 text-center text-fg/50">No people match &ldquo;{query}&rdquo;.</Card>
+      ) : employees.length === 0 ? (
+        <Card className="mt-8 text-center text-fg/50">
+          {query ? <>No people match &ldquo;{query}&rdquo;.</> : "No people yet."}
+        </Card>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((e) => (
+          {employees.map((e) => (
             <Card key={e.id} className="flex cursor-pointer flex-col gap-3 transition-colors hover:border-fg/20"
               onClick={() => setViewing(e)}>
               <div className="flex items-start justify-between gap-2">
@@ -107,7 +118,7 @@ export default function PeoplePage() {
                   </div>
                 </div>
                 {canEdit(e) && (
-                  <button onClick={(ev) => { ev.stopPropagation(); setEditing(e); }} aria-label={`Edit ${e.firstName}`}
+                  <button onClick={(ev) => { ev.stopPropagation(); void openEdit(e); }} aria-label={`Edit ${e.firstName}`}
                     className="rounded-md p-1.5 text-fg/40 hover:bg-fg/5 hover:text-fg">
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -136,16 +147,26 @@ export default function PeoplePage() {
         </div>
       )}
 
+      {employees !== null && total > 0 && totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <p className="text-sm text-fg/50">Page {page + 1} of {totalPages} · {total} people</p>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" disabled={page <= 0} onClick={() => void load(query, page - 1)}>Previous</Button>
+            <Button variant="secondary" size="sm" disabled={page + 1 >= totalPages} onClick={() => void load(query, page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+
       {editing && (
         <EditEmployeeDialog
           employee={editing}
           admin={isAdmin}
           departments={departments}
-          coworkers={(employees ?? []).filter((c) => c.id !== editing.id)}
+          coworkers={roster.filter((c) => c.id !== editing.id)}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            void load();
+            reload();
           }}
         />
       )}

@@ -9,6 +9,11 @@ import {
   type AnalyticsOverview,
   type BillingOverview,
   type PayslipComponent,
+  type Page,
+  type JobOpening,
+  type JobOpeningInput,
+  type Candidate,
+  type CandidateInput,
   type Compensation,
   type Payslip,
   type Department,
@@ -172,6 +177,38 @@ export const api = {
   payInvoice(month: string): Promise<BillingOverview> {
     return LIVE ? http<BillingOverview>(`/billing/invoices/${month}/pay`, { method: "POST" }) : mockBackend.payInvoice(accessToken, month);
   },
+  // --- recruitment / ATS ---
+  jobs(): Promise<JobOpening[]> {
+    return LIVE ? http<JobOpening[]>("/recruit/jobs") : mockBackend.jobs(accessToken);
+  },
+  job(id: string): Promise<JobOpening> {
+    return LIVE ? http<JobOpening>(`/recruit/jobs/${id}`) : mockBackend.job(accessToken, id);
+  },
+  createJob(input: JobOpeningInput): Promise<JobOpening> {
+    return LIVE ? http<JobOpening>("/recruit/jobs", { method: "POST", body: JSON.stringify(input) }) : mockBackend.createJob(accessToken, input);
+  },
+  updateJob(id: string, input: Partial<JobOpeningInput>): Promise<JobOpening> {
+    return LIVE ? http<JobOpening>(`/recruit/jobs/${id}`, { method: "PATCH", body: JSON.stringify(input) }) : mockBackend.updateJob(accessToken, id, input);
+  },
+  deleteJob(id: string): Promise<void> {
+    return LIVE ? http<void>(`/recruit/jobs/${id}`, { method: "DELETE" }) : mockBackend.deleteJob(accessToken, id);
+  },
+  candidates(jobId: string): Promise<Candidate[]> {
+    return LIVE ? http<Candidate[]>(`/recruit/jobs/${jobId}/candidates`) : mockBackend.candidates(accessToken, jobId);
+  },
+  addCandidate(jobId: string, input: CandidateInput): Promise<Candidate> {
+    return LIVE ? http<Candidate>(`/recruit/jobs/${jobId}/candidates`, { method: "POST", body: JSON.stringify(input) }) : mockBackend.addCandidate(accessToken, jobId, input);
+  },
+  updateCandidate(id: string, input: Partial<CandidateInput>): Promise<Candidate> {
+    return LIVE ? http<Candidate>(`/recruit/candidates/${id}`, { method: "PATCH", body: JSON.stringify(input) }) : mockBackend.updateCandidate(accessToken, id, input);
+  },
+  moveCandidate(id: string, stage: string): Promise<Candidate> {
+    return LIVE ? http<Candidate>(`/recruit/candidates/${id}/move`, { method: "POST", body: JSON.stringify({ stage }) }) : mockBackend.moveCandidate(accessToken, id, stage);
+  },
+  deleteCandidate(id: string): Promise<void> {
+    return LIVE ? http<void>(`/recruit/candidates/${id}`, { method: "DELETE" }) : mockBackend.deleteCandidate(accessToken, id);
+  },
+
   // --- payslip template ---
   payslipTemplate(): Promise<PayslipComponent[]> {
     return LIVE ? http<PayslipComponent[]>("/payroll/payslip-template") : mockBackend.payslipTemplate(accessToken);
@@ -277,6 +314,11 @@ export const api = {
   },
   listEmployees(): Promise<Employee[]> {
     return LIVE ? http<Employee[]>("/people/employees") : mockBackend.listEmployees(accessToken);
+  },
+  /** Paged, server-searched directory — scales to large companies. */
+  directoryPage(q: string, page: number, size = 24): Promise<Page<Employee>> {
+    const qs = `?q=${encodeURIComponent(q)}&page=${page}&size=${size}`;
+    return LIVE ? http<Page<Employee>>(`/people/employees/page${qs}`) : mockBackend.directoryPage(accessToken, q, page, size);
   },
   getEmployee(id: string): Promise<Employee> {
     return LIVE ? http<Employee>(`/people/employees/${id}`) : mockBackend.getEmployee(accessToken, id);
