@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Users, MailPlus, ArrowRight, Building2, Palmtree,
-  ClipboardCheck, Wallet, Receipt, Target,
+  ClipboardCheck, Wallet, Receipt, Target, Clock, Inbox,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
@@ -54,22 +54,23 @@ export default function DashboardPage() {
 
       {isAdmin && <TeamOverviewSection />}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Your day */}
-        <Card className="lg:col-span-2">
-          <CardTitle>Your day</CardTitle>
-          <div className="mt-4"><MyDay /></div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <QuickLink href="/me/leave" icon={<Palmtree className="h-4 w-4" />}
-              label={leaveLeft != null ? `${leaveLeft} leave days left` : "Time off"} />
-            <QuickLink href="/me/payslip" icon={<Wallet className="h-4 w-4" />} label="My pay" />
-            <QuickLink href="/me/review" icon={<Target className="h-4 w-4" />} label="My review" />
-            <QuickLink href="/me/expenses" icon={<Receipt className="h-4 w-4" />} label="Expenses" />
-          </div>
-        </Card>
+      <div className="mt-2 grid gap-6 lg:grid-cols-3">
+        {/* Time Today — the live clock + check-in/out */}
+        <div className="lg:col-span-2"><MyDay /></div>
+        <div className="flex flex-col gap-6"><WhatsComingUp /></div>
+      </div>
 
-        <div className="flex flex-col gap-6">
-          <WhatsComingUp />
+      {/* Quick Access — jump straight to what you do most (Keka-style) */}
+      <div className="mt-6">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Quick access</h2>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <QuickTile href="/me/attendance" icon={<Clock className="h-5 w-5 text-violet" />} label="Attendance" />
+          <QuickTile href="/me/leave" icon={<Palmtree className="h-5 w-5 text-amber-400" />}
+            label="Time off" sub={leaveLeft != null ? `${leaveLeft} days left` : undefined} />
+          <QuickTile href="/me/payslip" icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="My pay" />
+          <QuickTile href="/me/review" icon={<Target className="h-5 w-5 text-aqua" />} label="My review" />
+          <QuickTile href="/me/expenses" icon={<Receipt className="h-5 w-5 text-violet" />} label="Expenses" />
+          <QuickTile href="/inbox" icon={<Inbox className="h-5 w-5 text-amber-400" />} label="Inbox" />
         </div>
       </div>
 
@@ -108,11 +109,13 @@ function Stat({ icon, label, value, sub, href }: {
   );
 }
 
-function QuickLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function QuickTile({ href, icon, label, sub }: { href: string; icon: React.ReactNode; label: string; sub?: string }) {
   return (
     <Link href={href}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-fg/10 bg-fg/[0.02] px-3 py-1.5 text-sm text-fg/70 hover:bg-fg/5 hover:text-fg">
-      {icon} {label}
+      className="flex flex-col gap-2 rounded-xl border border-fg/10 bg-fg/[0.02] p-4 transition-colors hover:border-fg/20 hover:bg-fg/5">
+      {icon}
+      <span className="text-sm font-medium">{label}</span>
+      {sub && <span className="-mt-1 text-xs text-fg/40">{sub}</span>}
     </Link>
   );
 }

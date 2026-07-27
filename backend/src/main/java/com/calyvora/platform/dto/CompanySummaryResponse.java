@@ -14,6 +14,9 @@ public record CompanySummaryResponse(
         String endsAt,
         Long daysLeft,
         boolean locked,
+        java.math.BigDecimal pricePerEmployee,
+        java.math.BigDecimal monthlyRevenue,
+        String currency,
         String createdAt
 ) {
 }

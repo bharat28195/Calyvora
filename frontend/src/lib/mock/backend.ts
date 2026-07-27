@@ -1027,6 +1027,14 @@ export const mockBackend = {
     existing.checkOut = nowTime();
     return resolveAttendance(db, employeeId, todayIso());
   },
+  async resetToday(accessToken: string | null): Promise<AttendanceEntry> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const employeeId = myEmployeeId(db, user);
+    delete mockAttendance[`${employeeId}|${todayIso()}`];
+    return resolveAttendance(db, employeeId, todayIso());
+  },
   async myAttendance(accessToken: string | null, month?: string): Promise<AttendanceMonth> {
     await delay();
     const db = load();

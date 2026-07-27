@@ -229,19 +229,20 @@ public class DemoSeedService {
         }
         // name, adminEmail, first, last, seats, months, members, extra
         record Spec(String name, String email, String first, String last, int seats, int months,
-                    int members, String extra) {}
+                    int members, int price, String extra) {}
         java.util.List<Spec> specs = java.util.List.of(
-                new Spec("Acme Logistics", "admin@acme.demo", "Arjun", "Mehta", 12, 8, 8, "ok"),
-                new Spec("Verdant Foods", "admin@verdant.demo", "Divya", "Rao", 15, 0, 11, "expiring"),
-                new Spec("Sterling Finance", "admin@sterling.demo", "Kabir", "Shah", 25, 6, 23, "full"),
-                new Spec("Lumen Studios", "admin@lumen.demo", "Nisha", "Iyer", 10, 5, 4, "request"),
-                new Spec("Orbit Retail", "admin@orbit.demo", "Rohan", "Gupta", 8, 6, 6, "ended"));
+                new Spec("Acme Logistics", "admin@acme.demo", "Arjun", "Mehta", 12, 8, 8, 100, "ok"),
+                new Spec("Verdant Foods", "admin@verdant.demo", "Divya", "Rao", 15, 0, 11, 150, "expiring"),
+                new Spec("Sterling Finance", "admin@sterling.demo", "Kabir", "Shah", 25, 6, 23, 300, "full"),
+                new Spec("Lumen Studios", "admin@lumen.demo", "Nisha", "Iyer", 10, 5, 4, 200, "request"),
+                new Spec("Orbit Retail", "admin@orbit.demo", "Rohan", "Gupta", 8, 6, 6, 100, "ended"));
 
         for (Spec s : specs) {
             var summary = platformService.createCompany(new com.calyvora.platform.dto.CreateCompanyRequest(
                     s.name(), s.first(), s.last(), s.email(), DEMO_PASSWORD, s.seats(), Math.max(1, s.months())));
             UUID cid = UUID.fromString(summary.companyId());
             String slug = summary.slug();
+            platformService.setPrice(cid, java.math.BigDecimal.valueOf(s.price()));
             for (int i = 1; i <= s.members(); i++) {
                 createUser(cid, "emp" + i + "@" + slug + ".demo", "Employee", String.valueOf(i), Role.MEMBER);
             }

@@ -51,6 +51,12 @@ public class AttendanceController {
         return attendanceService.checkOut(principal);
     }
 
+    /** Clear today's clock-in/out (so the day is open again). */
+    @org.springframework.web.bind.annotation.DeleteMapping("/me/today")
+    public AttendanceEntryResponse resetToday(@CurrentUser AuthPrincipal principal) {
+        return attendanceService.clearToday(principal);
+    }
+
     @GetMapping("/me")
     public AttendanceMonthResponse myMonth(@RequestParam(required = false) String month,
                                            @CurrentUser AuthPrincipal principal) {

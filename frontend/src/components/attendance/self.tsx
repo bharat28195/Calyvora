@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, LogIn, LogOut } from "lucide-react";
+import { Loader2, LogIn, LogOut, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { AttendanceEntry, AttendanceMonth, AttendanceStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 /*
  * The self-service attendance pieces, shared by People -> Attendance (where they sit alongside the
@@ -29,6 +30,11 @@ export const MARKABLE: AttendanceStatus[] = ["PRESENT", "WORK_FROM_HOME", "HALF_
 
 export function hhmm(t: string): string {
   return t.slice(0, 5);
+}
+
+/** "HH:mm" for a live Date (used to show elapsed working time before check-out). */
+function nowHHmm(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 /** Minutes between two "HH:mm[:ss]" times, or null if either is missing. */
@@ -63,6 +69,7 @@ export function MyDay() {
   const [entry, setEntry] = useState<AttendanceEntry | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   const load = useCallback(() => {
     api.attendanceToday()
@@ -71,11 +78,20 @@ export function MyDay() {
   }, []);
   useEffect(() => load(), [load]);
 
-  async function act(which: "in" | "out") {
+  // A ticking clock, like Keka's "Time Today".
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  async function act(which: "in" | "out" | "reset") {
     setBusy(true);
     setError(null);
     try {
-      setEntry(which === "in" ? await api.checkIn() : await api.checkOut());
+      const next = which === "in" ? await api.checkIn()
+        : which === "out" ? await api.checkOut()
+        : await api.resetToday();
+      setEntry(next);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to record that");
     } finally {
@@ -83,30 +99,49 @@ export function MyDay() {
     }
   }
 
+  const clockedIn = !!entry?.checkIn;
+  const clockedOut = !!entry?.checkOut;
+  const worked = fmtDuration(minutesBetween(entry?.checkIn ?? null, entry?.checkOut ?? (clockedIn ? nowHHmm(now) : null)));
+  const dateLabel = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const timeLabel = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
   return (
     <Card className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <CardTitle>Today</CardTitle>
-          <p className="mt-1 text-sm text-fg/50">
-            {entry?.checkIn ? (
+          <div className="flex items-center gap-2">
+            <CardTitle>Time Today</CardTitle>
+            {entry?.status && <StatusChip status={entry.status} derived={entry.derived} />}
+          </div>
+          <p className="mt-1 text-xs text-fg/40">{dateLabel}</p>
+          <p className="mt-2 font-mono text-4xl font-semibold tabular-nums tracking-tight">{timeLabel}</p>
+          <p className="mt-2 text-sm text-fg/60">
+            {clockedIn ? (
               <>
-                In at <span className="text-fg">{hhmm(entry.checkIn)}</span>
-                {entry.checkOut && <> · out at <span className="text-fg">{hhmm(entry.checkOut)}</span></>}
+                In at <span className="font-medium text-fg">{hhmm(entry!.checkIn!)}</span>
+                {clockedOut
+                  ? <> · out at <span className="font-medium text-fg">{hhmm(entry!.checkOut!)}</span> · <span className="text-fg/80">{worked}</span></>
+                  : <> · <span className="text-emerald-400">working now</span> · {worked}</>}
               </>
-            ) : (
-              "You haven't clocked in yet."
-            )}
+            ) : "You haven't clocked in yet."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {entry?.status && <StatusChip status={entry.status} />}
-          <Button onClick={() => act("in")} disabled={busy || !!entry?.checkIn}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} Check in
-          </Button>
-          <Button variant="secondary" onClick={() => act("out")} disabled={busy || !entry?.checkIn}>
-            <LogOut className="h-4 w-4" /> Check out
-          </Button>
+        <div className="flex flex-col items-end gap-2">
+          {!clockedIn ? (
+            <Button onClick={() => act("in")} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} Check in
+            </Button>
+          ) : (
+            <Button variant={clockedOut ? "ghost" : "primary"} onClick={() => act("out")} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} {clockedOut ? "Update check-out" : "Check out"}
+            </Button>
+          )}
+          {clockedIn && (
+            <button onClick={() => act("reset")} disabled={busy}
+              className="inline-flex items-center gap-1 text-xs text-fg/40 hover:text-fg/70">
+              <RotateCcw className="h-3 w-3" /> Reset today
+            </button>
+          )}
         </div>
       </div>
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}
@@ -205,10 +240,9 @@ export function MyMonth() {
  */
 export function DailyLog({ days }: { days: AttendanceEntry[] }) {
   const today = new Date().toISOString().slice(0, 10);
-  const rows = days
-    .filter((d) => d.date <= today && d.status && d.status !== "WEEK_OFF" && d.status !== "HOLIDAY")
-    .slice()
-    .reverse();
+  // Full log: every day up to today (newest first), including week-offs/holidays (muted) and today
+  // even if it's still open — a complete timesheet, not just the days that were worked.
+  const rows = days.filter((d) => d.date <= today).slice().reverse();
 
   if (rows.length === 0) {
     return (
@@ -240,13 +274,14 @@ export function DailyLog({ days }: { days: AttendanceEntry[] }) {
             const dt = new Date(`${d.date}T00:00:00`);
             const weekday = dt.toLocaleDateString(undefined, { weekday: "short" });
             const nice = dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+            const offDay = d.status === "WEEK_OFF" || d.status === "HOLIDAY" || !d.status;
             return (
-              <tr key={d.date} className="border-b border-fg/5 last:border-0 hover:bg-fg/[0.03]">
+              <tr key={d.date} className={cn("border-b border-fg/5 last:border-0 hover:bg-fg/[0.03]", offDay && "text-fg/40")}>
                 <td className="px-5 py-2.5 whitespace-nowrap">
                   <span className="font-medium">{nice}</span>
                   <span className="ml-1.5 text-xs text-fg/40">{weekday}</span>
                 </td>
-                <td className="px-3 py-2.5">{d.status && <StatusChip status={d.status} derived={d.derived} />}</td>
+                <td className="px-3 py-2.5">{d.status ? <StatusChip status={d.status} derived={d.derived} /> : <span className="text-xs text-fg/30">not marked</span>}</td>
                 <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkIn ? hhmm(d.checkIn) : "—"}</td>
                 <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkOut ? hhmm(d.checkOut) : "—"}</td>
                 <td className="px-3 py-2.5 tabular-nums font-medium">{fmtDuration(mins)}</td>

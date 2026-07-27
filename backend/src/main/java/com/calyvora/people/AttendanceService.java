@@ -217,6 +217,19 @@ public class AttendanceService {
         return of(employee, user, today, record, false);
     }
 
+    /** Clear today's clock-in/out for the signed-in employee, so the day is open again. */
+    @Transactional
+    public AttendanceEntryResponse clearToday(AuthPrincipal principal) {
+        UUID companyId = TenantContext.getCompanyId();
+        Employee employee = requireSelf(companyId, principal);
+        LocalDate today = LocalDate.now();
+        attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
+                .ifPresent(attendanceRepository::delete);
+        User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
+        return resolve(employee, user, today, Optional.empty(),
+                approvedLeaveByEmployee(companyId).getOrDefault(employee.getId(), List.of()));
+    }
+
     /** Today's row for the signed-in employee (null status when they haven't clocked in). */
     @Transactional(readOnly = true)
     public AttendanceEntryResponse today(AuthPrincipal principal) {

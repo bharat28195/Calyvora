@@ -539,6 +539,9 @@ export interface CompanySummary {
   endsAt: string | null;
   daysLeft: number | null;
   locked: boolean;
+  pricePerEmployee: number | null;
+  monthlyRevenue: number | null;
+  currency: string;
   createdAt: string | null;
 }
 export interface CreateCompanyInput {

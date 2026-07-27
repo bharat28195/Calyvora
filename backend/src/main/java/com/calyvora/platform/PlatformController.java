@@ -58,6 +58,19 @@ public class PlatformController {
         return service.setSeats(id, body.getOrDefault("seats", 5));
     }
 
+    /** Set the subscription end date directly (edit/reset). Body: {"endsAt":"YYYY-MM-DD"}. */
+    @PostMapping("/companies/{id}/end-date")
+    public CompanySummaryResponse setEndDate(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        String raw = body.get("endsAt");
+        return service.setEndDate(id, raw == null || raw.isBlank() ? null : java.time.LocalDate.parse(raw));
+    }
+
+    /** Set this company's price per employee/seat. Body: {"price": 300}. */
+    @PostMapping("/companies/{id}/price")
+    public CompanySummaryResponse setPrice(@PathVariable UUID id, @RequestBody Map<String, java.math.BigDecimal> body) {
+        return service.setPrice(id, body.get("price"));
+    }
+
     @GetMapping("/seat-requests")
     public List<SeatRequestResponse> seatRequests() {
         return service.pendingSeatRequests();

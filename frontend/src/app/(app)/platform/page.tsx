@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Building2, Users, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Loader2, Plus, Building2, Users, CheckCircle2, XCircle, Clock, Wallet } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { CompanySummary, SeatRequest } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { money } from "@/lib/format";
 
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-500/15 text-emerald-400",
@@ -42,6 +43,7 @@ export default function PlatformPage() {
 
   const totalEmployees = companies?.reduce((s, c) => s + c.headcount, 0) ?? 0;
   const active = companies?.filter((c) => !c.locked).length ?? 0;
+  const mrr = companies?.reduce((s, c) => s + (c.monthlyRevenue ?? 0), 0) ?? 0;
 
   return (
     <div>
@@ -60,11 +62,12 @@ export default function PlatformPage() {
         <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Kpi label="Companies" value={companies.length} icon={<Building2 className="h-4 w-4 text-violet" />} />
-            <Kpi label="Employees" value={totalEmployees} icon={<Users className="h-4 w-4 text-aqua" />} />
-            <Kpi label="Active" value={active} icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />} />
-            <Kpi label="Seat requests" value={requests.length} icon={<Clock className="h-4 w-4 text-amber-400" />} />
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <Kpi label="Companies" value={String(companies.length)} icon={<Building2 className="h-4 w-4 text-violet" />} />
+            <Kpi label="Employees" value={String(totalEmployees)} icon={<Users className="h-4 w-4 text-aqua" />} />
+            <Kpi label="Active" value={String(active)} icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />} />
+            <Kpi label="Monthly revenue" value={money(mrr)} icon={<Wallet className="h-4 w-4 text-emerald-400" />} />
+            <Kpi label="Seat requests" value={String(requests.length)} icon={<Clock className="h-4 w-4 text-amber-400" />} />
           </div>
 
           {requests.length > 0 && (
@@ -88,12 +91,13 @@ export default function PlatformPage() {
           )}
 
           <Card className="mt-6 overflow-x-auto p-0">
-            <table className="w-full min-w-[820px] border-collapse text-sm">
+            <table className="w-full min-w-[980px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-fg/10 text-left text-xs uppercase tracking-wide text-fg/40">
                   <th className="px-5 py-3 font-medium">Company</th>
                   <th className="px-3 py-3 font-medium">Admin</th>
                   <th className="px-3 py-3 font-medium">Seats</th>
+                  <th className="px-3 py-3 font-medium">Billing</th>
                   <th className="px-3 py-3 font-medium">Subscription</th>
                   <th className="px-3 py-3 font-medium">Ends</th>
                   <th className="px-5 py-3 font-medium">Actions</th>
@@ -101,7 +105,7 @@ export default function PlatformPage() {
               </thead>
               <tbody>
                 {companies.length === 0 ? (
-                  <tr><td colSpan={6} className="px-5 py-8 text-center text-fg/50">No companies yet. Create your first customer.</td></tr>
+                  <tr><td colSpan={7} className="px-5 py-8 text-center text-fg/50">No companies yet. Create your first customer.</td></tr>
                 ) : companies.map((c) => (
                   <tr key={c.companyId} className="border-b border-fg/5 last:border-0">
                     <td className="px-5 py-3">
@@ -115,6 +119,10 @@ export default function PlatformPage() {
                     <td className="px-3 py-3 tabular-nums">
                       <span className={cn(c.headcount > c.seats ? "text-red-400" : "text-fg/80")}>{c.headcount}</span>
                       <span className="text-fg/40"> / {c.seats}</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <p className="tabular-nums text-fg/80">{c.monthlyRevenue != null ? money(c.monthlyRevenue) : "—"}<span className="text-xs text-fg/40">/mo</span></p>
+                      <p className="text-xs text-fg/40">{c.pricePerEmployee != null ? `${money(c.pricePerEmployee)}/seat` : ""}</p>
                     </td>
                     <td className="px-3 py-3">
                       <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_TONE[c.subscriptionStatus] ?? STATUS_TONE.NONE)}>
@@ -137,7 +145,12 @@ export default function PlatformPage() {
                           <Button size="sm" variant="ghost" disabled={busyId === c.companyId} onClick={() => act(c.companyId, () => api.endCompanySubscription(c.companyId))}><XCircle className="h-3.5 w-3.5" /> End</Button>
                         )}
                         <Button size="sm" variant="ghost" disabled={busyId === c.companyId} onClick={() => act(c.companyId, () => api.renewCompanySubscription(c.companyId, 12))}>+12mo</Button>
-                        <SeatEditor company={c} busy={busyId === c.companyId} onSet={(n) => act(c.companyId, () => api.setCompanySeats(c.companyId, n))} />
+                        <InlineEditor label="Date" type="date" initial={c.endsAt ?? ""} busy={busyId === c.companyId}
+                          onSet={(v) => act(c.companyId, () => api.setCompanyEndDate(c.companyId, v))} />
+                        <InlineEditor label="Seats" type="number" initial={String(c.seats)} busy={busyId === c.companyId}
+                          onSet={(v) => act(c.companyId, () => api.setCompanySeats(c.companyId, Number(v) || c.seats))} />
+                        <InlineEditor label="Price" type="number" initial={String(c.pricePerEmployee ?? 100)} busy={busyId === c.companyId}
+                          onSet={(v) => act(c.companyId, () => api.setCompanyPrice(c.companyId, Number(v)))} />
                       </div>
                     </td>
                   </tr>
@@ -151,15 +164,20 @@ export default function PlatformPage() {
   );
 }
 
-function SeatEditor({ company, busy, onSet }: { company: CompanySummary; busy: boolean; onSet: (n: number) => void }) {
+/** A compact "click a label → inline field → Set" editor, reused for end-date, seats and price. */
+function InlineEditor({ label, type, initial, busy, onSet }: {
+  label: string; type: "date" | "number"; initial: string; busy: boolean; onSet: (v: string) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [val, setVal] = useState(String(company.seats));
-  if (!open) return <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>Seats</Button>;
+  const [val, setVal] = useState(initial);
+  useEffect(() => setVal(initial), [initial]);
+  if (!open) return <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>{label}</Button>;
   return (
     <span className="inline-flex items-center gap-1">
-      <input type="number" min={1} value={val} onChange={(e) => setVal(e.target.value)}
-        className="h-8 w-16 rounded-md border border-fg/15 bg-fg/5 px-2 text-sm text-fg" />
-      <Button size="sm" disabled={busy} onClick={() => { onSet(Number(val) || company.seats); setOpen(false); }}>Set</Button>
+      <input type={type} min={type === "number" ? 1 : undefined} value={val} onChange={(e) => setVal(e.target.value)}
+        className={cn("h-8 rounded-md border border-fg/15 bg-fg/5 px-2 text-sm text-fg", type === "date" ? "w-36" : "w-20")} />
+      <Button size="sm" disabled={busy} onClick={() => { if (val) onSet(val); setOpen(false); }}>Set</Button>
+      <button type="button" onClick={() => setOpen(false)} className="text-xs text-fg/40 hover:text-fg/70">×</button>
     </span>
   );
 }
@@ -208,7 +226,7 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
   );
 }
 
-function Kpi({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
+function Kpi({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
     <Card className="py-4">
       <div className="flex items-center gap-2 text-xs text-fg/50">{icon} {label}</div>

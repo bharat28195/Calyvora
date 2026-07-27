@@ -233,6 +233,12 @@ export const api = {
   setCompanySeats(companyId: string, seats: number): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/seats`, { method: "POST", body: JSON.stringify({ seats }) }) : Promise.reject(new Error("live only"));
   },
+  setCompanyEndDate(companyId: string, endsAt: string): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/end-date`, { method: "POST", body: JSON.stringify({ endsAt }) }) : Promise.reject(new Error("live only"));
+  },
+  setCompanyPrice(companyId: string, price: number): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/price`, { method: "POST", body: JSON.stringify({ price }) }) : Promise.reject(new Error("live only"));
+  },
   platformSeatRequests(): Promise<SeatRequest[]> {
     return LIVE ? http<SeatRequest[]>("/platform/seat-requests") : Promise.reject(new Error("live only"));
   },
@@ -770,6 +776,9 @@ export const api = {
   },
   checkOut(): Promise<AttendanceEntry> {
     return LIVE ? http<AttendanceEntry>("/people/attendance/me/check-out", { method: "POST" }) : mockBackend.checkOut(accessToken);
+  },
+  resetToday(): Promise<AttendanceEntry> {
+    return LIVE ? http<AttendanceEntry>("/people/attendance/me/today", { method: "DELETE" }) : mockBackend.resetToday(accessToken);
   },
   myAttendance(month?: string): Promise<AttendanceMonth> {
     const qs = month ? `?month=${month}` : "";

@@ -132,6 +132,27 @@ public class PlatformService {
         return summarize(requireCompany(companyId));
     }
 
+    /** Set the subscription end date directly (editable in the console). A future date re-activates. */
+    @Transactional
+    public CompanySummaryResponse setEndDate(UUID companyId, LocalDate endsAt) {
+        Subscription sub = requireSubscription(companyId);
+        sub.setEndsAt(endsAt);
+        if (endsAt != null && !endsAt.isBefore(LocalDate.now())) {
+            sub.setStatus(SubscriptionStatus.ACTIVE);
+        }
+        return summarize(requireCompany(companyId));
+    }
+
+    /** Set this company's price per employee/seat (per-company pricing for the revenue view). */
+    @Transactional
+    public CompanySummaryResponse setPrice(UUID companyId, BigDecimal pricePerEmployee) {
+        Subscription sub = requireSubscription(companyId);
+        if (pricePerEmployee != null && pricePerEmployee.signum() >= 0) {
+            sub.setPricePerEmployee(pricePerEmployee);
+        }
+        return summarize(requireCompany(companyId));
+    }
+
     // ---- seat requests ----
 
     @Transactional(readOnly = true)
@@ -181,6 +202,10 @@ public class PlatformService {
         String endsAt = sub != null && sub.getEndsAt() != null ? sub.getEndsAt().toString() : null;
         Long daysLeft = sub != null && sub.getEndsAt() != null
                 ? ChronoUnit.DAYS.between(LocalDate.now(), sub.getEndsAt()) : null;
+        BigDecimal price = sub == null ? null : sub.getPricePerEmployee();
+        // Monthly revenue from this company = price/seat × active headcount (only while live).
+        BigDecimal revenue = (sub == null || sub.isLocked() || price == null)
+                ? BigDecimal.ZERO : price.multiply(BigDecimal.valueOf(headcount));
         return new CompanySummaryResponse(
                 company.getId().toString(), company.getName(), company.getSlug(), company.getStatus().name(),
                 admin == null ? "—" : (admin.getFirstName() + " " + admin.getLastName()).trim(),
@@ -190,6 +215,7 @@ public class PlatformService {
                 sub == null ? "NONE" : sub.getStatus().name(),
                 endsAt, daysLeft,
                 sub != null && sub.isLocked(),
+                price, revenue, sub == null ? "INR" : sub.getCurrency(),
                 company.getCreatedAt() == null ? null : company.getCreatedAt().toString());
     }
 
