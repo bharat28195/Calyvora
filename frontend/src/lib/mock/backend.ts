@@ -61,6 +61,8 @@ import {
   type AttendanceDay,
   type AttendanceEntry,
   type AttendanceMonth,
+  type Regularization,
+  type RegularizationInput,
   type AttendanceStatus,
   type MarkAttendanceInput,
   type DocumentTemplate,
@@ -1076,6 +1078,53 @@ export const mockBackend = {
     const employeeId = myEmployeeId(db, user);
     delete mockAttendance[`${employeeId}|${todayIso()}`];
     return resolveAttendance(db, employeeId, todayIso());
+  },
+  async raiseRegularization(accessToken: string | null, input: RegularizationInput): Promise<Regularization> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const employeeId = myEmployeeId(db, user);
+    const r: Regularization = {
+      id: crypto.randomUUID(), employeeId, employeeName: `${user.firstName} ${user.lastName}`.trim(),
+      date: input.date, checkIn: input.checkIn || null, checkOut: input.checkOut || null,
+      status: "PENDING", reason: input.reason || null, decisionNote: null, decidedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    (mockRegs[user.companyId] ??= []).unshift(r);
+    return r;
+  },
+  async myRegularizations(accessToken: string | null): Promise<Regularization[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const employeeId = myEmployeeId(db, user);
+    return (mockRegs[user.companyId] ?? []).filter((r) => r.employeeId === employeeId);
+  },
+  async pendingRegularizations(accessToken: string | null): Promise<Regularization[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const list = (mockRegs[user.companyId] ?? []).filter((r) => r.status === "PENDING");
+    if (isHelpdeskAgent(user)) return list;
+    const myEmp = db.employees.find((e) => e.userId === user.id);
+    return list.filter((r) => db.employees.find((e) => e.id === r.employeeId)?.managerId === myEmp?.id);
+  },
+  async decideRegularization(accessToken: string | null, id: string, approve: boolean, note?: string): Promise<Regularization> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const r = (mockRegs[user.companyId] ?? []).find((x) => x.id === id);
+    if (!r) throw err(404, "NOT_FOUND", "Regularization not found");
+    r.status = approve ? "APPROVED" : "REJECTED";
+    r.decisionNote = note || null;
+    r.decidedAt = new Date().toISOString();
+    if (approve) {
+      const row = attendanceRow(r.employeeId, r.date, "PRESENT");
+      row.status = "PRESENT";
+      if (r.checkIn) row.checkIn = r.checkIn;
+      if (r.checkOut) row.checkOut = r.checkOut;
+    }
+    return r;
   },
   async myAttendance(accessToken: string | null, month?: string): Promise<AttendanceMonth> {
     await delay();
@@ -3239,6 +3288,9 @@ interface MockJob {
 }
 const mockJobs: Record<string, MockJob[]> = {};
 const mockCandidates: Record<string, Candidate[]> = {};
+
+// --- attendance regularization (mock, in-memory, keyed by companyId) -------
+const mockRegs: Record<string, Regularization[]> = {};
 
 // --- HR helpdesk (mock, in-memory) -----------------------------------------
 const mockTickets: Record<string, HelpdeskTicket[]> = {};   // keyed by companyId

@@ -103,6 +103,7 @@ public class DemoSeedService {
     private final com.calyvora.billing.SubscriptionRepository subscriptionRepository;
     private final com.calyvora.platform.SeatRequestRepository seatRequestRepository;
     private final com.calyvora.helpdesk.HelpdeskService helpdeskService;
+    private final com.calyvora.people.RegularizationService regularizationService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -125,8 +126,10 @@ public class DemoSeedService {
                            com.calyvora.platform.PlatformService platformService,
                            com.calyvora.billing.SubscriptionRepository subscriptionRepository,
                            com.calyvora.platform.SeatRequestRepository seatRequestRepository,
-                           com.calyvora.helpdesk.HelpdeskService helpdeskService) {
+                           com.calyvora.helpdesk.HelpdeskService helpdeskService,
+                           com.calyvora.people.RegularizationService regularizationService) {
         this.helpdeskService = helpdeskService;
+        this.regularizationService = regularizationService;
         this.performanceReviewService = performanceReviewService;
         this.recruitService = recruitService;
         this.shiftService = shiftService;
@@ -418,6 +421,12 @@ public class DemoSeedService {
 
         // --- Helpdesk: a few tickets across statuses, with a reply and a resolution ---
         seedHelpdesk(owner, emp, priya, sara, tom, leo);
+
+        // --- Regularization: Sara forgot to punch a recent day; pending for her manager Tom ---
+        LocalDate missed = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() >= 6 ? 3 : 1);
+        regularizationService.raise(new com.calyvora.people.dto.RegularizationRequest(
+                missed.toString(), "09:30", "18:15", "Forgot to check in — was in office all day."),
+                principalFor(owner, emp, sara.getEmail()));
     }
 
     /**

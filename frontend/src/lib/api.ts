@@ -53,6 +53,8 @@ import {
   type AttendanceDay,
   type AttendanceEntry,
   type AttendanceMonth,
+  type Regularization,
+  type RegularizationInput,
   type MarkAttendanceInput,
   type DocumentTemplate,
   type DocumentPreview,
@@ -812,6 +814,22 @@ export const api = {
   },
   resetToday(): Promise<AttendanceEntry> {
     return LIVE ? http<AttendanceEntry>("/people/attendance/me/today", { method: "DELETE" }) : mockBackend.resetToday(accessToken);
+  },
+  // Regularization: fix a missed/incorrect day → manager/HR approves.
+  raiseRegularization(input: RegularizationInput): Promise<Regularization> {
+    return LIVE ? http<Regularization>("/attendance/regularizations", { method: "POST", body: JSON.stringify(input) }) : mockBackend.raiseRegularization(accessToken, input);
+  },
+  myRegularizations(): Promise<Regularization[]> {
+    return LIVE ? http<Regularization[]>("/attendance/regularizations/mine") : mockBackend.myRegularizations(accessToken);
+  },
+  pendingRegularizations(): Promise<Regularization[]> {
+    return LIVE ? http<Regularization[]>("/attendance/regularizations/pending") : mockBackend.pendingRegularizations(accessToken);
+  },
+  approveRegularization(id: string, note?: string): Promise<Regularization> {
+    return LIVE ? http<Regularization>(`/attendance/regularizations/${id}/approve`, { method: "POST", body: JSON.stringify({ note }) }) : mockBackend.decideRegularization(accessToken, id, true, note);
+  },
+  rejectRegularization(id: string, note?: string): Promise<Regularization> {
+    return LIVE ? http<Regularization>(`/attendance/regularizations/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) }) : mockBackend.decideRegularization(accessToken, id, false, note);
   },
   myAttendance(month?: string): Promise<AttendanceMonth> {
     const qs = month ? `?month=${month}` : "";

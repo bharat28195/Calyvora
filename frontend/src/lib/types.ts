@@ -292,6 +292,26 @@ export interface AttendanceDay {
   unmarked: number;
   entries: AttendanceEntry[];
 }
+export type RegularizationStatus = "PENDING" | "APPROVED" | "REJECTED";
+export interface Regularization {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  checkIn: string | null;
+  checkOut: string | null;
+  status: RegularizationStatus;
+  reason: string | null;
+  decisionNote: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+export interface RegularizationInput {
+  date: string;
+  checkIn?: string;
+  checkOut?: string;
+  reason?: string;
+}
 export interface AttendanceMonth {
   employeeId: string;
   employeeName: string;

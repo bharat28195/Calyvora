@@ -4,6 +4,20 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-27 — Payroll ↔ attendance, payroll run, payslip branding, regularization
+**Make pay reflect real attendance, and give employees a way to fix missed punches.**
+
+- **Attendance → payslip (LOP).** A month's payslip now factors unpaid absence: absent days (½ for a
+  half-day) become a **loss-of-pay** deduction (per-day = monthly gross ÷ working days), reducing net;
+  the payslip shows payable-vs-working days.
+- **HR payroll run** (`GET /api/v1/payroll/run`, Owner/Admin/HR): every employee's gross/LOP/net for a
+  month with totals + a "publish payslips" step (`/payroll/run`).
+- **Payslip branding** (Flyway V32): a company legal name + address (Settings → Payslip branding) print
+  on the payslip header.
+- **Attendance regularization** (Flyway V33): an employee who forgot to clock in raises a fix-up for a
+  past day (in/out + reason); their **manager** (or HR/admin) approves in a **Regularizations** queue,
+  which writes the attendance record. Notifications both ways. Managers now have an approval surface.
+
 ### 2026-07-27 — HR Helpdesk (employee case management)
 **Roadmap #2 — the employee-facing "raise a request to HR and track it" module (Keka helpdesk).**
 

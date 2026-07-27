@@ -35,6 +35,7 @@ interface NavItem {
 // Per-role visibility (PD-10). MEMBER/MANAGER get self-service; HR gets the people-ops surface;
 // ADMIN gets everything company-level; OWNER is the platform vendor — only the Platform console.
 const HR_PLUS: Role[] = ["ADMIN", "HR"];
+const MANAGES: Role[] = ["ADMIN", "HR", "MANAGER"]; // people who approve their team's requests
 const COMPANY: Role[] = ["ADMIN", "HR", "MANAGER", "MEMBER"]; // any company user (not the platform OWNER)
 const NAV: NavItem[] = [
   { href: "/platform", label: "Platform", icon: Building2, roles: ["OWNER"] },
@@ -54,6 +55,7 @@ const NAV: NavItem[] = [
   },
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
   { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY },
+  { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: MANAGES },
   {
     href: "/people", label: "People", icon: Users, roles: HR_PLUS,
     children: [

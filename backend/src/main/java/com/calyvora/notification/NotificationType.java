@@ -22,5 +22,9 @@ public enum NotificationType {
     HELPDESK_RAISED,
     /** Your helpdesk ticket was replied to or its status changed. */
     HELPDESK_UPDATED,
+    /** A report asked to regularize a missed attendance day and needs your approval. */
+    REGULARIZATION_RAISED,
+    /** Your attendance regularization was approved or rejected. */
+    REGULARIZATION_DECIDED,
     ANNOUNCEMENT,
 }
