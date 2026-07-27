@@ -19,6 +19,8 @@ export interface Me {
     name: string;
     slug: string;
     status: CompanyStatus;
+    currency: string;
+    timezone: string;
   };
 }
 
@@ -26,6 +28,7 @@ export interface CompanySettings {
   companyId: string;
   timezone: string;
   locale: string;
+  currency: string;
   logoUrl: string | null;
 }
 

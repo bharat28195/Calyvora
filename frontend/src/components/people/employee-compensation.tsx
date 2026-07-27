@@ -8,14 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
+import { money as fmtMoney, currentCurrency } from "@/lib/format";
 
-function money(n: number | null | undefined, currency: string) {
-  if (n == null) return "—";
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
-  } catch {
-    return `${currency} ${n.toLocaleString()}`;
-  }
+// The whole app formats money in the company currency (Settings → Localization), so we ignore the
+// per-record currency for display and go through the shared formatter.
+function money(n: number | null | undefined, _currency?: string) {
+  return fmtMoney(n);
 }
 
 /** Salary, hike history, and payslip for one employee (feedback C1–C3). Rendered admin-only. */
@@ -36,7 +34,7 @@ export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
       .finally(() => setLoading(false));
   }, [employeeId]);
 
-  const currency = comp?.currency ?? "USD";
+  const currency = currentCurrency();
 
   async function addRaise(e: React.FormEvent) {
     e.preventDefault();

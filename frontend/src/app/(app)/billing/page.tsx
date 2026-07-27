@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, CheckCircle2, Users, CalendarClock, Sparkles } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { BillingOverview } from "@/lib/types";
+import { money as fmtMoney } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,7 @@ export default function BillingPage() {
     api.billingOverview().then(setData).catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load billing"));
   }, []);
 
-  const money = (n: number) => {
-    try { return new Intl.NumberFormat(undefined, { style: "currency", currency: data?.currency ?? "INR", maximumFractionDigits: 0 }).format(n); }
-    catch { return `${data?.currency ?? "INR"} ${Math.round(n).toLocaleString()}`; }
-  };
+  const money = (n: number) => fmtMoney(n);
 
   async function run(label: string, fn: () => Promise<BillingOverview>) {
     setBusy(label); setError(null);

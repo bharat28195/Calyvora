@@ -59,6 +59,30 @@ body {
     box-shadow: none;
     padding: 0;
   }
+
+  /* A payslip prints as a clean black-on-white document, not the dark-themed app around it. */
+  .payslip-sheet,
+  .payslip-sheet * {
+    visibility: visible;
+    color: #111 !important;
+    border-color: #d1d5db !important;
+    background: transparent !important;
+  }
+  .payslip-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0 8mm;
+    box-shadow: none;
+  }
+  .payslip-print-only {
+    display: block !important;
+  }
+}
+
+/* Shown only on the printed payslip (a header with company/employee), hidden on screen. */
+.payslip-print-only {
+  display: none;
 }
 
 /* Brand gradient text helper */

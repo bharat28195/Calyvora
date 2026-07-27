@@ -250,6 +250,37 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-10 · 2026-07-27 · Priority HR becomes a true multi-tenant SaaS with a platform-owner above the companies
+- **Context:** founder feedback dump (8 points), on branch `product/hr-platform`. Decided jointly via a
+  4-question clarification. This reshapes the ownership model of the whole product.
+- **Decision (owner = platform vendor):** **OWNER is the seller (us), a platform super-admin sitting
+  _above_ all companies — not an employee of any company.** Owner has **no "Me" self-service**. Owner
+  gets a **Platform Console**: list every company (headcount, seats used/total, subscription end-date,
+  status), **create a company + its first ADMIN**, control each subscription/seat count, and **end a
+  subscription at any time → that company's app locks** with a "your subscription has ended" popup.
+- **Decision (roles inside a company):** a **fixed role ladder — ADMIN · HR · MANAGER · MEMBER** — with
+  preset permissions (custom roles deferred). Owner creates the first ADMIN; ADMIN creates HR/MANAGER/
+  MEMBER accounts. MEMBER sees only "Me"; HR sees People/Payroll/Leave/Recruit; MANAGER sees their team +
+  approvals; ADMIN sees the whole company (but **not** billing control — see below).
+- **Decision (subscription = Netflix model):** a company subscribes for **N seats at ₹100/employee/mo**.
+  ADMIN can **only see** the end-date (settings + a left-pane indicator) and gets a **notification as it
+  nears expiry** — billing management is **removed from ADMIN**. To grow, ADMIN raises an **in-app
+  "request more seats"** which appears in the owner console; **owner approves → seat limit bumps** (6→12)
+  and it runs on. (Real email is mocked, so the request is an in-app object, not an email.)
+- **Decision (localization):** Settings gets **currency + timezone now** (pick INR/USD… → money formats
+  app-wide; pick a timezone → times render in it) and **language as a stored preference only** (English
+  now; full translation deferred).
+- **Also in scope:** fix **check-in/out** + a **day-wise in/out log** with Keka/Zoho-style visuals; fix
+  **payslip printing**.
+- **Why:** this is what makes the product actually _sellable_ — a vendor provisions and controls tenants,
+  each tenant runs itself, and access is gated by a subscription the vendor owns. It's the SaaS shape the
+  ₹100/emp/mo pricing (PD adjacent) always implied.
+- **Architectural consequence (ADR to follow):** a **platform scope above the tenant** — an account that
+  reads _across_ tenants, which today's row-level security forbids. Building **mock-first** (the product's
+  default demo path has no RLS, so cross-company is trivial) then porting to the live backend.
+- **Status:** _in progress_ — phased build (owner/platform console → roles → subscription lifecycle →
+  check-in/out → localization → payslip print).
+
 ### PD-09 · 2026-07-22 · Documents are generated from templates and then frozen
 - **Decision:** the Documents module (founder notes D2/D3) is a **per-company template library** plus
   **immutable generated letters**. Starter templates (offer · joining · relieving · experience ·

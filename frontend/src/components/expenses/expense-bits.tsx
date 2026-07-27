@@ -1,6 +1,7 @@
 "use client";
 
 import type { ExpenseCategory, ExpenseStatus } from "@/lib/types";
+import { money as fmtMoney } from "@/lib/format";
 
 /** Shared labels and chips for expense claims, used by both the Me view and the approvals queue. */
 
@@ -35,7 +36,7 @@ export function StatusChip({ status }: { status: ExpenseStatus }) {
   );
 }
 
-/** Money with thousands separators — amounts are read at a glance, not parsed. */
-export function money(amount: number, currency: string): string {
-  return `${currency} ${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+// Company-currency formatting (Settings → Localization); the record currency is ignored for display.
+export function money(amount: number, _currency?: string): string {
+  return fmtMoney(amount);
 }

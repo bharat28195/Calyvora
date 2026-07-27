@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Users, Wallet, Gauge } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { AnalyticsOverview } from "@/lib/types";
+import { money as fmtMoney } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Donut, BarList, TrendLine, PALETTE } from "@/components/charts/charts";
@@ -26,10 +27,7 @@ export default function AnalyticsPage() {
   if (!data) return <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>;
 
   const { people, finance } = data;
-  const money = (n: number) => {
-    try { return new Intl.NumberFormat(undefined, { style: "currency", currency: finance.currency, maximumFractionDigits: 0 }).format(n); }
-    catch { return `${finance.currency} ${Math.round(n).toLocaleString()}`; }
-  };
+  const money = (n: number) => fmtMoney(n);
 
   return (
     <div>

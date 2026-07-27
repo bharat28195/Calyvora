@@ -7,11 +7,12 @@ import type { Compensation, Payslip } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useSession } from "@/hooks/useSession";
+import { money as fmtMoney } from "@/lib/format";
 
-function money(n: number | null | undefined, currency: string) {
-  if (n == null) return "—";
-  try { return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n); }
-  catch { return `${currency} ${n.toLocaleString()}`; }
+// Company-currency formatting (Settings → Localization); per-record currency is ignored for display.
+function money(n: number | null | undefined, _currency?: string) {
+  return fmtMoney(n);
 }
 
 /**
@@ -19,6 +20,7 @@ function money(n: number | null | undefined, currency: string) {
  * an Owner/Admin can change pay (that lives in Payroll).
  */
 export default function MyPayslipPage() {
+  const { me } = useSession();
   const [comp, setComp] = useState<Compensation | null>(null);
   const [slip, setSlip] = useState<Payslip | null>(null);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -83,7 +85,14 @@ export default function MyPayslipPage() {
             </Card>
           )}
 
-          <Card className="mt-4">
+          <div className="payslip-sheet mt-4">
+          {/* Printed-payslip header — only appears on paper, gives the sheet a real document identity. */}
+          <div className="payslip-print-only mb-4 border-b border-fg/20 pb-3">
+            <p className="text-lg font-semibold">{me?.company.name}</p>
+            <p className="text-sm">Payslip{slip ? ` · ${slip.month}` : ""}</p>
+            <p className="mt-1 text-sm">{me?.user.firstName} {me?.user.lastName}</p>
+          </div>
+          <Card>
             <div className="flex items-center justify-between gap-2">
               <CardTitle>Payslip</CardTitle>
               <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
@@ -112,6 +121,7 @@ export default function MyPayslipPage() {
               <p className="mt-3 text-sm text-fg/40">No payslip for this month.</p>
             )}
           </Card>
+          </div>
         </>
       ) : !error && (
         <Card className="mt-6"><p className="text-sm text-fg/50">No salary is on record for you yet. Your HR admin sets this in Payroll.</p></Card>

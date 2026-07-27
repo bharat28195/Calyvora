@@ -8,11 +8,11 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { EmployeeCompensation } from "@/components/people/employee-compensation";
 import { cn } from "@/lib/utils";
+import { money as fmtMoney } from "@/lib/format";
 
-function money(n: number | null | undefined, currency: string) {
-  if (n == null) return "—";
-  try { return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n); }
-  catch { return `${currency} ${n.toLocaleString()}`; }
+// Company-currency formatting (Settings → Localization); per-record currency ignored for display.
+function money(n: number | null | undefined, _currency?: string) {
+  return fmtMoney(n);
 }
 
 /**

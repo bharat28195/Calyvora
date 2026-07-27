@@ -44,6 +44,7 @@ export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
 export const settingsSchema = z.object({
   timezone: z.string().min(1, "Timezone is required").max(64),
   locale: z.enum(["en", "en-GB", "fr", "de", "es", "hi"]),
+  currency: z.enum(["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD"]),
   logoUrl: z
     .union([z.string().url("Must be a valid https URL").max(500), z.literal("")])
     .optional(),

@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { setLocaleConfig } from "@/lib/format";
 import type { Me } from "@/lib/types";
 
 type Status = "loading" | "authenticated" | "unauthenticated";
@@ -46,6 +47,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     bootstrapped.current = true;
     void load();
   }, [load]);
+
+  // Keep the app-wide money/time formatters in sync with the company's chosen currency + timezone.
+  useEffect(() => {
+    if (me?.company) {
+      setLocaleConfig({ currency: me.company.currency, timezone: me.company.timezone });
+    }
+  }, [me]);
 
   const value: SessionValue = {
     me,

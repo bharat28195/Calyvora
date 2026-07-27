@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2, Star, Check, Target, CircleDollarSign } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { PerformanceReview, HikeType, ReviewStatus } from "@/lib/types";
+import { money as fmtMoney } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,12 +21,9 @@ const STATUS_META: Record<ReviewStatus, { label: string; tone: string }> = {
 
 const TEXTAREA = "w-full rounded-lg border border-fg/15 bg-fg/5 p-3 text-sm text-fg placeholder:text-fg/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
 
-function money(currency: string, n: number): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
-  } catch {
-    return `${currency} ${Math.round(n).toLocaleString()}`;
-  }
+// Company-currency formatting (Settings → Localization); the record currency is ignored for display.
+function money(_currency: string, n: number): string {
+  return fmtMoney(n);
 }
 
 /**

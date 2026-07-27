@@ -349,7 +349,11 @@ function toMe(db: DB, user: User): Me {
       role: user.role,
       status: user.status,
     },
-    company: { id: company.id, name: company.name, slug: company.slug, status: company.status },
+    company: {
+      id: company.id, name: company.name, slug: company.slug, status: company.status,
+      currency: db.settings.find((s) => s.companyId === company.id)?.currency ?? "INR",
+      timezone: db.settings.find((s) => s.companyId === company.id)?.timezone ?? "UTC",
+    },
   };
 }
 
@@ -406,7 +410,7 @@ export const mockBackend = {
     };
     db.companies.push(company);
     db.users.push(user);
-    db.settings.push({ companyId: company.id, timezone: "UTC", locale: "en", logoUrl: null });
+    db.settings.push({ companyId: company.id, timezone: "Asia/Kolkata", locale: "en", currency: "INR", logoUrl: null });
     db.tokens.push(token);
     pushMail(db, email, "Verify your Calyvora email", `/verify-email?token=${token.token}`);
     save(db);
@@ -1591,7 +1595,7 @@ export const mockBackend = {
 
   async updateSettings(
     accessToken: string | null,
-    patch: { timezone: string; locale: string; logoUrl?: string },
+    patch: { timezone: string; locale: string; currency: string; logoUrl?: string },
   ): Promise<CompanySettings> {
     await delay();
     const db = load();
@@ -1600,6 +1604,7 @@ export const mockBackend = {
     const settings = db.settings.find((s) => s.companyId === user.companyId)!;
     settings.timezone = patch.timezone;
     settings.locale = patch.locale;
+    settings.currency = patch.currency;
     settings.logoUrl = patch.logoUrl && patch.logoUrl.length > 0 ? patch.logoUrl : null;
     save(db);
     return settings;

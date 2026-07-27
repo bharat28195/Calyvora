@@ -182,7 +182,8 @@ public class AuthService {
                 .orElseThrow(() -> new UnauthorizedException("Invalid session"));
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new NotFoundException("Company not found"));
-        return MeResponse.of(user, company);
+        CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
+        return MeResponse.of(user, company, settings);
     }
 
     /** Login/refresh result: the access token, the raw refresh token (→ cookie), and the body. */
@@ -197,7 +198,8 @@ public class AuthService {
         AuthPrincipal principal = new AuthPrincipal(user.getId(), user.getCompanyId(),
                 user.getRole().name(), user.getEmail());
         String accessToken = jwtService.createAccessToken(principal);
-        LoginResponse body = new LoginResponse(accessToken, MeResponse.of(user, company));
+        CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
+        LoginResponse body = new LoginResponse(accessToken, MeResponse.of(user, company, settings));
         return new LoginResult(accessToken, issued.rawToken(), body);
     }
 

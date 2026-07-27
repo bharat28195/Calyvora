@@ -63,6 +63,7 @@ public class CompanyService {
         }
         settings.setTimezone(request.timezone());
         settings.setLocale(request.locale());
+        settings.setCurrency(request.currency());
         settings.setLogoUrl(request.logoUrl() == null || request.logoUrl().isBlank()
                 ? null : request.logoUrl());
         return CompanySettingsResponse.of(settings);

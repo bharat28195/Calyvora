@@ -253,7 +253,7 @@ export const api = {
   getSettings(): Promise<CompanySettings> {
     return LIVE ? http<CompanySettings>("/company/settings") : mockBackend.getSettings(accessToken);
   },
-  updateSettings(patch: { timezone: string; locale: string; logoUrl?: string }): Promise<CompanySettings> {
+  updateSettings(patch: { timezone: string; locale: string; currency: string; logoUrl?: string }): Promise<CompanySettings> {
     return LIVE
       ? http<CompanySettings>("/company/settings", { method: "PATCH", body: JSON.stringify(patch) })
       : mockBackend.updateSettings(accessToken, patch);

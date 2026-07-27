@@ -25,6 +25,9 @@ public class CompanySettings {
     @Column(nullable = false, length = 16)
     private String locale = "en";
 
+    @Column(nullable = false, length = 8)
+    private String currency = "INR";
+
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
@@ -62,6 +65,14 @@ public class CompanySettings {
 
     public void setLocale(String locale) {
         this.locale = locale;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public String getLogoUrl() {
