@@ -575,6 +575,46 @@ export interface SubscriptionView {
   currency: string;
 }
 
+// --- HR Helpdesk ---
+export type TicketCategory = "HR" | "PAYROLL" | "IT" | "FACILITIES" | "OTHER";
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export interface HelpdeskTicket {
+  id: string;
+  category: TicketCategory;
+  subject: string;
+  description: string | null;
+  priority: TicketPriority;
+  status: TicketStatus;
+  raisedById: string;
+  raisedByName: string;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  commentCount: number;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+}
+export interface HelpdeskComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+export interface RaiseTicketInput {
+  category: TicketCategory;
+  subject: string;
+  description?: string;
+  priority?: TicketPriority;
+}
+export interface UpdateTicketInput {
+  status?: TicketStatus;
+  assigneeId?: string;
+  priority?: TicketPriority;
+  category?: TicketCategory;
+}
+
 /** A page of results from a paginated list endpoint. */
 export interface Page<T> {
   content: T[];

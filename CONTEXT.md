@@ -35,7 +35,9 @@ approve **seat requests** (Netflix model). **Roles ADMIN/HR/MANAGER/MEMBER** wit
 `@PreAuthorize`. **Currency+timezone** app-wide (₹ default); **check-in/out** + daily log fixed;
 **payslip printing** fixed. Demo: `POST /api/v1/dev/seed-platform` → owner `owner@priorityhr.app` +
 5 sample companies. **158 backend tests green.**
-**Next (HR roadmap):** HR helpdesk · offboarding · PF/ESI compliance · assets · LMS.
+**HR Helpdesk** (V31): employees raise HR/payroll/IT tickets; HR queue with assign + status flow +
+threaded replies + notifications (`com.calyvora.helpdesk`, `/helpdesk`).
+**Next (HR roadmap):** offboarding · PF/ESI compliance · assets · timesheets · LMS.
 
 **Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
 RS256 SD-5) + **demo suite** (one-click seed, cross-app dashboard, ⌘K global search, AI assistant) +

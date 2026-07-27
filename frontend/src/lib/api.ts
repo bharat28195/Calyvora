@@ -22,6 +22,10 @@ import {
   type CreateCompanyInput,
   type SeatRequest,
   type SubscriptionView,
+  type HelpdeskTicket,
+  type HelpdeskComment,
+  type RaiseTicketInput,
+  type UpdateTicketInput,
   type Compensation,
   type Payslip,
   type Department,
@@ -257,6 +261,30 @@ export const api = {
   },
   requestSeats(seats: number, note?: string): Promise<SubscriptionView> {
     return LIVE ? http<SubscriptionView>("/subscription/request-seats", { method: "POST", body: JSON.stringify({ seats, note }) }) : Promise.reject(new Error("live only"));
+  },
+
+  // --- HR helpdesk ---
+  raiseTicket(input: RaiseTicketInput): Promise<HelpdeskTicket> {
+    return LIVE ? http<HelpdeskTicket>("/helpdesk/tickets", { method: "POST", body: JSON.stringify(input) }) : mockBackend.raiseTicket(accessToken, input);
+  },
+  myTickets(): Promise<HelpdeskTicket[]> {
+    return LIVE ? http<HelpdeskTicket[]>("/helpdesk/tickets/mine") : mockBackend.myTickets(accessToken);
+  },
+  helpdeskQueue(status?: string): Promise<HelpdeskTicket[]> {
+    const qs = status ? `?status=${status}` : "";
+    return LIVE ? http<HelpdeskTicket[]>(`/helpdesk/tickets${qs}`) : mockBackend.helpdeskQueue(accessToken, status);
+  },
+  helpdeskTicket(id: string): Promise<HelpdeskTicket> {
+    return LIVE ? http<HelpdeskTicket>(`/helpdesk/tickets/${id}`) : mockBackend.helpdeskTicket(accessToken, id);
+  },
+  helpdeskComments(id: string): Promise<HelpdeskComment[]> {
+    return LIVE ? http<HelpdeskComment[]>(`/helpdesk/tickets/${id}/comments`) : mockBackend.helpdeskComments(accessToken, id);
+  },
+  commentOnTicket(id: string, body: string): Promise<HelpdeskComment> {
+    return LIVE ? http<HelpdeskComment>(`/helpdesk/tickets/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }) : mockBackend.commentOnTicket(accessToken, id, body);
+  },
+  updateHelpdeskTicket(id: string, input: UpdateTicketInput): Promise<HelpdeskTicket> {
+    return LIVE ? http<HelpdeskTicket>(`/helpdesk/tickets/${id}`, { method: "PATCH", body: JSON.stringify(input) }) : mockBackend.updateHelpdeskTicket(accessToken, id, input);
   },
 
   // --- shift scheduling / rostering ---

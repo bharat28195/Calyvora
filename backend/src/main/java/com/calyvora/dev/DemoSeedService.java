@@ -102,6 +102,7 @@ public class DemoSeedService {
     private final com.calyvora.platform.PlatformService platformService;
     private final com.calyvora.billing.SubscriptionRepository subscriptionRepository;
     private final com.calyvora.platform.SeatRequestRepository seatRequestRepository;
+    private final com.calyvora.helpdesk.HelpdeskService helpdeskService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -123,7 +124,9 @@ public class DemoSeedService {
                            com.calyvora.shift.ShiftService shiftService,
                            com.calyvora.platform.PlatformService platformService,
                            com.calyvora.billing.SubscriptionRepository subscriptionRepository,
-                           com.calyvora.platform.SeatRequestRepository seatRequestRepository) {
+                           com.calyvora.platform.SeatRequestRepository seatRequestRepository,
+                           com.calyvora.helpdesk.HelpdeskService helpdeskService) {
+        this.helpdeskService = helpdeskService;
         this.performanceReviewService = performanceReviewService;
         this.recruitService = recruitService;
         this.shiftService = shiftService;
@@ -412,6 +415,48 @@ public class DemoSeedService {
 
         // --- Shifts: a few shift templates + this week's roster for the support team ---
         seedShifts(emp, sara, tom);
+
+        // --- Helpdesk: a few tickets across statuses, with a reply and a resolution ---
+        seedHelpdesk(owner, emp, priya, sara, tom, leo);
+    }
+
+    /**
+     * A handful of helpdesk tickets raised by employees, spread across statuses — one fresh, one being
+     * worked with an HR reply, and one resolved — so the queue and thread open with a real story.
+     */
+    private void seedHelpdesk(AuthPrincipal owner, Map<String, EmployeeResponse> emp,
+                              User priya, User sara, User tom, User leo) {
+        AuthPrincipal pPriya = principalFor(owner, emp, priya.getEmail());
+        AuthPrincipal pSara = principalFor(owner, emp, sara.getEmail());
+        AuthPrincipal pTom = principalFor(owner, emp, tom.getEmail());
+        AuthPrincipal pLeo = principalFor(owner, emp, leo.getEmail());   // HR agent
+        String leoUserId = emp.get(leo.getEmail()).userId();
+
+        // 1) Fresh, unassigned.
+        helpdeskService.raise(new com.calyvora.helpdesk.dto.RaiseTicketRequest(
+                "IT", "Laptop won't connect to office Wi-Fi", "Since this morning my laptop keeps dropping the AsInt-Secure network.", "HIGH"), pTom);
+
+        // 2) In progress, assigned to HR, with a back-and-forth.
+        var payroll = helpdeskService.raise(new com.calyvora.helpdesk.dto.RaiseTicketRequest(
+                "PAYROLL", "PF not reflecting in last payslip", "My July payslip doesn't show the provident fund deduction.", "MEDIUM"), pPriya);
+        UUID payrollId = UUID.fromString(payroll.id());
+        helpdeskService.update(payrollId, new com.calyvora.helpdesk.dto.UpdateTicketRequest(
+                "IN_PROGRESS", leoUserId, null, null), pLeo);
+        helpdeskService.addComment(payrollId, new com.calyvora.helpdesk.dto.CommentPayload(
+                "Thanks Priya — checking with finance, will update you by EOD."), pLeo);
+        helpdeskService.addComment(payrollId, new com.calyvora.helpdesk.dto.CommentPayload(
+                "Appreciate it!"), pPriya);
+
+        // 3) Resolved.
+        var hr = helpdeskService.raise(new com.calyvora.helpdesk.dto.RaiseTicketRequest(
+                "HR", "Need employment verification letter", "Applying for a home loan — need a verification letter addressed to the bank.", "LOW"), pSara);
+        UUID hrId = UUID.fromString(hr.id());
+        helpdeskService.update(hrId, new com.calyvora.helpdesk.dto.UpdateTicketRequest(
+                "IN_PROGRESS", leoUserId, null, null), pLeo);
+        helpdeskService.addComment(hrId, new com.calyvora.helpdesk.dto.CommentPayload(
+                "Generated and emailed to you — closing this out."), pLeo);
+        helpdeskService.update(hrId, new com.calyvora.helpdesk.dto.UpdateTicketRequest(
+                "RESOLVED", null, null, null), pLeo);
     }
 
     /**

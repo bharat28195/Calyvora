@@ -18,5 +18,9 @@ public enum NotificationType {
     REVIEW_SUBMITTED,
     /** Your review was approved (and any hike applied). */
     REVIEW_APPROVED,
+    /** An employee raised an HR helpdesk ticket you can action. */
+    HELPDESK_RAISED,
+    /** Your helpdesk ticket was replied to or its status changed. */
+    HELPDESK_UPDATED,
     ANNOUNCEMENT,
 }

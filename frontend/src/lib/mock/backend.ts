@@ -24,6 +24,10 @@ import {
   type JobOpeningInput,
   type Candidate,
   type CandidateInput,
+  type HelpdeskTicket,
+  type HelpdeskComment,
+  type RaiseTicketInput,
+  type UpdateTicketInput,
   type Shift,
   type ShiftInput,
   type Roster,
@@ -1493,6 +1497,84 @@ export const mockBackend = {
     for (const jid of Object.keys(mockCandidates)) {
       mockCandidates[jid] = (mockCandidates[jid] ?? []).filter((x) => x.id !== id);
     }
+  },
+
+  // --- HR helpdesk (mirrors HelpdeskService) --------------------------------
+  async raiseTicket(accessToken: string | null, input: RaiseTicketInput): Promise<HelpdeskTicket> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const now = new Date().toISOString();
+    const t: HelpdeskTicket = {
+      id: crypto.randomUUID(), category: input.category, subject: input.subject.trim(),
+      description: input.description?.trim() || null, priority: input.priority ?? "MEDIUM", status: "OPEN",
+      raisedById: user.id, raisedByName: `${user.firstName} ${user.lastName}`.trim(),
+      assigneeId: null, assigneeName: null, commentCount: 0, createdAt: now, updatedAt: now, resolvedAt: null,
+    };
+    (mockTickets[user.companyId] ??= []).unshift(t);
+    return t;
+  },
+  async myTickets(accessToken: string | null): Promise<HelpdeskTicket[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    return (mockTickets[user.companyId] ?? []).filter((t) => t.raisedById === user.id);
+  },
+  async helpdeskQueue(accessToken: string | null, status?: string): Promise<HelpdeskTicket[]> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    return (mockTickets[user.companyId] ?? []).filter((t) => !status || t.status === status);
+  },
+  async helpdeskTicket(accessToken: string | null, id: string): Promise<HelpdeskTicket> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const t = (mockTickets[user.companyId] ?? []).find((x) => x.id === id);
+    if (!t) throw err(404, "NOT_FOUND", "Ticket not found");
+    if (t.raisedById !== user.id && !isHelpdeskAgent(user)) throw err(403, "FORBIDDEN", "You can't view this ticket");
+    return t;
+  },
+  async helpdeskComments(accessToken: string | null, id: string): Promise<HelpdeskComment[]> {
+    await delay();
+    const db = load();
+    requireSession(db, accessToken);
+    return (mockComments[id] ?? []).slice();
+  },
+  async commentOnTicket(accessToken: string | null, id: string, body: string): Promise<HelpdeskComment> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const c: HelpdeskComment = {
+      id: crypto.randomUUID(), authorId: user.id, authorName: `${user.firstName} ${user.lastName}`.trim(),
+      body: body.trim(), createdAt: new Date().toISOString(),
+    };
+    (mockComments[id] ??= []).push(c);
+    const t = (mockTickets[user.companyId] ?? []).find((x) => x.id === id);
+    if (t) t.commentCount = (mockComments[id] ?? []).length;
+    return c;
+  },
+  async updateHelpdeskTicket(accessToken: string | null, id: string, input: UpdateTicketInput): Promise<HelpdeskTicket> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const t = (mockTickets[user.companyId] ?? []).find((x) => x.id === id);
+    if (!t) throw err(404, "NOT_FOUND", "Ticket not found");
+    if (input.category) t.category = input.category;
+    if (input.priority) t.priority = input.priority;
+    if (input.assigneeId !== undefined) {
+      t.assigneeId = input.assigneeId || null;
+      const a = db.users.find((u) => u.id === input.assigneeId);
+      t.assigneeName = a ? `${a.firstName} ${a.lastName}`.trim() : null;
+    }
+    if (input.status) {
+      t.status = input.status;
+      t.resolvedAt = input.status === "RESOLVED" || input.status === "CLOSED" ? new Date().toISOString() : null;
+    }
+    t.updatedAt = new Date().toISOString();
+    return t;
   },
 
   // --- shift scheduling / rostering (mirrors ShiftService) ------------------
@@ -3117,6 +3199,13 @@ interface MockJob {
 }
 const mockJobs: Record<string, MockJob[]> = {};
 const mockCandidates: Record<string, Candidate[]> = {};
+
+// --- HR helpdesk (mock, in-memory) -----------------------------------------
+const mockTickets: Record<string, HelpdeskTicket[]> = {};   // keyed by companyId
+const mockComments: Record<string, HelpdeskComment[]> = {}; // keyed by ticketId
+function isHelpdeskAgent(user: User): boolean {
+  return user.role === "ADMIN" || user.role === "HR" || user.role === "OWNER";
+}
 
 // --- shift scheduling (mock, in-memory, keyed by companyId) ----------------
 const mockShifts: Record<string, Shift[]> = {};

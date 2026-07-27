@@ -4,6 +4,18 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-27 — HR Helpdesk (employee case management)
+**Roadmap #2 — the employee-facing "raise a request to HR and track it" module (Keka helpdesk).**
+
+- **HR Helpdesk (Flyway V31, RLS).** `com.calyvora.helpdesk`: employees raise tickets
+  (category HR/Payroll/IT/Facilities/Other · priority · subject · description) and track them; HR
+  agents (ADMIN/HR) run a **queue** with status filter, **assign** (incl. "assign to me"), move
+  **OPEN → IN_PROGRESS → RESOLVED → CLOSED**, and reply in a **threaded conversation**. Notifications
+  fire to agents on raise and to the raiser on reply/status change. A ticket is visible only to its
+  raiser and to agents. New **Helpdesk** nav item for everyone; `/helpdesk` (raise + my tickets + HR
+  queue) and `/helpdesk/[id]` (thread). Demo seeds three tickets across statuses with a reply and a
+  resolution. Integration-tested.
+
 ### 2026-07-27 — Multi-tenant SaaS: platform owner, roles, subscriptions + demo fixes (PD-10)
 **The founder's 8-point spec — Priority HR becomes a true SaaS with a vendor above the companies.**
 

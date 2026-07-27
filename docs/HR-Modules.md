@@ -21,6 +21,7 @@ HR suites — Keka, Zoho People, BambooHR and Darwinbox. Use this to see what's 
 | **Performance** | Review cycles (self-assessment → manager rating → approval → **hike into payroll**), goals/OKRs | `performance` |
 | **Recruitment / ATS** ⭐ | Job openings + candidate **hiring pipeline** board (applied→hired) | `recruit` |
 | **Shift scheduling / rostering** ⭐ | Shift templates + **weekly roster grid**, one shift per employee per day (upsert) | `shift` |
+| **HR Helpdesk / case management** ⭐ | Employees raise HR/payroll/IT tickets; HR queue with assign, status flow, threaded replies + notifications | `helpdesk` |
 | **Expenses & claims** | Submit → approve → reimburse, categories, pipeline totals | `expense` |
 | **Documents** | Letter templates, merge fields, issued letters (frozen) | `document` |
 | **Inbox / notifications** | Leave/review/expense routing to the right person | `notification` |
@@ -30,16 +31,15 @@ HR suites — Keka, Zoho People, BambooHR and Darwinbox. Use this to see what's 
 
 ## 🔜 Roadmap (highest value first, from the competitor benchmark)
 
-1. **HR Helpdesk / case management** — employees raise HR queries; HR resolves with SLAs (Keka helpdesk).
-2. **Offboarding / exit** — resignation, notice period, clearance checklist, full-and-final.
-3. **Payroll compliance (India)** — PF / ESI / PT / TDS computations and statutory reports.
-4. **Asset management** — assign laptops/devices to employees, track returns.
-5. **Timesheets** — project/task time, billable vs non-billable (Keka project timesheets).
-6. **Learning & Development (LMS)** — courses, assignments, completion tracking (Zoho add-on).
-7. **Surveys & engagement** — pulse surveys, eNPS.
-8. **Rewards & recognition** — kudos, points, badges.
-9. **Advanced attendance** — geofencing, biometric/kiosk, mobile punch-in.
-10. **Resume parsing & offer workflows** — deepen the ATS toward Keka parity.
+1. **Offboarding / exit** — resignation, notice period, clearance checklist, full-and-final.
+2. **Payroll compliance (India)** — PF / ESI / PT / TDS computations and statutory reports.
+3. **Asset management** — assign laptops/devices to employees, track returns.
+4. **Timesheets** — project/task time, billable vs non-billable (Keka project timesheets).
+5. **Learning & Development (LMS)** — courses, assignments, completion tracking (Zoho add-on).
+6. **Surveys & engagement** — pulse surveys, eNPS.
+7. **Rewards & recognition** — kudos, points, badges.
+8. **Advanced attendance** — geofencing, biometric/kiosk, mobile punch-in.
+9. **Resume parsing & offer workflows** — deepen the ATS toward Keka parity.
 
 ## Notes
 

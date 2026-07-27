@@ -7,7 +7,7 @@ import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
-  CalendarClock, Building2,
+  CalendarClock, Building2, LifeBuoy,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,7 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
+  { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY },
   {
     href: "/people", label: "People", icon: Users, roles: HR_PLUS,
     children: [
