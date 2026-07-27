@@ -483,7 +483,9 @@ public class DemoSeedService {
         int person = 0;
         for (EmployeeResponse e : emp.values()) {
             person++;
-            for (int back = 14; back >= 0; back--) {
+            // Seed history up to *yesterday* and leave today open, so the demo can show a real
+            // check-in → check-out on today's date instead of finding the day already filled.
+            for (int back = 14; back >= 1; back--) {
                 LocalDate date = today.minusDays(back);
                 if (date.getDayOfWeek() == java.time.DayOfWeek.SATURDAY
                         || date.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {

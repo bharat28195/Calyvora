@@ -31,6 +31,23 @@ export function hhmm(t: string): string {
   return t.slice(0, 5);
 }
 
+/** Minutes between two "HH:mm[:ss]" times, or null if either is missing. */
+export function minutesBetween(inT: string | null, outT: string | null): number | null {
+  if (!inT || !outT) return null;
+  const [ih, im] = inT.split(":").map(Number);
+  const [oh, om] = outT.split(":").map(Number);
+  const mins = oh * 60 + om - (ih * 60 + im);
+  return mins > 0 ? mins : null;
+}
+
+/** "8h 05m" (or "—" when we can't compute it). */
+export function fmtDuration(mins: number | null): string {
+  if (mins == null) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+}
+
 export function StatusChip({ status, derived }: { status: AttendanceStatus; derived?: boolean }) {
   return (
     <span
@@ -130,6 +147,7 @@ export function MyMonth() {
       {data === null ? (
         <Card className="mt-3"><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></Card>
       ) : (
+        <>
         <Card className="mt-3">
           <div className="flex flex-wrap items-center gap-6">
             <div>
@@ -172,8 +190,77 @@ export function MyMonth() {
             ))}
           </div>
         </Card>
+
+        <DailyLog days={data.days} />
+        </>
       )}
     </div>
+  );
+}
+
+/**
+ * A day-wise log of when you clocked in and out — the table people expect from Keka/Zoho. Newest
+ * first, working days only (weekends/holidays are hidden), future days dropped. Hours are computed
+ * from the in/out pair and shown with a bar relative to a 9-hour day.
+ */
+export function DailyLog({ days }: { days: AttendanceEntry[] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = days
+    .filter((d) => d.date <= today && d.status && d.status !== "WEEK_OFF" && d.status !== "HOLIDAY")
+    .slice()
+    .reverse();
+
+  if (rows.length === 0) {
+    return (
+      <Card className="mt-4">
+        <CardTitle>Daily log</CardTitle>
+        <p className="mt-2 text-sm text-fg/50">No days logged yet this month.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-4 overflow-x-auto p-0">
+      <div className="px-5 pt-5"><CardTitle>Daily log</CardTitle></div>
+      <table className="mt-3 w-full min-w-[560px] border-collapse text-sm">
+        <thead>
+          <tr className="border-y border-fg/10 text-left text-xs uppercase tracking-wide text-fg/40">
+            <th className="px-5 py-2 font-medium">Date</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Check in</th>
+            <th className="px-3 py-2 font-medium">Check out</th>
+            <th className="px-3 py-2 font-medium">Hours</th>
+            <th className="w-32 px-5 py-2 font-medium">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((d) => {
+            const mins = minutesBetween(d.checkIn, d.checkOut);
+            const pct = mins == null ? 0 : Math.min(100, Math.round((mins / (9 * 60)) * 100));
+            const dt = new Date(`${d.date}T00:00:00`);
+            const weekday = dt.toLocaleDateString(undefined, { weekday: "short" });
+            const nice = dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+            return (
+              <tr key={d.date} className="border-b border-fg/5 last:border-0 hover:bg-fg/[0.03]">
+                <td className="px-5 py-2.5 whitespace-nowrap">
+                  <span className="font-medium">{nice}</span>
+                  <span className="ml-1.5 text-xs text-fg/40">{weekday}</span>
+                </td>
+                <td className="px-3 py-2.5">{d.status && <StatusChip status={d.status} derived={d.derived} />}</td>
+                <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkIn ? hhmm(d.checkIn) : "—"}</td>
+                <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkOut ? hhmm(d.checkOut) : "—"}</td>
+                <td className="px-3 py-2.5 tabular-nums font-medium">{fmtDuration(mins)}</td>
+                <td className="px-5 py-2.5">
+                  <div className="h-1.5 w-full rounded-full bg-fg/10">
+                    <div className="h-1.5 rounded-full bg-violet" style={{ width: `${pct}%` }} />
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
   );
 }
 
