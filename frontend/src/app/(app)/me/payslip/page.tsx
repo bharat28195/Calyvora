@@ -88,8 +88,9 @@ export default function MyPayslipPage() {
           <div className="payslip-sheet mt-4">
           {/* Printed-payslip header — only appears on paper, gives the sheet a real document identity. */}
           <div className="payslip-print-only mb-4 border-b border-fg/20 pb-3">
-            <p className="text-lg font-semibold">{me?.company.name}</p>
-            <p className="text-sm">Payslip{slip ? ` · ${slip.month}` : ""}</p>
+            <p className="text-lg font-semibold">{slip?.companyName || me?.company.name}</p>
+            {slip?.companyAddress && <p className="text-xs">{slip.companyAddress}</p>}
+            <p className="mt-1 text-sm">Payslip{slip ? ` · ${slip.month}` : ""}</p>
             <p className="mt-1 text-sm">{me?.user.firstName} {me?.user.lastName}</p>
           </div>
           <Card>
@@ -100,6 +101,12 @@ export default function MyPayslipPage() {
             </div>
             {slip ? (
               <>
+                {slip.workingDays > 0 && (
+                  <p className="mt-3 text-xs text-fg/50">
+                    Attendance: <span className="font-medium text-fg/70">{slip.payableDays}</span> of {slip.workingDays} working days payable
+                    {slip.lopDays > 0 && <span className="text-amber-400"> · {slip.lopDays} day{slip.lopDays === 1 ? "" : "s"} loss of pay</span>}
+                  </p>
+                )}
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <div>
                     <p className="mb-1 text-xs uppercase tracking-wide text-fg/40">Earnings</p>

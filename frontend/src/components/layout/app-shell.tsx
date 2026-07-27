@@ -71,6 +71,7 @@ const NAV: NavItem[] = [
     href: "/payroll", label: "Payroll", icon: Wallet, roles: HR_PLUS,
     children: [
       { href: "/payroll", label: "Salaries" },
+      { href: "/payroll/run", label: "Payroll run" },
       { href: "/payroll/template", label: "Payslip template" },
     ],
   },

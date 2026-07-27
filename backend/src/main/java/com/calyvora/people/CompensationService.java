@@ -31,14 +31,25 @@ public class CompensationService {
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final PayslipTemplateService payslipTemplateService;
+    private final AttendanceService attendanceService;
+    private final EmployeeService employeeService;
+    private final com.calyvora.company.CompanyRepository companyRepository;
+    private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
 
     public CompensationService(CompensationRepository compensationRepository,
                                EmployeeRepository employeeRepository, UserRepository userRepository,
-                               PayslipTemplateService payslipTemplateService) {
+                               PayslipTemplateService payslipTemplateService,
+                               AttendanceService attendanceService, EmployeeService employeeService,
+                               com.calyvora.company.CompanyRepository companyRepository,
+                               com.calyvora.company.CompanySettingsRepository companySettingsRepository) {
         this.compensationRepository = compensationRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
         this.payslipTemplateService = payslipTemplateService;
+        this.attendanceService = attendanceService;
+        this.employeeService = employeeService;
+        this.companyRepository = companyRepository;
+        this.companySettingsRepository = companySettingsRepository;
     }
 
     @Transactional(readOnly = true)
@@ -107,6 +118,36 @@ public class CompensationService {
         return payslip(selfEmployeeId(userId), month);
     }
 
+    /**
+     * A month's payroll run for the whole company (HR "push payslips"): every employee with a salary on
+     * record, their gross, LOP days and net after attendance. Read-write because listing the directory
+     * may provision missing profiles (which a read-only transaction would silently swallow).
+     */
+    @Transactional
+    public com.calyvora.people.dto.PayrollRunResponse payrollRun(String month) {
+        java.time.YearMonth ym = month == null || month.isBlank()
+                ? java.time.YearMonth.now() : java.time.YearMonth.parse(month);
+        List<com.calyvora.people.dto.PayrollRunResponse.Row> rows = new java.util.ArrayList<>();
+        BigDecimal totalGross = BigDecimal.ZERO, totalNet = BigDecimal.ZERO;
+        double totalLop = 0;
+        String currency = "INR";
+        for (var e : employeeService.directory()) {
+            try {
+                PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString());
+                rows.add(new com.calyvora.people.dto.PayrollRunResponse.Row(
+                        e.id(), p.employeeName(), e.jobTitle(), p.gross(), p.lopDays(), p.net()));
+                totalGross = totalGross.add(p.gross());
+                totalNet = totalNet.add(p.net());
+                totalLop += p.lopDays();
+                currency = p.currency();
+            } catch (NotFoundException noSalary) {
+                // Employee has no salary on record yet — not part of this run.
+            }
+        }
+        return new com.calyvora.people.dto.PayrollRunResponse(
+                ym.toString(), currency, rows, totalGross, totalNet, totalLop, rows.size());
+    }
+
     private UUID selfEmployeeId(UUID userId) {
         UUID companyId = TenantContext.getCompanyId();
         return employeeRepository.findByUserId(userId)
@@ -134,8 +175,48 @@ public class CompensationService {
         // Generate the lines from the company's configurable payslip template.
         PayslipTemplateService.Computed c = payslipTemplateService.compute(companyId, gross);
 
+        // --- Attendance linkage: unpaid absences (LOP) reduce the month's pay -----------------
+        var att = attendanceService.month(employeeId, ym);
+        int workingDays = 0;
+        double lopDays = 0;
+        for (var d : att.days()) {
+            if (d.status() == null) continue;   // future/unmarked working day — not counted as LOP
+            AttendanceStatus s = AttendanceStatus.valueOf(d.status());
+            if (s == AttendanceStatus.WEEK_OFF || s == AttendanceStatus.HOLIDAY) continue;
+            workingDays++;
+            if (s == AttendanceStatus.ABSENT) lopDays += 1;          // unpaid full day
+            else if (s == AttendanceStatus.HALF_DAY) lopDays += 0.5;  // half unpaid
+        }
+        double payableDays = Math.max(0, workingDays - lopDays);
+
+        List<PayslipResponse.Line> deductions = new java.util.ArrayList<>(c.deductions());
+        BigDecimal totalDed = c.totalDeductions();
+        BigDecimal net = c.net();
+        if (lopDays > 0 && workingDays > 0) {
+            BigDecimal perDay = gross.divide(BigDecimal.valueOf(workingDays), 2, RoundingMode.HALF_UP);
+            BigDecimal lop = perDay.multiply(BigDecimal.valueOf(lopDays)).setScale(2, RoundingMode.HALF_UP);
+            deductions.add(new PayslipResponse.Line(
+                    "Loss of pay (" + trimNum(lopDays) + " day" + (lopDays == 1 ? "" : "s") + ")", lop));
+            totalDed = totalDed.add(lop);
+            net = net.subtract(lop);
+        }
+
+        // Payslip header — legal name (falling back to company name) + address.
+        var settings = companySettingsRepository.findById(companyId).orElse(null);
+        String companyName = settings != null && settings.getLegalName() != null && !settings.getLegalName().isBlank()
+                ? settings.getLegalName()
+                : companyRepository.findById(companyId).map(com.calyvora.company.Company::getName).orElse("");
+        String companyAddress = settings == null ? null : settings.getAddress();
+
         return new PayslipResponse(employeeId.toString(), name, ym.toString(), cur,
-                c.earnings(), c.deductions(), c.gross(), c.totalDeductions(), c.net());
+                companyName, companyAddress,
+                c.earnings(), deductions, c.gross(), totalDed, net,
+                workingDays, lopDays, payableDays);
+    }
+
+    /** "2" not "2.0", "1.5" kept — for the LOP line label. */
+    private static String trimNum(double d) {
+        return d == Math.floor(d) ? String.valueOf((long) d) : String.valueOf(d);
     }
 
     private Employee requireEmployee(UUID employeeId, UUID companyId) {

@@ -64,6 +64,8 @@ public class CompanyService {
         settings.setTimezone(request.timezone());
         settings.setLocale(request.locale());
         settings.setCurrency(request.currency());
+        settings.setLegalName(blankToNull(request.legalName()));
+        settings.setAddress(blankToNull(request.address()));
         settings.setLogoUrl(request.logoUrl() == null || request.logoUrl().isBlank()
                 ? null : request.logoUrl());
         return CompanySettingsResponse.of(settings);
@@ -75,6 +77,10 @@ public class CompanyService {
         return userRepository.findByCompanyIdOrderByCreatedAtAsc(companyId).stream()
                 .map(MemberResponse::of)
                 .toList();
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     private static boolean isValidZone(String zone) {

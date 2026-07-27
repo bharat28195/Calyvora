@@ -28,6 +28,7 @@ import {
   type UpdateTicketInput,
   type Compensation,
   type Payslip,
+  type PayrollRun,
   type Department,
   type Employee,
   type WorkItem,
@@ -327,7 +328,7 @@ export const api = {
   getSettings(): Promise<CompanySettings> {
     return LIVE ? http<CompanySettings>("/company/settings") : mockBackend.getSettings(accessToken);
   },
-  updateSettings(patch: { timezone: string; locale: string; currency: string; logoUrl?: string }): Promise<CompanySettings> {
+  updateSettings(patch: { timezone: string; locale: string; currency: string; legalName?: string; address?: string; logoUrl?: string }): Promise<CompanySettings> {
     return LIVE
       ? http<CompanySettings>("/company/settings", { method: "PATCH", body: JSON.stringify(patch) })
       : mockBackend.updateSettings(accessToken, patch);
@@ -662,6 +663,10 @@ export const api = {
   myPayslip(month?: string): Promise<Payslip> {
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";
     return LIVE ? http<Payslip>(`/people/me/payslip${qs}`) : mockBackend.myPayslip(accessToken, month);
+  },
+  payrollRun(month?: string): Promise<PayrollRun> {
+    const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+    return LIVE ? http<PayrollRun>(`/payroll/run${qs}`) : mockBackend.payrollRun(accessToken, month);
   },
   searchPages(q: string): Promise<PageSummary[]> {
     return LIVE

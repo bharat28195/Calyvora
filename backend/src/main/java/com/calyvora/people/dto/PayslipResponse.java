@@ -12,11 +12,17 @@ public record PayslipResponse(
         String employeeName,
         String month,          // YYYY-MM
         String currency,
+        String companyName,    // payslip header (legal name, falling back to company name)
+        String companyAddress,
         List<Line> earnings,
         List<Line> deductions,
         BigDecimal gross,
         BigDecimal totalDeductions,
-        BigDecimal net
+        BigDecimal net,
+        // Attendance linkage: LOP (unpaid absence) reduces net pay for the month.
+        int workingDays,
+        double lopDays,
+        double payableDays
 ) {
     public record Line(String label, BigDecimal amount) {}
 }

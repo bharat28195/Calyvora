@@ -15,6 +15,7 @@ import {
   type TeamOverview,
   type Compensation,
   type Payslip,
+  type PayrollRun,
   type WorkItem,
   type AnalyticsOverview,
   type BillingOverview,
@@ -414,7 +415,7 @@ export const mockBackend = {
     };
     db.companies.push(company);
     db.users.push(user);
-    db.settings.push({ companyId: company.id, timezone: "Asia/Kolkata", locale: "en", currency: "INR", logoUrl: null });
+    db.settings.push({ companyId: company.id, timezone: "Asia/Kolkata", locale: "en", currency: "INR", legalName: null, address: null, logoUrl: null });
     db.tokens.push(token);
     pushMail(db, email, "Verify your Calyvora email", `/verify-email?token=${token.token}`);
     save(db);
@@ -569,11 +570,31 @@ export const mockBackend = {
     const gross = round2(comp.currentAnnual / 12);
     const basic = round2(gross * 0.5), hra = round2(gross * 0.25), special = round2(gross - basic - hra);
     const pf = round2(basic * 0.12), tax = round2(gross * 0.1);
+    const deductions = [{ label: "Provident fund", amount: pf }, { label: "Income tax", amount: tax }];
+
+    // Attendance linkage (LOP) — mirror CompensationService.
+    const mon = buildAttendanceMonth(db, employeeId, month);
+    let workingDays = 0, lopDays = 0;
+    for (const d of mon.days) {
+      if (!d.status || d.status === "WEEK_OFF" || d.status === "HOLIDAY") continue;
+      workingDays++;
+      if (d.status === "ABSENT") lopDays += 1;
+      else if (d.status === "HALF_DAY") lopDays += 0.5;
+    }
+    let totalDed = round2(pf + tax), net = round2(gross - pf - tax);
+    if (lopDays > 0 && workingDays > 0) {
+      const lop = round2((gross / workingDays) * lopDays);
+      deductions.push({ label: `Loss of pay (${lopDays === Math.floor(lopDays) ? lopDays : lopDays} day${lopDays === 1 ? "" : "s"})`, amount: lop });
+      totalDed = round2(totalDed + lop); net = round2(net - lop);
+    }
+    const settings = db.settings.find((s) => s.companyId === (db.users.find((u) => db.employees.find((e) => e.id === employeeId)?.userId === u.id)?.companyId));
+    const company = db.companies.find((c) => c.id === settings?.companyId);
     return {
       employeeId, employeeName: comp.employeeName, month: month || new Date().toISOString().slice(0, 7), currency: comp.currency,
+      companyName: settings?.legalName || company?.name || "", companyAddress: settings?.address ?? null,
       earnings: [{ label: "Basic", amount: basic }, { label: "House rent allowance", amount: hra }, { label: "Special allowance", amount: special }],
-      deductions: [{ label: "Provident fund", amount: pf }, { label: "Income tax", amount: tax }],
-      gross, totalDeductions: round2(pf + tax), net: round2(gross - pf - tax),
+      deductions, gross, totalDeductions: totalDed, net,
+      workingDays, lopDays, payableDays: Math.max(0, workingDays - lopDays),
     };
   },
 
@@ -587,6 +608,23 @@ export const mockBackend = {
     const db = load();
     const user = requireSession(db, accessToken);
     return this.payslip(accessToken, myEmployeeId(db, user), month);
+  },
+  async payrollRun(accessToken: string | null, month?: string): Promise<PayrollRun> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const employees = db.employees.filter((e) => e.companyId === user.companyId);
+    const rows: PayrollRun["rows"] = [];
+    let totalGross = 0, totalNet = 0, totalLopDays = 0, currency = "INR";
+    for (const e of employees) {
+      const comp = buildCompensation(db, e.id);
+      if (comp.currentAnnual == null) continue;
+      const p = await this.payslip(accessToken, e.id, month);
+      rows.push({ employeeId: e.id, name: p.employeeName, jobTitle: e.jobTitle ?? null, gross: p.gross, lopDays: p.lopDays, net: p.net });
+      totalGross = round2(totalGross + p.gross); totalNet = round2(totalNet + p.net); totalLopDays += p.lopDays; currency = p.currency;
+    }
+    return { month: month || new Date().toISOString().slice(0, 7), currency, rows, totalGross, totalNet, totalLopDays, employees: rows.length };
   },
 
   async clients(accessToken: string | null): Promise<Client[]> {
@@ -1685,7 +1723,7 @@ export const mockBackend = {
 
   async updateSettings(
     accessToken: string | null,
-    patch: { timezone: string; locale: string; currency: string; logoUrl?: string },
+    patch: { timezone: string; locale: string; currency: string; legalName?: string; address?: string; logoUrl?: string },
   ): Promise<CompanySettings> {
     await delay();
     const db = load();
@@ -1695,6 +1733,8 @@ export const mockBackend = {
     settings.timezone = patch.timezone;
     settings.locale = patch.locale;
     settings.currency = patch.currency;
+    settings.legalName = patch.legalName && patch.legalName.trim() ? patch.legalName.trim() : null;
+    settings.address = patch.address && patch.address.trim() ? patch.address.trim() : null;
     settings.logoUrl = patch.logoUrl && patch.logoUrl.length > 0 ? patch.logoUrl : null;
     save(db);
     return settings;

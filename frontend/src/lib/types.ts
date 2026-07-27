@@ -29,6 +29,8 @@ export interface CompanySettings {
   timezone: string;
   locale: string;
   currency: string;
+  legalName: string | null;
+  address: string | null;
   logoUrl: string | null;
 }
 
@@ -964,11 +966,34 @@ export interface Payslip {
   employeeName: string;
   month: string;
   currency: string;
+  companyName: string;
+  companyAddress: string | null;
   earnings: PayslipLine[];
   deductions: PayslipLine[];
   gross: number;
   totalDeductions: number;
   net: number;
+  workingDays: number;
+  lopDays: number;
+  payableDays: number;
+}
+
+export interface PayrollRunRow {
+  employeeId: string;
+  name: string;
+  jobTitle: string | null;
+  gross: number;
+  lopDays: number;
+  net: number;
+}
+export interface PayrollRun {
+  month: string;
+  currency: string;
+  rows: PayrollRunRow[];
+  totalGross: number;
+  totalNet: number;
+  totalLopDays: number;
+  employees: number;
 }
 
 /** Shape of the one API error envelope (Sprint1 §13). */

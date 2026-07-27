@@ -28,6 +28,14 @@ public class CompanySettings {
     @Column(nullable = false, length = 8)
     private String currency = "INR";
 
+    /** Optional legal/registered name shown on the payslip header (falls back to the company name). */
+    @Column(name = "legal_name", length = 160)
+    private String legalName;
+
+    /** Optional company address shown on the payslip header. */
+    @Column(length = 300)
+    private String address;
+
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
@@ -73,6 +81,22 @@ public class CompanySettings {
 
     public void setCurrency(String currency) {
         this.currency = currency;
+    }
+
+    public String getLegalName() {
+        return legalName;
+    }
+
+    public void setLegalName(String legalName) {
+        this.legalName = legalName;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
     }
 
     public String getLogoUrl() {

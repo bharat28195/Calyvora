@@ -29,6 +29,8 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState("UTC");
   const [locale, setLocale] = useState<(typeof LOCALES)[number]>("en");
   const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>("INR");
+  const [legalName, setLegalName] = useState("");
+  const [address, setAddress] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -40,6 +42,8 @@ export default function SettingsPage() {
       setTimezone(s.timezone);
       setLocale((LOCALES as readonly string[]).includes(s.locale) ? (s.locale as (typeof LOCALES)[number]) : "en");
       setCurrency((CURRENCIES as readonly string[]).includes(s.currency) ? (s.currency as (typeof CURRENCIES)[number]) : "INR");
+      setLegalName(s.legalName ?? "");
+      setAddress(s.address ?? "");
       setLogoUrl(s.logoUrl ?? "");
     }).catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load settings"));
   }, []);
@@ -55,7 +59,7 @@ export default function SettingsPage() {
     }
     setBusy(true);
     try {
-      const updated = await api.updateSettings({ timezone, locale, currency, logoUrl });
+      const updated = await api.updateSettings({ timezone, locale, currency, legalName, address, logoUrl });
       setSettings(updated);
       setSaved(true);
       // Reflect currency/timezone across the app immediately (money + timestamps read from the session).
@@ -109,6 +113,19 @@ export default function SettingsPage() {
                 className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
                 {LOCALES.map((l) => <option key={l} value={l} className="bg-surface">{LANGUAGE_LABEL[l]}</option>)}
               </select>
+            </Field>
+          </div>
+
+          <div className="rounded-lg border border-fg/10 bg-fg/[0.02] p-4">
+            <p className="text-sm font-medium">Payslip branding</p>
+            <p className="mt-0.5 text-xs text-fg/50">Shown on the printed payslip header.</p>
+            <Field label="Legal / registered name" htmlFor="legalName" hint="Optional — falls back to the company name." className="mt-4">
+              <Input id="legalName" value={legalName} placeholder={me?.company.name}
+                onChange={(e) => setLegalName(e.target.value)} />
+            </Field>
+            <Field label="Address" htmlFor="address" className="mt-4">
+              <Input id="address" value={address} placeholder="Registered office address"
+                onChange={(e) => setAddress(e.target.value)} />
             </Field>
           </div>
 
