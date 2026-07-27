@@ -1640,7 +1640,7 @@ export const mockBackend = {
   async createInvitation(
     accessToken: string | null,
     email: string,
-    role: "ADMIN" | "MEMBER",
+    role: "ADMIN" | "HR" | "MANAGER" | "MEMBER",
   ): Promise<Invitation> {
     await delay();
     const db = load();

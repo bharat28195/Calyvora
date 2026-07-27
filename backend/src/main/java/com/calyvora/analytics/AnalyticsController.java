@@ -18,7 +18,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/overview")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public AnalyticsOverviewResponse overview() {
         return service.overview();
     }

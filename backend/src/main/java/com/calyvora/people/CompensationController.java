@@ -22,7 +22,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/people/employees/{employeeId}")
-@PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+@PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'HR')")
 public class CompensationController {
 
     private final CompensationService compensationService;

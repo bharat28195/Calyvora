@@ -60,20 +60,20 @@ public class AttendanceController {
     // ---- team ----
 
     @GetMapping("/day")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public AttendanceDayResponse day(@RequestParam(required = false) String date) {
         return attendanceService.day(date == null || date.isBlank() ? LocalDate.now() : LocalDate.parse(date));
     }
 
     @PostMapping("/mark")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public AttendanceEntryResponse mark(@Valid @RequestBody MarkAttendanceRequest request,
                                         @CurrentUser AuthPrincipal principal) {
         return attendanceService.mark(request, principal);
     }
 
     @GetMapping("/employees/{employeeId}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public AttendanceMonthResponse employeeMonth(@PathVariable UUID employeeId,
                                                  @RequestParam(required = false) String month) {
         return attendanceService.month(employeeId, parseMonth(month));

@@ -38,14 +38,14 @@ public class OnboardingController {
     }
 
     @PostMapping("/employees/{employeeId}/onboarding")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public ResponseEntity<OnboardingTaskResponse> add(@PathVariable UUID employeeId,
                                                       @Valid @RequestBody AddOnboardingTaskRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(onboardingService.add(employeeId, request.title()));
     }
 
     @PostMapping("/employees/{employeeId}/onboarding/seed-defaults")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public List<OnboardingTaskResponse> seedDefaults(@PathVariable UUID employeeId) {
         return onboardingService.seedDefaults(employeeId);
     }
@@ -58,7 +58,7 @@ public class OnboardingController {
     }
 
     @DeleteMapping("/onboarding/{taskId}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public ResponseEntity<Void> delete(@PathVariable UUID taskId) {
         onboardingService.delete(taskId);
         return ResponseEntity.noContent().build();

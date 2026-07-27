@@ -49,19 +49,19 @@ public class LeaveController {
 
     /** Approvals inbox — all company requests (admin). */
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public List<LeaveRequestResponse> all() {
         return leaveService.listAll();
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public LeaveRequestResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.approve(id, principal);
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public LeaveRequestResponse reject(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.reject(id, principal);
     }

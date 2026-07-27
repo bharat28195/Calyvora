@@ -28,7 +28,7 @@ public class DashboardController {
 
     /** Owner/Admin team overview: headcount, present vs on-leave today, reasons, month leave calendar. */
     @GetMapping("/team")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'HR')")
     public TeamOverviewResponse team() {
         return teamOverviewService.overview();
     }

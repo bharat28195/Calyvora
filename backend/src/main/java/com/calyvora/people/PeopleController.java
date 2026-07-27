@@ -63,7 +63,7 @@ public class PeopleController {
 
     /** Admin: update any employee's HR profile. */
     @PatchMapping("/employees/{id}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public EmployeeResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateEmployeeRequest request) {
         return employeeService.update(id, request);
     }

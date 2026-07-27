@@ -1,6 +1,6 @@
 // API contract types (Sprint1 §7). Kept in sync with backend DTOs.
 
-export type Role = "OWNER" | "ADMIN" | "MEMBER";
+export type Role = "OWNER" | "ADMIN" | "HR" | "MANAGER" | "MEMBER";
 export type UserStatus = "PENDING_VERIFICATION" | "INVITED" | "ACTIVE" | "DISABLED";
 export type CompanyStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";

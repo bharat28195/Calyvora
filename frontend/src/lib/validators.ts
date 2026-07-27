@@ -30,7 +30,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const inviteSchema = z.object({
   email,
-  role: z.enum(["ADMIN", "MEMBER"], { message: "Choose a role" }),
+  role: z.enum(["ADMIN", "HR", "MANAGER", "MEMBER"], { message: "Choose a role" }),
 });
 export type InviteInput = z.infer<typeof inviteSchema>;
 

@@ -31,11 +31,15 @@ interface NavItem {
 
 // HR-only product surface (feature/hr-suite). Work, Knowledge, Clients and Feed are intentionally
 // omitted here — this branch presents Orbit as a focused HR suite for the demo.
+// Per-role visibility (PD-10). MEMBER/MANAGER get self-service; HR gets the people-ops surface;
+// ADMIN gets everything company-level; OWNER (platform vendor) has no personal "Me".
+const HR_PLUS: Role[] = ["OWNER", "ADMIN", "HR"];
+const SELF: Role[] = ["ADMIN", "HR", "MANAGER", "MEMBER"]; // everyone except the platform OWNER
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/analytics", label: "Insights", icon: BarChart3, roles: ["OWNER", "ADMIN"] },
+  { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS },
   {
-    href: "/me", label: "Me", icon: CircleUser,
+    href: "/me", label: "Me", icon: CircleUser, roles: SELF,
     children: [
       { href: "/me", label: "Overview" },
       { href: "/me/attendance", label: "Attendance" },
@@ -48,7 +52,7 @@ const NAV: NavItem[] = [
   },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   {
-    href: "/people", label: "People", icon: Users,
+    href: "/people", label: "People", icon: Users, roles: HR_PLUS,
     children: [
       { href: "/people", label: "Directory" },
       { href: "/people/org", label: "Org chart" },
@@ -57,20 +61,20 @@ const NAV: NavItem[] = [
       { href: "/people/holidays", label: "Holidays" },
     ],
   },
-  { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: ["OWNER", "ADMIN"] },
-  { href: "/shifts", label: "Shifts", icon: CalendarClock, roles: ["OWNER", "ADMIN"] },
-  { href: "/performance", label: "Performance", icon: ClipboardCheck, roles: ["OWNER", "ADMIN"] },
+  { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: HR_PLUS },
+  { href: "/shifts", label: "Shifts", icon: CalendarClock, roles: HR_PLUS },
+  { href: "/performance", label: "Performance", icon: ClipboardCheck, roles: HR_PLUS },
   {
-    href: "/payroll", label: "Payroll", icon: Wallet, roles: ["OWNER", "ADMIN"],
+    href: "/payroll", label: "Payroll", icon: Wallet, roles: HR_PLUS,
     children: [
       { href: "/payroll", label: "Salaries" },
       { href: "/payroll/template", label: "Payslip template" },
     ],
   },
-  { href: "/expenses", label: "Expenses", icon: Receipt, roles: ["OWNER", "ADMIN"] },
+  { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS },
   { href: "/billing", label: "Billing", icon: CreditCard, roles: ["OWNER", "ADMIN"] },
   {
-    href: "/documents", label: "Documents", icon: FileText, roles: ["OWNER", "ADMIN"],
+    href: "/documents", label: "Documents", icon: FileText, roles: HR_PLUS,
     children: [
       { href: "/documents", label: "Issued" },
       { href: "/documents/new", label: "Generate" },

@@ -155,9 +155,9 @@ public class DemoSeedService {
         User owner = createUser(company.getId(), OWNER_EMAIL, "Ava", "Chen", Role.OWNER);
         User marcus = createUser(company.getId(), "marcus.reed@northwind.demo", "Marcus", "Reed", Role.ADMIN);
         User priya = createUser(company.getId(), "priya.nair@northwind.demo", "Priya", "Nair", Role.MEMBER);
-        User leo = createUser(company.getId(), "leo.martins@northwind.demo", "Leo", "Martins", Role.MEMBER);
+        User leo = createUser(company.getId(), "leo.martins@northwind.demo", "Leo", "Martins", Role.HR);
         User sara = createUser(company.getId(), "sara.okoro@northwind.demo", "Sara", "Okoro", Role.MEMBER);
-        User tom = createUser(company.getId(), "tom.becker@northwind.demo", "Tom", "Becker", Role.MEMBER);
+        User tom = createUser(company.getId(), "tom.becker@northwind.demo", "Tom", "Becker", Role.MANAGER);
 
         TenantContext.setCompanyId(company.getId());
         try {

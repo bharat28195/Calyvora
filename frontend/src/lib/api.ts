@@ -266,7 +266,7 @@ export const api = {
   listInvitations(): Promise<Invitation[]> {
     return LIVE ? http<Invitation[]>("/invitations") : mockBackend.listInvitations(accessToken);
   },
-  createInvitation(email: string, role: "ADMIN" | "MEMBER"): Promise<Invitation> {
+  createInvitation(email: string, role: "ADMIN" | "HR" | "MANAGER" | "MEMBER"): Promise<Invitation> {
     return LIVE
       ? http<Invitation>("/invitations", { method: "POST", body: JSON.stringify({ email, role }) })
       : mockBackend.createInvitation(accessToken, email, role);

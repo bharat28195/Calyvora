@@ -142,7 +142,7 @@ function InviteDialog({
   onInvited: () => void;
 }) {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
+  const [role, setRole] = useState<"ADMIN" | "HR" | "MANAGER" | "MEMBER">("MEMBER");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -217,11 +217,13 @@ function InviteDialog({
           <select
             id="invite-role"
             value={role}
-            onChange={(e) => setRole(e.target.value as "ADMIN" | "MEMBER")}
+            onChange={(e) => setRole(e.target.value as "ADMIN" | "HR" | "MANAGER" | "MEMBER")}
             className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
           >
-            <option value="MEMBER" className="bg-surface">Member</option>
-            <option value="ADMIN" className="bg-surface">Admin</option>
+            <option value="MEMBER" className="bg-surface">Member — self-service only</option>
+            <option value="MANAGER" className="bg-surface">Manager — leads a team</option>
+            <option value="HR" className="bg-surface">HR — people, payroll, recruiting</option>
+            <option value="ADMIN" className="bg-surface">Admin — full company access</option>
           </select>
         </Field>
         <div className="mt-2 flex justify-end gap-2">

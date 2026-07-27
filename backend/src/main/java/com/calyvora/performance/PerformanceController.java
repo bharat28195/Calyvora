@@ -40,26 +40,26 @@ public class PerformanceController {
     // ---- cycles (admin) ----
 
     @PostMapping("/cycles")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public ReviewCycleResponse createCycle(@Valid @RequestBody CreateCycleRequest req,
                                            @CurrentUser AuthPrincipal principal) {
         return service.createCycle(req, principal);
     }
 
     @GetMapping("/cycles")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public List<ReviewCycleResponse> cycles() {
         return service.cycles();
     }
 
     @GetMapping("/cycles/{id}/reviews")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public List<PerformanceReviewResponse> cycleReviews(@PathVariable UUID id) {
         return service.cycleReviews(id);
     }
 
     @PostMapping("/cycles/{id}/close")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public ReviewCycleResponse closeCycle(@PathVariable UUID id) {
         return service.closeCycle(id);
     }
@@ -100,7 +100,7 @@ public class PerformanceController {
     }
 
     @PostMapping("/reviews/{id}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public PerformanceReviewResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return service.approve(id, principal);
     }

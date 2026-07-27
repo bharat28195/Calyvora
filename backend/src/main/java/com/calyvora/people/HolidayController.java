@@ -44,28 +44,28 @@ public class HolidayController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public HolidayResponse create(@Valid @RequestBody HolidayPayload payload,
                                   @CurrentUser AuthPrincipal principal) {
         return holidayService.create(payload, principal);
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public HolidayResponse update(@PathVariable UUID id, @Valid @RequestBody HolidayPayload payload) {
         return holidayService.update(id, payload);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public void delete(@PathVariable UUID id) {
         holidayService.delete(id);
     }
 
     /** One-click starter calendar for a company that has none yet. */
     @PostMapping("/defaults")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public List<HolidayResponse> seedDefaults(@CurrentUser AuthPrincipal principal) {
         return holidayService.seedDefaults(principal);
     }
