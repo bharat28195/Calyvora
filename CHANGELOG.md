@@ -4,6 +4,28 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-27 — Multi-tenant SaaS: platform owner, roles, subscriptions + demo fixes (PD-10)
+**The founder's 8-point spec — Priority HR becomes a true SaaS with a vendor above the companies.**
+
+- **Platform-owner console (Flyway V30).** A new `OWNER` = the vendor above all companies
+  (`com.calyvora.platform`). `/api/v1/platform/**` (OWNER only): list every company with headcount,
+  seats, subscription status and end date; **create a company + its first ADMIN**; **end a
+  subscription** (locks that company's app) or reactivate/extend; set seats. Companies, users and
+  subscriptions are not RLS-isolated, so the owner reads across tenants without any bypass;
+  `subscriptions` + `company_settings` RLS is lifted (platform-managed / app-filtered).
+- **Roles — ADMIN · HR · MANAGER · MEMBER** (OWNER is now platform-only). People-ops controllers admit
+  HR; Members/Settings/Subscription stay ADMIN. Nav is gated per role; OWNER has no company app.
+- **Subscriptions — Netflix-style seats.** Each company has a seat limit + end date. Admins get a
+  **read-only** Subscription page (billing management removed) with an **expiry banner**, and can
+  **request more seats** → the owner approves in the console → the limit bumps. When a subscription
+  ends, the company app is covered by a **"your subscription has ended" lock**.
+- **Check-in/out fixed + daily log** (the demo pre-filled today, disabling the button); **currency +
+  timezone** app-wide (₹ default) with a Settings → Localization card; **payslip printing** fixed
+  (prints a real black-on-white payslip instead of a blank page).
+- **Demo:** `POST /api/v1/dev/seed-platform` provisions the platform owner + 5 varied sample companies
+  (healthy, near-expiry, near seat-limit, a pending seat request, and one ended/locked). 158 backend
+  tests green.
+
 ### 2026-07-27 — Shift scheduling / rostering
 **Roadmap #1 from [docs/HR-Modules.md](docs/HR-Modules.md) — Keka/Zoho core for hourly & ops teams.**
 

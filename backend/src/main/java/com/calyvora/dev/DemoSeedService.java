@@ -72,6 +72,8 @@ public class DemoSeedService {
     private static final String COMPANY = "Northwind Robotics";
     private static final String OWNER_EMAIL = "ava.chen@northwind.demo";
     private static final String DEMO_PASSWORD = "demopass123";
+    private static final String PLATFORM_COMPANY = "Priority HR (Platform)";
+    private static final String PLATFORM_OWNER_EMAIL = "owner@priorityhr.app";
 
     private final CompanyRepository companyRepository;
     private final CompanySettingsRepository companySettingsRepository;
@@ -97,6 +99,9 @@ public class DemoSeedService {
     private final com.calyvora.performance.PerformanceReviewService performanceReviewService;
     private final com.calyvora.recruit.RecruitService recruitService;
     private final com.calyvora.shift.ShiftService shiftService;
+    private final com.calyvora.platform.PlatformService platformService;
+    private final com.calyvora.billing.SubscriptionRepository subscriptionRepository;
+    private final com.calyvora.platform.SeatRequestRepository seatRequestRepository;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -115,10 +120,16 @@ public class DemoSeedService {
                            ExpenseService expenseService, FeedService feedService,
                            com.calyvora.performance.PerformanceReviewService performanceReviewService,
                            com.calyvora.recruit.RecruitService recruitService,
-                           com.calyvora.shift.ShiftService shiftService) {
+                           com.calyvora.shift.ShiftService shiftService,
+                           com.calyvora.platform.PlatformService platformService,
+                           com.calyvora.billing.SubscriptionRepository subscriptionRepository,
+                           com.calyvora.platform.SeatRequestRepository seatRequestRepository) {
         this.performanceReviewService = performanceReviewService;
         this.recruitService = recruitService;
         this.shiftService = shiftService;
+        this.platformService = platformService;
+        this.subscriptionRepository = subscriptionRepository;
+        this.seatRequestRepository = seatRequestRepository;
         this.feedService = feedService;
         this.attendanceService = attendanceService;
         this.holidayService = holidayService;
@@ -152,7 +163,8 @@ public class DemoSeedService {
         }
 
         Company company = provisionCompany();
-        User owner = createUser(company.getId(), OWNER_EMAIL, "Ava", "Chen", Role.OWNER);
+        // Ava runs Northwind as its ADMIN — OWNER is now the platform vendor above all companies (PD-10).
+        User owner = createUser(company.getId(), OWNER_EMAIL, "Ava", "Chen", Role.ADMIN);
         User marcus = createUser(company.getId(), "marcus.reed@northwind.demo", "Marcus", "Reed", Role.ADMIN);
         User priya = createUser(company.getId(), "priya.nair@northwind.demo", "Priya", "Nair", Role.MEMBER);
         User leo = createUser(company.getId(), "leo.martins@northwind.demo", "Leo", "Martins", Role.HR);
@@ -167,8 +179,86 @@ public class DemoSeedService {
             TenantContext.clear();
         }
 
+        // Northwind's own subscription, so it shows up live in the owner console.
+        activeSubscription(company.getId(), 10, 10);
+        // The platform vendor sits above every company.
+        createPlatformOwner();
+
         log.info("Seeded demo company '{}' ({} users) — owner {}", COMPANY, 6, OWNER_EMAIL);
         return new DemoCredentials(COMPANY, OWNER_EMAIL, DEMO_PASSWORD, false);
+    }
+
+    /** The platform vendor (OWNER) in its own company — above all customer companies. Idempotent. */
+    private void createPlatformOwner() {
+        if (userRepository.existsByEmail(PLATFORM_OWNER_EMAIL)) {
+            return;
+        }
+        Company platform = companyRepository.save(new Company(UUID.randomUUID(), PLATFORM_COMPANY,
+                uniqueSlug(PLATFORM_COMPANY), CompanyStatus.ACTIVE));
+        companySettingsRepository.save(new CompanySettings(platform.getId()));
+        User owner = new User(UUID.randomUUID(), platform.getId(), PLATFORM_OWNER_EMAIL,
+                "Priority", "Owner", Role.OWNER, UserStatus.ACTIVE);
+        owner.setPasswordHash(passwordEncoder.encode(DEMO_PASSWORD));
+        owner.setEmailVerifiedAt(Instant.now());
+        userRepository.save(owner);
+        log.info("Seeded platform owner {}", PLATFORM_OWNER_EMAIL);
+    }
+
+    /** Give a company an ACTIVE subscription with a seat limit ending {@code months} out. */
+    private void activeSubscription(UUID companyId, int seats, int months) {
+        com.calyvora.billing.Subscription sub = subscriptionRepository.findByCompanyId(companyId)
+                .orElseGet(() -> new com.calyvora.billing.Subscription(UUID.randomUUID(), companyId,
+                        java.math.BigDecimal.valueOf(100), "INR", null));
+        sub.setStatus(com.calyvora.billing.SubscriptionStatus.ACTIVE);
+        sub.setStartedAt(Instant.now());
+        sub.setSeats(seats);
+        sub.setEndsAt(LocalDate.now().plusMonths(months));
+        subscriptionRepository.save(sub);
+    }
+
+    /**
+     * Provision 5 sample customer companies with varied states so the owner console tells a story:
+     * healthy, near-expiry (triggers the admin's renewal nudge), near seat-limit, one with a pending
+     * seat request to approve, and one whose subscription has ended (its app is locked). Idempotent.
+     */
+    public java.util.List<String> seedPlatformSamples() {
+        createPlatformOwner();
+        java.util.List<String> logins = new java.util.ArrayList<>();
+        if (companyRepository.existsBySlug("acme-logistics")) {
+            return logins; // already seeded
+        }
+        // name, adminEmail, first, last, seats, months, members, extra
+        record Spec(String name, String email, String first, String last, int seats, int months,
+                    int members, String extra) {}
+        java.util.List<Spec> specs = java.util.List.of(
+                new Spec("Acme Logistics", "admin@acme.demo", "Arjun", "Mehta", 12, 8, 8, "ok"),
+                new Spec("Verdant Foods", "admin@verdant.demo", "Divya", "Rao", 15, 0, 11, "expiring"),
+                new Spec("Sterling Finance", "admin@sterling.demo", "Kabir", "Shah", 25, 6, 23, "full"),
+                new Spec("Lumen Studios", "admin@lumen.demo", "Nisha", "Iyer", 10, 5, 4, "request"),
+                new Spec("Orbit Retail", "admin@orbit.demo", "Rohan", "Gupta", 8, 6, 6, "ended"));
+
+        for (Spec s : specs) {
+            var summary = platformService.createCompany(new com.calyvora.platform.dto.CreateCompanyRequest(
+                    s.name(), s.first(), s.last(), s.email(), DEMO_PASSWORD, s.seats(), Math.max(1, s.months())));
+            UUID cid = UUID.fromString(summary.companyId());
+            String slug = summary.slug();
+            for (int i = 1; i <= s.members(); i++) {
+                createUser(cid, "emp" + i + "@" + slug + ".demo", "Employee", String.valueOf(i), Role.MEMBER);
+            }
+            switch (s.extra()) {
+                case "expiring" -> subscriptionRepository.findByCompanyId(cid).ifPresent(sub -> {
+                    sub.setEndsAt(LocalDate.now().plusDays(9));
+                    subscriptionRepository.save(sub);
+                });
+                case "request" -> seatRequestRepository.save(new com.calyvora.platform.SeatRequest(
+                        UUID.randomUUID(), cid, 20, "Hiring 6 more this quarter — need seats."));
+                case "ended" -> platformService.endSubscription(cid);
+                default -> { /* healthy */ }
+            }
+            logins.add(s.email() + " / " + DEMO_PASSWORD + "  (" + s.name() + ", admin)");
+        }
+        log.info("Seeded {} sample companies for the owner console", specs.size());
+        return logins;
     }
 
     private void seedTenant(AuthPrincipal owner, User marcus, User priya, User leo, User sara, User tom) {

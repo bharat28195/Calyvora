@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
  * prod. Idempotent — safe to click twice; it returns the same login either way.
  */
 @RestController
-@RequestMapping("/api/v1/dev/seed-demo")
+@RequestMapping("/api/v1/dev")
 @Profile("!prod")
 public class DevSeedController {
 
@@ -21,8 +21,14 @@ public class DevSeedController {
         this.demoSeedService = demoSeedService;
     }
 
-    @PostMapping
+    @PostMapping("/seed-demo")
     public DemoSeedService.DemoCredentials seed() {
         return demoSeedService.seed();
+    }
+
+    /** Provision 5 varied sample companies so the platform-owner console has a full picture. */
+    @PostMapping("/seed-platform")
+    public java.util.List<String> seedPlatform() {
+        return demoSeedService.seedPlatformSamples();
     }
 }

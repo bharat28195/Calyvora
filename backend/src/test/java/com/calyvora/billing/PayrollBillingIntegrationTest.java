@@ -59,7 +59,9 @@ class PayrollBillingIntegrationTest extends IntegrationTestBase {
         assertThat(b.get("billableEmployees").asInt()).isEqualTo(6);
         assertThat(b.get("monthlyCharge").asDouble()).isEqualTo(600.0);   // 6 × 100
         assertThat(b.get("annualCharge").asDouble()).isEqualTo(7200.0);
-        assertThat(b.get("status").asText()).isEqualTo("TRIALING");
+        // The demo seeds Northwind with a live (ACTIVE) subscription so it shows up real in the
+        // platform owner console (PD-10).
+        assertThat(b.get("status").asText()).isEqualTo("ACTIVE");
 
         // Activate, then pay the current month → it reads back as paid.
         mockMvc.perform(post("/api/v1/billing/activate").header("Authorization", bearer(owner))).andExpect(status().isOk());

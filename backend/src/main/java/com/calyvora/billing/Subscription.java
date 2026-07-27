@@ -51,6 +51,14 @@ public class Subscription {
     @Column(name = "trial_ends_at")
     private Instant trialEndsAt;
 
+    /** Seat limit the company is paying for (Netflix-style); headcount must fit within it. */
+    @Column(nullable = false)
+    private int seats = 5;
+
+    /** The date the subscription runs to; past this (or a CANCELLED status) the app is locked. */
+    @Column(name = "ends_at")
+    private java.time.LocalDate endsAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -96,6 +104,16 @@ public class Subscription {
     public Instant getStartedAt() { return startedAt; }
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
     public Instant getTrialEndsAt() { return trialEndsAt; }
+    public int getSeats() { return seats; }
+    public void setSeats(int seats) { this.seats = seats; }
+    public java.time.LocalDate getEndsAt() { return endsAt; }
+    public void setEndsAt(java.time.LocalDate endsAt) { this.endsAt = endsAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    /** The app is locked when the owner has ended the subscription or its end date has passed. */
+    public boolean isLocked() {
+        return status == SubscriptionStatus.CANCELLED
+                || (endsAt != null && endsAt.isBefore(java.time.LocalDate.now()));
+    }
 }

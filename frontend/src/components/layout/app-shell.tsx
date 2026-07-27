@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
-  CalendarClock,
+  CalendarClock, Building2,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -32,14 +33,15 @@ interface NavItem {
 // HR-only product surface (feature/hr-suite). Work, Knowledge, Clients and Feed are intentionally
 // omitted here — this branch presents Orbit as a focused HR suite for the demo.
 // Per-role visibility (PD-10). MEMBER/MANAGER get self-service; HR gets the people-ops surface;
-// ADMIN gets everything company-level; OWNER (platform vendor) has no personal "Me".
-const HR_PLUS: Role[] = ["OWNER", "ADMIN", "HR"];
-const SELF: Role[] = ["ADMIN", "HR", "MANAGER", "MEMBER"]; // everyone except the platform OWNER
+// ADMIN gets everything company-level; OWNER is the platform vendor — only the Platform console.
+const HR_PLUS: Role[] = ["ADMIN", "HR"];
+const COMPANY: Role[] = ["ADMIN", "HR", "MANAGER", "MEMBER"]; // any company user (not the platform OWNER)
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/platform", label: "Platform", icon: Building2, roles: ["OWNER"] },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS },
   {
-    href: "/me", label: "Me", icon: CircleUser, roles: SELF,
+    href: "/me", label: "Me", icon: CircleUser, roles: COMPANY,
     children: [
       { href: "/me", label: "Overview" },
       { href: "/me/attendance", label: "Attendance" },
@@ -50,7 +52,7 @@ const NAV: NavItem[] = [
       { href: "/me/expenses", label: "Expenses" },
     ],
   },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
   {
     href: "/people", label: "People", icon: Users, roles: HR_PLUS,
     children: [
@@ -72,7 +74,6 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS },
-  { href: "/billing", label: "Billing", icon: CreditCard, roles: ["OWNER", "ADMIN"] },
   {
     href: "/documents", label: "Documents", icon: FileText, roles: HR_PLUS,
     children: [
@@ -81,14 +82,24 @@ const NAV: NavItem[] = [
       { href: "/documents/templates", label: "Templates" },
     ],
   },
-  { href: "/members", label: "Members", icon: UserCog, roles: ["OWNER", "ADMIN"] },
-  { href: "/settings", label: "Settings", icon: Settings, roles: ["OWNER", "ADMIN"] },
+  { href: "/members", label: "Members", icon: UserCog, roles: ["ADMIN"] },
+  { href: "/subscription", label: "Subscription", icon: CreditCard, roles: ["ADMIN"] },
+  { href: "/settings", label: "Settings", icon: Settings, roles: ["ADMIN"] },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const session = useRequireAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // The platform OWNER (vendor) has no company app — send them to the Platform console.
+  const role = session.me?.user.role;
+  useEffect(() => {
+    if (role === "OWNER" && !pathname.startsWith("/platform")) {
+      router.replace("/platform");
+    }
+  }, [role, pathname, router]);
 
   if (session.status !== "authenticated" || !session.me) {
     return (
@@ -109,6 +120,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <>
+    {user.role !== "OWNER" && <SubscriptionGate />}
     <div className="min-h-screen md:flex">
       {/* Left sidebar (md+) */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-fg/10 bg-surface/70 backdrop-blur md:flex">
@@ -227,5 +240,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <AssistantPanel />
     </div>
+    </>
   );
 }

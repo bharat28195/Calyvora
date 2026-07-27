@@ -1,0 +1,215 @@
+package com.calyvora.platform;
+
+import com.calyvora.billing.Subscription;
+import com.calyvora.billing.SubscriptionRepository;
+import com.calyvora.billing.SubscriptionStatus;
+import com.calyvora.common.error.ApiException;
+import com.calyvora.common.error.ConflictException;
+import com.calyvora.common.error.ErrorCode;
+import com.calyvora.common.error.NotFoundException;
+import com.calyvora.common.util.Slugs;
+import com.calyvora.company.Company;
+import com.calyvora.company.CompanyRepository;
+import com.calyvora.company.CompanySettings;
+import com.calyvora.company.CompanySettingsRepository;
+import com.calyvora.company.CompanyStatus;
+import com.calyvora.identity.Role;
+import com.calyvora.identity.User;
+import com.calyvora.identity.UserRepository;
+import com.calyvora.identity.UserStatus;
+import com.calyvora.platform.dto.CompanySummaryResponse;
+import com.calyvora.platform.dto.CreateCompanyRequest;
+import com.calyvora.platform.dto.SeatRequestResponse;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * The platform-owner (vendor) layer (PD-10): one account above all companies that provisions tenants
+ * and controls their subscriptions. This reads/writes across tenants — legitimate because companies,
+ * users and subscriptions are not RLS-isolated (the auth surface + the now platform-managed
+ * subscriptions table), so no RLS bypass is needed.
+ */
+@Service
+public class PlatformService {
+
+    private static final BigDecimal DEFAULT_PRICE = new BigDecimal("100");
+
+    private final CompanyRepository companyRepository;
+    private final CompanySettingsRepository settingsRepository;
+    private final UserRepository userRepository;
+    private final SubscriptionRepository subscriptionRepository;
+    private final SeatRequestRepository seatRequestRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public PlatformService(CompanyRepository companyRepository, CompanySettingsRepository settingsRepository,
+                           UserRepository userRepository, SubscriptionRepository subscriptionRepository,
+                           SeatRequestRepository seatRequestRepository, PasswordEncoder passwordEncoder) {
+        this.companyRepository = companyRepository;
+        this.settingsRepository = settingsRepository;
+        this.userRepository = userRepository;
+        this.subscriptionRepository = subscriptionRepository;
+        this.seatRequestRepository = seatRequestRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    // ---- companies ----
+
+    /** Every customer company (excluding the owner's own platform company). */
+    @Transactional(readOnly = true)
+    public List<CompanySummaryResponse> companies(UUID platformCompanyId) {
+        return companyRepository.findAll().stream()
+                .filter(c -> !c.getId().equals(platformCompanyId))
+                .map(this::summarize)
+                .sorted(Comparator.comparing(CompanySummaryResponse::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    @Transactional
+    public CompanySummaryResponse createCompany(CreateCompanyRequest req) {
+        String email = req.adminEmail().trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            throw new ConflictException("That email is already registered");
+        }
+        Company company = companyRepository.save(
+                new Company(UUID.randomUUID(), req.companyName().trim(), uniqueSlug(req.companyName()),
+                        CompanyStatus.ACTIVE));
+
+        CompanySettings settings = new CompanySettings(company.getId());
+        settings.setTimezone("Asia/Kolkata");
+        settings.setCurrency("INR");
+        settingsRepository.save(settings);
+
+        User admin = new User(UUID.randomUUID(), company.getId(), email,
+                req.adminFirstName().trim(), req.adminLastName().trim(), Role.ADMIN, UserStatus.ACTIVE);
+        admin.setPasswordHash(passwordEncoder.encode(req.password()));
+        admin.setEmailVerifiedAt(Instant.now());
+        userRepository.save(admin);
+
+        Subscription sub = new Subscription(UUID.randomUUID(), company.getId(), DEFAULT_PRICE, "INR", null);
+        sub.setStatus(SubscriptionStatus.ACTIVE);
+        sub.setStartedAt(Instant.now());
+        sub.setSeats(Math.max(1, req.seats()));
+        sub.setEndsAt(LocalDate.now().plusMonths(Math.max(1, req.months())));
+        subscriptionRepository.save(sub);
+
+        return summarize(company);
+    }
+
+    /** Owner ends a company's subscription — its app locks immediately. */
+    @Transactional
+    public CompanySummaryResponse endSubscription(UUID companyId) {
+        Subscription sub = requireSubscription(companyId);
+        sub.setStatus(SubscriptionStatus.CANCELLED);
+        return summarize(requireCompany(companyId));
+    }
+
+    /** Reactivate (or extend) a subscription by N months from today (or its end date, whichever is later). */
+    @Transactional
+    public CompanySummaryResponse renewSubscription(UUID companyId, int months) {
+        Subscription sub = requireSubscription(companyId);
+        LocalDate base = sub.getEndsAt() != null && sub.getEndsAt().isAfter(LocalDate.now())
+                ? sub.getEndsAt() : LocalDate.now();
+        sub.setEndsAt(base.plusMonths(Math.max(1, months)));
+        sub.setStatus(SubscriptionStatus.ACTIVE);
+        return summarize(requireCompany(companyId));
+    }
+
+    @Transactional
+    public CompanySummaryResponse setSeats(UUID companyId, int seats) {
+        Subscription sub = requireSubscription(companyId);
+        sub.setSeats(Math.max(1, seats));
+        return summarize(requireCompany(companyId));
+    }
+
+    // ---- seat requests ----
+
+    @Transactional(readOnly = true)
+    public List<SeatRequestResponse> pendingSeatRequests() {
+        Map<UUID, String> names = companyRepository.findAll().stream()
+                .collect(Collectors.toMap(Company::getId, Company::getName));
+        return seatRequestRepository.findByStatusOrderByCreatedAtAsc(SeatRequestStatus.PENDING).stream()
+                .map(r -> {
+                    int current = subscriptionRepository.findByCompanyId(r.getCompanyId())
+                            .map(Subscription::getSeats).orElse(0);
+                    return new SeatRequestResponse(r.getId().toString(), r.getCompanyId().toString(),
+                            names.getOrDefault(r.getCompanyId(), "—"), current, r.getRequestedSeats(),
+                            r.getStatus().name(), r.getNote(), r.getCreatedAt().toString());
+                })
+                .toList();
+    }
+
+    @Transactional
+    public CompanySummaryResponse approveSeatRequest(UUID requestId) {
+        SeatRequest req = seatRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Seat request not found"));
+        Subscription sub = requireSubscription(req.getCompanyId());
+        sub.setSeats(req.getRequestedSeats());
+        req.setStatus(SeatRequestStatus.APPROVED);
+        req.setDecidedAt(Instant.now());
+        return summarize(requireCompany(req.getCompanyId()));
+    }
+
+    @Transactional
+    public void declineSeatRequest(UUID requestId) {
+        SeatRequest req = seatRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Seat request not found"));
+        req.setStatus(SeatRequestStatus.DECLINED);
+        req.setDecidedAt(Instant.now());
+    }
+
+    // ---- helpers ----
+
+    private CompanySummaryResponse summarize(Company company) {
+        long headcount = userRepository.countByCompanyIdAndStatus(company.getId(), UserStatus.ACTIVE);
+        Subscription sub = subscriptionRepository.findByCompanyId(company.getId()).orElse(null);
+        User admin = userRepository.findByCompanyIdOrderByCreatedAtAsc(company.getId()).stream()
+                .filter(u -> u.getRole() == Role.ADMIN).findFirst()
+                .orElseGet(() -> userRepository.findByCompanyIdOrderByCreatedAtAsc(company.getId())
+                        .stream().findFirst().orElse(null));
+
+        String endsAt = sub != null && sub.getEndsAt() != null ? sub.getEndsAt().toString() : null;
+        Long daysLeft = sub != null && sub.getEndsAt() != null
+                ? ChronoUnit.DAYS.between(LocalDate.now(), sub.getEndsAt()) : null;
+        return new CompanySummaryResponse(
+                company.getId().toString(), company.getName(), company.getSlug(), company.getStatus().name(),
+                admin == null ? "—" : (admin.getFirstName() + " " + admin.getLastName()).trim(),
+                admin == null ? "—" : admin.getEmail(),
+                headcount,
+                sub == null ? 0 : sub.getSeats(),
+                sub == null ? "NONE" : sub.getStatus().name(),
+                endsAt, daysLeft,
+                sub != null && sub.isLocked(),
+                company.getCreatedAt() == null ? null : company.getCreatedAt().toString());
+    }
+
+    private Company requireCompany(UUID companyId) {
+        return companyRepository.findById(companyId)
+                .orElseThrow(() -> new NotFoundException("Company not found"));
+    }
+
+    private Subscription requireSubscription(UUID companyId) {
+        return subscriptionRepository.findByCompanyId(companyId)
+                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_ERROR, "No subscription for this company"));
+    }
+
+    private String uniqueSlug(String name) {
+        String base = Slugs.slugify(name);
+        String slug = base;
+        int suffix = 1;
+        while (companyRepository.existsBySlug(slug)) {
+            slug = base + "-" + (++suffix);
+        }
+        return slug;
+    }
+}

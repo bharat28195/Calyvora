@@ -278,8 +278,13 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Architectural consequence (ADR to follow):** a **platform scope above the tenant** — an account that
   reads _across_ tenants, which today's row-level security forbids. Building **mock-first** (the product's
   default demo path has no RLS, so cross-company is trivial) then porting to the live backend.
-- **Status:** _in progress_ — phased build (owner/platform console → roles → subscription lifecycle →
-  check-in/out → localization → payslip print).
+- **Status:** _shipped & verified live 2026-07-27_ — all 8 points delivered on `product/hr-platform`:
+  platform-owner console + create-company/end-subscription/seat-approval (V30), roles ADMIN/HR/MANAGER/
+  MEMBER with per-role nav+guards, Netflix-style seats + app-lock + expiry banner + request-seats,
+  check-in/out fix + daily log, currency/timezone app-wide (₹), payslip printing. 158 backend tests
+  green. Demo: `owner@priorityhr.app` + 5 sample companies via `/dev/seed-platform`. Follow-up debt:
+  self-registration still creates an OWNER (should be ADMIN); server-side lock is advisory (frontend
+  overlay) — enforce at a filter later.
 
 ### PD-09 · 2026-07-22 · Documents are generated from templates and then frozen
 - **Decision:** the Documents module (founder notes D2/D3) is a **per-company template library** plus

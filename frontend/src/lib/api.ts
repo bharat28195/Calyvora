@@ -18,6 +18,10 @@ import {
   type ShiftInput,
   type Roster,
   type RosterEntry,
+  type CompanySummary,
+  type CreateCompanyInput,
+  type SeatRequest,
+  type SubscriptionView,
   type Compensation,
   type Payslip,
   type Department,
@@ -211,6 +215,42 @@ export const api = {
   },
   deleteCandidate(id: string): Promise<void> {
     return LIVE ? http<void>(`/recruit/candidates/${id}`, { method: "DELETE" }) : mockBackend.deleteCandidate(accessToken, id);
+  },
+
+  // --- platform owner (vendor) console — live backend only ---
+  platformCompanies(): Promise<CompanySummary[]> {
+    return LIVE ? http<CompanySummary[]>("/platform/companies") : Promise.reject(new Error("The platform console requires the live backend."));
+  },
+  createCompany(input: CreateCompanyInput): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>("/platform/companies", { method: "POST", body: JSON.stringify(input) }) : Promise.reject(new Error("The platform console requires the live backend."));
+  },
+  endCompanySubscription(companyId: string): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/end`, { method: "POST" }) : Promise.reject(new Error("live only"));
+  },
+  renewCompanySubscription(companyId: string, months: number): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/renew`, { method: "POST", body: JSON.stringify({ months }) }) : Promise.reject(new Error("live only"));
+  },
+  setCompanySeats(companyId: string, seats: number): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/seats`, { method: "POST", body: JSON.stringify({ seats }) }) : Promise.reject(new Error("live only"));
+  },
+  platformSeatRequests(): Promise<SeatRequest[]> {
+    return LIVE ? http<SeatRequest[]>("/platform/seat-requests") : Promise.reject(new Error("live only"));
+  },
+  approveSeatRequest(id: string): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/seat-requests/${id}/approve`, { method: "POST" }) : Promise.reject(new Error("live only"));
+  },
+  declineSeatRequest(id: string): Promise<void> {
+    return LIVE ? http<void>(`/platform/seat-requests/${id}/decline`, { method: "POST" }) : Promise.reject(new Error("live only"));
+  },
+
+  // --- a company's own subscription (admin read-only + app-lock check) ---
+  mySubscription(): Promise<SubscriptionView> {
+    return LIVE
+      ? http<SubscriptionView>("/subscription/me")
+      : Promise.resolve({ status: "NONE", seats: 0, seatsUsed: 0, endsAt: null, daysLeft: null, locked: false, pendingRequestSeats: null, pricePerEmployee: null, currency: "INR" });
+  },
+  requestSeats(seats: number, note?: string): Promise<SubscriptionView> {
+    return LIVE ? http<SubscriptionView>("/subscription/request-seats", { method: "POST", body: JSON.stringify({ seats, note }) }) : Promise.reject(new Error("live only"));
   },
 
   // --- shift scheduling / rostering ---

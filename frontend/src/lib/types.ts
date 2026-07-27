@@ -525,6 +525,53 @@ export interface Roster {
   assignments: RosterEntry[];
 }
 
+// --- platform owner (vendor) console + subscriptions ---
+export interface CompanySummary {
+  companyId: string;
+  name: string;
+  slug: string;
+  status: string;
+  adminName: string;
+  adminEmail: string;
+  headcount: number;
+  seats: number;
+  subscriptionStatus: string;
+  endsAt: string | null;
+  daysLeft: number | null;
+  locked: boolean;
+  createdAt: string | null;
+}
+export interface CreateCompanyInput {
+  companyName: string;
+  adminFirstName: string;
+  adminLastName: string;
+  adminEmail: string;
+  password: string;
+  seats: number;
+  months: number;
+}
+export interface SeatRequest {
+  id: string;
+  companyId: string;
+  companyName: string;
+  currentSeats: number;
+  requestedSeats: number;
+  status: string;
+  note: string | null;
+  createdAt: string;
+}
+export interface SubscriptionView {
+  status: string;
+  seats: number;
+  seatsUsed: number;
+  endsAt: string | null;
+  daysLeft: number | null;
+  locked: boolean;
+  pendingRequestSeats: number | null;
+  pricePerEmployee: number | null;
+  currency: string;
+}
+
 /** A page of results from a paginated list endpoint. */
 export interface Page<T> {
   content: T[];

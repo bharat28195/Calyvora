@@ -25,9 +25,16 @@ deploy to any domain, scale to 1,000+ employees. It's the full app with non-HR m
 nav (not deleted). Added there: **self-service payslips** + admin **Payroll**; **configurable payslip
 template** with payroll validation (V25); **subscription billing** — ₹100/employee/month, metered on
 headcount (V26); **directory pagination** (`/people/employees/page`, scales to 1,000+); and
-**Recruitment / ATS** — job openings + candidate pipeline (V27); and **Shift scheduling** — shift
-templates + a weekly roster grid, one shift per employee/day (V28). Plus a marketing site in
-`website/priority-hr-services/`. **155 backend tests green.**
+**Recruitment / ATS** — job openings + candidate pipeline (V27); **Shift scheduling** — templates +
+weekly roster (V28). Plus a marketing site in `website/priority-hr-services/`.
+
+**SaaS pivot (PD-10, [[hr-platform-saas-pivot]]):** now a true multi-tenant SaaS. **OWNER = platform
+vendor** above all companies with a **Platform console** (V30): list companies + headcount/seats/sub
+end-date, create company + first admin, end/renew subscription (ends → app **locks**), set seats;
+approve **seat requests** (Netflix model). **Roles ADMIN/HR/MANAGER/MEMBER** with per-role nav +
+`@PreAuthorize`. **Currency+timezone** app-wide (₹ default); **check-in/out** + daily log fixed;
+**payslip printing** fixed. Demo: `POST /api/v1/dev/seed-platform` → owner `owner@priorityhr.app` +
+5 sample companies. **158 backend tests green.**
 **Next (HR roadmap):** HR helpdesk · offboarding · PF/ESI compliance · assets · LMS.
 
 **Prior state:** Phase-1 trio (People/Work/Knowledge) + Work OS depth + **foundation hardening** (RLS SD-2,
