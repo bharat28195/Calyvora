@@ -1,0 +1,55 @@
+# Render.com blueprint — provisions the whole app (database + backend + frontend) in one go.
+# In the Render dashboard: New > Blueprint > pick this repo. Render reads this file and creates
+# all three services wired together. See docs/DEPLOY.md for the click-by-click walkthrough.
+#
+# Free tier notes: web services sleep after ~15 min idle (first request after is slow), and the
+# free Postgres is removed after 30 days. Bump plans to "starter" for always-on / persistent.
+
+databases:
+  - name: calyvora-db
+    plan: free
+    databaseName: calyvora
+    user: calyvora
+    # Render's Postgres role is NOSUPERUSER without BYPASSRLS -> tenant Row-Level Security works.
+
+services:
+  # ---- Backend: Spring Boot (Docker) ----
+  - type: web
+    name: calyvora-backend
+    runtime: docker
+    plan: free
+    region: singapore            # pick the region closest to you / your customers
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: staging
+      - key: DB_HOST
+        fromDatabase: { name: calyvora-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: calyvora-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: calyvora-db, property: database }
+      - key: DB_USERNAME
+        fromDatabase: { name: calyvora-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: calyvora-db, property: password }
+
+  # ---- Frontend: Next.js (native Node) ----
+  - type: web
+    name: calyvora-frontend
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_MODE
+        value: live
+      # The browser calls the frontend origin; Next proxies /api/* to the backend (first-party
+      # cookies, no CORS). This is read at BUILD time, so it must be set before the build runs —
+      # Render injects blueprint env vars into the build, so fromService works here.
+      - key: BACKEND_ORIGIN
+        fromService: { name: calyvora-backend, type: web, property: host }

@@ -250,6 +250,30 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-11 · 2026-07-27 · Ship a first-deploy path (Render blueprint) + the "Orbit by Calyvora" marketing site
+- **Context:** founder wants to host the app for real testing ("think of it as Keka") — a first-ever
+  deploy, no prior devops — and, separately, a very polished marketing site branded **Orbit by Calyvora**.
+- **Decision (hosting):** one-file **Render.com blueprint** (`render.yaml`) provisions all three parts —
+  managed **Postgres**, the **Spring Boot** backend (Docker), the **Next.js** frontend (native Node) —
+  wired together automatically. Recommended because Render's Postgres role is **NOSUPERUSER** so tenant
+  RLS holds with zero setup. Railway (all-in-one, no sleep) and Hostinger VPS documented as alternatives;
+  Railway needs a one-time non-superuser app-role because its default `postgres` is a superuser.
+- **Decision (test vs. prod profile):** deploy under a new **`staging`** profile — production-hardened
+  (HTTPS/secure cookies, `forward-headers`, small Hikari pool, INFO logs) **but not named `prod`**, so the
+  one-click `/api/v1/dev/**` seeding stays available for UAT. A separate **`prod`** profile turns seeding +
+  Swagger off for real customers.
+- **Decision (safety backstop):** `TenantIsolationVerifier` refuses to boot in `staging`/`prod` if the DB
+  role can bypass RLS (superuser/BYPASSRLS) — a multi-tenant data-leak is worse than a failed boot.
+  Overridable via `REQUIRE_TENANT_ISOLATION=false`.
+- **Also:** datasource now assembles from `DB_HOST/DB_PORT/DB_NAME` when no full `DB_URL` (so a managed DB
+  wires in with no JDBC-URL editing); Next config emits `standalone` + tolerates a scheme-less
+  `BACKEND_ORIGIN`; beginner guide in `docs/DEPLOY.md`.
+- **Decision (marketing site):** a standalone, self-contained `website/orbit/index.html` — dark premium
+  aesthetic on the app's own palette (violet #7c5cff → aqua #22d3ee), feature story mapped to the **real**
+  shipped modules (attendance→payroll LOP, regularization, helpdesk, platform console), per-seat pricing.
+  Kept as a static file (deployable anywhere), distinct from the in-app brand tokens.
+- **Status:** _shipped 2026-07-27_ — backend compiles, frontend production build green (standalone emitted).
+
 ### PD-10 · 2026-07-27 · Priority HR becomes a true multi-tenant SaaS with a platform-owner above the companies
 - **Context:** founder feedback dump (8 points), on branch `product/hr-platform`. Decided jointly via a
   4-question clarification. This reshapes the ownership model of the whole product.

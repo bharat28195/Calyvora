@@ -4,6 +4,21 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-07-27 — Deployment (Render blueprint) + "Orbit by Calyvora" marketing site
+**Make the app hostable for real testing, and give it a landing page.**
+
+- **One-click hosting.** `render.yaml` blueprint provisions Postgres + backend (Docker) + frontend
+  (Node) wired together; `docs/DEPLOY.md` is a first-timer walkthrough (Render / Railway / Hostinger VPS).
+- **`staging` + `prod` profiles.** New `application-staging.yml` (hosted testing — hardened but seeding
+  stays on) and `application-prod.yml` (real customers — seeding + Swagger off). Backend + frontend
+  `Dockerfile`s; Next.js emits a `standalone` bundle.
+- **Tenant-isolation guard.** `TenantIsolationVerifier` refuses to start in a hosted profile if the DB
+  role can bypass Row-Level Security (superuser/BYPASSRLS) — prevents a silent cross-tenant data leak.
+- **Flexible DB config.** Datasource assembles from `DB_HOST/DB_PORT/DB_NAME` when no full `DB_URL` is
+  given, so managed databases wire in without hand-editing a JDBC URL.
+- **Marketing site.** `website/orbit/index.html` — a polished, self-contained landing page for **Orbit
+  by Calyvora** on the product palette, with the feature story mapped to the real shipped modules.
+
 ### 2026-07-27 — Payroll ↔ attendance, payroll run, payslip branding, regularization
 **Make pay reflect real attendance, and give employees a way to fix missed punches.**
 

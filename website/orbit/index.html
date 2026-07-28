@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orbit by Calyvora — HR, in one calm orbit</title>
+<meta name="description" content="Orbit by Calyvora is the modern HR platform — attendance, leave, payroll, helpdesk and people ops in one beautifully simple place. Built for growing teams." />
+<style>
+  :root{
+    --violet:#7c5cff; --aqua:#22d3ee; --ink:#0b0b12; --ink-2:#101019;
+    --panel:#14141f; --panel-2:#1a1a27; --line:rgba(255,255,255,.09);
+    --fg:#f4f4fb; --fg-2:#a9a9c2; --fg-3:#6f6f88;
+    --radius:18px; --max:1160px;
+    --grad:linear-gradient(120deg,var(--violet),var(--aqua));
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--ink); color:var(--fg); line-height:1.55; -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+  /* ambient background glows */
+  .glow{position:fixed;border-radius:50%;filter:blur(120px);opacity:.5;z-index:0;pointer-events:none}
+  .glow.a{width:520px;height:520px;background:#7c5cff;top:-160px;left:-120px}
+  .glow.b{width:480px;height:480px;background:#22d3ee;top:280px;right:-160px;opacity:.32}
+
+  /* NAV */
+  header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
+    background:rgba(11,11,18,.6);border-bottom:1px solid transparent;transition:border-color .3s,background .3s}
+  header.scrolled{border-color:var(--line);background:rgba(11,11,18,.82)}
+  nav{display:flex;align-items:center;justify-content:space-between;height:70px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:19px;letter-spacing:-.02em}
+  .logo{width:34px;height:34px;border-radius:10px;background:var(--grad);position:relative;box-shadow:0 6px 20px rgba(124,92,255,.45)}
+  .logo::after{content:"";position:absolute;inset:8px;border:2px solid rgba(11,11,18,.9);border-radius:50%}
+  .logo::before{content:"";position:absolute;width:7px;height:7px;background:var(--ink);border-radius:50%;top:6px;right:6px;box-shadow:0 0 0 3px var(--aqua)}
+  .brand small{display:block;font-size:11px;font-weight:500;color:var(--fg-3);letter-spacing:.02em;margin-top:-3px}
+  .nav-links{display:flex;gap:30px;align-items:center}
+  .nav-links a{color:var(--fg-2);font-size:14.5px;font-weight:500;transition:color .2s}
+  .nav-links a:hover{color:var(--fg)}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14.5px;padding:11px 20px;border-radius:11px;border:1px solid transparent;cursor:pointer;transition:transform .15s,box-shadow .2s,background .2s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn-primary{background:var(--grad);color:#0a0a12;box-shadow:0 8px 24px rgba(124,92,255,.4)}
+  .btn-primary:hover{box-shadow:0 12px 30px rgba(124,92,255,.55)}
+  .btn-ghost{border-color:var(--line);color:var(--fg);background:rgba(255,255,255,.02)}
+  .btn-ghost:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.05)}
+  .nav-cta{display:flex;gap:12px;align-items:center}
+  .menu-btn{display:none;background:none;border:0;color:var(--fg);font-size:24px;cursor:pointer}
+
+  section{position:relative;z-index:1}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--aqua);
+    border:1px solid var(--line);padding:6px 14px;border-radius:100px;background:rgba(255,255,255,.02)}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--aqua);box-shadow:0 0 10px var(--aqua)}
+
+  /* HERO */
+  .hero{padding:90px 0 40px;text-align:center}
+  .hero h1{font-size:clamp(38px,6.2vw,72px);line-height:1.03;letter-spacing:-.03em;font-weight:800;margin:26px auto 0;max-width:14ch}
+  .hero p.sub{font-size:clamp(16px,2vw,20px);color:var(--fg-2);max-width:60ch;margin:24px auto 0}
+  .hero-cta{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap}
+  .hero-note{margin-top:16px;font-size:13px;color:var(--fg-3)}
+  .trust{margin-top:52px;display:flex;flex-wrap:wrap;gap:12px 40px;justify-content:center;align-items:center;opacity:.75}
+  .trust span{font-weight:700;font-size:15px;color:var(--fg-2);letter-spacing:.01em}
+
+  /* product mock */
+  .mock{position:relative;max-width:980px;margin:60px auto 0;perspective:1600px}
+  .mock-glow{position:absolute;inset:-10% 10% auto;height:70%;background:var(--grad);filter:blur(90px);opacity:.28;border-radius:50%;z-index:0}
+  .window{position:relative;z-index:1;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:linear-gradient(180deg,#12121c,#0d0d15);
+    box-shadow:0 40px 100px -30px rgba(0,0,0,.8);transform:rotateX(6deg);transform-origin:top}
+  .win-bar{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .win-bar i{width:11px;height:11px;border-radius:50%;background:#3a3a4a;display:block}
+  .win-bar i:nth-child(1){background:#ff5f57}.win-bar i:nth-child(2){background:#febc2e}.win-bar i:nth-child(3){background:#28c840}
+  .win-bar .url{margin-left:14px;font-size:12px;color:var(--fg-3);background:rgba(255,255,255,.04);padding:5px 12px;border-radius:7px}
+  .win-body{display:grid;grid-template-columns:190px 1fr;min-height:400px}
+  .side{border-right:1px solid var(--line);padding:18px 12px;background:rgba(255,255,255,.015)}
+  .side .s-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;font-size:13px;color:var(--fg-2);margin-bottom:3px}
+  .side .s-item.active{background:rgba(124,92,255,.16);color:#c9bcff;font-weight:600}
+  .side .s-item .ic{width:15px;height:15px;border-radius:5px;background:rgba(255,255,255,.14)}
+  .side .s-item.active .ic{background:var(--grad)}
+  .content{padding:22px 24px}
+  .content h4{font-size:15px;font-weight:700;margin-bottom:2px}
+  .content .muted{font-size:12px;color:var(--fg-3);margin-bottom:18px}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .kpi{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:rgba(255,255,255,.02)}
+  .kpi .n{font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .kpi .l{font-size:11px;color:var(--fg-3);margin-top:2px}
+  .kpi .n.g{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .rows{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:11px 15px;font-size:12.5px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row .who{display:flex;align-items:center;gap:9px}
+  .av{width:24px;height:24px;border-radius:50%;background:var(--grad);font-size:10px;display:flex;align-items:center;justify-content:center;color:#0a0a12;font-weight:700}
+  .pill{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:100px}
+  .pill.ok{background:rgba(40,200,100,.16);color:#4ade80}
+  .pill.warn{background:rgba(254,188,46,.16);color:#fbbf24}
+
+  /* SECTION HEADERS */
+  .sec-head{text-align:center;max-width:720px;margin:0 auto 54px}
+  .sec-head h2{font-size:clamp(28px,4.4vw,44px);letter-spacing:-.03em;font-weight:800;line-height:1.08;margin-top:18px}
+  .sec-head p{color:var(--fg-2);font-size:17px;margin-top:16px}
+  .pad{padding:100px 0}
+
+  /* FEATURE GRID */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+    transition:transform .2s,border-color .2s,box-shadow .3s;position:relative;overflow:hidden}
+  .card:hover{transform:translateY(-4px);border-color:rgba(124,92,255,.4);box-shadow:0 20px 50px -20px rgba(124,92,255,.4)}
+  .card .ci{width:46px;height:46px;border-radius:12px;background:rgba(124,92,255,.14);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+  .card .ci svg{width:23px;height:23px;stroke:var(--aqua);fill:none;stroke-width:1.8}
+  .card h3{font-size:18px;font-weight:700;letter-spacing:-.01em}
+  .card p{color:var(--fg-2);font-size:14.5px;margin-top:9px}
+
+  /* SPLIT STORY */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+  .split h2{font-size:clamp(26px,3.6vw,38px);letter-spacing:-.02em;font-weight:800;line-height:1.12}
+  .split p{color:var(--fg-2);font-size:16px;margin-top:16px}
+  .steps{margin-top:26px;display:flex;flex-direction:column;gap:14px}
+  .step{display:flex;gap:14px;align-items:flex-start}
+  .step .num{flex:0 0 auto;width:30px;height:30px;border-radius:9px;background:rgba(124,92,255,.16);color:#c9bcff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .step b{font-size:15px}
+  .step span{display:block;color:var(--fg-3);font-size:13.5px;margin-top:2px}
+  .flow{border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:rgba(255,255,255,.02)}
+  .flow .frow{display:flex;align-items:center;justify-content:space-between;padding:15px 16px;border:1px solid var(--line);border-radius:12px;margin-bottom:12px;font-size:14px;background:rgba(255,255,255,.02)}
+  .flow .frow:last-child{margin-bottom:0}
+  .flow .frow .r{font-weight:700}
+  .flow .arrow{text-align:center;color:var(--violet);font-size:20px;margin:-4px 0}
+
+  /* PLATFORM strip */
+  .platform{border:1px solid var(--line);border-radius:26px;padding:56px;background:
+     radial-gradient(120% 120% at 0% 0%,rgba(124,92,255,.16),transparent 55%),
+     radial-gradient(120% 120% at 100% 100%,rgba(34,211,238,.14),transparent 55%),var(--panel);
+     display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+  .platform h2{font-size:clamp(26px,3.6vw,38px);letter-spacing:-.02em;font-weight:800}
+  .platform p{color:var(--fg-2);margin-top:14px;font-size:16px}
+  .plist{margin-top:22px;display:grid;gap:12px}
+  .plist div{display:flex;gap:11px;align-items:center;font-size:14.5px;color:var(--fg-2)}
+  .check{width:22px;height:22px;border-radius:50%;background:var(--grad);color:#0a0a12;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto}
+
+  /* PRICING */
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
+  .price{border:1px solid var(--line);border-radius:var(--radius);padding:30px;background:rgba(255,255,255,.02);display:flex;flex-direction:column}
+  .price.feat{border-color:rgba(124,92,255,.5);background:linear-gradient(180deg,rgba(124,92,255,.1),rgba(255,255,255,.02));box-shadow:0 24px 60px -30px rgba(124,92,255,.6);position:relative}
+  .price.feat .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--grad);color:#0a0a12;font-size:11.5px;font-weight:700;padding:5px 14px;border-radius:100px}
+  .price h3{font-size:16px;font-weight:700;color:var(--fg-2)}
+  .price .amt{font-size:42px;font-weight:800;letter-spacing:-.03em;margin-top:12px}
+  .price .amt small{font-size:15px;font-weight:500;color:var(--fg-3)}
+  .price .desc{font-size:13.5px;color:var(--fg-3);margin-top:6px;min-height:38px}
+  .price ul{list-style:none;margin:22px 0;display:grid;gap:11px}
+  .price li{font-size:14px;color:var(--fg-2);display:flex;gap:10px;align-items:flex-start}
+  .price li::before{content:"✓";color:var(--aqua);font-weight:800}
+  .price .btn{width:100%;justify-content:center;margin-top:auto}
+
+  /* QUOTE */
+  .quote{text-align:center;max-width:820px;margin:0 auto}
+  .quote p{font-size:clamp(22px,3vw,30px);font-weight:600;letter-spacing:-.02em;line-height:1.35}
+  .quote .by{margin-top:22px;color:var(--fg-3);font-size:14px}
+
+  /* CTA */
+  .final{border-radius:28px;padding:70px 40px;text-align:center;position:relative;overflow:hidden;
+    background:radial-gradient(120% 140% at 50% 0%,rgba(124,92,255,.28),transparent 60%),var(--panel);border:1px solid var(--line)}
+  .final h2{font-size:clamp(30px,4.6vw,48px);letter-spacing:-.03em;font-weight:800;line-height:1.06}
+  .final p{color:var(--fg-2);font-size:18px;margin:18px auto 0;max-width:52ch}
+  .final .hero-cta{margin-top:30px}
+
+  /* FOOTER */
+  footer{border-top:1px solid var(--line);margin-top:100px;padding:56px 0 40px}
+  .foot{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:30px}
+  .foot h5{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3);margin-bottom:16px}
+  .foot a{display:block;color:var(--fg-2);font-size:14px;margin-bottom:11px;transition:color .2s}
+  .foot a:hover{color:var(--fg)}
+  .foot .brand{margin-bottom:14px}
+  .foot .tagline{color:var(--fg-3);font-size:14px;max-width:34ch}
+  .foot-bottom{margin-top:44px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;color:var(--fg-3);font-size:13px}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  @media(max-width:900px){
+    .win-body{grid-template-columns:1fr}.side{display:none}
+    .grid,.prices{grid-template-columns:1fr 1fr}
+    .split,.platform{grid-template-columns:1fr;gap:34px}
+    .foot{grid-template-columns:1fr 1fr}
+  }
+  @media(max-width:640px){
+    .nav-links{display:none}.nav-cta .btn-ghost{display:none}
+    .grid,.prices,.kpis,.foot{grid-template-columns:1fr}
+    .pad{padding:70px 0}.hero{padding:56px 0 20px}
+    .platform,.final{padding:36px 22px}
+    .trust{gap:10px 24px}
+  }
+</style>
+</head>
+<body>
+<div class="glow a"></div><div class="glow b"></div>
+
+<header id="hdr">
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="#top">
+        <span class="logo"></span>
+        <span>Orbit<small>by Calyvora</small></span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Product</a>
+        <a href="#flow">How it works</a>
+        <a href="#platform">For agencies</a>
+        <a href="#pricing">Pricing</a>
+      </div>
+      <div class="nav-cta">
+        <a href="#" class="btn btn-ghost">Sign in</a>
+        <a href="#pricing" class="btn btn-primary">Start free →</a>
+      </div>
+      <button class="menu-btn" aria-label="menu">☰</button>
+    </nav>
+  </div>
+</header>
+
+<span id="top"></span>
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow reveal"><span class="dot"></span>The modern HR platform</span>
+    <h1 class="reveal">All of HR, in one calm <span class="grad-text">orbit</span>.</h1>
+    <p class="sub reveal">Attendance, leave, payroll, helpdesk and every people-ops workflow — in a single, beautifully simple place your whole team actually enjoys using.</p>
+    <div class="hero-cta reveal">
+      <a href="#pricing" class="btn btn-primary">Start free trial →</a>
+      <a href="#flow" class="btn btn-ghost">See how it works</a>
+    </div>
+    <p class="hero-note reveal">No credit card needed · Set up your company in minutes</p>
+
+    <div class="trust reveal">
+      <span>Northwind</span><span>Vertex Labs</span><span>Meridian</span><span>Kite &amp; Co</span><span>Solstice</span>
+    </div>
+  </div>
+
+  <!-- PRODUCT MOCK -->
+  <div class="wrap">
+    <div class="mock reveal">
+      <div class="mock-glow"></div>
+      <div class="window">
+        <div class="win-bar"><i></i><i></i><i></i><span class="url">app.orbit.calyvora.com/dashboard</span></div>
+        <div class="win-body">
+          <aside class="side">
+            <div class="s-item active"><span class="ic"></span>Dashboard</div>
+            <div class="s-item"><span class="ic"></span>People</div>
+            <div class="s-item"><span class="ic"></span>Attendance</div>
+            <div class="s-item"><span class="ic"></span>Payroll</div>
+            <div class="s-item"><span class="ic"></span>Helpdesk</div>
+            <div class="s-item"><span class="ic"></span>Recruitment</div>
+            <div class="s-item"><span class="ic"></span>Documents</div>
+          </aside>
+          <div class="content">
+            <h4>Good morning, Ava 👋</h4>
+            <div class="muted">Here's what's happening at Northwind today.</div>
+            <div class="kpis">
+              <div class="kpi"><div class="n">142</div><div class="l">Employees</div></div>
+              <div class="kpi"><div class="n g">96%</div><div class="l">Checked in</div></div>
+              <div class="kpi"><div class="n">7</div><div class="l">Pending approvals</div></div>
+            </div>
+            <div class="rows">
+              <div class="row"><div class="who"><span class="av">SO</span>Sara Okoro · Leave request</div><span class="pill warn">Pending</span><span>2 days</span></div>
+              <div class="row"><div class="who"><span class="av">MK</span>Marcus Kane · Regularization</div><span class="pill ok">Approved</span><span>Today</span></div>
+              <div class="row"><div class="who"><span class="av">PN</span>Priya Nair · Payslip ready</div><span class="pill ok">Sent</span><span>Jul</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="pad" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>One platform, every module</span>
+      <h2>Everything your people team touches — under one roof.</h2>
+      <p>Stop stitching together five tools and a dozen spreadsheets. Orbit brings the entire employee lifecycle into one connected system.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg></div><h3>Attendance &amp; shifts</h3><p>Live check-in/out, a day-wise log for every employee, shift schedules and a clean team sheet — the way Keka and Zoho do it, minus the clutter.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><h3>Leave &amp; time off</h3><p>Balances, policies and holidays that just work. Employees request in a tap; managers approve from their inbox or phone.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><h3>Payroll that reads attendance</h3><p>Salaries, loss-of-pay auto-calculated from real attendance, and branded payslips. HR runs the whole month in one click.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></div><h3>Regularizations</h3><p>Forgot to punch in? Employees raise a fix-up request; the right manager approves and the day is marked present automatically.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg></div><h3>Employee helpdesk</h3><p>People raise HR tickets and track them to resolution. HR gets a tidy queue with threads, priorities and status — nothing slips.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM19 8v6M22 11h-6"/></svg></div><h3>Recruitment &amp; onboarding</h3><p>Track candidates through your pipeline and turn a hire into a fully onboarded employee with tasks, documents and a warm first day.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/></svg></div><h3>Performance</h3><p>Goals, reviews and check-ins that keep growth on the calendar instead of in someone's forgotten to-do list.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div><h3>Documents &amp; letters</h3><p>Generate offer letters, payslips and certificates from your own templates — with your company's name and branding on top.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8"/></svg></div><h3>Roles &amp; permissions</h3><p>Owner, Admin, HR, Manager, Employee — each sees exactly what they should. Set up your org's personas in minutes.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div><h3>Currency, timezone &amp; language</h3><p>Run India in ₹ and the US in $, each in the right timezone — one workspace, applied everywhere automatically.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FLOW / STORY -->
+<section class="pad" id="flow">
+  <div class="wrap">
+    <div class="split">
+      <div class="reveal">
+        <span class="eyebrow"><span class="dot"></span>Connected by design</span>
+        <h2>Attendance flows straight into pay. Automatically.</h2>
+        <p>In most companies, attendance lives in one tool and payroll in another — so someone spends the last week of every month reconciling spreadsheets. In Orbit, it's one thread.</p>
+        <div class="steps">
+          <div class="step"><span class="num">1</span><div><b>Employees clock in</b><span>Check-in/out and a full day-wise log, on web or mobile.</span></div></div>
+          <div class="step"><span class="num">2</span><div><b>Exceptions get fixed</b><span>Forgot to punch? A regularization goes to the manager and, once approved, updates the day.</span></div></div>
+          <div class="step"><span class="num">3</span><div><b>Payroll reads it</b><span>Loss-of-pay is calculated from real attendance — no manual deductions.</span></div></div>
+          <div class="step"><span class="num">4</span><div><b>Payslips go out</b><span>HR runs the month in one click; branded payslips land with each employee.</span></div></div>
+        </div>
+      </div>
+      <div class="flow reveal">
+        <div class="frow"><span>Attendance · July</span><span class="r">21 / 22 days</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Loss of pay</span><span class="r" style="color:#fbbf24">1 day</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Gross salary</span><span class="r">₹ 68,000</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow" style="border-color:rgba(124,92,255,.5)"><span>Net payable</span><span class="r grad-text" style="font-size:17px">₹ 64,905</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORM / AGENCY -->
+<section class="pad" id="platform">
+  <div class="wrap">
+    <div class="platform reveal">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>For agencies &amp; groups</span>
+        <h2>Manage every company from one console.</h2>
+        <p>Run HR for many companies? Orbit's platform view lets you create companies, invite their first admin, watch subscriptions and headcount, and control seats — all from a single owner dashboard.</p>
+        <div class="plist">
+          <div><span class="check">✓</span>See all companies, employees and revenue at a glance</div>
+          <div><span class="check">✓</span>Spin up a new company and its admin in seconds</div>
+          <div><span class="check">✓</span>Metered, Netflix-style seats — scale up when they grow</div>
+          <div><span class="check">✓</span>Airtight data isolation between every tenant</div>
+        </div>
+      </div>
+      <div class="flow" style="background:rgba(0,0,0,.25)">
+        <div class="frow"><span class="who" style="display:flex;gap:9px;align-items:center"><span class="av">NW</span>Northwind</span><span class="pill ok">Active · 142</span></div>
+        <div class="frow"><span class="who" style="display:flex;gap:9px;align-items:center"><span class="av">VL</span>Vertex Labs</span><span class="pill ok">Active · 38</span></div>
+        <div class="frow"><span class="who" style="display:flex;gap:9px;align-items:center"><span class="av">MD</span>Meridian</span><span class="pill warn">Expires 9d</span></div>
+        <div class="frow" style="border-color:rgba(124,92,255,.5)"><span>Monthly revenue</span><span class="r grad-text" style="font-size:17px">₹ 4.2L</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pad" id="pricing">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Simple, per-seat pricing</span>
+      <h2>Pay for the people you have. Nothing else.</h2>
+      <p>Every plan includes the full platform. You only choose how much scale and support you need.</p>
+    </div>
+    <div class="prices">
+      <div class="price reveal">
+        <h3>Starter</h3>
+        <div class="amt">₹99<small> / employee / mo</small></div>
+        <div class="desc">For small teams getting HR in order for the first time.</div>
+        <ul><li>Attendance, leave &amp; holidays</li><li>Employee helpdesk</li><li>Documents &amp; letters</li><li>Up to 25 employees</li></ul>
+        <a href="#" class="btn btn-ghost">Start free</a>
+      </div>
+      <div class="price feat reveal">
+        <span class="tag">Most popular</span>
+        <h3>Growth</h3>
+        <div class="amt">₹149<small> / employee / mo</small></div>
+        <div class="desc">The full platform for growing companies that run payroll.</div>
+        <ul><li>Everything in Starter</li><li>Payroll + loss-of-pay from attendance</li><li>Regularizations &amp; shifts</li><li>Performance &amp; recruitment</li><li>Roles, currency &amp; timezone</li></ul>
+        <a href="#" class="btn btn-primary">Start free trial →</a>
+      </div>
+      <div class="price reveal">
+        <h3>Agency</h3>
+        <div class="amt">Custom</div>
+        <div class="desc">For agencies &amp; groups running HR for many companies.</div>
+        <ul><li>Everything in Growth</li><li>Multi-company platform console</li><li>Metered seats &amp; billing</li><li>Priority support &amp; onboarding</li></ul>
+        <a href="#" class="btn btn-ghost">Talk to us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUOTE -->
+<section class="pad">
+  <div class="wrap">
+    <div class="quote reveal">
+      <p>“We replaced three tools and a mountain of spreadsheets with Orbit. Month-end payroll went from three days to <span class="grad-text">twenty minutes</span>.”</p>
+      <div class="by">Ava Chen · Head of People, Northwind</div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="wrap">
+  <div class="final reveal">
+    <h2>Bring your whole team into orbit.</h2>
+    <p>Set up your company, invite your people, and run your first payroll this week. It's genuinely that fast.</p>
+    <div class="hero-cta">
+      <a href="#" class="btn btn-primary">Start free trial →</a>
+      <a href="#" class="btn btn-ghost">Book a demo</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="brand" href="#top"><span class="logo"></span><span>Orbit<small>by Calyvora</small></span></a>
+        <p class="tagline">The modern HR platform for growing teams. Built with care by Calyvora.</p>
+      </div>
+      <div><h5>Product</h5><a href="#features">Attendance</a><a href="#features">Payroll</a><a href="#features">Helpdesk</a><a href="#pricing">Pricing</a></div>
+      <div><h5>Company</h5><a href="#">About Calyvora</a><a href="#">Careers</a><a href="#">Contact</a><a href="#">Blog</a></div>
+      <div><h5>Legal</h5><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Security</a><a href="#">Status</a></div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Calyvora. All rights reserved.</span>
+      <span>Orbit™ is a product of Calyvora.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // sticky nav shadow
+  const hdr=document.getElementById('hdr');
+  addEventListener('scroll',()=>hdr.classList.toggle('scrolled',scrollY>12));
+  // scroll reveal
+  const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(i%3*70)+'ms';io.observe(el)});
+</script>
+</body>
+</html>
