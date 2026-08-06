@@ -155,6 +155,12 @@ When you're done testing and want a real production instance:
   or do the Railway role fix above.
 - **Frontend loads but every action fails / "Network error"** → `BACKEND_ORIGIN` is wrong or was set
   *after* the build. Fix it and **rebuild** the frontend.
+- **`/api/...` returns a bare 500 "Internal Server Error" from the frontend** (but the same call works
+  against the backend url directly) → the Next.js proxy can't reach `BACKEND_ORIGIN`. On Render, don't
+  use `fromService: { property: host }` for this — that yields the *private* network name, which
+  speaks plain http on port 8080 and isn't reachable as `https://<name>`. Set `BACKEND_ORIGIN` to the
+  backend's **public** url (`https://calyvora-backend.onrender.com`) and **rebuild** the frontend;
+  the rewrite is baked in at build time, so a restart alone won't pick it up.
 - **Backend can't connect to DB** → check `DB_HOST/PORT/NAME/USERNAME/PASSWORD`; for Neon/managed DBs
   reachable over the public internet, use `DB_URL` with `?sslmode=require`.
 - **`UnknownHostException: dpg-xxxxxxxx-a` on Render** → the database and the backend are in

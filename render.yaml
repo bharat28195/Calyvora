@@ -52,7 +52,12 @@ services:
       - key: NEXT_PUBLIC_API_MODE
         value: live
       # The browser calls the frontend origin; Next proxies /api/* to the backend (first-party
-      # cookies, no CORS). This is read at BUILD time, so it must be set before the build runs —
-      # Render injects blueprint env vars into the build, so fromService works here.
+      # cookies, no CORS). Read at BUILD time (next.config.mjs rewrites are baked into
+      # routes-manifest.json), and Render injects blueprint env vars into builds.
+      #
+      # Deliberately the PUBLIC url, not `fromService property: host` — that resolves to the
+      # private-network name, which serves plain http on 8080 and is not reachable as
+      # https://<name>, so the proxy 500s. Update this if the backend service is ever renamed
+      # or Render appends a uniqueness suffix to its url.
       - key: BACKEND_ORIGIN
-        fromService: { name: calyvora-backend, type: web, property: host }
+        value: https://calyvora-backend.onrender.com
