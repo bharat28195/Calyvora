@@ -46,6 +46,37 @@ class JwtServiceTest {
     }
 
     @Test
+    void unfilled_key_slots_are_ignored_and_fall_back_to_ephemeral() {
+        // application.yml declares fixed key slots fed by env vars; with those env vars unset the
+        // slots bind as all-blank entries. Local dev must still boot, not fail as "misconfigured".
+        AppProperties.RsaKey blank = new AppProperties.RsaKey("", "", "");
+        AppProperties p = props(jwt("", List.of(blank, blank)));
+        JwtService service = new JwtService(new JwtKeyStore(p), p);
+
+        assertThat(service.parse(service.createAccessToken(PRINCIPAL)).userId()).isEqualTo(PRINCIPAL.userId());
+    }
+
+    @Test
+    void partially_filled_key_slot_still_fails_fast() {
+        // A kid with no public key is a genuine misconfiguration, not an unused slot.
+        AppProperties p = props(jwt("k1", List.of(new AppProperties.RsaKey("k1", null, null))));
+        assertThatThrownBy(() -> new JwtKeyStore(p)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void single_line_pem_is_accepted() {
+        // PEMs get pasted into a host's env-var UI as one line; the armor strip must cope.
+        KeyPair pair = generate();
+        AppProperties.RsaKey oneLine = new AppProperties.RsaKey("k1",
+                singleLinePem("PRIVATE KEY", pair.getPrivate().getEncoded()),
+                singleLinePem("PUBLIC KEY", pair.getPublic().getEncoded()));
+        AppProperties p = props(jwt("k1", List.of(oneLine)));
+        JwtService service = new JwtService(new JwtKeyStore(p), p);
+
+        assertThat(service.parse(service.createAccessToken(PRINCIPAL)).email()).isEqualTo("owner@calyvora.local");
+    }
+
+    @Test
     void token_signed_by_retired_key_still_verifies_after_rotation() {
         KeyPair k1 = generate();
         KeyPair k2 = generate();
@@ -131,6 +162,12 @@ class JwtServiceTest {
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    private static String singleLinePem(String label, byte[] der) {
+        return "-----BEGIN " + label + "-----"
+                + Base64.getEncoder().encodeToString(der)
+                + "-----END " + label + "-----";
     }
 
     private static String pem(String label, byte[] der) {

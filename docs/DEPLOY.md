@@ -53,6 +53,38 @@ the $7/mo "starter" plans for always-on + permanent).
    `[TENANT ISOLATION] OK`, and the frontend is "Live", open the **frontend** URL
    (`https://calyvora-frontend.onrender.com`).
 
+### Set the JWT signing keys (do this before you demo)
+
+`render.yaml` marks three backend variables `sync: false`, meaning **you** set them in the dashboard —
+a private key must never be committed. Until they're set the app generates a throwaway keypair at
+boot, so **every restart logs all users out** (and free-tier services restart whenever they wake from
+idle — mid-demo).
+
+Generate a keypair, then flatten each PEM to a single line (the app strips the armor and ignores
+whitespace, so one line pastes cleanly into a dashboard field):
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-private.pem
+openssl rsa -in jwt-private.pem -pubout -out jwt-public.pem
+tr -d '\r\n' < jwt-private.pem   # -> JWT_PRIVATE_KEY
+tr -d '\r\n' < jwt-public.pem    # -> JWT_PUBLIC_KEY
+```
+
+In Render → `calyvora-backend` → **Environment**, set:
+
+| Key | Value |
+|-----|-------|
+| `JWT_KID` | any stable label, e.g. `orbit-202608` |
+| `JWT_PRIVATE_KEY` | the single-line private PEM |
+| `JWT_PUBLIC_KEY` | the single-line public PEM |
+
+Save (the service redeploys). The log should then read `RS256 JWT key store ready: activeKid=<your
+kid>` with **no** "EPHEMERAL keypair" warning. Keep `jwt-private.pem` out of git.
+
+**Rotating later, with no downtime:** move the current three values into `JWT_KID_PREV` /
+`JWT_PRIVATE_KEY_PREV` / `JWT_PUBLIC_KEY_PREV`, put a fresh keypair in the primary three, redeploy.
+Tokens signed by the old key keep verifying; drop the `_PREV` trio once they've all expired (15 min).
+
 ### Load sample data (5 companies, admins, employees, payroll…)
 
 Because this test deploy runs under the `staging` profile, the one-click seeding still works. After
@@ -132,6 +164,10 @@ The backend reads everything from env vars (base config in `application.yml`):
 | `DB_HOST` / `DB_PORT` / `DB_NAME` | DB location if not using `DB_URL` | `...`/`5432`/`calyvora` |
 | `DB_USERNAME` / `DB_PASSWORD` | DB login (must be NOSUPERUSER) | |
 | `REQUIRE_TENANT_ISOLATION` | Safety check on/off. Leave `true`. | `true` |
+| `FRONTEND_BASE_URL` | Where invite / verification email links point. **Must** be the public frontend url — defaults to `localhost:3000`. | `https://calyvora-frontend.onrender.com` |
+| `CORS_ALLOWED_ORIGINS` | Origins allowed to call the API. Same value as above. | `https://calyvora-frontend.onrender.com` |
+| `JWT_KID` / `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | RS256 signing keys. Unset ⇒ ephemeral keypair ⇒ everyone logged out on each restart. See the section above. | |
+| `JWT_KID_PREV` / `JWT_PRIVATE_KEY_PREV` / `JWT_PUBLIC_KEY_PREV` | Optional retired key, kept trusted for verification during a rotation. | |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_FROM` | SMTP for invite/verification email. Optional — invites work without it; set later for real email. | |
 
 The frontend reads (at **build** time): `NEXT_PUBLIC_API_MODE=live` and `BACKEND_ORIGIN=<backend URL>`.

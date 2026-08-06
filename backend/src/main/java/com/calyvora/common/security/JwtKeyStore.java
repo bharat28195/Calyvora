@@ -15,6 +15,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -45,7 +46,13 @@ public class JwtKeyStore {
         Map<String, RSAPublicKey> publics = new LinkedHashMap<>();
         Map<String, PrivateKey> privates = new LinkedHashMap<>();
 
-        if (jwt.keys() == null || jwt.keys().isEmpty()) {
+        // application.yml declares fixed key slots fed by env vars, so an unused slot binds as an
+        // all-blank entry. Drop those: "slot left empty" means no key, not a broken key. A slot with
+        // *some* fields filled still falls through to the validation below.
+        List<AppProperties.RsaKey> configured = jwt.keys() == null ? List.of()
+                : jwt.keys().stream().filter(k -> !isEmptySlot(k)).toList();
+
+        if (configured.isEmpty()) {
             KeyPair generated = generateKeyPair();
             String kid = "dev-" + UUID.randomUUID();
             publics.put(kid, (RSAPublicKey) generated.getPublic());
@@ -55,12 +62,12 @@ public class JwtKeyStore {
                     + "All access tokens become invalid on restart. Configure calyvora.security.jwt.keys "
                     + "in any shared environment.", kid);
         } else {
-            for (AppProperties.RsaKey k : jwt.keys()) {
-                if (k.publicKeyPem() == null || k.publicKeyPem().isBlank()) {
+            for (AppProperties.RsaKey k : configured) {
+                if (isBlank(k.publicKeyPem())) {
                     throw new IllegalStateException("JWT key '" + k.kid() + "' is missing a public key");
                 }
                 publics.put(k.kid(), parsePublicKey(k.publicKeyPem()));
-                if (k.privateKeyPem() != null && !k.privateKeyPem().isBlank()) {
+                if (!isBlank(k.privateKeyPem())) {
                     privates.put(k.kid(), parsePrivateKey(k.privateKeyPem()));
                 }
             }
@@ -106,6 +113,15 @@ public class JwtKeyStore {
     /** kid -> public key, in a stable order — the source for the JWKS endpoint. */
     public Map<String, RSAPublicKey> verificationKeys() {
         return verificationKeys;
+    }
+
+    /** An entirely unfilled key slot — every field blank. */
+    private static boolean isEmptySlot(AppProperties.RsaKey k) {
+        return isBlank(k.kid()) && isBlank(k.privateKeyPem()) && isBlank(k.publicKeyPem());
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     private static KeyPair generateKeyPair() {

@@ -44,18 +44,26 @@ calyvora:
     from: ${MAIL_FROM:no-reply@calyvora.local}
   security:
     jwt:
-      # RS256 asymmetric signing with key rotation (SD-5).
-      # Leaving `keys` empty generates an EPHEMERAL keypair at startup — fine for local/dev/test,
-      # never for a shared env (tokens die on restart). To configure real keys, set active-kid and
-      # supply one or more PKCS#8 PEM keypairs; rotate by adding a key, flipping active-kid, then
-      # dropping the retired key once its last token has expired. Public keys are served at
-      # /.well-known/jwks.json. Example wiring via env for a shared environment:
-      #   active-kid: ${JWT_ACTIVE_KID:}
-      #   keys:
-      #     - kid: ${JWT_KID_1:}
-      #       private-key-pem: ${JWT_PRIVATE_KEY_1:}
-      #       public-key-pem: ${JWT_PUBLIC_KEY_1:}
-      active-kid: ${JWT_ACTIVE_KID:}
+      # RS256 asymmetric signing with key rotation (SD-5). Public keys are served at
+      # /.well-known/jwks.json.
+      #
+      # Two key slots, both env-fed. Leave them unset locally and an EPHEMERAL keypair is generated
+      # at startup (zero-config dev/test) — but a restart then invalidates every outstanding token,
+      # so any shared environment MUST set JWT_KID / JWT_PRIVATE_KEY / JWT_PUBLIC_KEY. PEMs are
+      # PKCS#8 and may be supplied on a single line (the armor is stripped and whitespace ignored),
+      # which is what makes them pasteable into a host's env-var UI.
+      #
+      # To rotate with no downtime: move the current trio into the _PREV slot, put the new keypair
+      # in the primary slot, redeploy — old tokens still verify against _PREV; drop _PREV once every
+      # token signed by it has expired (access-token-ttl).
+      keys:
+        - kid: ${JWT_KID:}
+          private-key-pem: ${JWT_PRIVATE_KEY:}
+          public-key-pem: ${JWT_PUBLIC_KEY:}
+        - kid: ${JWT_KID_PREV:}
+          private-key-pem: ${JWT_PRIVATE_KEY_PREV:}
+          public-key-pem: ${JWT_PUBLIC_KEY_PREV:}
+      active-kid: ${JWT_ACTIVE_KID:${JWT_KID:}}
       access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
       issuer: calyvora
     refresh:
