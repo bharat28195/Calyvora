@@ -157,5 +157,12 @@ When you're done testing and want a real production instance:
   *after* the build. Fix it and **rebuild** the frontend.
 - **Backend can't connect to DB** → check `DB_HOST/PORT/NAME/USERNAME/PASSWORD`; for Neon/managed DBs
   reachable over the public internet, use `DB_URL` with `?sslmode=require`.
+- **`UnknownHostException: dpg-xxxxxxxx-a` on Render** → the database and the backend are in
+  **different regions**. Render's private database hostname only resolves inside its own region, so a
+  Singapore service cannot see an Oregon database. `render.yaml` now pins the database to `singapore`
+  too, but **a database's region cannot be changed after it is created** — delete the existing
+  `calyvora-db` in the Render dashboard (Settings → Delete), then re-sync the blueprint (Blueprint →
+  Manual Sync) so it is recreated in the right region. Check the region badge on all three resources
+  afterwards; they must be identical.
 - **Everything is slow on the first click** → free-tier services were asleep; the first request wakes
   them (~30–60s). Upgrade to starter to keep them awake.

@@ -8,6 +8,9 @@
 databases:
   - name: calyvora-db
     plan: free
+    region: singapore          # MUST match the services' region — Render's private DB hostname
+                               # (dpg-xxxx-a) only resolves inside the same region. A mismatch
+                               # fails at boot with UnknownHostException on that hostname.
     databaseName: calyvora
     user: calyvora
     # Render's Postgres role is NOSUPERUSER without BYPASSRLS -> tenant Row-Level Security works.
