@@ -18,6 +18,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Holds the RSA keys the {@link JwtService} signs and verifies with (SD-5, RS256 + rotation).
@@ -36,51 +38,92 @@ public class JwtKeyStore {
 
     private static final Logger log = LoggerFactory.getLogger(JwtKeyStore.class);
 
+    private static final Pattern BEGIN_MARKER = Pattern.compile("-----BEGIN ([A-Z0-9 ]+)-----");
+    private static final Pattern PEM_MARKER = Pattern.compile("-----(?:BEGIN|END) [A-Z0-9 ]+-----");
+
     private final String activeKid;
     private final PrivateKey signingKey;
     /** kid -> public key, insertion-ordered so JWKS output is stable. */
     private final Map<String, RSAPublicKey> verificationKeys;
+    /** Why the configured keys were rejected, or {@code null} if they loaded (or none were given). */
+    private final String configurationError;
+    private final boolean ephemeral;
 
     public JwtKeyStore(AppProperties props) {
         AppProperties.Jwt jwt = props.security().jwt();
         Map<String, RSAPublicKey> publics = new LinkedHashMap<>();
         Map<String, PrivateKey> privates = new LinkedHashMap<>();
+        String resolvedKid = null;
+        String error = null;
 
         // application.yml declares fixed key slots fed by env vars, so an unused slot binds as an
         // all-blank entry. Drop those: "slot left empty" means no key, not a broken key. A slot with
-        // *some* fields filled still falls through to the validation below.
+        // *some* fields filled is a real mistake and is reported below.
         List<AppProperties.RsaKey> configured = jwt.keys() == null ? List.of()
                 : jwt.keys().stream().filter(k -> !isEmptySlot(k)).toList();
 
-        if (configured.isEmpty()) {
-            KeyPair generated = generateKeyPair();
-            String kid = "dev-" + UUID.randomUUID();
-            publics.put(kid, (RSAPublicKey) generated.getPublic());
-            privates.put(kid, generated.getPrivate());
-            this.activeKid = kid;
-            log.warn("No RS256 JWT keys configured — generated an EPHEMERAL keypair (kid={}). "
-                    + "All access tokens become invalid on restart. Configure calyvora.security.jwt.keys "
-                    + "in any shared environment.", kid);
-        } else {
-            for (AppProperties.RsaKey k : configured) {
-                if (isBlank(k.publicKeyPem())) {
-                    throw new IllegalStateException("JWT key '" + k.kid() + "' is missing a public key");
-                }
-                publics.put(k.kid(), parsePublicKey(k.publicKeyPem()));
-                if (!isBlank(k.privateKeyPem())) {
-                    privates.put(k.kid(), parsePrivateKey(k.privateKeyPem()));
-                }
+        if (!configured.isEmpty()) {
+            try {
+                resolvedKid = load(jwt, configured, publics, privates);
+            } catch (RuntimeException ex) {
+                // Deliberately non-fatal. A mistyped key is a config error, and refusing to boot
+                // turns it into a total outage — every user locked out to protect token longevity.
+                // The fallback is a freshly generated 2048-bit keypair, so this costs persistence
+                // across restarts, not strength. Logged at ERROR because it must not pass unnoticed.
+                publics.clear();
+                privates.clear();
+                resolvedKid = null;
+                error = ex.getMessage();
+                log.error("RS256 JWT key configuration is invalid, so the app is running on an "
+                        + "EPHEMERAL keypair — everyone is logged out on each restart until this is "
+                        + "fixed. Cause: {}", ex.getMessage(), ex);
             }
-            this.activeKid = resolveActiveKid(jwt, privates);
         }
 
-        this.signingKey = privates.get(activeKid);
-        this.verificationKeys = Map.copyOf(publics);
-        if (this.signingKey == null) {
-            throw new IllegalStateException("Active JWT key '" + activeKid + "' has no private key to sign with");
+        boolean wasGenerated = resolvedKid == null;
+        if (wasGenerated) {
+            KeyPair generated = generateKeyPair();
+            resolvedKid = "dev-" + UUID.randomUUID();
+            publics.put(resolvedKid, (RSAPublicKey) generated.getPublic());
+            privates.put(resolvedKid, generated.getPrivate());
+            if (configured.isEmpty()) {
+                log.warn("No RS256 JWT keys configured — generated an EPHEMERAL keypair (kid={}). "
+                        + "All access tokens become invalid on restart. Configure "
+                        + "calyvora.security.jwt.keys in any shared environment.", resolvedKid);
+            }
         }
-        log.info("RS256 JWT key store ready: activeKid={}, {} verification key(s)",
-                activeKid, verificationKeys.size());
+
+        this.activeKid = resolvedKid;
+        this.signingKey = privates.get(resolvedKid);
+        this.verificationKeys = Map.copyOf(publics);
+        this.configurationError = error;
+        this.ephemeral = wasGenerated;
+        log.info("RS256 JWT key store ready: activeKid={}, {} verification key(s), ephemeral={}",
+                activeKid, verificationKeys.size(), ephemeral);
+    }
+
+    /**
+     * Parse every configured key and pick the active one. Throws on any problem — the caller turns
+     * that into an ephemeral fallback rather than a failed startup.
+     *
+     * @return the active kid, guaranteed to have a private key to sign with.
+     */
+    private static String load(AppProperties.Jwt jwt, List<AppProperties.RsaKey> configured,
+                               Map<String, RSAPublicKey> publics, Map<String, PrivateKey> privates) {
+        for (AppProperties.RsaKey k : configured) {
+            if (isBlank(k.publicKeyPem())) {
+                throw new IllegalStateException("JWT key '" + k.kid() + "' is missing a public key");
+            }
+            publics.put(k.kid(), parsePublicKey(k.kid(), k.publicKeyPem()));
+            if (!isBlank(k.privateKeyPem())) {
+                privates.put(k.kid(), parsePrivateKey(k.kid(), k.privateKeyPem()));
+            }
+        }
+        String kid = resolveActiveKid(jwt, privates);
+        if (privates.get(kid) == null) {
+            throw new IllegalStateException("Active JWT key '" + kid + "' has no private key to sign with");
+        }
+        return kid;
     }
 
     private static String resolveActiveKid(AppProperties.Jwt jwt, Map<String, PrivateKey> privates) {
@@ -99,6 +142,16 @@ public class JwtKeyStore {
 
     public String activeKid() {
         return activeKid;
+    }
+
+    /** Signing on a keypair generated at startup — tokens will not survive a restart. */
+    public boolean isEphemeral() {
+        return ephemeral;
+    }
+
+    /** Why configured keys were rejected, or {@code null} if they loaded / none were supplied. */
+    public String configurationError() {
+        return configurationError;
     }
 
     public PrivateKey signingKey() {
@@ -134,31 +187,57 @@ public class JwtKeyStore {
         }
     }
 
-    private static RSAPublicKey parsePublicKey(String pem) {
+    private static RSAPublicKey parsePublicKey(String kid, String pem) {
         try {
             byte[] der = decodePem(pem, "PUBLIC KEY");
             PublicKey key = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(der));
             return (RSAPublicKey) key;
         } catch (Exception e) {
-            throw new IllegalStateException("Invalid RSA public key PEM (expect PKCS#8 'PUBLIC KEY')", e);
+            throw new IllegalStateException("Invalid RSA public key for kid '" + kid + "' (expect an "
+                    + "X.509 'PUBLIC KEY' PEM): " + e.getMessage(), e);
         }
     }
 
-    private static PrivateKey parsePrivateKey(String pem) {
+    private static PrivateKey parsePrivateKey(String kid, String pem) {
         try {
             byte[] der = decodePem(pem, "PRIVATE KEY");
             return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der));
         } catch (Exception e) {
-            throw new IllegalStateException("Invalid RSA private key PEM (expect PKCS#8 'PRIVATE KEY')", e);
+            throw new IllegalStateException("Invalid RSA private key for kid '" + kid + "' (expect a "
+                    + "PKCS#8 'PRIVATE KEY' PEM): " + e.getMessage(), e);
         }
     }
 
-    /** Strip the {@code -----BEGIN/END <label>-----} armor and any whitespace, then Base64-decode. */
-    private static byte[] decodePem(String pem, String label) {
-        String body = pem
-                .replace("-----BEGIN " + label + "-----", "")
-                .replace("-----END " + label + "-----", "")
-                .replaceAll("\\s", "");
+    /**
+     * Strip the {@code -----BEGIN/END <label>-----} armor and any whitespace, then Base64-decode.
+     *
+     * <p>These values are typed or pasted into a hosting dashboard by hand, so the armor is matched
+     * by pattern rather than exact text: a mismatch used to leave the dashes in place and surface as
+     * "Illegal base64 character 2d", which says nothing about the actual mistake. When the label is
+     * present but wrong — overwhelmingly a private key pasted into the public-key variable, or the
+     * two swapped — say exactly that instead.
+     */
+    private static byte[] decodePem(String pem, String expectedLabel) {
+        String cleaned = pem.trim();
+        // Some dashboards keep the surrounding quotes when a value is pasted as a quoted string.
+        if (cleaned.length() > 1 && (cleaned.startsWith("\"") && cleaned.endsWith("\"")
+                || cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.substring(1, cleaned.length() - 1);
+        }
+
+        Matcher begin = BEGIN_MARKER.matcher(cleaned);
+        if (begin.find()) {
+            String found = begin.group(1).trim();
+            if (!found.equals(expectedLabel)) {
+                throw new IllegalStateException("expected a '" + expectedLabel + "' PEM but the value "
+                        + "is a '" + found + "' PEM — the public and private keys look swapped");
+            }
+        }
+
+        String body = PEM_MARKER.matcher(cleaned).replaceAll("").replaceAll("\\s", "");
+        if (body.isEmpty()) {
+            throw new IllegalStateException("PEM body is empty once the armor is stripped");
+        }
         return Base64.getDecoder().decode(body);
     }
 }

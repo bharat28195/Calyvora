@@ -75,11 +75,28 @@ In Render → `calyvora-backend` → **Environment**, set:
 | Key | Value |
 |-----|-------|
 | `JWT_KID` | any stable label, e.g. `orbit-202608` |
-| `JWT_PRIVATE_KEY` | the single-line private PEM |
+| `JWT_PRIVATE_KEY` | the single-line private PEM |/m 
 | `JWT_PUBLIC_KEY` | the single-line public PEM |
 
 Save (the service redeploys). The log should then read `RS256 JWT key store ready: activeKid=<your
-kid>` with **no** "EPHEMERAL keypair" warning. Keep `jwt-private.pem` out of git.
+kid>, ... ephemeral=false`. Keep `jwt-private.pem` out of git.
+
+The two values are easy to mix up — check before saving:
+
+| Variable | Starts with | Length |
+|----------|-------------|--------|
+| `JWT_PRIVATE_KEY` | `-----BEGIN PRIVATE KEY-----` | ~1,700 chars |
+| `JWT_PUBLIC_KEY` | `-----BEGIN PUBLIC KEY-----` | ~450 chars |
+
+If they're swapped or malformed the app **does not** refuse to start — it logs an ERROR naming the
+problem and falls back to a generated keypair, so a typo costs token persistence rather than uptime:
+
+```
+ERROR ... RS256 JWT key configuration is invalid, so the app is running on an EPHEMERAL keypair —
+everyone is logged out on each restart until this is fixed. Cause: Invalid RSA public key for kid
+'orbit-202608' ...: expected a 'PUBLIC KEY' PEM but the value is a 'PRIVATE KEY' PEM — the public
+and private keys look swapped
+```
 
 **Rotating later, with no downtime:** move the current three values into `JWT_KID_PREV` /
 `JWT_PRIVATE_KEY_PREV` / `JWT_PUBLIC_KEY_PREV`, put a fresh keypair in the primary three, redeploy.
@@ -247,6 +264,22 @@ When you're done testing and want a real production instance:
    free HTTPS).
 
 ---
+
+## What can and cannot stop the app from starting
+
+Config mistakes shouldn't turn into outages, so most bad settings degrade loudly instead of killing
+the boot. Only two things are fatal, and both are cases where running on would be worse than being
+down:
+
+| Problem | Behaviour |
+|---------|-----------|
+| Database unreachable / migration fails | **Fatal** — there is no app without its data |
+| DB role bypasses Row-Level Security | **Fatal** — booting anyway would let one company read another's data |
+| JWT keys missing, malformed, or swapped | Degrades: ERROR in the log + generated keypair; logins work, tokens don't survive restarts |
+| SMTP unset, wrong host, bad password | Degrades: send failures are logged; signup and invites still succeed |
+
+So a mistyped secret costs you a warning in the log, not a dead service. Check the startup log after
+any deploy for `ephemeral=false` and no `[TENANT ISOLATION]` error.
 
 ## Troubleshooting
 

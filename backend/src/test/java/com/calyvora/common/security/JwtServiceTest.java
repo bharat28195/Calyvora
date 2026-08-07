@@ -57,10 +57,15 @@ class JwtServiceTest {
     }
 
     @Test
-    void partially_filled_key_slot_still_fails_fast() {
-        // A kid with no public key is a genuine misconfiguration, not an unused slot.
+    void partially_filled_key_slot_is_reported_but_does_not_stop_startup() {
+        // A kid with no public key is a genuine misconfiguration, not an unused slot — but still
+        // not a reason to refuse to boot.
         AppProperties p = props(jwt("k1", List.of(new AppProperties.RsaKey("k1", null, null))));
-        assertThatThrownBy(() -> new JwtKeyStore(p)).isInstanceOf(IllegalStateException.class);
+
+        JwtKeyStore store = new JwtKeyStore(p);
+
+        assertThat(store.isEphemeral()).isTrue();
+        assertThat(store.configurationError()).contains("k1");
     }
 
     @Test
@@ -74,6 +79,59 @@ class JwtServiceTest {
         JwtService service = new JwtService(new JwtKeyStore(p), p);
 
         assertThat(service.parse(service.createAccessToken(PRINCIPAL)).email()).isEqualTo("owner@calyvora.local");
+    }
+
+    @Test
+    void swapped_public_and_private_keys_degrade_instead_of_killing_startup() {
+        // The real-world slip: the private key pasted into the public-key variable. It must not
+        // take the deployment down — a mistyped key should cost token persistence, not uptime.
+        KeyPair pair = generate();
+        AppProperties.RsaKey swapped = new AppProperties.RsaKey("k1",
+                pem("PRIVATE KEY", pair.getPrivate().getEncoded()),
+                pem("PRIVATE KEY", pair.getPrivate().getEncoded()));  // private in the public slot
+        AppProperties p = props(jwt("k1", List.of(swapped)));
+
+        JwtKeyStore store = new JwtKeyStore(p);
+
+        assertThat(store.isEphemeral()).isTrue();
+        assertThat(store.configurationError()).contains("k1").contains("swapped");
+        // And the app is fully usable on the generated key.
+        JwtService service = new JwtService(store, p);
+        assertThat(service.parse(service.createAccessToken(PRINCIPAL)).userId()).isEqualTo(PRINCIPAL.userId());
+    }
+
+    @Test
+    void valid_keys_are_not_reported_as_ephemeral() {
+        JwtKeyStore store = new JwtKeyStore(props(jwt("k1", List.of(activeKey("k1")))));
+
+        assertThat(store.isEphemeral()).isFalse();
+        assertThat(store.configurationError()).isNull();
+        assertThat(store.activeKid()).isEqualTo("k1");
+    }
+
+    @Test
+    void pem_surrounded_by_quotes_is_accepted() {
+        // Some dashboards keep the quotes when a value is pasted as a quoted string.
+        KeyPair pair = generate();
+        AppProperties.RsaKey quoted = new AppProperties.RsaKey("k1",
+                "\"" + pem("PRIVATE KEY", pair.getPrivate().getEncoded()) + "\"",
+                "\"" + pem("PUBLIC KEY", pair.getPublic().getEncoded()) + "\"");
+        AppProperties p = props(jwt("k1", List.of(quoted)));
+        JwtService service = new JwtService(new JwtKeyStore(p), p);
+
+        assertThat(service.parse(service.createAccessToken(PRINCIPAL)).userId()).isEqualTo(PRINCIPAL.userId());
+    }
+
+    @Test
+    void truncated_pem_names_the_key_it_came_from() {
+        AppProperties.RsaKey truncated = new AppProperties.RsaKey(
+                "orbit-key", null, "-----BEGIN PUBLIC KEY-----MIIBIjANBg-----END PUBLIC KEY-----");
+        AppProperties p = props(jwt("orbit-key", List.of(truncated)));
+
+        JwtKeyStore store = new JwtKeyStore(p);
+
+        assertThat(store.isEphemeral()).isTrue();
+        assertThat(store.configurationError()).contains("orbit-key");
     }
 
     @Test
@@ -119,10 +177,14 @@ class JwtServiceTest {
     }
 
     @Test
-    void active_kid_without_private_key_fails_fast() {
+    void active_kid_without_private_key_degrades_instead_of_failing() {
         KeyPair k1 = generate();
         AppProperties p = props(jwt("k1", List.of(keyOf("k1", k1, false))));
-        assertThatThrownBy(() -> new JwtKeyStore(p)).isInstanceOf(IllegalStateException.class);
+
+        JwtKeyStore store = new JwtKeyStore(p);
+
+        assertThat(store.isEphemeral()).isTrue();
+        assertThat(store.configurationError()).contains("k1");
     }
 
     // --- helpers ---------------------------------------------------------------
