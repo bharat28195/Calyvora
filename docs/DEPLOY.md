@@ -130,6 +130,20 @@ Common failures in the `error` field:
 Mail lands in spam? Add SPF/DKIM records for the sending domain in your DNS — Hostinger publishes the
 exact values in its email dashboard.
 
+**Try it locally before deploying.** Put the mailbox credentials in `backend/.env.local` (gitignored)
+and run against the embedded database — no Docker, no Postgres install:
+
+```bash
+cd backend
+set -a && . ./.env.local && set +a && export MAIL_FROM="$MAIL_USERNAME"
+./mvnw spring-boot:run -Dspring-boot.run.profiles=embedded
+```
+
+With `MAIL_USERNAME` set, `ConsoleEmailService` (which normally prints links to the log under the
+`embedded` profile) stands aside so the **real** SMTP path runs — the same one a deployment uses. A
+signup against `POST /api/v1/auth/register` then sends a genuine verification email, so you can prove
+the whole flow before it matters in front of a customer.
+
 ### Load sample data (5 companies, admins, employees, payroll…)
 
 Because this test deploy runs under the `staging` profile, the one-click seeding still works. After
