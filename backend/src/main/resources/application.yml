@@ -22,14 +22,28 @@ spring:
     enabled: true
     locations: classpath:db/migration
   mail:
+    # Defaults target Mailpit for local dev (no auth, no TLS). A real provider needs
+    # MAIL_USERNAME/MAIL_PASSWORD plus one of STARTTLS (587) or implicit SSL (465) — e.g. Hostinger:
+    #   MAIL_HOST=smtp.hostinger.com  MAIL_PORT=587  MAIL_SMTP_AUTH=true  MAIL_SMTP_STARTTLS=true
+    # MAIL_USERNAME must be the full mailbox address, and MAIL_FROM must match it — providers reject
+    # a sender that differs from the authenticated mailbox.
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: false
+          auth: ${MAIL_SMTP_AUTH:false}
           starttls:
-            enable: false
+            enable: ${MAIL_SMTP_STARTTLS:false}
+          ssl:
+            enable: ${MAIL_SMTP_SSL:false}
+          # Never let an unreachable mail host hold a request thread open — registration and invite
+          # both send inline, and the default JavaMail timeout is infinite.
+          connectiontimeout: ${MAIL_TIMEOUT_MS:10000}
+          timeout: ${MAIL_TIMEOUT_MS:10000}
+          writetimeout: ${MAIL_TIMEOUT_MS:10000}
 
 server:
   port: ${SERVER_PORT:8080}

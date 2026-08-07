@@ -85,6 +85,51 @@ kid>` with **no** "EPHEMERAL keypair" warning. Keep `jwt-private.pem` out of git
 `JWT_PRIVATE_KEY_PREV` / `JWT_PUBLIC_KEY_PREV`, put a fresh keypair in the primary three, redeploy.
 Tokens signed by the old key keep verifying; drop the `_PREV` trio once they've all expired (15 min).
 
+### Turn on real email (Hostinger) — otherwise no verification mail is sent
+
+**Why nothing arrives today:** with `MAIL_HOST` unset the app targets `localhost:1025` (Mailpit, for
+local dev). On a server nothing is listening there, the send fails, and `SmtpEmailService`
+**deliberately swallows the error** — a mail outage must never roll back a completed signup. So
+registration returns success and the verification email silently goes nowhere.
+
+In Render → `calyvora-backend` → **Environment** (`render.yaml` already sets the host/port/TLS flags;
+these three are `sync: false` because they're yours):
+
+| Key | Value |
+|-----|-------|
+| `MAIL_USERNAME` | the **full** mailbox address, e.g. `no-reply@yourdomain.com` |
+| `MAIL_PASSWORD` | that mailbox's password |
+| `MAIL_FROM` | **the same address as `MAIL_USERNAME`** |
+
+`MAIL_FROM` must match `MAIL_USERNAME` — providers reject a `From:` that differs from the
+authenticated mailbox, which shows up as a confusing "sender denied" / relay error.
+
+Hostinger's settings, already in `render.yaml`: `smtp.hostinger.com`, port `587`, STARTTLS. If your
+account prefers implicit TLS, use port `465` and swap the flags — `MAIL_SMTP_SSL=true`,
+`MAIL_SMTP_STARTTLS=false`.
+
+**Verify it in one call** (staging only, disabled in `prod`):
+
+```bash
+curl -X POST "https://calyvora-backend.onrender.com/api/v1/dev/test-email?to=you@example.com"
+```
+
+It reports the real provider error instead of hiding it, and echoes the settings in effect:
+
+```json
+{"sent":true,"error":null,
+ "config":{"host":"smtp.hostinger.com","port":587,"username":"no-reply@yourdomain.com",
+           "from":"no-reply@yourdomain.com","auth":true,"starttls":true,"ssl":false}}
+```
+
+Common failures in the `error` field:
+- `AuthenticationFailedException … 535` → wrong password, or `MAIL_USERNAME` isn't the full address.
+- `MailConnectException … connect timed out` → wrong port, or outbound SMTP is blocked. Try 465+SSL.
+- `553 / 550 sender denied` → `MAIL_FROM` doesn't match `MAIL_USERNAME`.
+
+Mail lands in spam? Add SPF/DKIM records for the sending domain in your DNS — Hostinger publishes the
+exact values in its email dashboard.
+
 ### Load sample data (5 companies, admins, employees, payroll…)
 
 Because this test deploy runs under the `staging` profile, the one-click seeding still works. After
@@ -168,7 +213,11 @@ The backend reads everything from env vars (base config in `application.yml`):
 | `CORS_ALLOWED_ORIGINS` | Origins allowed to call the API. Same value as above. | `https://calyvora-frontend.onrender.com` |
 | `JWT_KID` / `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | RS256 signing keys. Unset ⇒ ephemeral keypair ⇒ everyone logged out on each restart. See the section above. | |
 | `JWT_KID_PREV` / `JWT_PRIVATE_KEY_PREV` / `JWT_PUBLIC_KEY_PREV` | Optional retired key, kept trusted for verification during a rotation. | |
-| `MAIL_HOST` / `MAIL_PORT` / `MAIL_FROM` | SMTP for invite/verification email. Optional — invites work without it; set later for real email. | |
+| `MAIL_HOST` / `MAIL_PORT` | SMTP server. Unset ⇒ `localhost:1025` ⇒ **no mail is ever sent** (failure is swallowed). | `smtp.hostinger.com` / `587` |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | Mailbox login. Username must be the full address. | |
+| `MAIL_FROM` | `From:` header — must equal `MAIL_USERNAME`. | `no-reply@yourdomain.com` |
+| `MAIL_SMTP_AUTH` / `MAIL_SMTP_STARTTLS` / `MAIL_SMTP_SSL` | `true`/`true`/`false` for port 587; `true`/`false`/`true` for port 465. | |
+| `MAIL_TIMEOUT_MS` | SMTP connect/read/write timeout. Keeps a dead mail host from stalling signup. | `10000` |
 
 The frontend reads (at **build** time): `NEXT_PUBLIC_API_MODE=live` and `BACKEND_ORIGIN=<backend URL>`.
 
@@ -208,3 +257,7 @@ When you're done testing and want a real production instance:
   afterwards; they must be identical.
 - **Everything is slow on the first click** → free-tier services were asleep; the first request wakes
   them (~30–60s). Upgrade to starter to keep them awake.
+- **Signup succeeds but no verification email arrives** → SMTP isn't configured, and the failure is
+  swallowed on purpose (see the email section above). Run
+  `curl -X POST "<backend>/api/v1/dev/test-email?to=you@example.com"` — it returns the real provider
+  error. Also check the backend log for `Failed to send email`.

@@ -54,6 +54,26 @@ services:
         sync: false
       - key: JWT_PUBLIC_KEY
         sync: false
+      # Outgoing email (Hostinger). Without these MAIL_HOST falls back to localhost:1025 (Mailpit),
+      # so every verification / invite send fails and is swallowed as a WARN — signup appears to
+      # succeed and no mail ever arrives. Port 587 + STARTTLS; use 465 with MAIL_SMTP_SSL=true and
+      # MAIL_SMTP_STARTTLS=false if your host prefers implicit TLS.
+      - key: MAIL_HOST
+        value: smtp.hostinger.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_SMTP_AUTH
+        value: "true"
+      - key: MAIL_SMTP_STARTTLS
+        value: "true"
+      # Full mailbox address, its password, and the From: — MAIL_FROM must equal MAIL_USERNAME or
+      # the provider rejects the message as a spoofed sender.
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
 
   # ---- Frontend: Next.js (native Node) ----
   - type: web

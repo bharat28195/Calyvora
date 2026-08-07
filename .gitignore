@@ -28,6 +28,8 @@ frontend/tsconfig.tsbuildinfo
 .env
 .env.local
 *.local.env
+# Key material (JWT signing keys are generated locally and pasted into the host's dashboard)
+*.pem
 secrets/
 
 # ---- Misc ----
