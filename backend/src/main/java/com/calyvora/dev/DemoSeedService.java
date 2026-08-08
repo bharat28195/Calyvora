@@ -167,7 +167,8 @@ public class DemoSeedService {
 
     public DemoCredentials seed() {
         if (userRepository.existsByEmail(OWNER_EMAIL)) {
-            log.info("Demo company already seeded — returning existing credentials for {}", OWNER_EMAIL);
+            log.info("Demo company already seeded — topping up any newly-added demo data for {}", OWNER_EMAIL);
+            topUpExistingDemo();
             return new DemoCredentials(COMPANY, OWNER_EMAIL, DEMO_PASSWORD, true);
         }
 
@@ -195,6 +196,58 @@ public class DemoSeedService {
 
         log.info("Seeded demo company '{}' ({} users) — owner {}", COMPANY, 6, OWNER_EMAIL);
         return new DemoCredentials(COMPANY, OWNER_EMAIL, DEMO_PASSWORD, false);
+    }
+
+    /**
+     * Bring an already-seeded demo up to date with demo content added since it was first seeded.
+     *
+     * <p>Without this, a long-lived environment silently misses every new feature's sample data: the
+     * seeder short-circuits on "already seeded", so payslip branding and the finance records added in
+     * V34 would stay blank on exactly the deployment being demoed.
+     *
+     * <p>Only ever <em>fills gaps</em> — anything already set is left alone, so re-seeding can't
+     * overwrite edits made by hand while testing.
+     */
+    private void topUpExistingDemo() {
+        User owner = userRepository.findByEmail(OWNER_EMAIL).orElse(null);
+        if (owner == null) {
+            return;
+        }
+        UUID companyId = owner.getCompanyId();
+        TenantContext.setCompanyId(companyId);
+        try {
+            // Payslip branding — only if the company hasn't set its own.
+            companySettingsRepository.findById(companyId).ifPresent(settings -> {
+                boolean changed = false;
+                if (isBlank(settings.getLegalName())) {
+                    settings.setLegalName("Northwind Robotics Private Limited");
+                    changed = true;
+                }
+                if (isBlank(settings.getAddress())) {
+                    settings.setAddress("704-705, Sankalp Square 3A, Beside Taj Skyline Hotel, "
+                            + "PRL Colony, Thaltej, Ahmedabad, Gujarat, 380059.");
+                    changed = true;
+                }
+                if (changed) {
+                    companySettingsRepository.save(settings);
+                }
+            });
+
+            // Bank / PF / ESI / PAN for the demo staff, if they have none yet.
+            Map<String, EmployeeResponse> emp = employeesByEmail();
+            boolean anyMissing = emp.values().stream().anyMatch(e ->
+                    employeeFinanceService.rawOrNull(UUID.fromString(e.id())) == null
+                            || isBlank(employeeFinanceService.rawOrNull(UUID.fromString(e.id())).getBankName()));
+            if (anyMissing) {
+                seedFinance(emp);
+            }
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     /** The platform vendor (OWNER) in its own company — above all customer companies. Idempotent. */
