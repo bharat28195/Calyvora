@@ -35,7 +35,7 @@ public class Subscription {
     private BigDecimal pricePerEmployee;
 
     /**
-     * False (the default) means bill from the published {@link VolumePricing} list. True means the
+     * False (the default) means bill from the published price list ({@link PricingService}). True means
      * platform owner quoted this company its own flat rate, which then applies to every employee and
      * must not be silently overwritten by a price-list change.
      */
@@ -106,17 +106,8 @@ public class Subscription {
 
     public void setCustomPrice(boolean customPrice) { this.customPrice = customPrice; }
 
-    /** This company's monthly charge — its negotiated flat rate, or the published volume tiers. */
-    public BigDecimal monthlyFor(long headcount) {
-        return customPrice
-                ? pricePerEmployee.multiply(BigDecimal.valueOf(headcount))
-                : VolumePricing.monthlyFor(headcount);
-    }
-
-    /** The rate the next employee is charged at — what a customer means by "our price". */
-    public BigDecimal rateFor(long headcount) {
-        return customPrice ? pricePerEmployee : VolumePricing.marginalRate(headcount);
-    }
+    // Charges are computed by PricingService, not here: the rate depends on the price list in force
+    // for the month being billed, which is data this entity has no business reaching for.
 
     public BigDecimal getPricePerEmployee() { return pricePerEmployee; }
     public void setPricePerEmployee(BigDecimal pricePerEmployee) { this.pricePerEmployee = pricePerEmployee; }

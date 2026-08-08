@@ -39,6 +39,23 @@ public class PlatformController {
         return service.companies(principal.companyId());
     }
 
+    /** Every version of the price list, newest first — the current one is flagged. */
+    @GetMapping("/pricing")
+    public List<com.calyvora.platform.dto.PriceListResponse> pricing() {
+        return service.priceLists();
+    }
+
+    /**
+     * Publish a new price list. Takes effect on its start date with no deploy and no restart;
+     * months already invoiced keep the list that was in force then.
+     */
+    @PostMapping("/pricing")
+    @ResponseStatus(HttpStatus.CREATED)
+    public com.calyvora.platform.dto.PriceListResponse publishPricing(
+            @Valid @RequestBody com.calyvora.platform.dto.PublishPriceListRequest request) {
+        return service.publishPriceList(request);
+    }
+
     @PostMapping("/companies")
     @ResponseStatus(HttpStatus.CREATED)
     public CompanySummaryResponse createCompany(@Valid @RequestBody CreateCompanyRequest req) {

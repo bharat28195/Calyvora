@@ -4,6 +4,26 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-08-09 — Prices are editable from the owner console, no deploy
+**Founder: "what if I want to change rates — do I have to do this much deployment?" No. Needing an
+engineer to change your own prices is a reason not to change them.**
+
+- **Price lists are data now (Flyway V37).** Rates and employee thresholds live in `price_lists` /
+  `price_list_tiers` and are edited on **Platform → Pricing**. Changes are live immediately — no
+  deploy, no restart, no code.
+- **Versioned by start date, so a change is never retroactive.** Each month is priced by the list in
+  force *then*, so last month's invoice keeps saying what the customer was actually asked to pay.
+  Editing a single global rate in place would silently restate issued invoices and make the billing
+  page something nobody could check — and a billing dispute unanswerable.
+- **Any shape of list works**, not just two tiers: add as many bands as you like, each with its own
+  employee limit and rate. The last is always open-ended, because a headcount with no price is a bug
+  waiting to happen — the API rejects a closed final tier, and limits that don't increase.
+- **The graduated rule holds for whatever you configure.** A test walks 0→250 employees against a
+  three-tier list and asserts the bill never falls as headcount rises.
+- **`VolumePricing` (the hardcoded list from earlier today) is gone.** Leaving a second copy of the
+  prices in code would have guaranteed the two disagree the first time either changed.
+- 8 integration tests, including the retroactivity guarantee, owner-only access, and tier validation.
+
 ### 2026-08-09 — In-app billing matches the published price list (₹149 / ₹99)
 **The site advertised volume pricing while the app still charged a flat ₹100 per employee stored per
 company. What a customer is billed should be what they were sold.**

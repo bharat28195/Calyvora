@@ -250,6 +250,21 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-15 · 2026-08-09 · Pricing is data the owner edits, and price changes are never retroactive
+- **Context:** founder asked whether changing rates would always mean a full deploy, and said to do
+  whatever is best for the product.
+- **Decision:** the price list moves out of code into the database, edited on Platform → Pricing.
+  Changing what you charge is a business decision that happens on a business timescale; making it
+  wait on a build is how prices end up stale because changing them is a chore.
+- **Decision (the important one):** price lists are **versioned by the date they take effect**, and
+  every calculation asks for the list in force for the month it's pricing. A single editable rate
+  would have been far simpler and quietly wrong — it would restate invoices already issued, so a
+  customer querying last month's bill would be shown a number that never existed at the time.
+  Billing that can't be checked isn't billing.
+- **Consequence:** any tier shape works, so a future "₹199 under 25 people" or an enterprise band is a
+  form fill, not a release. The graduated rule (PD-14) is enforced for whatever is configured.
+- **Rejected:** env vars on Render. No history, a restart per change, and still retroactive.
+
 ### PD-14 · 2026-08-09 · Volume pricing is graduated, not a flat band
 - **Context:** founder set pricing at ₹149 per employee up to 100 people and ₹99 beyond, and asked
   for the app to match the website.

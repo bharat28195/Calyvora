@@ -51,10 +51,13 @@ public class PlatformService {
     private final SubscriptionRepository subscriptionRepository;
     private final SeatRequestRepository seatRequestRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.calyvora.billing.PricingService pricingService;
 
     public PlatformService(CompanyRepository companyRepository, CompanySettingsRepository settingsRepository,
                            UserRepository userRepository, SubscriptionRepository subscriptionRepository,
-                           SeatRequestRepository seatRequestRepository, PasswordEncoder passwordEncoder) {
+                           SeatRequestRepository seatRequestRepository, PasswordEncoder passwordEncoder,
+                           com.calyvora.billing.PricingService pricingService) {
+        this.pricingService = pricingService;
         this.companyRepository = companyRepository;
         this.settingsRepository = settingsRepository;
         this.userRepository = userRepository;
@@ -162,6 +165,36 @@ public class PlatformService {
         return summarize(requireCompany(companyId));
     }
 
+    // ---- pricing ----
+
+    /** Every version of the price list, newest first, with the one currently in force flagged. */
+    @Transactional(readOnly = true)
+    public List<com.calyvora.platform.dto.PriceListResponse> priceLists() {
+        UUID currentId = pricingService.current().getId();
+        return pricingService.history().stream()
+                .map(l -> com.calyvora.platform.dto.PriceListResponse.of(l, l.getId().equals(currentId)))
+                .toList();
+    }
+
+    @Transactional
+    public com.calyvora.platform.dto.PriceListResponse publishPriceList(
+            com.calyvora.platform.dto.PublishPriceListRequest request) {
+        LocalDate effectiveFrom;
+        try {
+            effectiveFrom = LocalDate.parse(request.effectiveFrom().trim());
+        } catch (RuntimeException ex) {
+            throw new com.calyvora.common.error.ApiException(
+                    com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
+                    "Invalid start date — use YYYY-MM-DD");
+        }
+        List<com.calyvora.billing.PricingService.TierInput> tiers = request.tiers().stream()
+                .map(t -> new com.calyvora.billing.PricingService.TierInput(t.toEmployee(), t.rate()))
+                .toList();
+        var saved = pricingService.publish(effectiveFrom, request.note(), tiers);
+        return com.calyvora.platform.dto.PriceListResponse.of(
+                saved, saved.getId().equals(pricingService.current().getId()));
+    }
+
     // ---- seat requests ----
 
     @Transactional(readOnly = true)
@@ -214,9 +247,10 @@ public class PlatformService {
         // The rate the next employee is charged at, and the actual bill. These use the same
         // calculation as the customer's own billing page — the owner console must never quote a
         // revenue figure the customer isn't being asked to pay.
-        BigDecimal price = sub == null ? null : sub.rateFor(headcount);
+        java.time.YearMonth thisMonth = java.time.YearMonth.now();
+        BigDecimal price = sub == null ? null : pricingService.rateFor(sub, headcount, thisMonth);
         BigDecimal revenue = (sub == null || sub.isLocked())
-                ? BigDecimal.ZERO : sub.monthlyFor(headcount);
+                ? BigDecimal.ZERO : pricingService.monthlyFor(sub, headcount, thisMonth);
         return new CompanySummaryResponse(
                 company.getId().toString(), company.getName(), company.getSlug(), company.getStatus().name(),
                 admin == null ? "—" : (admin.getFirstName() + " " + admin.getLastName()).trim(),

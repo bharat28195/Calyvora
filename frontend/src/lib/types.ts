@@ -669,6 +669,19 @@ export interface BillingOverview {
   invoices: { month: string; headcount: number; amount: number; status: "PAID" | "DUE" | "OVERDUE" }[];
 }
 
+/**
+ * One version of the platform's price list. Versioned by start date so a price change never rewrites
+ * what a customer was already invoiced.
+ */
+export interface PriceListVersion {
+  id: string;
+  effectiveFrom: string;
+  note: string | null;
+  current: boolean;
+  /** `toEmployee` is null on the final, open-ended tier. */
+  tiers: { fromEmployee: number; toEmployee: number | null; rate: number }[];
+}
+
 /** Configurable payslip template (feedback: "add template for creating payslip"). */
 export type PayComponentKind = "EARNING" | "DEDUCTION";
 export type PayComponentCalc = "PERCENT_OF_GROSS" | "PERCENT_OF_BASIC" | "FIXED" | "REMAINDER";

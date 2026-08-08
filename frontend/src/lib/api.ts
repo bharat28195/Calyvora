@@ -28,6 +28,7 @@ import {
   type UpdateTicketInput,
   type Compensation,
   type Payslip,
+  type PriceListVersion,
   type EmployeeFinance,
   type PayrollRun,
   type Department,
@@ -239,6 +240,16 @@ export const api = {
   },
 
   // --- platform owner (vendor) console — live backend only ---
+  /** Every version of the price list, newest first. Owner only. */
+  platformPricing(): Promise<PriceListVersion[]> {
+    return LIVE ? http<PriceListVersion[]>("/platform/pricing") : Promise.reject(new Error("live only"));
+  },
+  /** Publish a new price list — live immediately, no deploy. Owner only. */
+  publishPricing(input: { effectiveFrom: string; note?: string; tiers: { toEmployee: number | null; rate: number }[] }): Promise<PriceListVersion> {
+    return LIVE
+      ? http<PriceListVersion>("/platform/pricing", { method: "POST", body: JSON.stringify(input) })
+      : Promise.reject(new Error("live only"));
+  },
   platformCompanies(): Promise<CompanySummary[]> {
     return LIVE ? http<CompanySummary[]>("/platform/companies") : Promise.reject(new Error("The platform console requires the live backend."));
   },

@@ -37,12 +37,14 @@ public class BillingService {
     private final SubscriptionRepository subscriptionRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final PricingService pricingService;
 
     public BillingService(SubscriptionRepository subscriptionRepository, UserRepository userRepository,
-                          EmployeeRepository employeeRepository) {
+                          EmployeeRepository employeeRepository, PricingService pricingService) {
         this.subscriptionRepository = subscriptionRepository;
         this.userRepository = userRepository;
         this.employeeRepository = employeeRepository;
+        this.pricingService = pricingService;
     }
 
     @Transactional
@@ -51,11 +53,12 @@ public class BillingService {
         Subscription sub = getOrCreate(companyId);
 
         long billable = userRepository.countByCompanyIdAndStatus(companyId, UserStatus.ACTIVE);
-        // Graduated by headcount unless this company was quoted its own rate — see VolumePricing.
-        BigDecimal rate = sub.rateFor(billable);
-        BigDecimal monthly = sub.monthlyFor(billable);
-        BigDecimal annual = monthly.multiply(BigDecimal.valueOf(12));
         YearMonth now = YearMonth.now();
+        // Graduated by headcount from the price list in force this month, unless this company was
+        // quoted its own flat rate.
+        BigDecimal rate = pricingService.rateFor(sub, billable, now);
+        BigDecimal monthly = pricingService.monthlyFor(sub, billable, now);
+        BigDecimal annual = monthly.multiply(BigDecimal.valueOf(12));
 
         return new BillingOverviewResponse(
                 sub.getPlan(), sub.getStatus().name(), rate, rate.multiply(BigDecimal.valueOf(12)),
@@ -64,7 +67,7 @@ public class BillingService {
                 sub.getStatus() == SubscriptionStatus.TRIALING,
                 billable, monthly, annual,
                 now.toString(), sub.getPaidThrough(),
-                sub.isCustomPrice() ? null : tierBreakdown(),
+                sub.isCustomPrice() ? null : tierBreakdown(now),
                 invoices(companyId, sub, now));
     }
 
@@ -108,14 +111,17 @@ public class BillingService {
                         DEFAULT_PRICE, DEFAULT_CURRENCY, java.time.Instant.now().plus(14, ChronoUnit.DAYS))));
     }
 
-    /** The published price list, so the UI can explain a bill that isn't headcount × one rate. */
-    private static List<BillingOverviewResponse.PriceTier> tierBreakdown() {
+    /** The price list in force this month, so the UI can explain a bill that isn't headcount × one rate. */
+    private List<BillingOverviewResponse.PriceTier> tierBreakdown(YearMonth month) {
         List<BillingOverviewResponse.PriceTier> out = new ArrayList<>();
         long from = 1;
-        for (VolumePricing.Tier tier : VolumePricing.TIERS) {
-            Long upTo = tier.upTo() == Long.MAX_VALUE ? null : tier.upTo();
-            out.add(new BillingOverviewResponse.PriceTier(from, upTo, tier.rate()));
-            from = tier.upTo() + 1;
+        for (PriceListTier tier : pricingService.tiersFor(month)) {
+            Long upTo = tier.getUpTo() == null ? null : tier.getUpTo().longValue();
+            out.add(new BillingOverviewResponse.PriceTier(from, upTo, tier.getRate()));
+            if (upTo == null) {
+                break;
+            }
+            from = upTo + 1;
         }
         return out;
     }
@@ -132,9 +138,9 @@ public class BillingService {
             long headcount = employees.stream()
                     .filter(e -> e.getStartDate() != null && !e.getStartDate().isAfter(monthEnd))
                     .count();
-            // Priced on that month's headcount, so an invoice from when the company was smaller shows
-            // the higher tier rate it was genuinely on at the time.
-            BigDecimal amount = sub.monthlyFor(headcount);
+            // Priced on that month's headcount *and* that month's price list, so an old invoice keeps
+            // reading what the customer was actually asked to pay after a price change.
+            BigDecimal amount = pricingService.monthlyFor(sub, headcount, ym);
             String status;
             if (paidThrough != null && !ym.isAfter(paidThrough)) {
                 status = "PAID";

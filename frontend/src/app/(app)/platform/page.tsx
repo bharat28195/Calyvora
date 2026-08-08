@@ -11,6 +11,7 @@ import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
+import { PricingEditor } from "@/components/platform/pricing-editor";
 
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-500/15 text-emerald-400",
@@ -89,6 +90,8 @@ export default function PlatformPage() {
               </div>
             </Card>
           )}
+
+          <PricingEditor />
 
           <Card className="mt-6 overflow-x-auto p-0">
             <table className="w-full min-w-[980px] border-collapse text-sm">
