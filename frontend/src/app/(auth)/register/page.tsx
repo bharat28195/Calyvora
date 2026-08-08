@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { api, ApiError, isLive } from "@/lib/api";
 import { registerSchema, passwordStrength, type RegisterInput } from "@/lib/validators";
@@ -19,6 +20,7 @@ const STRENGTH_LABELS = ["Too weak", "Weak", "Fair", "Good", "Strong"];
 const showDevMailbox = !isLive || process.env.NODE_ENV !== "production";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [values, setValues] = useState<RegisterInput>({
     companyName: "",
     firstName: "",
@@ -53,8 +55,17 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       const result = await api.register(parsed.data);
-      setEmailSent(result.emailSent);
-      setDone(true);
+      // Creating a workspace signs you straight into it — you've just set up a company and need to
+      // start adding people. If the backend still requires verification it refuses the login, and
+      // we fall back to the "check your email" screen rather than showing an error.
+      try {
+        await api.login(parsed.data.email, parsed.data.password);
+        router.replace("/dashboard");
+        return;
+      } catch {
+        setEmailSent(result.emailSent);
+        setDone(true);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.fieldErrors as Partial<Record<keyof RegisterInput, string>>);
@@ -132,7 +143,9 @@ export default function RegisterPage() {
   return (
     <Card>
       <CardTitle>Create your company workspace</CardTitle>
-      <CardDescription>You&apos;ll be the Owner. Takes about a minute.</CardDescription>
+      <CardDescription>
+        You&apos;ll be the admin, and you&apos;ll go straight in. Takes about a minute.
+      </CardDescription>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4" noValidate>
         {formError && <Alert tone="error">{formError}</Alert>}

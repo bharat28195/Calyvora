@@ -84,18 +84,29 @@ public class AuthService {
             throw new ConflictException("That email is already registered");
         }
 
+        // Signing up creates a company and its first ADMIN. Deliberately not OWNER: that role is the
+        // platform vendor above every tenant, and granting it here let anyone who registered read
+        // every customer's data from the owner console (fixed in V35).
+        boolean verificationRequired = props.security().verification().required();
+
         Company company = new Company(UUID.randomUUID(), request.companyName().trim(),
-                uniqueSlug(request.companyName()), CompanyStatus.PENDING);
+                uniqueSlug(request.companyName()),
+                verificationRequired ? CompanyStatus.PENDING : CompanyStatus.ACTIVE);
         companyRepository.save(company);
         companySettingsRepository.save(new CompanySettings(company.getId()));
 
-        User owner = new User(UUID.randomUUID(), company.getId(), email,
-                request.firstName().trim(), request.lastName().trim(), Role.OWNER,
-                UserStatus.PENDING_VERIFICATION);
-        owner.setPasswordHash(passwordEncoder.encode(request.password()));
-        userRepository.save(owner);
+        User admin = new User(UUID.randomUUID(), company.getId(), email,
+                request.firstName().trim(), request.lastName().trim(), Role.ADMIN,
+                verificationRequired ? UserStatus.PENDING_VERIFICATION : UserStatus.ACTIVE);
+        admin.setPasswordHash(passwordEncoder.encode(request.password()));
+        if (!verificationRequired) {
+            admin.setEmailVerifiedAt(Instant.now());
+        }
+        userRepository.save(admin);
 
-        String rawToken = issueVerificationToken(owner.getId());
+        // The email still goes out when a mailbox is configured — it's a useful welcome and confirms
+        // the address — but with verification off it never stands between someone and their workspace.
+        String rawToken = issueVerificationToken(admin.getId());
         return emailService.sendVerificationEmail(email, verificationUrl(rawToken)).delivered();
     }
 
@@ -151,7 +162,11 @@ public class AuthService {
                 || !passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new UnauthorizedException("Invalid email or password");
         }
-        if (user.getStatus() == UserStatus.PENDING_VERIFICATION) {
+        // Only blocks when verification is switched on. Off (the default), an account created before
+        // it was disabled still logs in — otherwise every signup made while mail was broken would
+        // stay permanently locked out with no way to rescue it.
+        if (user.getStatus() == UserStatus.PENDING_VERIFICATION
+                && props.security().verification().required()) {
             throw new ForbiddenException("Please verify your email before logging in");
         }
         if (user.getStatus() != UserStatus.ACTIVE) {

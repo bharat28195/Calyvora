@@ -42,7 +42,12 @@ public record AppProperties(
 
     public record Refresh(Duration ttl, String cookieName, boolean cookieSecure) {}
 
-    public record Verification(Duration ttl) {}
+    /**
+     * @param required when false (the default) a new workspace is usable the moment it's created —
+     *                 the signup becomes an active company ADMIN and can log straight in. Turn it on
+     *                 once outgoing mail is proven, to make people confirm they own the address.
+     */
+    public record Verification(Duration ttl, boolean required) {}
 
     public record Invitation(Duration ttl) {}
 }

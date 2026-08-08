@@ -4,6 +4,40 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-08-09 — Workspaces are usable immediately — and signup no longer grants the owner console
+**Founder request: "when I create a workspace for anyone they should be able to log in directly
+without verification… they will be admin, and the owner page is only for me." Acting on the second
+half of that turned out to be a security fix, not a preference.**
+
+- **`[CRITICAL]` Self-registration assigned `Role.OWNER`.** `/api/v1/platform/**` is guarded by
+  `hasRole('OWNER')` and lists `companyRepository.findAll()` — every company on the platform with its
+  headcount, seats, subscription and billing. So **anyone who signed up became a platform owner and
+  could read every customer's data.**
+  - **Why it never fired:** the broken email verification was accidentally the only lock on the door.
+    No self-registered account could ever log in, so nobody ever reached the console. Removing that
+    gate — exactly what was being asked for — would have opened it on the next signup.
+  - **Fix, in two layers.** Registration now creates an **ADMIN** of the new company, which is what a
+    company signup always should have produced. And the console requires **role `OWNER` *and*
+    membership of the company explicitly flagged as the platform** (`companies.is_platform`, new in
+    V35, checked by `PlatformAccess`) — so a stray OWNER row, however it appears, still can't reach
+    another tenant's data.
+  - **V35 repairs existing data:** every OWNER outside the platform company is demoted to ADMIN.
+- **Creating a workspace signs you straight into it.** You've just set up a company and need to start
+  adding people — waiting on an email helped nobody, least of all while mail was broken. The signup
+  becomes an active ADMIN of an active company and the UI logs them in and lands on the dashboard.
+- **Verification is a switch, not a deletion.** `REQUIRE_EMAIL_VERIFICATION=true` restores the old
+  behaviour once outgoing mail is proven. The login gate is checked against the same flag, so the
+  accounts created while mail was broken aren't left permanently locked out with no way to rescue
+  them. The welcome email still sends when a mailbox is configured — it just never blocks anyone.
+- **The app opens on the app.** `/` was a marketing landing page, so anyone opening the deployment —
+  including a customer who just wants to work — had to get past a brochure first. It now redirects:
+  dashboard if you have a session, log in if you don't. The product story still lives on the separate
+  marketing site (`website/orbit`), which is where it belongs.
+- **The mock backend mirrors all of it**, so the two modes can't drift on something this important.
+- 6 integration tests: signup logs in immediately, signup is an ADMIN, signup **cannot** reach the
+  platform console, a new admin can invite members straight away, the real platform owner still can
+  reach the console, and one company's admin still can't see another's people.
+
 ### 2026-08-09 — My Finances + a payslip that reads like a real document
 **Founder request, with Keka's "My Finances" screens as the reference: an employee should see how
 they're paid and what they're enrolled in, and the payslip should carry the company's logo and

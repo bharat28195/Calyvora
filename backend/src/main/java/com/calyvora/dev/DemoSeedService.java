@@ -255,8 +255,12 @@ public class DemoSeedService {
         if (userRepository.existsByEmail(PLATFORM_OWNER_EMAIL)) {
             return;
         }
-        Company platform = companyRepository.save(new Company(UUID.randomUUID(), PLATFORM_COMPANY,
-                uniqueSlug(PLATFORM_COMPANY), CompanyStatus.ACTIVE));
+        // Marked as the platform company — membership of it, not the OWNER role alone, is what
+        // unlocks the owner console (see PlatformAccess / V35).
+        Company platformCompany = new Company(UUID.randomUUID(), PLATFORM_COMPANY,
+                uniqueSlug(PLATFORM_COMPANY), CompanyStatus.ACTIVE);
+        platformCompany.setPlatform(true);
+        Company platform = companyRepository.save(platformCompany);
         companySettingsRepository.save(new CompanySettings(platform.getId()));
         User owner = new User(UUID.randomUUID(), platform.getId(), PLATFORM_OWNER_EMAIL,
                 "Priority", "Owner", Role.OWNER, UserStatus.ACTIVE);

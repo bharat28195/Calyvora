@@ -99,6 +99,10 @@ calyvora:
       cookie-secure: ${REFRESH_COOKIE_SECURE:false}   # true behind HTTPS (prod)
     verification:
       ttl: ${VERIFICATION_TTL:P1D}
+      # Off by default: creating a workspace should let you into it immediately (the signup becomes
+      # that company's ADMIN). Set REQUIRE_EMAIL_VERIFICATION=true once outgoing mail is proven, to
+      # make people confirm they own the address before the workspace activates.
+      required: ${REQUIRE_EMAIL_VERIFICATION:false}
     invitation:
       ttl: ${INVITATION_TTL:P7D}
 

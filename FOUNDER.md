@@ -250,6 +250,26 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-13 · 2026-08-09 · A workspace is usable the moment it's created — and OWNER means the vendor, only
+- **Context:** founder — "when I create a workspace for anyone they should be able to log in directly
+  without verification, they'll be admin, and the owner page is only for me, to see how many companies
+  there are and what I'm earning."
+- **Decision (activation):** creating a workspace creates an **active company + active ADMIN** and
+  signs them in. Email verification becomes a switch (`REQUIRE_EMAIL_VERIFICATION`, off by default),
+  not a requirement — it can come back on once outgoing mail is proven.
+- **Decision (roles):** `OWNER` is the platform vendor and **nothing else**. A company signup is an
+  `ADMIN`. This was already the intent under PD-10, but registration still handed out `OWNER`.
+- **What that uncovered:** because `/api/v1/platform/**` is guarded on the `OWNER` role and lists
+  every company, **every self-registered user was a platform owner** who could read every customer's
+  headcount, seats and billing. It had never fired only because verification was broken, so nobody
+  could log in after signing up — the bug was holding the door shut on itself. Acting on the founder's
+  request without noticing would have opened it.
+- **Decision (defence in depth):** the console now needs the role **and** membership of the company
+  flagged `is_platform`. A privileged role should never be the only thing standing between one
+  customer and another's data — roles get handed out by code that changes, company identity doesn't.
+- **Lesson:** a bug can mask a worse one. The email outage looked like a availability problem and was
+  also, silently, the only access control on the platform console.
+
 ### PD-12 · 2026-08-09 · "My Finances" — separate the pay record from the directory, mask it, split who owns it
 - **Context:** founder shared Keka's My Finances screens and asked for the same: an employee should
   see how they're paid and what they're enrolled in, and the payslip should carry the company logo

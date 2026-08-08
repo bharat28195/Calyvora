@@ -56,7 +56,8 @@ class ProfileDepthIntegrationTest extends IntegrationTestBase {
                         .content(json(Map.of("skills", List.of("UX", "Illustration"), "rating", 3, "endDate", "2027-01-01"))))
                 .andExpect(status().isOk());
         JsonNode leo = employeeByEmail(owner, "leo.martins@northwind.demo");
-        assertThat(objectMapper.convertValue(leo.get("skills"), List.class)).containsExactly("UX", "Illustration");
+        List<String> skills = objectMapper.convertValue(leo.get("skills"), List.class);
+        assertThat(skills).containsExactly("UX", "Illustration");
         assertThat(leo.get("rating").asInt()).isEqualTo(3);
         assertThat(leo.get("endDate").asText()).isEqualTo("2027-01-01");
     }

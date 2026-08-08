@@ -30,6 +30,14 @@ public class Company {
     @Column(nullable = false, length = 24)
     private CompanyStatus status = CompanyStatus.PENDING;
 
+    /**
+     * True for the single vendor company that owns the platform console. Membership of it — not the
+     * {@code OWNER} role alone — is what grants access to every tenant's data, so a stray OWNER row
+     * can never reach the console (see V35, where self-registration used to create exactly that).
+     */
+    @Column(name = "is_platform", nullable = false)
+    private boolean platform;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -80,6 +88,14 @@ public class Company {
 
     public void setStatus(CompanyStatus status) {
         this.status = status;
+    }
+
+    public boolean isPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(boolean platform) {
+        this.platform = platform;
     }
 
     public Instant getCreatedAt() {

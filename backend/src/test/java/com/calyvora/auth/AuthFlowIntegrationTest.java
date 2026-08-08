@@ -52,8 +52,13 @@ class AuthFlowIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
+    /**
+     * Verification is off by default (PD-13): creating a workspace means walking into it. The
+     * forbidden-until-verified path still exists and is covered by
+     * {@link VerificationRequiredIntegrationTest}, which turns the flag on.
+     */
     @Test
-    void login_before_verification_is_forbidden() throws Exception {
+    void login_without_verification_is_allowed_by_default() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("companyName", "Acme", "firstName", "Ada", "lastName", "L",
@@ -63,7 +68,8 @@ class AuthFlowIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "pending@acme.com", "password", PASSWORD))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
     }
 
     @Test
@@ -76,7 +82,9 @@ class AuthFlowIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + session.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.email").value("ok@acme.com"))
-                .andExpect(jsonPath("$.user.role").value("OWNER"))
+                // ADMIN, not OWNER: OWNER is the platform vendor above every tenant, and handing it
+                // to a signup gave them the owner console over every customer (PD-13 / V35).
+                .andExpect(jsonPath("$.user.role").value("ADMIN"))
                 .andExpect(jsonPath("$.company.status").value("ACTIVE"));
     }
 

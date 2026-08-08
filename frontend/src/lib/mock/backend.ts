@@ -396,7 +396,9 @@ export const mockBackend = {
       id: uuid(),
       name: input.companyName.trim(),
       slug: uniqueSlug(db, slugify(input.companyName)),
-      status: "PENDING",
+      // Active immediately — creating a workspace signs you into it (mirrors the server, where
+      // REQUIRE_EMAIL_VERIFICATION is off by default).
+      status: "ACTIVE",
     };
     const user: User = {
       id: uuid(),
@@ -405,8 +407,10 @@ export const mockBackend = {
       password: input.password,
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
-      role: "OWNER",
-      status: "PENDING_VERIFICATION",
+      // ADMIN, never OWNER: OWNER is the platform vendor above every tenant, and granting it here
+      // would hand the owner console — every customer's data — to anyone who signed up.
+      role: "ADMIN",
+      status: "ACTIVE",
     };
     const token: Token = {
       token: uuid(),

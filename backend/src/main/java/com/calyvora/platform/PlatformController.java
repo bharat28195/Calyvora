@@ -23,7 +23,9 @@ import java.util.UUID;
 /** Platform-owner (vendor) console — above all companies. OWNER only. Base {@code /api/v1/platform}. */
 @RestController
 @RequestMapping("/api/v1/platform")
-@PreAuthorize("hasRole('OWNER')")
+// Role *and* membership of the platform company. The role alone was the only guard until V35, when
+// self-registration turned out to hand OWNER to everyone who signed up — see PlatformAccess.
+@PreAuthorize("hasRole('OWNER') and @platformAccess.granted()")
 public class PlatformController {
 
     private final PlatformService service;
