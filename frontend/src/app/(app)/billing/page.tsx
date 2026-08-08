@@ -63,7 +63,9 @@ export default function BillingPage() {
             <p className="text-xs uppercase tracking-wide text-fg/40">This month</p>
             <p className="mt-1 text-4xl font-semibold tabular-nums">{money(data.monthlyCharge)}</p>
             <p className="mt-1 text-sm text-fg/50">
-              {data.billableEmployees} employees × {money(data.pricePerEmployee)}/mo
+              {data.tiers
+                ? `${data.billableEmployees} employees · ${tierSummary(data)}`
+                : `${data.billableEmployees} employees × ${money(data.pricePerEmployee)}/mo`}
             </p>
           </div>
           <div className="flex gap-2">
@@ -77,10 +79,39 @@ export default function BillingPage() {
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Mini icon={<Users className="h-4 w-4" />} label="Billable employees" value={String(data.billableEmployees)} />
-          <Mini label="Per employee / month" value={money(data.pricePerEmployee)} />
+          <Mini label={data.tiers ? "Your current rate" : "Per employee / month"} value={money(data.pricePerEmployee)} />
           <Mini label="Per employee / year" value={money(data.pricePerEmployeePerYear)} />
           <Mini icon={<CalendarClock className="h-4 w-4" />} label="Annual run-rate" value={money(data.annualCharge)} />
         </div>
+
+        {/* The bill isn't headcount × one rate once a company crosses a tier, so show the ladder
+            rather than leaving them to wonder why the arithmetic doesn't work. */}
+        {data.tiers && (
+          <div className="mt-4 rounded-lg border border-fg/10 bg-fg/[0.03] px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-fg/40">How this is calculated</p>
+            <div className="mt-2 flex flex-col gap-1">
+              {data.tiers.map((t) => {
+                const inTier = Math.max(
+                  0,
+                  Math.min(data.billableEmployees, t.toEmployee ?? data.billableEmployees) - (t.fromEmployee - 1),
+                );
+                return (
+                  <div key={t.fromEmployee} className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className={inTier > 0 ? "text-fg/70" : "text-fg/30"}>
+                      {t.toEmployee
+                        ? `Employees ${t.fromEmployee}–${t.toEmployee}`
+                        : `Employee ${t.fromEmployee} onwards`}
+                      <span className="text-fg/40"> · {money(t.rate)} each</span>
+                    </span>
+                    <span className={"tabular-nums " + (inTier > 0 ? "text-fg/80" : "text-fg/25")}>
+                      {inTier > 0 ? `${inTier} × ${money(t.rate)} = ${money(inTier * t.rate)}` : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Invoice history */}
@@ -94,7 +125,10 @@ export default function BillingPage() {
             <div key={inv.month} className="flex items-center gap-3 px-5 py-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{monthLabel(inv.month)}</p>
-                <p className="text-xs text-fg/40">{inv.headcount} employees × {money(data.pricePerEmployee)}</p>
+                <p className="text-xs text-fg/40">
+                  {inv.headcount} employees
+                  {!data.tiers && ` × ${money(data.pricePerEmployee)}`}
+                </p>
               </div>
               <p className="shrink-0 text-sm font-medium tabular-nums">{money(inv.amount)}</p>
               <div className="w-24 shrink-0 text-right">
@@ -128,6 +162,18 @@ function StatusPill({ status }: { status: BillingOverview["status"] }) {
     CANCELLED: "bg-fg/10 text-fg/50",
   };
   return <span className={cn("rounded-full px-3 py-1 text-xs font-medium", map[status])}>{status.toLowerCase().replace("_", " ")}</span>;
+}
+
+/** "first 100 at ₹149, then ₹99" — the price list in one line, under the headline number. */
+function tierSummary(data: BillingOverview): string {
+  if (!data.tiers?.length) return "";
+  return data.tiers
+    .map((t, i) =>
+      t.toEmployee
+        ? `${i === 0 ? "first" : "next"} ${t.toEmployee - (t.fromEmployee - 1)} at ${fmtMoney(t.rate)}`
+        : `then ${fmtMoney(t.rate)} each`,
+    )
+    .join(", ");
 }
 
 function Mini({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) {

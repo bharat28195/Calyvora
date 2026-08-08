@@ -20,7 +20,15 @@ public record BillingOverviewResponse(
         BigDecimal annualCharge,
         String currentMonth,
         String paidThrough,
+        /**
+         * The published volume tiers, so the UI can explain a bill that isn't simply headcount × one
+         * rate. Null for a company on a negotiated flat rate, where there is nothing to explain.
+         */
+        List<PriceTier> tiers,
         List<Invoice> invoices
 ) {
     public record Invoice(String month, long headcount, BigDecimal amount, String status) {}
+
+    /** "Employees 1–100 cost ₹149 each"; {@code toEmployee} is null on the final, open-ended tier. */
+    public record PriceTier(long fromEmployee, Long toEmployee, BigDecimal rate) {}
 }

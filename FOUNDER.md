@@ -250,6 +250,22 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-14 · 2026-08-09 · Volume pricing is graduated, not a flat band
+- **Context:** founder set pricing at ₹149 per employee up to 100 people and ₹99 beyond, and asked
+  for the app to match the website.
+- **Decision:** the cheaper rate applies **only to the employees above 100**, not to everyone once the
+  threshold is crossed.
+- **Why:** a flat band makes revenue fall as a customer grows. 100 employees at ₹149 is ₹14,900; 101
+  at ₹99 would be ₹9,999 — the 101st hire would cost us ₹4,901 a month, and a 101-person customer
+  would pay less in total than a 71-person one. Graduated keeps the bill monotonic (101 = ₹14,999)
+  while still honouring the promise that bigger companies get the better rate.
+- **Also decided:** the quoted rate shown to a customer is the **marginal** one ("you're on ₹99 now"),
+  not a blended average — a blended figure appears on no price list and answers no question they have.
+  And a company the owner has quoted a special rate is flagged `custom_price`, so future changes to
+  the standard list can't silently rewrite what was agreed with an existing customer.
+- **Open question for later:** whether crossing 100 should be sticky (a company that dips to 98 goes
+  back to ₹149 today). Fine at current scale; worth revisiting before a customer notices.
+
 ### PD-13 · 2026-08-09 · A workspace is usable the moment it's created — and OWNER means the vendor, only
 - **Context:** founder — "when I create a workspace for anyone they should be able to log in directly
   without verification, they'll be admin, and the owner page is only for me, to see how many companies

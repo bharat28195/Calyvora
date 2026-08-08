@@ -660,6 +660,12 @@ export interface BillingOverview {
   annualCharge: number;
   currentMonth: string;
   paidThrough: string | null;
+  /**
+   * The published volume tiers. Once a company crosses one, the bill is no longer headcount × a
+   * single rate, so the UI shows the ladder instead of arithmetic that doesn't add up. Null for a
+   * company on a negotiated flat rate, where there's nothing to explain.
+   */
+  tiers: { fromEmployee: number; toEmployee: number | null; rate: number }[] | null;
   invoices: { month: string; headcount: number; amount: number; status: "PAID" | "DUE" | "OVERDUE" }[];
 }
 

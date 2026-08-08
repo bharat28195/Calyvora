@@ -51,19 +51,21 @@ public class BillingService {
         Subscription sub = getOrCreate(companyId);
 
         long billable = userRepository.countByCompanyIdAndStatus(companyId, UserStatus.ACTIVE);
-        BigDecimal price = sub.getPricePerEmployee();
-        BigDecimal monthly = price.multiply(BigDecimal.valueOf(billable));
+        // Graduated by headcount unless this company was quoted its own rate — see VolumePricing.
+        BigDecimal rate = sub.rateFor(billable);
+        BigDecimal monthly = sub.monthlyFor(billable);
         BigDecimal annual = monthly.multiply(BigDecimal.valueOf(12));
         YearMonth now = YearMonth.now();
 
         return new BillingOverviewResponse(
-                sub.getPlan(), sub.getStatus().name(), price, price.multiply(BigDecimal.valueOf(12)),
+                sub.getPlan(), sub.getStatus().name(), rate, rate.multiply(BigDecimal.valueOf(12)),
                 sub.getCurrency(),
                 sub.getTrialEndsAt() == null ? null : sub.getTrialEndsAt().toString(),
                 sub.getStatus() == SubscriptionStatus.TRIALING,
                 billable, monthly, annual,
                 now.toString(), sub.getPaidThrough(),
-                invoices(companyId, sub, price, now));
+                sub.isCustomPrice() ? null : tierBreakdown(),
+                invoices(companyId, sub, now));
     }
 
     @Transactional
@@ -106,8 +108,20 @@ public class BillingService {
                         DEFAULT_PRICE, DEFAULT_CURRENCY, java.time.Instant.now().plus(14, ChronoUnit.DAYS))));
     }
 
+    /** The published price list, so the UI can explain a bill that isn't headcount × one rate. */
+    private static List<BillingOverviewResponse.PriceTier> tierBreakdown() {
+        List<BillingOverviewResponse.PriceTier> out = new ArrayList<>();
+        long from = 1;
+        for (VolumePricing.Tier tier : VolumePricing.TIERS) {
+            Long upTo = tier.upTo() == Long.MAX_VALUE ? null : tier.upTo();
+            out.add(new BillingOverviewResponse.PriceTier(from, upTo, tier.rate()));
+            from = tier.upTo() + 1;
+        }
+        return out;
+    }
+
     /** One invoice per recent month, headcount derived from who had started by the end of that month. */
-    private List<Invoice> invoices(UUID companyId, Subscription sub, BigDecimal price, YearMonth now) {
+    private List<Invoice> invoices(UUID companyId, Subscription sub, YearMonth now) {
         List<Employee> employees = employeeRepository.findByCompanyId(companyId);
         YearMonth paidThrough = sub.getPaidThrough() == null ? null : YearMonth.parse(sub.getPaidThrough());
 
@@ -118,7 +132,9 @@ public class BillingService {
             long headcount = employees.stream()
                     .filter(e -> e.getStartDate() != null && !e.getStartDate().isAfter(monthEnd))
                     .count();
-            BigDecimal amount = price.multiply(BigDecimal.valueOf(headcount));
+            // Priced on that month's headcount, so an invoice from when the company was smaller shows
+            // the higher tier rate it was genuinely on at the time.
+            BigDecimal amount = sub.monthlyFor(headcount);
             String status;
             if (paidThrough != null && !ym.isAfter(paidThrough)) {
                 status = "PAID";

@@ -34,6 +34,14 @@ public class Subscription {
     @Column(name = "price_per_employee", nullable = false)
     private BigDecimal pricePerEmployee;
 
+    /**
+     * False (the default) means bill from the published {@link VolumePricing} list. True means the
+     * platform owner quoted this company its own flat rate, which then applies to every employee and
+     * must not be silently overwritten by a price-list change.
+     */
+    @Column(name = "custom_price", nullable = false)
+    private boolean customPrice;
+
     @Column(nullable = false, length = 3)
     private String currency = "INR";
 
@@ -94,6 +102,22 @@ public class Subscription {
     public UUID getId() { return id; }
     public UUID getCompanyId() { return companyId; }
     public String getPlan() { return plan; }
+    public boolean isCustomPrice() { return customPrice; }
+
+    public void setCustomPrice(boolean customPrice) { this.customPrice = customPrice; }
+
+    /** This company's monthly charge — its negotiated flat rate, or the published volume tiers. */
+    public BigDecimal monthlyFor(long headcount) {
+        return customPrice
+                ? pricePerEmployee.multiply(BigDecimal.valueOf(headcount))
+                : VolumePricing.monthlyFor(headcount);
+    }
+
+    /** The rate the next employee is charged at — what a customer means by "our price". */
+    public BigDecimal rateFor(long headcount) {
+        return customPrice ? pricePerEmployee : VolumePricing.marginalRate(headcount);
+    }
+
     public BigDecimal getPricePerEmployee() { return pricePerEmployee; }
     public void setPricePerEmployee(BigDecimal pricePerEmployee) { this.pricePerEmployee = pricePerEmployee; }
     public String getCurrency() { return currency; }

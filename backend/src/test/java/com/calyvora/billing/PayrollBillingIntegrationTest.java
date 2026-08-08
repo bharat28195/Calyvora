@@ -54,11 +54,14 @@ class PayrollBillingIntegrationTest extends IntegrationTestBase {
         Session owner = login("ava.chen@northwind.demo", DEMO_PW);
 
         JsonNode b = getJson("/api/v1/billing", owner);
-        assertThat(b.get("pricePerEmployee").asDouble()).isEqualTo(100.0);
-        assertThat(b.get("pricePerEmployeePerYear").asDouble()).isEqualTo(1200.0);
+        // Northwind is on the published price list, well inside the first tier (₹149 up to 100).
+        assertThat(b.get("pricePerEmployee").asDouble()).isEqualTo(149.0);
+        assertThat(b.get("pricePerEmployeePerYear").asDouble()).isEqualTo(1788.0);
         assertThat(b.get("billableEmployees").asInt()).isEqualTo(6);
-        assertThat(b.get("monthlyCharge").asDouble()).isEqualTo(600.0);   // 6 × 100
-        assertThat(b.get("annualCharge").asDouble()).isEqualTo(7200.0);
+        assertThat(b.get("monthlyCharge").asDouble()).isEqualTo(894.0);   // 6 × 149
+        assertThat(b.get("annualCharge").asDouble()).isEqualTo(10728.0);
+        // The tier ladder is sent so the UI can explain a bill that isn't headcount × one rate.
+        assertThat(b.get("tiers")).hasSize(2);
         // The demo seeds Northwind with a live (ACTIVE) subscription so it shows up real in the
         // platform owner console (PD-10).
         assertThat(b.get("status").asText()).isEqualTo("ACTIVE");

@@ -4,6 +4,30 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-08-09 — In-app billing matches the published price list (₹149 / ₹99)
+**The site advertised volume pricing while the app still charged a flat ₹100 per employee stored per
+company. What a customer is billed should be what they were sold.**
+
+- **Volume tiers, applied everywhere** (`VolumePricing`, Flyway V36): ₹149 per employee per month for
+  the first 100 people, ₹99 for each one after. Used by the customer's billing page, their invoice
+  history, and the platform owner's revenue view — one calculation, so the owner console can never
+  quote a figure the customer isn't being asked to pay.
+- **Graduated, not a flat band — deliberately.** Reading "₹99 once you pass 100" as a rate on *every*
+  employee makes the bill **fall** as a company grows: 100 people at ₹149 is ₹14,900, but 101 at ₹99
+  would be ₹9,999 — a third of the revenue lost at the moment a customer hires their 101st person,
+  and a 101-person customer paying less in total than a 71-person one. Charging the cheaper rate only
+  above the threshold keeps the bill rising (101 people = ₹14,999) while still giving larger
+  customers the better marginal rate. A test asserts the bill never falls as headcount grows.
+- **Negotiated rates still win.** `subscriptions.custom_price` marks a company the platform owner has
+  quoted its own flat rate; the price list doesn't touch it. Existing rows on the old ₹100 default —
+  which nobody chose — move to the standard list, while any row whose price had been deliberately
+  changed keeps it.
+- **The UI explains the bill.** Once a company crosses a tier the total is no longer headcount × one
+  rate, so the billing page shows the ladder ("Employees 1–100 · ₹149 each") instead of arithmetic
+  that doesn't add up. The headline rate is the **marginal** one — "you're on ₹99 now" — rather than a
+  blended average, which appears on no price list and answers no question anyone has.
+- **The mock backend carries the same tier table**, so the two modes can't quote different money.
+
 ### 2026-08-09 — Workspaces are usable immediately — and signup no longer grants the owner console
 **Founder request: "when I create a workspace for anyone they should be able to log in directly
 without verification… they will be admin, and the owner page is only for me." Acting on the second

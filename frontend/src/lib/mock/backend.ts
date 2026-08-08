@@ -3298,10 +3298,41 @@ function mockSubscription(companyId: string): MockSub {
     trialEndsAt: new Date(Date.now() + 14 * 86_400_000).toISOString(),
   });
 }
+/**
+ * The published price list — must stay identical to VolumePricing on the server, or the two modes
+ * quote different money for the same company.
+ *
+ * Graduated on purpose: charging every employee ₹99 once a company passes 100 would make the bill
+ * *fall* as it grows (100 × ₹149 = ₹14,900 but 101 × ₹99 = ₹9,999). Only the employees above the
+ * threshold get the cheaper rate, so the bill keeps rising (101 people = ₹14,999).
+ */
+const PRICE_TIERS: { fromEmployee: number; toEmployee: number | null; rate: number }[] = [
+  { fromEmployee: 1, toEmployee: 100, rate: 149 },
+  { fromEmployee: 101, toEmployee: null, rate: 99 },
+];
+
+function monthlyForHeadcount(headcount: number): number {
+  let total = 0;
+  for (const t of PRICE_TIERS) {
+    const inTier = Math.max(0, Math.min(headcount, t.toEmployee ?? headcount) - (t.fromEmployee - 1));
+    total += inTier * t.rate;
+  }
+  return total;
+}
+
+/** The rate the next employee is charged at — what a customer means by "our price". */
+function marginalRate(headcount: number): number {
+  for (const t of PRICE_TIERS) {
+    if (t.toEmployee === null || headcount < t.toEmployee) return t.rate;
+  }
+  return PRICE_TIERS[PRICE_TIERS.length - 1].rate;
+}
+
 function buildBilling(db: DB, companyId: string): BillingOverview {
   const sub = mockSubscription(companyId);
   const billable = db.users.filter((u) => u.companyId === companyId && u.status === "ACTIVE").length;
-  const monthly = sub.price * billable;
+  const monthly = monthlyForHeadcount(billable);
+  const rate = marginalRate(billable);
   const now = new Date();
   const currentMonth = now.toISOString().slice(0, 7);
   const employees = db.employees.filter((e) => e.companyId === companyId);
@@ -3311,14 +3342,14 @@ function buildBilling(db: DB, companyId: string): BillingOverview {
     const headcount = employees.filter((e) => e.startDate && e.startDate <= d.toISOString().slice(0, 10)).length;
     const status: "PAID" | "DUE" | "OVERDUE" =
       sub.paidThrough && month <= sub.paidThrough ? "PAID" : month < currentMonth ? "OVERDUE" : "DUE";
-    return { month, headcount, amount: sub.price * headcount, status };
+    return { month, headcount, amount: monthlyForHeadcount(headcount), status };
   });
   return {
-    plan: "PER_EMPLOYEE", status: sub.status, pricePerEmployee: sub.price,
-    pricePerEmployeePerYear: sub.price * 12, currency: sub.currency,
+    plan: "PER_EMPLOYEE", status: sub.status, pricePerEmployee: rate,
+    pricePerEmployeePerYear: rate * 12, currency: sub.currency,
     trialEndsAt: sub.trialEndsAt, trialActive: sub.status === "TRIALING",
     billableEmployees: billable, monthlyCharge: monthly, annualCharge: monthly * 12,
-    currentMonth, paidThrough: sub.paidThrough, invoices,
+    currentMonth, paidThrough: sub.paidThrough, tiers: PRICE_TIERS, invoices,
   };
 }
 

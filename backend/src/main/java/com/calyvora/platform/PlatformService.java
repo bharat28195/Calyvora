@@ -143,12 +143,21 @@ public class PlatformService {
         return summarize(requireCompany(companyId));
     }
 
-    /** Set this company's price per employee/seat (per-company pricing for the revenue view). */
+    /**
+     * Quote this company its own flat rate, overriding the published volume tiers.
+     *
+     * <p>Setting a price marks the subscription as custom, so a later change to the standard price
+     * list can't silently overwrite what was agreed with this customer. Passing {@code null} puts
+     * them back on the standard list.
+     */
     @Transactional
     public CompanySummaryResponse setPrice(UUID companyId, BigDecimal pricePerEmployee) {
         Subscription sub = requireSubscription(companyId);
-        if (pricePerEmployee != null && pricePerEmployee.signum() >= 0) {
+        if (pricePerEmployee == null) {
+            sub.setCustomPrice(false);
+        } else if (pricePerEmployee.signum() >= 0) {
             sub.setPricePerEmployee(pricePerEmployee);
+            sub.setCustomPrice(true);
         }
         return summarize(requireCompany(companyId));
     }
@@ -202,10 +211,12 @@ public class PlatformService {
         String endsAt = sub != null && sub.getEndsAt() != null ? sub.getEndsAt().toString() : null;
         Long daysLeft = sub != null && sub.getEndsAt() != null
                 ? ChronoUnit.DAYS.between(LocalDate.now(), sub.getEndsAt()) : null;
-        BigDecimal price = sub == null ? null : sub.getPricePerEmployee();
-        // Monthly revenue from this company = price/seat × active headcount (only while live).
-        BigDecimal revenue = (sub == null || sub.isLocked() || price == null)
-                ? BigDecimal.ZERO : price.multiply(BigDecimal.valueOf(headcount));
+        // The rate the next employee is charged at, and the actual bill. These use the same
+        // calculation as the customer's own billing page — the owner console must never quote a
+        // revenue figure the customer isn't being asked to pay.
+        BigDecimal price = sub == null ? null : sub.rateFor(headcount);
+        BigDecimal revenue = (sub == null || sub.isLocked())
+                ? BigDecimal.ZERO : sub.monthlyFor(headcount);
         return new CompanySummaryResponse(
                 company.getId().toString(), company.getName(), company.getSlug(), company.getStatus().name(),
                 admin == null ? "—" : (admin.getFirstName() + " " + admin.getLastName()).trim(),
