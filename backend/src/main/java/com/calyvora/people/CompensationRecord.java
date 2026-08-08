@@ -33,8 +33,10 @@ public class CompensationRecord {
     @Column(name = "annual_amount", nullable = false)
     private BigDecimal annualAmount;
 
+    // Historical record of what the salary was agreed in. Display currency comes from company
+    // settings — see CompensationService.companyCurrency.
     @Column(nullable = false, length = 3)
-    private String currency = "USD";
+    private String currency = "INR";
 
     @Enumerated(EnumType.STRING)
     @Column(name = "change_type", nullable = false, length = 24)

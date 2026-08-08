@@ -62,6 +62,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthFilter jwtAuthFilter,
             TenantFilter tenantFilter,
+            com.calyvora.common.security.SubscriptionLockFilter subscriptionLockFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler
     ) throws Exception {
@@ -77,9 +78,11 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
-                // JWT first (populates SecurityContext), then TenantContext binding.
+                // JWT first (populates SecurityContext), then TenantContext binding, then the
+                // subscription lock — which needs the tenant bound before it can look one up.
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(tenantFilter, JwtAuthFilter.class);
+                .addFilterAfter(tenantFilter, JwtAuthFilter.class)
+                .addFilterAfter(subscriptionLockFilter, TenantFilter.class);
 
         return http.build();
     }

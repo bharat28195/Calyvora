@@ -51,6 +51,12 @@ export interface Invitation {
   invitedByEmail: string;
   createdAt: string;
   expiresAt: string;
+  /**
+   * The joining link — present only in the response to creating or regenerating an invitation, since
+   * the token is stored hashed and can't be read back. Surfacing it means adding a colleague never
+   * depends on email being deliverable.
+   */
+  acceptUrl?: string | null;
 }
 
 export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN";
@@ -1087,15 +1093,38 @@ export interface ApiErrorBody {
   errors?: { field: string; message: string }[];
 }
 
+/** "bankIfsc" -> "Bank IFSC", "panNumber" -> "PAN number" — field names as the form labels them. */
+function humanizeField(field: string): string {
+  const words = field
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase())
+    .split(" ");
+  const acronyms = new Set(["IFSC", "PAN", "UAN", "PF", "ESI", "PT", "NO", "URL", "ID"]);
+  return words
+    .map((w) => (acronyms.has(w.toUpperCase()) ? w.toUpperCase() : w.toLowerCase()))
+    .join(" ")
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
 export class ApiError extends Error {
   status: number;
   code: string;
   fieldErrors: Record<string, string>;
 
+  /**
+   * The server answers a failed validation with a generic "Validation failed" plus a per-field list.
+   * Showing only `message` told the user nothing about what to fix, so the readable summary is built
+   * here — every form that renders `error.message` gets the detail for free.
+   */
   constructor(body: ApiErrorBody) {
-    super(body.message);
+    const fields = body.errors ?? [];
+    super(
+      fields.length === 0
+        ? body.message
+        : fields.map((e) => `${humanizeField(e.field)} — ${e.message}`).join(". "),
+    );
     this.status = body.status;
     this.code = body.code;
-    this.fieldErrors = Object.fromEntries((body.errors ?? []).map((e) => [e.field, e.message]));
+    this.fieldErrors = Object.fromEntries(fields.map((e) => [e.field, e.message]));
   }
 }

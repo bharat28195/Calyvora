@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /** Shift scheduling / rostering (Owner/Admin). Base {@code /api/v1/shifts}. */
@@ -68,9 +67,10 @@ public class ShiftController {
     }
 
     @PostMapping("/roster/assign")
-    public RosterResponse.RosterEntry assign(@RequestBody Map<String, String> body) {
-        return service.assign(UUID.fromString(body.get("employeeId")),
-                LocalDate.parse(body.get("onDate")), UUID.fromString(body.get("shiftId")));
+    public RosterResponse.RosterEntry assign(
+            @Valid @RequestBody com.calyvora.shift.dto.AssignShiftRequest req) {
+        return service.assign(UUID.fromString(req.employeeId()),
+                LocalDate.parse(req.onDate()), UUID.fromString(req.shiftId()));
     }
 
     @DeleteMapping("/roster/assign/{id}")

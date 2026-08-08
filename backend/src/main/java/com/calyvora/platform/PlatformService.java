@@ -44,6 +44,10 @@ import java.util.stream.Collectors;
 public class PlatformService {
 
     private static final BigDecimal DEFAULT_PRICE = new BigDecimal("100");
+    /** Sanity ceilings, so a slipped digit in the console can't be stored as a real commercial term. */
+    private static final int MAX_SEATS = 100_000;
+    private static final int MAX_RENEW_MONTHS = 120;
+    private static final BigDecimal MAX_PRICE = new BigDecimal("1000000");
 
     private final CompanyRepository companyRepository;
     private final CompanySettingsRepository settingsRepository;
@@ -121,17 +125,37 @@ public class PlatformService {
     @Transactional
     public CompanySummaryResponse renewSubscription(UUID companyId, int months) {
         Subscription sub = requireSubscription(companyId);
+        if (months < 1 || months > MAX_RENEW_MONTHS) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "Renewal must be between 1 and " + MAX_RENEW_MONTHS + " months",
+                    fieldError("months", "must be between 1 and " + MAX_RENEW_MONTHS));
+        }
         LocalDate base = sub.getEndsAt() != null && sub.getEndsAt().isAfter(LocalDate.now())
                 ? sub.getEndsAt() : LocalDate.now();
-        sub.setEndsAt(base.plusMonths(Math.max(1, months)));
+        sub.setEndsAt(base.plusMonths(months));
         sub.setStatus(SubscriptionStatus.ACTIVE);
         return summarize(requireCompany(companyId));
     }
 
+    /**
+     * Set the seat limit. Silently clamping an out-of-range value used to answer 200 while storing
+     * something the owner never asked for — a mistyped "-5" became 1, quietly cutting the customer
+     * off from seats they had paid for. Bad input is now refused and explained.
+     */
     @Transactional
     public CompanySummaryResponse setSeats(UUID companyId, int seats) {
         Subscription sub = requireSubscription(companyId);
-        sub.setSeats(Math.max(1, seats));
+        if (seats < 1 || seats > MAX_SEATS) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "Seats must be between 1 and " + MAX_SEATS, fieldError("seats", "must be between 1 and " + MAX_SEATS));
+        }
+        long headcount = userRepository.countByCompanyIdAndStatus(companyId, UserStatus.ACTIVE);
+        if (seats < headcount) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "This company already has " + headcount + " active people — seats can't be set below that.",
+                    fieldError("seats", "must be at least the current headcount (" + headcount + ")"));
+        }
+        sub.setSeats(seats);
         return summarize(requireCompany(companyId));
     }
 
@@ -158,7 +182,14 @@ public class PlatformService {
         Subscription sub = requireSubscription(companyId);
         if (pricePerEmployee == null) {
             sub.setCustomPrice(false);
-        } else if (pricePerEmployee.signum() >= 0) {
+        } else {
+            // Silently dropping a negative price answered 200 while leaving the old rate in place, so
+            // the console showed a change that had not happened.
+            if (pricePerEmployee.signum() < 0 || pricePerEmployee.compareTo(MAX_PRICE) > 0) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                        "Price must be between 0 and " + MAX_PRICE,
+                        fieldError("price", "must be between 0 and " + MAX_PRICE));
+            }
             sub.setPricePerEmployee(pricePerEmployee);
             sub.setCustomPrice(true);
         }
@@ -232,6 +263,10 @@ public class PlatformService {
     }
 
     // ---- helpers ----
+
+    private static java.util.List<com.calyvora.common.error.ApiError.FieldError> fieldError(String field, String message) {
+        return java.util.List.of(new com.calyvora.common.error.ApiError.FieldError(field, message));
+    }
 
     private CompanySummaryResponse summarize(Company company) {
         long headcount = userRepository.countByCompanyIdAndStatus(company.getId(), UserStatus.ACTIVE);

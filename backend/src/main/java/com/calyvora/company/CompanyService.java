@@ -64,10 +64,14 @@ public class CompanyService {
         settings.setTimezone(request.timezone());
         settings.setLocale(request.locale());
         settings.setCurrency(request.currency());
-        settings.setLegalName(blankToNull(request.legalName()));
-        settings.setAddress(blankToNull(request.address()));
-        settings.setLogoUrl(request.logoUrl() == null || request.logoUrl().isBlank()
-                ? null : request.logoUrl());
+
+        // PATCH semantics for the optional identity fields: an omitted (null) field keeps its current
+        // value; an explicit empty string clears it. Overwriting on null made a caller that sent only
+        // {timezone, locale, currency} silently erase the legal name, address and logo — details that
+        // print on every payslip and are not obviously connected to the form being saved.
+        if (request.legalName() != null) settings.setLegalName(blankToNull(request.legalName()));
+        if (request.address() != null) settings.setAddress(blankToNull(request.address()));
+        if (request.logoUrl() != null) settings.setLogoUrl(blankToNull(request.logoUrl()));
         return CompanySettingsResponse.of(settings);
     }
 

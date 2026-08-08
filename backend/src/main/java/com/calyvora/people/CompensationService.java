@@ -82,7 +82,7 @@ public class CompensationService {
         }
 
         CompensationRecord current = records.isEmpty() ? null : records.get(0);
-        String currency = current == null ? "USD" : current.getCurrency();
+        String currency = companyCurrency(companyId);
         BigDecimal annual = current == null ? null : current.getAnnualAmount();
         BigDecimal monthly = annual == null ? null : annual.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
         return new CompensationResponse(employeeId.toString(), name, currency, annual, monthly,
@@ -105,7 +105,8 @@ public class CompensationService {
         }
         LocalDate effective = req.effectiveDate() == null || req.effectiveDate().isBlank()
                 ? LocalDate.now() : LocalDate.parse(req.effectiveDate());
-        String currency = req.currency() == null || req.currency().isBlank() ? "USD" : req.currency().toUpperCase();
+        String currency = req.currency() == null || req.currency().isBlank()
+                ? companyCurrency(companyId) : req.currency().toUpperCase();
 
         compensationRepository.save(new CompensationRecord(UUID.randomUUID(), companyId, employeeId,
                 effective, req.annualAmount(), currency, type, blankToNull(req.reason()), principal.userId()));
@@ -136,7 +137,7 @@ public class CompensationService {
         List<com.calyvora.people.dto.PayrollRunResponse.Row> rows = new java.util.ArrayList<>();
         BigDecimal totalGross = BigDecimal.ZERO, totalNet = BigDecimal.ZERO;
         double totalLop = 0;
-        String currency = "INR";
+        String currency = companyCurrency(TenantContext.getCompanyId());
         for (var e : employeeService.directory()) {
             try {
                 PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString());
@@ -145,13 +146,23 @@ public class CompensationService {
                 totalGross = totalGross.add(p.gross());
                 totalNet = totalNet.add(p.net());
                 totalLop += p.lopDays();
-                currency = p.currency();
             } catch (NotFoundException noSalary) {
                 // Employee has no salary on record yet — not part of this run.
             }
         }
         return new com.calyvora.people.dto.PayrollRunResponse(
                 ym.toString(), currency, rows, totalGross, totalNet, totalLop, rows.size());
+    }
+
+    /**
+     * The currency every amount in People/Payroll is denominated in — the one the company picked in
+     * settings. Falls back to INR only when a company predates the settings row.
+     */
+    private String companyCurrency(UUID companyId) {
+        return companySettingsRepository.findById(companyId)
+                .map(com.calyvora.company.CompanySettings::getCurrency)
+                .filter(c -> c != null && !c.isBlank())
+                .orElse("INR");
     }
 
     private UUID selfEmployeeId(UUID userId) {
@@ -175,7 +186,10 @@ public class CompensationService {
             throw new NotFoundException("No salary on record for this employee");
         }
         CompensationRecord current = records.get(0);
-        String cur = current.getCurrency();
+        // The company's configured currency is the single source of truth for what money on a payslip
+        // means. A salary row carries its own code only as history (and older rows default to USD), so
+        // reading it here printed "USD" on an INR company's payslip.
+        String cur = companyCurrency(companyId);
         BigDecimal gross = current.getAnnualAmount().divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
 
         // Generate the lines from the company's configurable payslip template.

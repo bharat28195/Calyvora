@@ -169,14 +169,19 @@ function EditForm({ finance, onCancel, onSaved }: {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const set = (k: keyof typeof values) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (k: keyof typeof values) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues((v) => ({ ...v, [k]: e.target.value }));
+    // Clear the field's complaint as soon as the user starts correcting it.
+    setFieldErrors((f) => (f[k] ? { ...f, [k]: "" } : f));
+  };
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setFieldErrors({});
     try {
       // Only send what changed — an untouched account number must not be overwritten with the mask.
       const patch: Record<string, unknown> = { ...values };
@@ -184,7 +189,14 @@ function EditForm({ finance, onCancel, onSaved }: {
       if (!values.panNumber) delete patch.panNumber;
       onSaved(await api.updateMyFinance(patch));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save your details");
+      if (err instanceof ApiError) {
+        setFieldErrors(err.fieldErrors);
+        // Field-level messages sit under their inputs; the banner only carries what has no home.
+        const unplaced = Object.keys(err.fieldErrors).length === 0;
+        setError(unplaced ? err.message : "Please correct the highlighted fields.");
+      } else {
+        setError("Couldn't save your details");
+      }
     } finally {
       setSaving(false);
     }
@@ -199,23 +211,24 @@ function EditForm({ finance, onCancel, onSaved }: {
       {error && <Alert tone="error" className="mt-4">{error}</Alert>}
       <form onSubmit={save} className="mt-5 flex flex-col gap-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Bank name" htmlFor="bankName">
+          <Field label="Bank name" htmlFor="bankName" error={fieldErrors.bankName}>
             <Input id="bankName" value={values.bankName} onChange={set("bankName")} />
           </Field>
           <Field
             label="Account number"
             htmlFor="bankAccountNo"
+            error={fieldErrors.bankAccountNo}
             hint={finance.bankAccountMasked ? `Currently ${finance.bankAccountMasked} — leave blank to keep it` : undefined}
           >
             <Input id="bankAccountNo" value={values.bankAccountNo} onChange={set("bankAccountNo")} />
           </Field>
-          <Field label="IFSC code" htmlFor="bankIfsc" hint="e.g. HDFC0003939">
+          <Field label="IFSC code" htmlFor="bankIfsc" error={fieldErrors.bankIfsc} hint="e.g. HDFC0003939">
             <Input id="bankIfsc" value={values.bankIfsc} onChange={set("bankIfsc")} />
           </Field>
-          <Field label="Name on the account" htmlFor="bankAccountName">
+          <Field label="Name on the account" htmlFor="bankAccountName" error={fieldErrors.bankAccountName}>
             <Input id="bankAccountName" value={values.bankAccountName} onChange={set("bankAccountName")} />
           </Field>
-          <Field label="Branch" htmlFor="bankBranch">
+          <Field label="Branch" htmlFor="bankBranch" error={fieldErrors.bankBranch}>
             <Input id="bankBranch" value={values.bankBranch} onChange={set("bankBranch")} />
           </Field>
         </div>
@@ -224,14 +237,15 @@ function EditForm({ finance, onCancel, onSaved }: {
           <Field
             label="PAN"
             htmlFor="panNumber"
+            error={fieldErrors.panNumber}
             hint={finance.panMasked ? `Currently ${finance.panMasked} — changing it needs re-verification` : "e.g. ABCDE1234F"}
           >
             <Input id="panNumber" value={values.panNumber} onChange={set("panNumber")} />
           </Field>
-          <Field label="Date of birth" htmlFor="dateOfBirth">
+          <Field label="Date of birth" htmlFor="dateOfBirth" error={fieldErrors.dateOfBirth}>
             <Input id="dateOfBirth" type="date" value={values.dateOfBirth} onChange={set("dateOfBirth")} />
           </Field>
-          <Field label="Parent's name" htmlFor="parentName">
+          <Field label="Parent's name" htmlFor="parentName" error={fieldErrors.parentName}>
             <Input id="parentName" value={values.parentName} onChange={set("parentName")} />
           </Field>
         </div>

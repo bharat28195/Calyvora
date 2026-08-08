@@ -4,6 +4,29 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-08-09 — Joining a company no longer depends on email arriving
+**The invitation link existed only inside the email. With outbound SMTP blocked, an invited person
+could never get in — and the admin had no way to help them.**
+
+- **The joining link comes back to the admin**, shown with a Copy button the moment an invitation is
+  created, and available later from **Members → Copy invite link**. Send it over WhatsApp, Slack, or
+  read it out. Email is now a convenience rather than the only door.
+- **Links can be reissued.** Tokens are stored hashed, so a lost link can't be read back — only
+  replaced. Reissuing invalidates the previous one, which is also what you want when a link went to
+  the wrong address.
+- **A link never leaks through the list endpoint** — there's nothing to leak (only a hash is stored),
+  and a link exposed that way would be a route into a company you were never invited to. Tested.
+- The invitation email itself is unchanged and still sends through the Resend transport once
+  `RESEND_API_KEY` is set; this is the belt to its braces.
+- 5 integration tests, including that the returned link genuinely works end to end and that a plain
+  member can't reissue one.
+
+### 2026-08-09 — Website: the features that shipped, and a visible contact address
+- Added the modules the site didn't mention: **My Finances**, **expenses &amp; reimbursements**, the
+  **AI assistant**, **knowledge base &amp; projects**, and **analytics**.
+- Contact address surfaced as `connect@calyvora.in` in both footers rather than hidden behind the
+  word "Contact".
+
 ### 2026-08-09 — Prices are editable from the owner console, no deploy
 **Founder: "what if I want to change rates — do I have to do this much deployment?" No. Needing an
 engineer to change your own prices is a reason not to change them.**

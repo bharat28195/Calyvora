@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, MailPlus, Trash2, UserPlus, Mail } from "lucide-react";
-import { api, ApiError } from "@/lib/api";
+import { Check, Link as LinkIcon, Loader2, MailPlus, Trash2, UserPlus, Mail } from "lucide-react";
+import { api, ApiError, isLive } from "@/lib/api";
 import { inviteSchema } from "@/lib/validators";
 import type { Invitation, Member } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,16 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 
+// The dev mailbox is a local-development convenience with no equivalent on a deployed backend, so
+// pointing a real admin at it would only confuse them.
+const showDevMailbox = !isLive || process.env.NODE_ENV !== "production";
+
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [invites, setInvites] = useState<Invitation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -38,6 +43,23 @@ export default function MembersPage() {
   async function revoke(id: string) {
     await api.revokeInvitation(id);
     void load();
+  }
+
+  /**
+   * Put a fresh joining link on the clipboard. The token is stored hashed, so the original can't be
+   * read back — this issues a new one, which also invalidates a link that went to the wrong place.
+   */
+  async function copyLink(id: string) {
+    setError(null);
+    try {
+      const invitation = await api.invitationLink(id);
+      if (!invitation.acceptUrl) throw new Error("no link");
+      await navigator.clipboard.writeText(invitation.acceptUrl);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 2500);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't copy the invite link");
+    }
   }
 
   const loading = members === null || invites === null;
@@ -105,12 +127,24 @@ export default function MembersPage() {
                         invited by {inv.invitedByEmail}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <button
-                          onClick={() => revoke(inv.id)}
-                          className="inline-flex items-center gap-1 text-xs text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Revoke
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          {/* Joining doesn't depend on the email arriving — the admin can copy the
+                              link and send it any way they like. */}
+                          <button
+                            onClick={() => copyLink(inv.id)}
+                            className="inline-flex items-center gap-1 text-xs text-fg/60 hover:text-fg"
+                          >
+                            {copiedId === inv.id
+                              ? <><Check className="h-3.5 w-3.5 text-emerald-400" /> Copied</>
+                              : <><LinkIcon className="h-3.5 w-3.5" /> Copy invite link</>}
+                          </button>
+                          <button
+                            onClick={() => revoke(inv.id)}
+                            className="inline-flex items-center gap-1 text-xs text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Revoke
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -146,12 +180,16 @@ function InviteDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   function reset() {
     setEmail("");
     setRole("MEMBER");
     setError(null);
     setSentTo(null);
+    setLink(null);
+    setCopied(false);
   }
 
   function close() {
@@ -169,8 +207,9 @@ function InviteDialog({
     }
     setBusy(true);
     try {
-      await api.createInvitation(parsed.data.email, parsed.data.role);
+      const invitation = await api.createInvitation(parsed.data.email, parsed.data.role);
       setSentTo(parsed.data.email);
+      setLink(invitation.acceptUrl ?? null);
       onInvited();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to send invitation");
@@ -184,18 +223,45 @@ function InviteDialog({
       <Modal open={open} onClose={close} title="Invitation sent">
         <div className="flex flex-col gap-4">
           <Alert tone="success">
-            Invitation created for <span className="font-medium">{sentTo}</span>.
+            We&apos;ve emailed an invitation to <span className="font-medium">{sentTo}</span>.
           </Alert>
-          <div className="rounded-lg border border-fg/10 bg-fg/5 p-4 text-sm text-fg/70">
-            <p className="flex items-center gap-2 font-medium text-fg">
-              <Mail className="h-4 w-4 text-aqua" /> No email server in local dev
-            </p>
-            <p className="mt-1.5">
-              The invite link is waiting in the{" "}
+
+          {/* Always offer the link too. Mail can be slow, land in spam, or not be configured yet —
+              and none of that should stop someone joining while you're sat next to them. */}
+          {link && (
+            <div className="rounded-lg border border-fg/10 bg-fg/5 p-4 text-sm text-fg/70">
+              <p className="font-medium text-fg">Or share the link directly</p>
+              <p className="mt-1.5">
+                They&apos;ll set their own password and be signed in. The link works once and expires
+                in 7 days.
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-md bg-fg/10 px-2 py-1.5 text-xs">
+                  {link}
+                </code>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(link);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2500);
+                  }}
+                >
+                  {copied ? <><Check className="h-4 w-4 text-emerald-400" /> Copied</> : <><LinkIcon className="h-4 w-4" /> Copy</>}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {showDevMailbox && (
+            <p className="text-xs text-fg/40">
+              Local dev: the message is also in the{" "}
               <Link href="/dev/mailbox" target="_blank" className="text-violet hover:underline">dev mailbox</Link>.
-              Open it, click the link, and the new member sets their own password and is logged in.
             </p>
-          </div>
+          )}
+
           <div className="mt-1 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => reset()}>Invite another</Button>
             <Button onClick={close}>Done</Button>

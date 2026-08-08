@@ -81,6 +81,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
     }
 
+    /**
+     * A request that can't be read at all: malformed JSON, a missing required parameter, or a value
+     * of the wrong shape (a non-UUID where a UUID belongs, "31-12-2020" where a date does). These are
+     * the caller's mistake, not ours — reporting them as 500 hid real client bugs behind an apparent
+     * server crash and put noise in the error log.
+     *
+     * <p>Deliberately narrow: {@code NullPointerException} and friends stay on the 500 path, because a
+     * genuine server fault reported as "your request was bad" is the more expensive mistake.
+     */
+    @ExceptionHandler({
+            org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            java.time.format.DateTimeParseException.class
+    })
+    public ResponseEntity<ApiError> handleBadRequest(Exception ex, HttpServletRequest request) {
+        String correlationId = correlationId(request);
+        // Logged at debug: useful when chasing a client integration, not worth alerting on.
+        log.debug("Rejected malformed request [correlationId={}]", correlationId, ex);
+        ApiError body = ApiError.of(ErrorCode.VALIDATION_ERROR,
+                "The request could not be read — check the fields and their formats.", correlationId, null);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
     /** Anything uncaught: log with the correlation id, return an opaque 500. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex, HttpServletRequest request) {

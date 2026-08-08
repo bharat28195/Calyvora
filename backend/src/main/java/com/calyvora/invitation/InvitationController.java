@@ -49,6 +49,16 @@ public class InvitationController {
         return invitationService.listPending();
     }
 
+    /**
+     * A fresh joining link for a pending invitation, so onboarding never depends on the email having
+     * arrived. Invalidates the previous link — which is also what you want if it went astray.
+     */
+    @PostMapping("/{id}/link")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    public InvitationResponse regenerateLink(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
+        return invitationService.regenerateLink(id, principal);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ResponseEntity<Void> revoke(@PathVariable UUID id) {

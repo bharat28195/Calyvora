@@ -103,6 +103,15 @@ public class Invitation {
         return tokenHash;
     }
 
+    /** Replacing the hash invalidates the previous joining link — see {@code regenerateLink}. */
+    public void setTokenHash(String tokenHash) {
+        this.tokenHash = tokenHash;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
     public InvitationStatus getStatus() {
         return status;
     }

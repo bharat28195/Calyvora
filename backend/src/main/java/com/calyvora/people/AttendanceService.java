@@ -27,17 +27,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Daily attendance (feedback C.4 — phase 2 of the "attendance option"). Phase 1 derived present vs
+ * Daily attendance (feedback C.4 â€” phase 2 of the "attendance option"). Phase 1 derived present vs
  * on-leave from approved leave; this stores a real row per employee per day.
  *
  * <p>Two rules keep it from becoming double data entry:
  * <ul>
- *   <li><b>Approved leave fills the day automatically.</b> Nobody marks time off twice — an
+ *   <li><b>Approved leave fills the day automatically.</b> Nobody marks time off twice â€” an
  *       unmarked day covered by approved leave resolves to {@code ON_LEAVE} (flagged {@code derived}).</li>
  *   <li><b>A marked row always wins</b> over anything derived, so a correction sticks.</li>
  * </ul>
  * Company holidays fill the day the same way; weekends resolve to {@code WEEK_OFF}. The work-week
- * itself is still hardcoded Mon–Fri — configurable work-week policy is the remaining debt here.
+ * itself is still hardcoded Monâ€“Fri â€” configurable work-week policy is the remaining debt here.
  */
 @Service
 public class AttendanceService {
@@ -49,11 +49,13 @@ public class AttendanceService {
     private final HolidayRepository holidayRepository;
     private final UserRepository userRepository;
     private final LeaveRequestRepository leaveRepository;
+    private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
 
     public AttendanceService(AttendanceRepository attendanceRepository, EmployeeRepository employeeRepository,
                              EmployeeService employeeService, DepartmentRepository departmentRepository,
                              HolidayRepository holidayRepository,
-                             UserRepository userRepository, LeaveRequestRepository leaveRepository) {
+                             UserRepository userRepository, LeaveRequestRepository leaveRepository,
+                             com.calyvora.company.CompanySettingsRepository companySettingsRepository) {
         this.holidayRepository = holidayRepository;
         this.attendanceRepository = attendanceRepository;
         this.employeeRepository = employeeRepository;
@@ -61,6 +63,36 @@ public class AttendanceService {
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
         this.leaveRepository = leaveRepository;
+        this.companySettingsRepository = companySettingsRepository;
+    }
+
+    /**
+     * "Now" as the company experiences it. Attendance is the one place where the server's own clock is
+     * the wrong clock: on a UTC host, an Indian employee clocking in at 04:15 IST was recorded at 22:45
+     * on the <em>previous</em> day, putting the punch on the wrong date and the wrong payslip.
+     */
+    private java.time.ZoneId zone() {
+        return companySettingsRepository.findById(TenantContext.getCompanyId())
+                .map(com.calyvora.company.CompanySettings::getTimezone)
+                .filter(tz -> tz != null && !tz.isBlank())
+                .map(tz -> {
+                    try {
+                        return java.time.ZoneId.of(tz);
+                    } catch (RuntimeException badZone) {
+                        return java.time.ZoneOffset.UTC;
+                    }
+                })
+                .orElse(java.time.ZoneOffset.UTC);
+    }
+
+    /** Today's date in the company's timezone. */
+    private LocalDate today() {
+        return LocalDate.now(zone());
+    }
+
+    /** The current wall-clock time in the company's timezone, to the minute. */
+    private LocalTime nowTime() {
+        return LocalTime.now(zone()).withSecond(0).withNano(0);
     }
 
     // ---- team day sheet ----
@@ -130,7 +162,7 @@ public class AttendanceService {
         }
         double worked = 0;
         long expected = 0;
-        LocalDate today = LocalDate.now();
+        LocalDate today = today();
 
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             AttendanceEntryResponse entry = resolve(employee, user, d,
@@ -164,8 +196,8 @@ public class AttendanceService {
         Employee employee = employeeRepository
                 .findByIdAndCompanyId(UUID.fromString(req.employeeId()), companyId)
                 .orElseThrow(() -> new NotFoundException("Employee not found"));
-        LocalDate date = req.date() == null || req.date().isBlank() ? LocalDate.now() : LocalDate.parse(req.date());
-        if (date.isAfter(LocalDate.now())) {
+        LocalDate date = req.date() == null || req.date().isBlank() ? today() : LocalDate.parse(req.date());
+        if (date.isAfter(today())) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Attendance can't be marked for a future date");
         }
 
@@ -183,17 +215,17 @@ public class AttendanceService {
         return of(employee, user, date, record, false);
     }
 
-    /** The signed-in employee clocks in for today. Idempotent — a second call won't move the time. */
+    /** The signed-in employee clocks in for today. Idempotent â€” a second call won't move the time. */
     @Transactional
     public AttendanceEntryResponse checkIn(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
-        LocalDate today = LocalDate.now();
+        LocalDate today = today();
         AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .orElseGet(() -> attendanceRepository.save(new AttendanceRecord(UUID.randomUUID(), companyId,
                         employee.getId(), today, AttendanceStatus.PRESENT, null)));
         if (record.getCheckIn() == null) {
-            record.setCheckIn(LocalTime.now().withSecond(0).withNano(0));
+            record.setCheckIn(nowTime());
             // Someone clocking in is present, unless an admin deliberately marked the day otherwise.
             if (record.getStatus() == AttendanceStatus.ABSENT) {
                 record.setStatus(AttendanceStatus.PRESENT);
@@ -203,15 +235,15 @@ public class AttendanceService {
         return of(employee, user, today, record, false);
     }
 
-    /** The signed-in employee clocks out. Later calls overwrite — leaving twice means the later one. */
+    /** The signed-in employee clocks out. Later calls overwrite â€” leaving twice means the later one. */
     @Transactional
     public AttendanceEntryResponse checkOut(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
-        LocalDate today = LocalDate.now();
+        LocalDate today = today();
         AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_ERROR, "Check in first"));
-        record.setCheckOut(LocalTime.now().withSecond(0).withNano(0));
+        record.setCheckOut(nowTime());
         validateTimes(record);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
         return of(employee, user, today, record, false);
@@ -222,7 +254,7 @@ public class AttendanceService {
     public AttendanceEntryResponse clearToday(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
-        LocalDate today = LocalDate.now();
+        LocalDate today = today();
         attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .ifPresent(attendanceRepository::delete);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
@@ -236,7 +268,7 @@ public class AttendanceService {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
-        LocalDate today = LocalDate.now();
+        LocalDate today = today();
         return resolve(employee, user, today,
                 attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today),
                 approvedLeaveByEmployee(companyId).getOrDefault(employee.getId(), List.of()));
@@ -252,7 +284,7 @@ public class AttendanceService {
 
     /**
      * A day's status: the marked row if there is one, else approved leave, else a weekend, else
-     * unmarked (null status) — which the UI shows as "not marked yet" rather than inventing a value.
+     * unmarked (null status) â€” which the UI shows as "not marked yet" rather than inventing a value.
      */
     private AttendanceEntryResponse resolve(Employee employee, User user, LocalDate date,
                                             Optional<AttendanceRecord> marked, List<LeaveRequest> leave) {
@@ -262,7 +294,7 @@ public class AttendanceService {
         for (LeaveRequest lr : leave) {
             if (!date.isBefore(lr.getStartDate()) && !date.isAfter(lr.getEndDate())) {
                 return entry(employee, user, date, AttendanceStatus.ON_LEAVE.name(), null, null,
-                        lr.getType().name().toLowerCase() + (lr.getReason() == null ? "" : " · " + lr.getReason()),
+                        lr.getType().name().toLowerCase() + (lr.getReason() == null ? "" : " Â· " + lr.getReason()),
                         true);
             }
         }

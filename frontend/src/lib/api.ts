@@ -373,6 +373,15 @@ export const api = {
       ? http<Invitation>("/invitations", { method: "POST", body: JSON.stringify({ email, role }) })
       : mockBackend.createInvitation(accessToken, email, role);
   },
+  /**
+   * A fresh joining link for a pending invitation. The token is stored hashed, so the original link
+   * can't be read back — only replaced. Regenerating invalidates the previous one.
+   */
+  invitationLink(id: string): Promise<Invitation> {
+    return LIVE
+      ? http<Invitation>(`/invitations/${id}/link`, { method: "POST" })
+      : mockBackend.invitationLink(accessToken, id);
+  },
   revokeInvitation(id: string): Promise<void> {
     return LIVE ? http<void>(`/invitations/${id}`, { method: "DELETE" }) : mockBackend.revokeInvitation(accessToken, id);
   },

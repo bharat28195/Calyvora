@@ -43,19 +43,41 @@ public class InvitationService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties props;
+    private final com.calyvora.billing.SubscriptionRepository subscriptionRepository;
 
     public InvitationService(InvitationRepository invitationRepository,
                              UserRepository userRepository,
                              CompanyRepository companyRepository,
                              EmailService emailService,
                              PasswordEncoder passwordEncoder,
-                             AppProperties props) {
+                             AppProperties props,
+                             com.calyvora.billing.SubscriptionRepository subscriptionRepository) {
         this.invitationRepository = invitationRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.emailService = emailService;
         this.passwordEncoder = passwordEncoder;
         this.props = props;
+        this.subscriptionRepository = subscriptionRepository;
+    }
+
+    /**
+     * Refuse to hand out a seat the company is not paying for (PD-10 pt 3). Seats are consumed by
+     * active members <em>and</em> outstanding invitations — counting only members would let an admin
+     * issue a hundred invitations against five seats and blow the limit at accept time, long after
+     * the point where a helpful error was possible.
+     *
+     * <p>Companies with no subscription row (the platform company itself) are unlimited.
+     */
+    private void requireFreeSeat(UUID companyId) {
+        subscriptionRepository.findByCompanyId(companyId).ifPresent(sub -> {
+            long used = userRepository.countByCompanyIdAndStatus(companyId, UserStatus.ACTIVE)
+                    + invitationRepository.countByCompanyIdAndStatus(companyId, InvitationStatus.PENDING);
+            if (used >= sub.getSeats()) {
+                throw new ApiException(ErrorCode.SEAT_LIMIT_REACHED,
+                        "All " + sub.getSeats() + " seats are in use. Ask for more seats before inviting anyone else.");
+            }
+        });
     }
 
     @Transactional
@@ -71,6 +93,7 @@ public class InvitationService {
                 .ifPresent(i -> {
                     throw new ConflictException("An invitation is already pending for that email");
                 });
+        requireFreeSeat(companyId);
 
         String rawToken = TokenGenerator.rawToken();
         Invitation invitation = new Invitation(UUID.randomUUID(), companyId, email, role,
@@ -80,9 +103,36 @@ public class InvitationService {
 
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Company not found"));
-        emailService.sendInvitationEmail(email, company.getName(), acceptUrl(rawToken));
+        String link = acceptUrl(rawToken);
+        emailService.sendInvitationEmail(email, company.getName(), link);
 
-        return InvitationResponse.of(invitation, principal.email());
+        // The link goes back to the admin as well as into the email. Onboarding a colleague must not
+        // depend on mail being deliverable — the admin can pass it on however they like.
+        return InvitationResponse.of(invitation, principal.email(), link);
+    }
+
+    /**
+     * Issue a fresh joining link for a pending invitation.
+     *
+     * <p>Needed because the token is stored hashed: once the original link is lost there is no way to
+     * read it back, only to replace it. Regenerating invalidates the previous link, which is also the
+     * right behaviour if it was sent to the wrong place.
+     */
+    @Transactional
+    public InvitationResponse regenerateLink(UUID invitationId, AuthPrincipal principal) {
+        UUID companyId = TenantContext.getCompanyId();
+        Invitation invitation = invitationRepository.findById(invitationId)
+                .filter(i -> i.getCompanyId().equals(companyId))
+                .orElseThrow(() -> new NotFoundException("Invitation not found"));
+        if (invitation.getStatus() != InvitationStatus.PENDING) {
+            throw new ConflictException("That invitation is no longer pending");
+        }
+
+        String rawToken = TokenGenerator.rawToken();
+        invitation.setTokenHash(TokenGenerator.sha256(rawToken));
+        invitation.setExpiresAt(Instant.now().plus(props.security().invitation().ttl()));
+
+        return InvitationResponse.of(invitation, emailOf(invitation.getInvitedBy()), acceptUrl(rawToken));
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +175,9 @@ public class InvitationService {
             // Email is globally unique (SD-3); the address was registered elsewhere in the meantime.
             throw new ConflictException("That email is already registered");
         }
+        // Checked again here, not just at invite time: seats can be cut, or the subscription can
+        // lapse, between issuing a link and someone clicking it.
+        requireActiveSubscription(invitation.getCompanyId());
 
         User user = new User(UUID.randomUUID(), invitation.getCompanyId(), invitation.getEmail(),
                 request.firstName().trim(), request.lastName().trim(), invitation.getRole(),
@@ -137,6 +190,23 @@ public class InvitationService {
     }
 
     // ---- helpers ----
+
+    /**
+     * Joining a workspace whose subscription has ended must fail. The accept endpoint is public, so
+     * it runs with no tenant bound and {@code SubscriptionLockFilter} cannot cover it — the company
+     * comes from the invitation instead.
+     *
+     * <p>No seat check here on purpose: the pending invitation already reserved the seat in
+     * {@link #requireFreeSeat}, and accepting only converts that reservation into a member.
+     */
+    private void requireActiveSubscription(UUID companyId) {
+        subscriptionRepository.findByCompanyId(companyId)
+                .filter(com.calyvora.billing.Subscription::isLocked)
+                .ifPresent(sub -> {
+                    throw new ApiException(ErrorCode.SUBSCRIPTION_INACTIVE,
+                            "This workspace is locked because its subscription has ended.");
+                });
+    }
 
     private Invitation validPending(String rawToken) {
         Invitation invitation = invitationRepository.findByTokenHash(TokenGenerator.sha256(rawToken))

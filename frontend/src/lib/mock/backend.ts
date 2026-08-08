@@ -1903,7 +1903,24 @@ export const mockBackend = {
     db.invitations.push(invitation);
     pushMail(db, normalized, `You're invited to join ${nameOf(db, user.companyId)} on Calyvora`, `/accept-invite?token=${token.token}`);
     save(db);
-    return invitation;
+    // The link comes back to the admin as well as going into the mock mailbox — mirrors the server,
+    // where onboarding a colleague must not depend on mail being deliverable.
+    return { ...invitation, acceptUrl: `${location.origin}/accept-invite?token=${token.token}` };
+  },
+
+  async invitationLink(accessToken: string | null, id: string): Promise<Invitation> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const invitation = db.invitations.find((i) => i.id === id);
+    if (!invitation || companyOfInvite(db, id) !== user.companyId) {
+      throw err(404, "NOT_FOUND", "Invitation not found");
+    }
+    if (invitation.status !== "PENDING") {
+      throw err(409, "CONFLICT", "That invitation is no longer pending");
+    }
+    return { ...invitation, acceptUrl: `${location.origin}/accept-invite?token=${id}` };
   },
 
   async revokeInvitation(accessToken: string | null, id: string): Promise<void> {
