@@ -790,7 +790,8 @@ public class DemoSeedService {
         UUID employeeId = UUID.fromString(e.id());
         employeeFinanceService.update(employeeId, new com.calyvora.people.dto.UpdateEmployeeFinanceRequest(
                 "BANK_TRANSFER", bank, account, ifsc, e.firstName() + " " + e.lastName(), "Thaltej",
-                pfStatus, pfNumber, uan, pfJoinDate, "Mr " + (e.firstName() + " " + e.lastName()).toUpperCase(),
+                // No honorific — the seeder has no idea what any of these people use.
+                pfStatus, pfNumber, uan, pfJoinDate, (e.firstName() + " " + e.lastName()).toUpperCase(),
                 "NOT_ELIGIBLE", null,
                 "Gujarat", "Gujarat",
                 pan, true, dob, parent));
