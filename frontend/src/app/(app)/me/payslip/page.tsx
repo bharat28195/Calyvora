@@ -86,43 +86,91 @@ export default function MyPayslipPage() {
           )}
 
           <div className="payslip-sheet mt-4">
-          {/* Printed-payslip header — only appears on paper, gives the sheet a real document identity. */}
-          <div className="payslip-print-only mb-4 border-b border-fg/20 pb-3">
-            <p className="text-lg font-semibold">{slip?.companyName || me?.company.name}</p>
-            {slip?.companyAddress && <p className="text-xs">{slip.companyAddress}</p>}
-            <p className="mt-1 text-sm">Payslip{slip ? ` · ${slip.month}` : ""}</p>
-            <p className="mt-1 text-sm">{me?.user.firstName} {me?.user.lastName}</p>
-          </div>
           <Card>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 print:hidden">
               <CardTitle>Payslip</CardTitle>
               <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
-                className="rounded-md border border-fg/15 bg-fg/5 px-2 py-1 text-xs text-fg print:hidden" />
+                className="rounded-md border border-fg/15 bg-fg/5 px-2 py-1 text-xs text-fg" />
             </div>
             {slip ? (
               <>
-                {slip.workingDays > 0 && (
-                  <p className="mt-3 text-xs text-fg/50">
-                    Attendance: <span className="font-medium text-fg/70">{slip.payableDays}</span> of {slip.workingDays} working days payable
-                    {slip.lopDays > 0 && <span className="text-amber-400"> · {slip.lopDays} day{slip.lopDays === 1 ? "" : "s"} loss of pay</span>}
-                  </p>
-                )}
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {/* Document header: the month on the left, the company's branding on the right. */}
+                <div className="mt-4 flex items-start justify-between gap-6 border-b border-fg/10 pb-5">
+                  <div className="min-w-0">
+                    <p className="text-lg font-semibold">
+                      Payslip <span className="font-normal text-fg/60">{formatMonth(slip.month)}</span>
+                    </p>
+                    <p className="mt-2 text-sm font-medium uppercase tracking-wide">
+                      {slip.companyName || me?.company.name}
+                    </p>
+                    {slip.companyAddress && (
+                      <p className="mt-1 max-w-xs text-xs leading-relaxed text-fg/50">{slip.companyAddress}</p>
+                    )}
+                  </div>
+                  {slip.companyLogoUrl && (
+                    // A customer's logo can live on any host, and next/image would need every one
+                    // of those hosts allow-listed in next.config to optimise it — so a plain <img>
+                    // is the only thing that works for an arbitrary tenant-supplied URL.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={slip.companyLogoUrl} alt={`${slip.companyName} logo`}
+                      className="max-h-14 w-auto max-w-[180px] shrink-0 object-contain" />
+                  )}
+                </div>
+
+                {/* Who this is for. */}
+                <p className="mt-5 text-base font-semibold uppercase tracking-wide">{slip.employeeName}</p>
+                <div className="mt-3 grid gap-x-6 gap-y-4 border-b border-fg/10 pb-5 sm:grid-cols-4">
+                  <Detail label="Employee number" value={slip.employeeNo} />
+                  <Detail label="Date joined" value={slip.dateJoined} />
+                  <Detail label="Department" value={slip.department} />
+                  <Detail label="Designation" value={slip.designation} />
+                  <Detail label="Payment mode" value={slip.paymentMode ? humanise(slip.paymentMode) : null} />
+                  <Detail label="UAN" value={slip.uan} />
+                  <Detail label="PF number" value={slip.pfNumber} />
+                  <Detail label="PAN number" value={slip.panMasked} />
+                </div>
+
+                {/* Salary details — attendance is what makes the payable days differ from working days. */}
+                <p className="mt-5 text-sm font-semibold uppercase tracking-wide text-fg/70">Salary details</p>
+                <div className="mt-3 grid gap-x-6 gap-y-4 border-b border-fg/10 pb-5 sm:grid-cols-4">
+                  <Detail label="Actual payable days" value={String(slip.payableDays)} />
+                  <Detail label="Total working days" value={String(slip.workingDays)} />
+                  <Detail label="Loss of pay days" value={String(slip.lopDays)} />
+                  <Detail label="Days payable" value={String(slip.payableDays)} />
+                </div>
+
+                <div className="mt-5 grid gap-6 sm:grid-cols-2">
                   <div>
                     <p className="mb-1 text-xs uppercase tracking-wide text-fg/40">Earnings</p>
                     {slip.earnings.map((l) => <Row key={l.label} label={l.label} value={money(l.amount, currency)} />)}
-                    <Row label="Gross" value={money(slip.gross, currency)} strong />
+                    <Row label="Total earnings (A)" value={money(slip.gross, currency)} strong />
                   </div>
                   <div>
-                    <p className="mb-1 text-xs uppercase tracking-wide text-fg/40">Deductions</p>
+                    <p className="mb-1 text-xs uppercase tracking-wide text-fg/40">Taxes &amp; deductions</p>
                     {slip.deductions.map((l) => <Row key={l.label} label={l.label} value={money(l.amount, currency)} />)}
-                    <Row label="Total deductions" value={money(slip.totalDeductions, currency)} strong />
+                    <Row label="Total deductions (B)" value={money(slip.totalDeductions, currency)} strong />
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between border-t border-fg/10 pt-3">
-                  <span className="text-sm font-medium">Net pay · {slip.month}</span>
-                  <span className="text-lg font-semibold text-emerald-400">{money(slip.net, currency)}</span>
+
+                <div className="mt-5 rounded-lg bg-fg/5 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">Net salary payable (A − B)</span>
+                    <span className="text-lg font-semibold text-emerald-400 tabular-nums">
+                      {money(slip.net, currency)}
+                    </span>
+                  </div>
+                  {slip.netInWords && (
+                    <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-fg/10 pt-2">
+                      <span className="text-xs uppercase tracking-wide text-fg/40">Net salary in words</span>
+                      <span className="text-xs text-fg/70">{slip.netInWords}</span>
+                    </div>
+                  )}
                 </div>
+
+                <p className="mt-4 text-[11px] italic text-fg/40">
+                  All amounts are in {currency}. This is a computer-generated statement and does not
+                  require a signature.
+                </p>
               </>
             ) : (
               <p className="mt-3 text-sm text-fg/40">No payslip for this month.</p>
@@ -135,6 +183,30 @@ export default function MyPayslipPage() {
       )}
     </div>
   );
+}
+
+function Detail({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wide text-fg/40">{label}</p>
+      <p className="mt-0.5 truncate text-xs text-fg/90">
+        {value?.trim() ? value : <span className="text-fg/30">—</span>}
+      </p>
+    </div>
+  );
+}
+
+/** "2026-07" -> "July 2026", the way a payslip titles itself. */
+function formatMonth(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return month;
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+/** BANK_TRANSFER -> "Bank transfer". */
+function humanise(s: string): string {
+  const lower = s.toLowerCase().replace(/_/g, " ");
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

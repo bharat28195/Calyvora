@@ -26,9 +26,25 @@ import java.util.UUID;
 public class CompensationController {
 
     private final CompensationService compensationService;
+    private final EmployeeFinanceService financeService;
 
-    public CompensationController(CompensationService compensationService) {
+    public CompensationController(CompensationService compensationService,
+                                  EmployeeFinanceService financeService) {
         this.compensationService = compensationService;
+        this.financeService = financeService;
+    }
+
+    /** Anyone's bank / statutory / identity record — HR maintains these. */
+    @GetMapping("/finance")
+    public com.calyvora.people.dto.EmployeeFinanceResponse finance(@PathVariable UUID employeeId) {
+        return financeService.forEmployee(employeeId);
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/finance")
+    public com.calyvora.people.dto.EmployeeFinanceResponse updateFinance(
+            @PathVariable UUID employeeId,
+            @Valid @RequestBody com.calyvora.people.dto.UpdateEmployeeFinanceRequest request) {
+        return financeService.update(employeeId, request);
     }
 
     @GetMapping("/compensation")

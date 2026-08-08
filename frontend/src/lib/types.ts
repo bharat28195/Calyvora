@@ -986,16 +986,58 @@ export interface Payslip {
   employeeName: string;
   month: string;
   currency: string;
+  /** Company header — legal name, address and logo as configured in Settings → Payslip branding. */
   companyName: string;
   companyAddress: string | null;
+  companyLogoUrl: string | null;
+  /** Who the payslip is for. */
+  employeeNo: string | null;
+  dateJoined: string | null;
+  department: string | null;
+  designation: string | null;
+  /** Statutory identifiers a payslip is expected to carry. PAN arrives masked. */
+  paymentMode: string | null;
+  uan: string | null;
+  pfNumber: string | null;
+  panMasked: string | null;
   earnings: PayslipLine[];
   deductions: PayslipLine[];
   gross: number;
   totalDeductions: number;
   net: number;
+  /** The net spelled out, as a payslip conventionally states it. */
+  netInWords: string | null;
   workingDays: number;
   lopDays: number;
   payableDays: number;
+}
+
+/**
+ * An employee's bank / statutory / identity record ("My Finances"). The account number and PAN
+ * arrive already masked — the full values never reach the browser.
+ */
+export interface EmployeeFinance {
+  employeeId: string;
+  employeeName: string;
+  paymentMode: string;
+  bankName: string | null;
+  bankAccountMasked: string | null;
+  bankIfsc: string | null;
+  bankAccountName: string | null;
+  bankBranch: string | null;
+  pfStatus: "ENABLED" | "NOT_ELIGIBLE";
+  pfNumber: string | null;
+  uan: string | null;
+  pfJoinDate: string | null;
+  pfAccountName: string | null;
+  esiStatus: "ELIGIBLE" | "NOT_ELIGIBLE";
+  esiNumber: string | null;
+  ptState: string | null;
+  ptLocation: string | null;
+  panMasked: string | null;
+  panVerified: boolean;
+  dateOfBirth: string | null;
+  parentName: string | null;
 }
 
 export interface PayrollRunRow {

@@ -4,6 +4,125 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-08-09 — My Finances + a payslip that reads like a real document
+**Founder request, with Keka's "My Finances" screens as the reference: an employee should see how
+they're paid and what they're enrolled in, and the payslip should carry the company's logo and
+identity rather than a bare table of numbers.**
+
+- **Employee finance record (Flyway V34, RLS).** New `employee_finance` — payment mode, bank
+  (name / account / IFSC / account name / branch), PF (status, number, UAN, join date, account name),
+  ESI (status, number), professional tax (state, registered location), and identity (PAN, verified
+  flag, date of birth, parent's name). One row per employee, created on first view.
+  - **Why its own table rather than more columns on `employees`:** the directory row is readable by
+    every colleague by design. A bank account and a PAN never should be, and putting them in the same
+    entity would be one careless `SELECT` away from a leak.
+- **Two access rules, both tested.** Visibility is **self-or-HR** — not even a manager can read a
+  report's bank details. Edit ownership is **split**: an employee maintains their own bank details and
+  identity, while PF/ESI/professional-tax enrolment is HR's, because those are employer filings and
+  self-service there is a compliance hole rather than a convenience. A self-edit of a statutory field
+  is rejected with `403`.
+- **Account number and PAN are masked server-side** (`XXXXXX456D`) — the full values never reach the
+  browser at all, so there is nothing for a screenshot, a bug report or a devtools tab to expose.
+  Changing a PAN clears its `verified` flag, so the tick can't carry over to an unchecked document.
+- **Payslip now carries the whole document.** `PayslipResponse` gained the company block (legal name,
+  address, **logo**), who it's for (employee number, date joined, department, designation), the
+  statutory identifiers a payslip is expected to show (payment mode, UAN, PF number, masked PAN), and
+  **net-in-words** — spelled with Indian lakh/crore grouping, the line a reader uses to catch a
+  misplaced digit. Rendered as a real document rather than a two-column table.
+- **`/me/finances`** — payroll summary strip, payment information, statutory information (read-only,
+  marked as HR-maintained) and identity information with a verification badge, plus an edit form for
+  the half the employee owns.
+- **Branding already existed but never reached the payslip.** `logoUrl` / `legalName` / `address` have
+  been in Settings since V32; the payslip only used two of them. It now uses all three, and the demo
+  seeds a legal name + address so a demo payslip looks like a document out of the box.
+- **Validation matches the real formats:** IFSC (`ABCD0123456`), UAN (12 digits), PAN
+  (`ABCDE1234F`) — a malformed value is a `400`, not a silently stored typo.
+- 8 integration tests covering masking, cross-employee refusal, the statutory-edit rule, PAN
+  re-verification and the enriched payslip.
+
+### 2026-08-09 — Live QA pass on the hosted deployment: fix the signup blocker + 5 bugs
+**A full QA sweep against `calyvora-frontend.onrender.com` found the product working but the front
+door jammed: nobody could complete a signup. This is what was wrong, and why each fix is shaped the
+way it is — recorded in full because every one of these was invisible from the code alone.**
+
+Scope of the sweep: 42 API endpoints exercised live as four roles, plus write journeys (leave
+request → approval → balance, check-in, helpdesk ticket, AI assistant). 41/42 passed. Tenant
+isolation, salary privacy, role gates and anonymous access were probed directly and all held.
+
+#### 1. `[P0]` Verification email could never be delivered — signup was unrecoverable
+- **Symptom:** `POST /auth/register` returned `201`, the UI said "Check your email", no mail ever
+  arrived, and login then returned `403 Please verify your email`. The account was permanently stuck.
+  There was no way out: `/dev/mailbox` is registered only under the `embedded` profile, so it does not
+  exist on a deployed `staging` build.
+- **Root cause:** **Render blocks outbound SMTP on every port.** `smtp.hostinger.com:587` failed with
+  `SocketTimeoutException: Connect timed out`. Credentials were correct — the packets never left the
+  host. `SmtpEmailService` swallowed the error by design (a mail outage must not roll back a completed
+  signup), which is right, but it made a total mail failure indistinguishable from success.
+- **Fix — the email layer is now transport-pluggable.** `EmailSender` implementations
+  (`ResendSender` over HTTPS :443, `SmtpSender`, `ConsoleSender`) are selected per send from an
+  `EmailSettings` resolved by an `EmailSettingsResolver`. `MAIL_PROVIDER` pins the transport;
+  unset, it is inferred (Resend key → Resend, SMTP username → SMTP, neither → console).
+  **Use Resend on any hosted deployment — port 443 is never blocked.**
+- **A silent misconfiguration is no longer possible.** With nothing configured the app logs a loud
+  warning at startup, and `POST /dev/test-email` reports `sent: false` with an explanation rather than
+  claiming success for a message that was only written to a log.
+- **Why not just try port 465:** worth a 2-minute test, but it is the same gamble on a blocked port.
+  HTTPS removes the class of failure instead of moving it.
+- **Per-tenant sending is now a one-resolver job.** Nothing else — no transport, no caller — knows
+  tenants exist, so "each customer sends from their own domain" drops in without a rewrite.
+
+#### 2. `[P0]` Signup claimed success for mail that was never sent
+- **Symptom:** the "Check your email" screen appeared unconditionally, so the user waited for a
+  message that did not exist.
+- **Fix:** sends return an `EmailResult`; `POST /auth/register` answers `{"emailSent": true|false}`
+  and the signup screen shows either "Check your email" or "Workspace created — but we couldn't send
+  the email" with a **Resend** button. The account is still created either way: a mail outage must
+  never lose a completed signup.
+
+#### 3. `[P1]` Logged-out visitors saw ~25 app pages instead of the login screen
+- **Symptom:** `/payroll`, `/billing`, `/platform`, `/expenses` and others returned `200` with an
+  empty shell to a stranger; only `/dashboard`, `/people`, `/work`, `/members`, `/settings` redirected.
+- **Root cause:** `middleware.ts` listed *protected* prefixes, so every route added since was
+  unguarded by default. No data leaked — the API correctly returns `401` — but it looked broken.
+- **Fix:** inverted to an allow-list of **public** paths. A new page is now protected the moment it
+  exists rather than when someone remembers to add it.
+
+#### 4. `[P2]` Any employee could read every colleague's performance rating
+- **Symptom:** `GET /people/employees` returned `rating` on every record to any authenticated user.
+  Salary was already protected (compensation is self-only, `403` for others), so this was an oversight
+  rather than a decision.
+- **Fix:** `RatingVisibility` strips the rating at the API boundary — visible to HR/leadership, to the
+  person themselves, and to their manager. Applied to both the list and paged endpoints; internal
+  callers (analytics, team overview) keep the full record. Four regression tests.
+
+#### 5. `[P2]` Unknown API routes returned `500`, not `404`
+- **Symptom:** `GET /api/v1/anything-misspelled` → `500 INTERNAL_ERROR "Something went wrong"`. A typo
+  was indistinguishable from a server crash — this cost real time during the QA sweep itself.
+- **Root cause:** `NoResourceFoundException` fell through to the catch-all `Exception` handler.
+- **Fix:** explicit handlers for `NoHandlerFoundException` / `NoResourceFoundException` → `404`, and
+  `HttpRequestMethodNotSupportedException` → `405`. (Anonymous callers still get `401` before routing
+  — deliberate, so strangers can't enumerate which endpoints exist.)
+
+#### 6. `[P2]` Production users were told to open the local-dev mailbox
+- **Symptom:** the signup success screen hardcoded "open `/dev/mailbox`" — a development instruction
+  shown to real customers, pointing at a page that cannot work on a deployment.
+- **Fix:** shown only in mock/development builds.
+
+#### 7. `[P2]` Documentation defects
+- `docs/DEPLOY.md` listed the HR demo login as `leo.martin@northwind.demo`; the seeder creates
+  `leo.martins@` (with an *s*) — the documented one returned `401`. Corrected.
+- A stray `/m` typo in the `JWT_PRIVATE_KEY` table row. Removed.
+- The email section is rewritten around Resend, with the SMTP-is-blocked warning first, a transport
+  comparison table, and the real error strings each misconfiguration produces.
+
+#### Still open — configuration, not code
+- **JWT keys are not set on Render.** Tokens come back signed with `kid: dev-…`, the ephemeral-keypair
+  prefix, so **every restart logs all users out** — and free-tier services restart whenever they wake
+  from idle. Set `JWT_KID` / `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY`; the startup log should read
+  `ephemeral=false`.
+- **Cold start is ~81 seconds** on the free tier, during which the Next.js proxy gives up and returns
+  a bare `500`. Wake the site before any demo, or move to the always-on starter plan.
+
 ### 2026-07-27 — Deployment (Render blueprint) + "Orbit by Calyvora" marketing site
 **Make the app hostable for real testing, and give it a landing page.**
 

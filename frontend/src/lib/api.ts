@@ -28,6 +28,7 @@ import {
   type UpdateTicketInput,
   type Compensation,
   type Payslip,
+  type EmployeeFinance,
   type PayrollRun,
   type Department,
   type Employee,
@@ -88,6 +89,9 @@ const LIVE = process.env.NEXT_PUBLIC_API_MODE === "live";
 export const isLive = LIVE;
 const BASE = "/api/v1";
 
+/** Outcome of a signup: the account always exists, but the email may not have gone out. */
+export type RegisterResult = { emailSent: boolean };
+
 /** Credentials returned by the one-click demo seed. */
 export type DemoCredentials = { companyName: string; email: string; password: string; alreadySeeded: boolean };
 
@@ -120,8 +124,18 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   // --- auth / registration ---
-  register(input: { companyName: string; firstName: string; lastName: string; email: string; password: string }) {
-    return LIVE ? http<void>("/auth/register", { method: "POST", body: JSON.stringify(input) }) : mockBackend.register(input);
+  /**
+   * The workspace is created even if its verification email couldn't be sent, so the result carries
+   * `emailSent` — the signup screen must not promise a message that never left the server.
+   */
+  async register(input: { companyName: string; firstName: string; lastName: string; email: string; password: string }): Promise<RegisterResult> {
+    if (!LIVE) {
+      await mockBackend.register(input);
+      return { emailSent: true };
+    }
+    const result = await http<RegisterResult | null>("/auth/register", { method: "POST", body: JSON.stringify(input) });
+    // Older backends answered 201 with an empty body; treat that as "sent" rather than alarming.
+    return { emailSent: result?.emailSent ?? true };
   },
   verifyEmail(token: string) {
     return LIVE ? http<void>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }) : mockBackend.verifyEmail(token);
@@ -665,6 +679,27 @@ export const api = {
   myPayslip(month?: string): Promise<Payslip> {
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";
     return LIVE ? http<Payslip>(`/people/me/payslip${qs}`) : mockBackend.myPayslip(accessToken, month);
+  },
+  /** My bank / statutory / identity record. Account number and PAN arrive masked. */
+  myFinance(): Promise<EmployeeFinance> {
+    return LIVE ? http<EmployeeFinance>("/people/me/finance") : mockBackend.myFinance(accessToken);
+  },
+  /** Employees maintain their own bank details and identity; PF/ESI/PT are rejected here (HR owns them). */
+  updateMyFinance(patch: Partial<EmployeeFinance> & { bankAccountNo?: string; panNumber?: string }): Promise<EmployeeFinance> {
+    return LIVE
+      ? http<EmployeeFinance>("/people/me/finance", { method: "PATCH", body: JSON.stringify(patch) })
+      : mockBackend.updateMyFinance(accessToken, patch);
+  },
+  /** Anyone's finance record — HR/admin only. */
+  employeeFinance(employeeId: string): Promise<EmployeeFinance> {
+    return LIVE
+      ? http<EmployeeFinance>(`/people/employees/${employeeId}/finance`)
+      : mockBackend.employeeFinance(accessToken, employeeId);
+  },
+  updateEmployeeFinance(employeeId: string, patch: Record<string, unknown>): Promise<EmployeeFinance> {
+    return LIVE
+      ? http<EmployeeFinance>(`/people/employees/${employeeId}/finance`, { method: "PATCH", body: JSON.stringify(patch) })
+      : mockBackend.updateEmployeeFinance(accessToken, employeeId, patch);
   },
   payrollRun(month?: string): Promise<PayrollRun> {
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";

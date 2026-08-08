@@ -15,6 +15,7 @@ import {
   type TeamOverview,
   type Compensation,
   type Payslip,
+  type EmployeeFinance,
   type PayrollRun,
   type WorkItem,
   type AnalyticsOverview,
@@ -591,13 +592,50 @@ export const mockBackend = {
     }
     const settings = db.settings.find((s) => s.companyId === (db.users.find((u) => db.employees.find((e) => e.id === employeeId)?.userId === u.id)?.companyId));
     const company = db.companies.find((c) => c.id === settings?.companyId);
+    const employee = db.employees.find((e) => e.id === employeeId);
+    const finance = mockFinance(db, employeeId);
     return {
       employeeId, employeeName: comp.employeeName, month: month || new Date().toISOString().slice(0, 7), currency: comp.currency,
       companyName: settings?.legalName || company?.name || "", companyAddress: settings?.address ?? null,
+      companyLogoUrl: settings?.logoUrl ?? null,
+      employeeNo: employee?.employeeNo ?? null,
+      dateJoined: employee?.startDate ?? null,
+      department: db.departments.find((d) => d.id === employee?.departmentId)?.name ?? null,
+      designation: employee?.jobTitle ?? null,
+      paymentMode: finance.paymentMode,
+      uan: finance.uan,
+      pfNumber: finance.pfNumber,
+      panMasked: finance.panMasked,
       earnings: [{ label: "Basic", amount: basic }, { label: "House rent allowance", amount: hra }, { label: "Special allowance", amount: special }],
       deductions, gross, totalDeductions: totalDed, net,
+      netInWords: amountInWords(net, comp.currency),
       workingDays, lopDays, payableDays: Math.max(0, workingDays - lopDays),
     };
+  },
+
+  async myFinance(accessToken: string | null): Promise<EmployeeFinance> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    return mockFinance(db, myEmployeeId(db, user));
+  },
+  async updateMyFinance(accessToken: string | null, patch: Record<string, unknown>): Promise<EmployeeFinance> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    return saveMockFinance(db, myEmployeeId(db, user), patch, false);
+  },
+  async employeeFinance(accessToken: string | null, employeeId: string): Promise<EmployeeFinance> {
+    await delay();
+    const db = load();
+    requireAdmin(requireSession(db, accessToken));
+    return mockFinance(db, employeeId);
+  },
+  async updateEmployeeFinance(accessToken: string | null, employeeId: string, patch: Record<string, unknown>): Promise<EmployeeFinance> {
+    await delay();
+    const db = load();
+    requireAdmin(requireSession(db, accessToken));
+    return saveMockFinance(db, employeeId, patch, true);
   },
 
   async myCompensation(accessToken: string | null): Promise<Compensation> {
@@ -3378,6 +3416,102 @@ function validatePayslipTemplate(components: PayslipComponent[]): void {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// ---- My Finances (mock) ---------------------------------------------------------------------
+// The mock DB predates this record, so finance rows live in their own store rather than forcing a
+// schema migration on every existing mock database in a browser's localStorage.
+const mockFinanceStore = new Map<string, EmployeeFinance>();
+
+/** Mask all but the last four characters — the server does the same before it ever sends these. */
+function maskTail(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  return v.length <= 4 ? v : "X".repeat(v.length - 4) + v.slice(-4);
+}
+
+function mockFinance(db: DB, employeeId: string): EmployeeFinance {
+  const existing = mockFinanceStore.get(employeeId);
+  if (existing) return existing;
+  const emp = db.employees.find((e) => e.id === employeeId);
+  const u = emp && db.users.find((x) => x.id === emp.userId);
+  const name = u ? `${u.firstName} ${u.lastName}` : "Employee";
+  const created: EmployeeFinance = {
+    employeeId,
+    employeeName: name,
+    paymentMode: "BANK_TRANSFER",
+    bankName: null,
+    bankAccountMasked: null,
+    bankIfsc: null,
+    bankAccountName: name,
+    bankBranch: null,
+    pfStatus: "NOT_ELIGIBLE",
+    pfNumber: null,
+    uan: null,
+    pfJoinDate: null,
+    pfAccountName: null,
+    esiStatus: "NOT_ELIGIBLE",
+    esiNumber: null,
+    ptState: null,
+    ptLocation: null,
+    panMasked: null,
+    panVerified: false,
+    dateOfBirth: null,
+    parentName: null,
+  };
+  mockFinanceStore.set(employeeId, created);
+  return created;
+}
+
+/**
+ * @param hr when false, PF/ESI/PT edits are refused — those are employer filings that HR owns, and
+ *           the mock has to enforce the same rule as the server or the UI can't be trusted.
+ */
+function saveMockFinance(db: DB, employeeId: string, patch: Record<string, unknown>, hr: boolean): EmployeeFinance {
+  const current = mockFinance(db, employeeId);
+  const statutory = ["pfStatus", "pfNumber", "uan", "pfJoinDate", "pfAccountName",
+    "esiStatus", "esiNumber", "ptState", "ptLocation", "panVerified"];
+  if (!hr && statutory.some((k) => patch[k] !== undefined)) {
+    throw err(403, "FORBIDDEN", "PF, ESI and professional-tax details are maintained by HR");
+  }
+  const next: EmployeeFinance = { ...current };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    if (k === "bankAccountNo") next.bankAccountMasked = maskTail(v as string);
+    else if (k === "panNumber") {
+      const pan = (v as string || "").toUpperCase() || null;
+      next.panMasked = maskTail(pan);
+      next.panVerified = false;   // a changed PAN is an unverified PAN
+    } else (next as unknown as Record<string, unknown>)[k] = v === "" ? null : v;
+  }
+  mockFinanceStore.set(employeeId, next);
+  return next;
+}
+
+/** Net in words for the payslip footer — mirrors the server's Indian-numbering spelling. */
+function amountInWords(amount: number, currency: string): string {
+  const units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const two = (n: number): string =>
+    n < 20 ? units[n] : tens[Math.floor(n / 10)] + (n % 10 ? " " + units[n % 10] : "");
+  const indian = (n: number): string => {
+    if (n === 0) return "Zero";
+    let out = "";
+    const crore = Math.floor(n / 10000000); n %= 10000000;
+    const lakh = Math.floor(n / 100000); n %= 100000;
+    const thousand = Math.floor(n / 1000); n %= 1000;
+    const hundred = Math.floor(n / 100); const rest = n % 100;
+    if (crore) out += indian(crore) + " Crore ";
+    if (lakh) out += two(lakh) + " Lakh ";
+    if (thousand) out += two(thousand) + " Thousand ";
+    if (hundred) out += two(hundred) + " Hundred ";
+    if (rest) out += (out ? "and " : "") + two(rest) + " ";
+    return out.trim();
+  };
+  const whole = Math.floor(Math.abs(round2(amount)));
+  const major = currency === "INR" ? "Rupees" : currency;
+  return `${indian(whole)} ${major} Only`;
 }
 
 function buildCompensation(db: DB, employeeId: string): Compensation {

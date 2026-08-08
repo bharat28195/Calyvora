@@ -50,6 +50,7 @@ const NAV: NavItem[] = [
       { href: "/me/performance", label: "Performance" },
       { href: "/me/review", label: "Review" },
       { href: "/me/payslip", label: "My pay" },
+      { href: "/me/finances", label: "My finances" },
       { href: "/me/expenses", label: "Expenses" },
     ],
   },

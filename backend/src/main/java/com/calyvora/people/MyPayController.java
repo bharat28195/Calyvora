@@ -19,9 +19,30 @@ import org.springframework.web.bind.annotation.RestController;
 public class MyPayController {
 
     private final CompensationService compensationService;
+    private final EmployeeFinanceService financeService;
 
-    public MyPayController(CompensationService compensationService) {
+    public MyPayController(CompensationService compensationService,
+                           EmployeeFinanceService financeService) {
         this.compensationService = compensationService;
+        this.financeService = financeService;
+    }
+
+    /** My bank, statutory and identity record — the "My Finances → Summary" screen. */
+    @GetMapping("/finance")
+    public com.calyvora.people.dto.EmployeeFinanceResponse myFinance(@CurrentUser AuthPrincipal principal) {
+        return financeService.forSelf(principal.userId());
+    }
+
+    /**
+     * Update my own bank details and identity. PF/ESI/professional-tax enrolment is rejected here —
+     * those are employer filings and belong to HR (see {@link EmployeeFinanceService}).
+     */
+    @org.springframework.web.bind.annotation.PatchMapping("/finance")
+    public com.calyvora.people.dto.EmployeeFinanceResponse updateMyFinance(
+            @CurrentUser AuthPrincipal principal,
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
+            com.calyvora.people.dto.UpdateEmployeeFinanceRequest request) {
+        return financeService.updateSelf(principal.userId(), request);
     }
 
     @GetMapping("/compensation")

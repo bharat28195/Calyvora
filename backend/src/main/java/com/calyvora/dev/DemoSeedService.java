@@ -104,6 +104,7 @@ public class DemoSeedService {
     private final com.calyvora.platform.SeatRequestRepository seatRequestRepository;
     private final com.calyvora.helpdesk.HelpdeskService helpdeskService;
     private final com.calyvora.people.RegularizationService regularizationService;
+    private final com.calyvora.people.EmployeeFinanceService employeeFinanceService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -127,7 +128,9 @@ public class DemoSeedService {
                            com.calyvora.billing.SubscriptionRepository subscriptionRepository,
                            com.calyvora.platform.SeatRequestRepository seatRequestRepository,
                            com.calyvora.helpdesk.HelpdeskService helpdeskService,
-                           com.calyvora.people.RegularizationService regularizationService) {
+                           com.calyvora.people.RegularizationService regularizationService,
+                           com.calyvora.people.EmployeeFinanceService employeeFinanceService) {
+        this.employeeFinanceService = employeeFinanceService;
         this.helpdeskService = helpdeskService;
         this.regularizationService = regularizationService;
         this.performanceReviewService = performanceReviewService;
@@ -293,6 +296,9 @@ public class DemoSeedService {
                 java.util.List.of("Customer Success", "Zendesk", "Troubleshooting"), 4);
         profile(emp, tom.getEmail(), "NR-006", "Sales Manager", sales.id(), mgrAva, "2021-11-08",
                 java.util.List.of("B2B Sales", "Negotiation", "CRM"), 3);
+
+        // Bank / PF / ESI / PAN, so "My Finances" and the payslip header aren't a page of dashes.
+        seedFinance(emp);
 
         // Compensation history (initial salary + a review hike) so salary/hikes/payslips look real.
         seedComp(emp, OWNER_EMAIL, 220000, owner);
@@ -690,8 +696,51 @@ public class DemoSeedService {
     private Company provisionCompany() {
         Company company = new Company(UUID.randomUUID(), COMPANY, uniqueSlug(COMPANY), CompanyStatus.ACTIVE);
         companyRepository.save(company);
-        companySettingsRepository.save(new CompanySettings(company.getId()));
+
+        // Branded out of the box, so a demo payslip looks like a real document rather than a form
+        // with the fields left blank.
+        CompanySettings settings = new CompanySettings(company.getId());
+        settings.setLegalName("Northwind Robotics Private Limited");
+        settings.setAddress("704-705, Sankalp Square 3A, Beside Taj Skyline Hotel, "
+                + "PRL Colony, Thaltej, Ahmedabad, Gujarat, 380059.");
+        companySettingsRepository.save(settings);
         return company;
+    }
+
+    /**
+     * Bank / statutory / identity records for the demo staff, so "My Finances" and the payslip
+     * header have something real to show. Values are obviously fictional but correctly shaped —
+     * a UAN is 12 digits and a PAN matches its format, so the validation rules are exercised too.
+     */
+    private void seedFinance(Map<String, EmployeeResponse> emp) {
+        finance(emp, "ava.chen@northwind.demo", "HDFC Bank", "50100424268412", "HDFC0003939",
+                "ENABLED", "GJVAT35530670000010105", "101794989961", "2021-01-04",
+                "AVCPC1234A", "1988-04-12", "Wei Chen");
+        finance(emp, "leo.martins@northwind.demo", "ICICI Bank", "002401527788", "ICIC0000024",
+                "ENABLED", "GJVAT35530670000010106", "101794989962", "2022-03-15",
+                "BXTPM5678B", "1990-09-02", "Rosa Martins");
+        finance(emp, "tom.becker@northwind.demo", "Axis Bank", "918010049211334", "UTIB0001234",
+                "ENABLED", "GJVAT35530670000010107", "101794989963", "2022-07-01",
+                "CQRPB9012C", "1987-11-23", "Hans Becker");
+        finance(emp, "sara.okoro@northwind.demo", "State Bank of India", "38240015566", "SBIN0011513",
+                "NOT_ELIGIBLE", null, null, null,
+                "DLMPO3456D", "1996-01-28", "Chidi Okoro");
+    }
+
+    private void finance(Map<String, EmployeeResponse> emp, String email, String bank, String account,
+                         String ifsc, String pfStatus, String pfNumber, String uan, String pfJoinDate,
+                         String pan, String dob, String parent) {
+        EmployeeResponse e = emp.get(email);
+        if (e == null) {
+            return;
+        }
+        UUID employeeId = UUID.fromString(e.id());
+        employeeFinanceService.update(employeeId, new com.calyvora.people.dto.UpdateEmployeeFinanceRequest(
+                "BANK_TRANSFER", bank, account, ifsc, e.firstName() + " " + e.lastName(), "Thaltej",
+                pfStatus, pfNumber, uan, pfJoinDate, "Mr " + (e.firstName() + " " + e.lastName()).toUpperCase(),
+                "NOT_ELIGIBLE", null,
+                "Gujarat", "Gujarat",
+                pan, true, dob, parent));
     }
 
     private User createUser(UUID companyId, String email, String first, String last, Role role) {

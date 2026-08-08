@@ -250,6 +250,26 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-12 · 2026-08-09 · "My Finances" — separate the pay record from the directory, mask it, split who owns it
+- **Context:** founder shared Keka's My Finances screens and asked for the same: an employee should
+  see how they're paid and what they're enrolled in, and the payslip should carry the company logo
+  and identity instead of a bare table of numbers.
+- **Decision (shape):** a separate `employee_finance` table rather than more columns on `employees`.
+  The directory row is readable by every colleague by design; a bank account and a PAN never should
+  be. Same entity would put them one careless `SELECT` away from each other.
+- **Decision (visibility):** self-or-HR only. A manager can see a report's *rating* but not their bank
+  details — being someone's manager is not a reason to see where their salary lands.
+- **Decision (edit ownership is split):** the employee owns bank details and identity; HR owns
+  PF/ESI/professional tax. Those are employer filings — letting people edit their own enrolment is a
+  compliance problem wearing the costume of a self-service feature. The server rejects it rather than
+  merely hiding the form.
+- **Decision (masking is server-side):** the full account number and PAN never leave the backend, so
+  a screenshot, a bug report or an open devtools tab can't expose them. A changed PAN drops its
+  verified flag, because otherwise the tick survives onto a document nobody has checked.
+- **Consequence:** the payslip becomes a real document (logo, legal name, address, employee number,
+  designation, UAN/PF/PAN, net-in-words in lakh/crore grouping) — which is what makes it credible in
+  a demo, and what an employee actually needs when a bank asks for one.
+
 ### PD-11 · 2026-07-27 · Ship a first-deploy path (Render blueprint) + the "Orbit by Calyvora" marketing site
 - **Context:** founder wants to host the app for real testing ("think of it as Keka") — a first-ever
   deploy, no prior devops — and, separately, a very polished marketing site branded **Orbit by Calyvora**.
@@ -515,6 +535,25 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   distributed-systems tax before we can pay it. The classic startup-killer avoided.
 - **Alternatives:** microservices-from-day-one (rejected — premature); single monolith (rejected —
   ball of mud). **Detail:** [docs/06 §6.1](docs/06-architecture-principles.md#61-topology).
+
+### ADR-02 · 2026-08-09 · Transactional email = HTTPS API (Resend), not SMTP
+- **What:** Outgoing mail goes through an `EmailSender` chosen per send from `EmailSettings`, with
+  three transports — Resend (HTTPS :443), SMTP, and a console transport for local dev. Which one is
+  used is resolved by an `EmailSettingsResolver`; `MAIL_PROVIDER` pins it, otherwise it's inferred
+  from whichever credentials exist. A deployment with nothing configured now logs a loud warning at
+  startup and reports its sends as *undelivered*, instead of silently pretending to work.
+- **Why:** Found in live QA — every signup on the hosted deployment was unrecoverable. Render (like
+  many hosts) blocks outbound SMTP on all ports, so `smtp.hostinger.com:587` timed out; the swallowed
+  failure meant registration returned 201, the verification mail went nowhere, and the account could
+  never be activated. Not a credential problem and not fixable with TLS settings — SMTP is simply not
+  available. Port 443 always is.
+- **Also:** sends now return an `EmailResult`, so `POST /auth/register` answers `{"emailSent": …}` and
+  the signup screen offers a resend instead of claiming "check your email" for mail that never left.
+  Failures still never roll back the signup — the account is real either way.
+- **Alternatives:** stay on SMTP via a relay on 2525 (rejected — still a blocked-port gamble);
+  fire-and-forget queue (rejected for now — the honest inline result is what the UI needs).
+- **Consequence:** per-tenant sending ("customer's mail comes from *their* domain") is now a matter
+  of implementing one resolver; no transport or caller knows tenants exist.
 
 ### Deployment baseline (cross-cutting)
 Cloud-agnostic Kubernetes, service mesh (mTLS), GitOps, trunk-based dev + feature flags +

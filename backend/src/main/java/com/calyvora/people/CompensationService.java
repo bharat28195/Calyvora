@@ -35,13 +35,19 @@ public class CompensationService {
     private final EmployeeService employeeService;
     private final com.calyvora.company.CompanyRepository companyRepository;
     private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
+    private final EmployeeFinanceService financeService;
+    private final DepartmentRepository departmentRepository;
 
     public CompensationService(CompensationRepository compensationRepository,
                                EmployeeRepository employeeRepository, UserRepository userRepository,
                                PayslipTemplateService payslipTemplateService,
                                AttendanceService attendanceService, EmployeeService employeeService,
                                com.calyvora.company.CompanyRepository companyRepository,
-                               com.calyvora.company.CompanySettingsRepository companySettingsRepository) {
+                               com.calyvora.company.CompanySettingsRepository companySettingsRepository,
+                               EmployeeFinanceService financeService,
+                               DepartmentRepository departmentRepository) {
+        this.financeService = financeService;
+        this.departmentRepository = departmentRepository;
         this.compensationRepository = compensationRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
@@ -201,17 +207,43 @@ public class CompensationService {
             net = net.subtract(lop);
         }
 
-        // Payslip header — legal name (falling back to company name) + address.
+        // Payslip header — legal name (falling back to company name), address and logo.
         var settings = companySettingsRepository.findById(companyId).orElse(null);
         String companyName = settings != null && settings.getLegalName() != null && !settings.getLegalName().isBlank()
                 ? settings.getLegalName()
                 : companyRepository.findById(companyId).map(com.calyvora.company.Company::getName).orElse("");
         String companyAddress = settings == null ? null : settings.getAddress();
+        String companyLogoUrl = settings == null ? null : settings.getLogoUrl();
+
+        // Who it's for, and the statutory identifiers a payslip is expected to carry. All optional —
+        // a company that hasn't filled in PF/PAN yet still gets a valid payslip, just a sparser one.
+        EmployeeFinance finance = financeService.rawOrNull(employeeId);
+        String department = employee.getDepartmentId() == null ? null
+                : departmentRepository.findById(employee.getDepartmentId())
+                        .map(Department::getName).orElse(null);
 
         return new PayslipResponse(employeeId.toString(), name, ym.toString(), cur,
-                companyName, companyAddress,
+                companyName, companyAddress, companyLogoUrl,
+                employee.getEmployeeNo(),
+                employee.getStartDate() == null ? null : employee.getStartDate().toString(),
+                department,
+                employee.getJobTitle(),
+                finance == null ? null : finance.getPaymentMode(),
+                finance == null ? null : finance.getUan(),
+                finance == null ? null : finance.getPfNumber(),
+                finance == null ? null : maskPan(finance.getPanNumber()),
                 c.earnings(), deductions, c.gross(), totalDed, net,
+                AmountInWords.of(net, cur),
                 workingDays, lopDays, payableDays);
+    }
+
+    /** PAN as {@code XXXXXX894N} — a payslip identifies the PAN without reprinting it in full. */
+    private static String maskPan(String pan) {
+        if (pan == null || pan.isBlank()) {
+            return null;
+        }
+        String p = pan.trim();
+        return p.length() <= 4 ? p : "X".repeat(p.length() - 4) + p.substring(p.length() - 4);
     }
 
     /** "2" not "2.0", "1.5" kept — for the LOP line label. */
