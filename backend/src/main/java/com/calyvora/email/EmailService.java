@@ -1,12 +1,15 @@
 package com.calyvora.email;
 
 /**
- * Transactional email. Sprint 1 has a local SMTP impl (Mailpit); prod swaps to SES/Resend (SD-6).
- * Links passed in are already fully-formed absolute URLs to the frontend.
+ * Transactional email. Links passed in are already fully-formed absolute URLs to the frontend.
+ *
+ * <p>Sends return an {@link EmailResult} rather than throwing: a mail failure must not roll back the
+ * registration or invitation that triggered it, but the caller still needs to know whether anything
+ * was delivered so it can offer a resend instead of claiming success.
  */
 public interface EmailService {
 
-    void sendVerificationEmail(String to, String verificationUrl);
+    EmailResult sendVerificationEmail(String to, String verificationUrl);
 
-    void sendInvitationEmail(String to, String companyName, String acceptUrl);
+    EmailResult sendInvitationEmail(String to, String companyName, String acceptUrl);
 }

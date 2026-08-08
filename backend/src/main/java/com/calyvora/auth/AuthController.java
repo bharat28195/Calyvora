@@ -37,11 +37,18 @@ public class AuthController {
         this.refreshProps = props.security().refresh();
     }
 
+    /**
+     * The workspace is created regardless of whether its verification email got out, so this returns
+     * 201 either way — but {@code emailSent} tells the client which screen to show: "check your
+     * email", or "we couldn't send it, here's how to resend".
+     */
     @PostMapping("/register")
-    public ResponseEntity<Void> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        boolean emailSent = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new RegisterResponse(emailSent));
     }
+
+    public record RegisterResponse(boolean emailSent) {}
 
     @PostMapping("/verify-email")
     public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {

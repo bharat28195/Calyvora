@@ -28,24 +28,34 @@ public class PeopleController {
         this.employeeService = employeeService;
     }
 
-    /** Directory: any authenticated member can browse their company's people. */
+    /**
+     * Directory: any authenticated member can browse their company's people — but the performance
+     * rating is stripped for everyone except HR/leadership, the person themselves, and their manager.
+     */
     @GetMapping("/employees")
-    public List<EmployeeResponse> directory() {
-        return employeeService.directory();
+    public List<EmployeeResponse> directory(@CurrentUser AuthPrincipal principal) {
+        return RatingVisibility.filter(employeeService.directory(), principal);
     }
 
     /** Paged, searchable directory — the scalable path for large companies. */
     @GetMapping("/employees/page")
     public com.calyvora.common.dto.PageResponse<EmployeeResponse> directoryPage(
+            @CurrentUser AuthPrincipal principal,
             @org.springframework.web.bind.annotation.RequestParam(name = "q", required = false) String q,
             @org.springframework.web.bind.annotation.RequestParam(name = "page", defaultValue = "0") int page,
             @org.springframework.web.bind.annotation.RequestParam(name = "size", defaultValue = "25") int size) {
-        return employeeService.directoryPage(q, page, size);
+        var result = employeeService.directoryPage(q, page, size);
+        return result.map(e -> RatingVisibility.filter(e, principal, myEmployeeId(principal)));
     }
 
     @GetMapping("/employees/{id}")
-    public EmployeeResponse get(@PathVariable UUID id) {
-        return employeeService.get(id);
+    public EmployeeResponse get(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
+        return RatingVisibility.filter(employeeService.get(id), principal, myEmployeeId(principal));
+    }
+
+    /** The caller's own employee id — needed to tell "my report" from "a colleague". */
+    private String myEmployeeId(AuthPrincipal principal) {
+        return employeeService.me(principal.userId()).id();
     }
 
     /** My own profile (auto-provisioned if missing). */

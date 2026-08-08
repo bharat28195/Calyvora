@@ -1,5 +1,6 @@
 package com.calyvora.support;
 
+import com.calyvora.email.EmailResult;
 import com.calyvora.email.EmailService;
 import org.springframework.context.annotation.Primary;
 
@@ -22,13 +23,15 @@ public class RecordingEmailService implements EmailService {
     private final List<Sent> invitations = new ArrayList<>();
 
     @Override
-    public void sendVerificationEmail(String to, String verificationUrl) {
+    public EmailResult sendVerificationEmail(String to, String verificationUrl) {
         verifications.add(new Sent(to, verificationUrl));
+        return EmailResult.ok("RECORDING");
     }
 
     @Override
-    public void sendInvitationEmail(String to, String companyName, String acceptUrl) {
+    public EmailResult sendInvitationEmail(String to, String companyName, String acceptUrl) {
         invitations.add(new Sent(to, acceptUrl));
+        return EmailResult.ok("RECORDING");
     }
 
     public String lastVerificationToken() {

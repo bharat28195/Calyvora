@@ -18,4 +18,10 @@ public record PageResponse<T>(
                 page.getContent().stream().map(map).toList(),
                 page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
+
+    /** Transform the entries, keeping the paging envelope — e.g. to redact fields per viewer. */
+    public <R> PageResponse<R> map(Function<T, R> map) {
+        return new PageResponse<>(content.stream().map(map).toList(),
+                page, size, totalElements, totalPages);
+    }
 }

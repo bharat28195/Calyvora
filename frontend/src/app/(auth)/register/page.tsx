@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { api, ApiError } from "@/lib/api";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { api, ApiError, isLive } from "@/lib/api";
 import { registerSchema, passwordStrength, type RegisterInput } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,11 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
 const STRENGTH_LABELS = ["Too weak", "Weak", "Fair", "Good", "Strong"];
+
+// The dev mailbox is a local-development convenience that doesn't exist on a deployed backend
+// (its controller is registered only under the `embedded` profile). Pointing a real customer at
+// it sends them to a page that can only confuse them.
+const showDevMailbox = !isLive || process.env.NODE_ENV !== "production";
 
 export default function RegisterPage() {
   const [values, setValues] = useState<RegisterInput>({
@@ -25,6 +30,8 @@ export default function RegisterPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [emailSent, setEmailSent] = useState(true);
+  const [resent, setResent] = useState(false);
 
   const set = (key: keyof RegisterInput) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -45,7 +52,8 @@ export default function RegisterPage() {
     setErrors({});
     setSubmitting(true);
     try {
-      await api.register(parsed.data);
+      const result = await api.register(parsed.data);
+      setEmailSent(result.emailSent);
       setDone(true);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -61,22 +69,56 @@ export default function RegisterPage() {
   }
 
   if (done) {
+    // The workspace exists either way. Say which of the two situations the user is actually in —
+    // claiming "check your email" when the send failed leaves them waiting for nothing.
     return (
       <Card className="text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
-        <CardTitle className="mt-4">Check your email</CardTitle>
-        <CardDescription>
-          We sent a verification link to <span className="text-fg">{values.email}</span>. Click it
-          to activate your account, then log in.
-        </CardDescription>
+        {emailSent ? (
+          <>
+            <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
+            <CardTitle className="mt-4">Check your email</CardTitle>
+            <CardDescription>
+              We sent a verification link to <span className="text-fg">{values.email}</span>. Click
+              it to activate your account, then log in.
+            </CardDescription>
+          </>
+        ) : (
+          <>
+            <AlertTriangle className="mx-auto h-10 w-10 text-amber-400" />
+            <CardTitle className="mt-4">Workspace created — but we couldn&apos;t send the email</CardTitle>
+            <CardDescription>
+              Your account for <span className="text-fg">{values.email}</span> exists. The
+              verification email didn&apos;t go out, so it can&apos;t be activated yet. Try again, or
+              ask your administrator to check the mail settings.
+            </CardDescription>
+          </>
+        )}
         <div className="mt-6 flex flex-col gap-2">
-          <Alert tone="info">
-            Local dev uses a mock mailbox — open{" "}
-            <Link href="/dev/mailbox" className="underline">
-              /dev/mailbox
-            </Link>{" "}
-            to click your verification link.
-          </Alert>
+          {!emailSent && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  await api.resendVerification(values.email);
+                  setResent(true);
+                } catch {
+                  setResent(false);
+                }
+              }}
+            >
+              {resent ? "Verification email requested" : "Resend verification email"}
+            </Button>
+          )}
+          {showDevMailbox && (
+            <Alert tone="info">
+              Local dev uses a mock mailbox — open{" "}
+              <Link href="/dev/mailbox" className="underline">
+                /dev/mailbox
+              </Link>{" "}
+              to click your verification link.
+            </Alert>
+          )}
           <Link href="/login" className="text-sm text-fg/60 hover:text-fg">
             Back to log in
           </Link>

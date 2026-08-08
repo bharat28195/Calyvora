@@ -17,7 +17,14 @@ public record AppProperties(
         Mail mail,
         Security security
 ) {
-    public record Mail(String from) {}
+    /**
+     * Outgoing mail. {@code provider} pins the transport ({@code resend} / {@code smtp} /
+     * {@code console}); left blank it is inferred from whichever credentials are present.
+     */
+    public record Mail(String provider, String from, Resend resend) {}
+
+    /** Resend's HTTPS API — the transport that survives hosts which block outbound SMTP. */
+    public record Resend(String apiKey, String apiUrl) {}
 
     public record Security(Jwt jwt, Refresh refresh, Verification verification, Invitation invitation) {}
 

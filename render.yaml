@@ -54,23 +54,19 @@ services:
         sync: false
       - key: JWT_PUBLIC_KEY
         sync: false
-      # Outgoing email (Hostinger). Without these MAIL_HOST falls back to localhost:1025 (Mailpit),
-      # so every verification / invite send fails and is swallowed as a WARN — signup appears to
-      # succeed and no mail ever arrives. Port 587 + STARTTLS; use 465 with MAIL_SMTP_SSL=true and
-      # MAIL_SMTP_STARTTLS=false if your host prefers implicit TLS.
-      - key: MAIL_HOST
-        value: smtp.hostinger.com
-      - key: MAIL_PORT
-        value: "587"
-      - key: MAIL_SMTP_AUTH
-        value: "true"
-      - key: MAIL_SMTP_STARTTLS
-        value: "true"
-      # Full mailbox address, its password, and the From: — MAIL_FROM must equal MAIL_USERNAME or
-      # the provider rejects the message as a spoofed sender.
-      - key: MAIL_USERNAME
-        sync: false
-      - key: MAIL_PASSWORD
+      # Outgoing email over Resend's HTTPS API.
+      #
+      # NOT SMTP: Render blocks outbound SMTP on every port (25/587/465) — connections simply time
+      # out, and because a send failure is swallowed on purpose (a mail outage must not roll back a
+      # completed signup) the symptom is silent: signup succeeds and no verification mail ever
+      # arrives, so the account can never be activated. Port 443 is never blocked.
+      #
+      # Both are sync: false — an API key must never live in this file. Set them in the dashboard.
+      # MAIL_FROM must be at a domain verified in Resend, or it rejects the send with a 403.
+      # Unset ⇒ the app falls back to the console transport and says so loudly at startup.
+      - key: MAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
         sync: false
       - key: MAIL_FROM
         sync: false

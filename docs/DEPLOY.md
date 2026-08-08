@@ -75,7 +75,7 @@ In Render → `calyvora-backend` → **Environment**, set:
 | Key | Value |
 |-----|-------|
 | `JWT_KID` | any stable label, e.g. `orbit-202608` |
-| `JWT_PRIVATE_KEY` | the single-line private PEM |/m 
+| `JWT_PRIVATE_KEY` | the single-line private PEM |
 | `JWT_PUBLIC_KEY` | the single-line public PEM |
 
 Save (the service redeploys). The log should then read `RS256 JWT key store ready: activeKid=<your
@@ -102,28 +102,32 @@ and private keys look swapped
 `JWT_PRIVATE_KEY_PREV` / `JWT_PUBLIC_KEY_PREV`, put a fresh keypair in the primary three, redeploy.
 Tokens signed by the old key keep verifying; drop the `_PREV` trio once they've all expired (15 min).
 
-### Turn on real email (Hostinger) — otherwise no verification mail is sent
+### Turn on real email — otherwise nobody can finish signing up
 
-**Why nothing arrives today:** with `MAIL_HOST` unset the app targets `localhost:1025` (Mailpit, for
-local dev). On a server nothing is listening there, the send fails, and `SmtpEmailService`
-**deliberately swallows the error** — a mail outage must never roll back a completed signup. So
-registration returns success and the verification email silently goes nowhere.
+**Read this before anything else: do not use SMTP on Render.** Render (like many hosts) blocks
+outbound SMTP on every port — 25, 587 and 465 all just time out. It is not a credential problem and
+no amount of fiddling with STARTTLS fixes it. Because a mail failure is deliberately swallowed (an
+outage must never roll back a completed signup), the symptom is silent: registration returns success,
+the verification email goes nowhere, and the account can never be activated.
 
-In Render → `calyvora-backend` → **Environment** (`render.yaml` already sets the host/port/TLS flags;
-these three are `sync: false` because they're yours):
+Use **Resend** instead. It sends over HTTPS on port 443, which no host blocks.
+
+1. Sign up at **https://resend.com** (free tier: 3,000 emails/month).
+2. **Add your domain** and paste the SPF/DKIM records it gives you into your DNS. Until the domain is
+   verified you can only send to your own address — enough to test, not enough to demo.
+3. Create an **API key**.
+4. In Render → `calyvora-backend` → **Environment**:
 
 | Key | Value |
 |-----|-------|
-| `MAIL_USERNAME` | the **full** mailbox address, e.g. `no-reply@yourdomain.com` |
-| `MAIL_PASSWORD` | that mailbox's password |
-| `MAIL_FROM` | **the same address as `MAIL_USERNAME`** |
+| `RESEND_API_KEY` | the key from step 3 (starts `re_…`) |
+| `MAIL_FROM` | an address at your verified domain, e.g. `no-reply@calyvora.in` |
 
-`MAIL_FROM` must match `MAIL_USERNAME` — providers reject a `From:` that differs from the
-authenticated mailbox, which shows up as a confusing "sender denied" / relay error.
+That's it — no host, port or TLS flags. The startup log confirms the choice:
 
-Hostinger's settings, already in `render.yaml`: `smtp.hostinger.com`, port `587`, STARTTLS. If your
-account prefers implicit TLS, use port `465` and swap the flags — `MAIL_SMTP_SSL=true`,
-`MAIL_SMTP_STARTTLS=false`.
+```
+Outgoing email: provider=RESEND, from=no-reply@calyvora.in, endpoint=https://api.resend.com/emails
+```
 
 **Verify it in one call** (staging only, disabled in `prod`):
 
@@ -131,35 +135,55 @@ account prefers implicit TLS, use port `465` and swap the flags — `MAIL_SMTP_S
 curl -X POST "https://calyvora-backend.onrender.com/api/v1/dev/test-email?to=you@example.com"
 ```
 
-It reports the real provider error instead of hiding it, and echoes the settings in effect:
+It reports the real provider error instead of hiding it, and echoes the settings in effect (never the
+key or password):
 
 ```json
-{"sent":true,"error":null,
- "config":{"host":"smtp.hostinger.com","port":587,"username":"no-reply@yourdomain.com",
-           "from":"no-reply@yourdomain.com","auth":true,"starttls":true,"ssl":false}}
+{"sent":true,"provider":"RESEND","error":null,
+ "config":{"endpoint":"https://api.resend.com/emails","from":"no-reply@calyvora.in",
+           "username":null,"auth":false,"starttls":false,"ssl":false}}
 ```
 
 Common failures in the `error` field:
-- `AuthenticationFailedException … 535` → wrong password, or `MAIL_USERNAME` isn't the full address.
-- `MailConnectException … connect timed out` → wrong port, or outbound SMTP is blocked. Try 465+SSL.
-- `553 / 550 sender denied` → `MAIL_FROM` doesn't match `MAIL_USERNAME`.
+- `Resend returned 403: The domain is not verified` → finish step 2; DNS can take a few minutes.
+- `Resend returned 401: API key is invalid` → wrong or rotated `RESEND_API_KEY`.
+- `Resend returned 422: from is not valid` → `MAIL_FROM` isn't at a domain you've verified.
+- `MailConnectException … connect timed out` (SMTP) → the host is blocking SMTP. Switch to Resend.
 
-Mail lands in spam? Add SPF/DKIM records for the sending domain in your DNS — Hostinger publishes the
-exact values in its email dashboard.
+#### Choosing the transport explicitly
 
-**Try it locally before deploying.** Put the mailbox credentials in `backend/.env.local` (gitignored)
-and run against the embedded database — no Docker, no Postgres install:
+`MAIL_PROVIDER` pins it; left unset the app infers one. Order of inference: a `RESEND_API_KEY` means
+Resend, otherwise a `MAIL_USERNAME` means SMTP, otherwise **console** — links are written to the log
+and never delivered, and the app says so loudly at startup rather than pretending to send.
+
+| `MAIL_PROVIDER` | Needs | Use when |
+|-----------------|-------|----------|
+| `resend` | `RESEND_API_KEY`, `MAIL_FROM` | Any hosted deployment — **recommended** |
+| `smtp` | `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM` | Your own server, or a host that allows SMTP |
+| `console` | nothing | Local development |
+
+For SMTP, `MAIL_FROM` must equal `MAIL_USERNAME` — providers reject a `From:` that differs from the
+authenticated mailbox ("sender denied"). Port 587 uses `MAIL_SMTP_STARTTLS=true`; port 465 uses
+`MAIL_SMTP_SSL=true` with STARTTLS off.
+
+**Try it locally before deploying.** Put the credentials in `backend/.env.local` (gitignored) and run
+against the embedded database — no Docker, no Postgres install:
 
 ```bash
 cd backend
-set -a && . ./.env.local && set +a && export MAIL_FROM="$MAIL_USERNAME"
+set -a && . ./.env.local && set +a
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=embedded
 ```
 
-With `MAIL_USERNAME` set, `ConsoleEmailService` (which normally prints links to the log under the
-`embedded` profile) stands aside so the **real** SMTP path runs — the same one a deployment uses. A
-signup against `POST /api/v1/auth/register` then sends a genuine verification email, so you can prove
-the whole flow before it matters in front of a customer.
+With `RESEND_API_KEY` (or `MAIL_USERNAME`) set, the console transport stands aside so the **real**
+send path runs — the same one a deployment uses. A signup against `POST /api/v1/auth/register` then
+sends a genuine verification email, so you can prove the whole flow before it matters in front of a
+customer. Registration also returns `{"emailSent": true|false}`, and the signup screen tells the user
+the truth either way instead of always claiming "check your email".
+
+> **Per-tenant sending** (each customer sending from their own mailbox) is not wired up yet, but the
+> layer is built for it: `EmailSettingsResolver` chooses the mailbox per company and everything else
+> — the transports, the callers — is already independent of where the settings came from.
 
 ### Load sample data (5 companies, admins, employees, payroll…)
 
@@ -179,7 +203,7 @@ curl -X POST https://calyvora-backend.onrender.com/api/v1/dev/seed-platform
 **Logins after seeding** (password `demopass123` for all):
 - **Platform owner:** `owner@priorityhr.app`  → sees the Platform console (all companies)
 - **Company admin:** `ava.chen@northwind.demo`
-- **HR:** `leo.martin@northwind.demo` · **Manager:** `tom.becker@northwind.demo` · **Employee:** `sara.okoro@northwind.demo`
+- **HR:** `leo.martins@northwind.demo` · **Manager:** `tom.becker@northwind.demo` · **Employee:** `sara.okoro@northwind.demo`
 
 ---
 

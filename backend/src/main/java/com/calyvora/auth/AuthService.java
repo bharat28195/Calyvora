@@ -72,8 +72,13 @@ public class AuthService {
 
     // ---- F2: registration -------------------------------------------------
 
+    /**
+     * @return whether the verification email actually reached the provider. The account is created
+     *         either way — but the caller must not tell the user to "check your email" for a message
+     *         that was never delivered, which is exactly what a blocked SMTP port produces.
+     */
     @Transactional
-    public void register(RegisterRequest request) {
+    public boolean register(RegisterRequest request) {
         String email = normalize(request.email());
         if (userRepository.existsByEmail(email)) {
             throw new ConflictException("That email is already registered");
@@ -91,7 +96,7 @@ public class AuthService {
         userRepository.save(owner);
 
         String rawToken = issueVerificationToken(owner.getId());
-        emailService.sendVerificationEmail(email, verificationUrl(rawToken));
+        return emailService.sendVerificationEmail(email, verificationUrl(rawToken)).delivered();
     }
 
     // ---- F3: verification -------------------------------------------------

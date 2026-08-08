@@ -45,6 +45,11 @@ spring:
           timeout: ${MAIL_TIMEOUT_MS:10000}
           writetimeout: ${MAIL_TIMEOUT_MS:10000}
 
+  mvc:
+    # Send an unmatched URL to the exception handler (which answers 404) instead of letting it fall
+    # through to the servlet container's default, where it surfaced as an opaque 500.
+    throw-exception-if-no-handler-found: true
+
 server:
   port: ${SERVER_PORT:8080}
   error:
@@ -55,7 +60,15 @@ calyvora:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   mail:
+    # Which transport sends verification / invitation mail. Leave blank to infer: a Resend API key
+    # means Resend, an SMTP username means SMTP, neither means console (logged, never delivered).
+    # Prefer Resend on a hosted deployment — it sends over HTTPS on 443, whereas outbound SMTP
+    # (25/587/465) is blocked entirely by many hosts, Render's free tier included.
+    provider: ${MAIL_PROVIDER:}
     from: ${MAIL_FROM:no-reply@calyvora.local}
+    resend:
+      api-key: ${RESEND_API_KEY:}
+      api-url: ${RESEND_API_URL:https://api.resend.com/emails}
   security:
     jwt:
       # RS256 asymmetric signing with key rotation (SD-5). Public keys are served at

@@ -48,6 +48,17 @@ public record EmployeeResponse(
                 e.getRating());
     }
 
+    /**
+     * The same entry with the performance rating removed — one colleague's rating is not directory
+     * information. Applied at the API boundary, where who is asking is known; internal callers
+     * (analytics, team overview) keep the full record.
+     */
+    public EmployeeResponse withoutRating() {
+        return rating == null ? this : new EmployeeResponse(id, userId, firstName, lastName, email, role,
+                employeeNo, jobTitle, employmentType, employmentStatus, departmentId, managerId,
+                workLocation, phone, startDate, endDate, skills, null);
+    }
+
     /** Split the denormalized comma-separated skills column into a list (empty when unset). */
     private static List<String> parseSkills(String csv) {
         if (csv == null || csv.isBlank()) {

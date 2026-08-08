@@ -9,9 +9,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.Objects;
@@ -55,6 +58,27 @@ public class GlobalExceptionHandler {
         ApiError body = ApiError.of(ErrorCode.FORBIDDEN, "You do not have permission to perform this action",
                 correlationId(request), null);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    /**
+     * A URL that matches no handler. Without this the catch-all below turns every typo into
+     * {@code 500 Something went wrong}, which is indistinguishable from a genuine server fault —
+     * expensive for us to debug and actively misleading to anyone integrating against the API.
+     */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<ApiError> handleNotFound(Exception ex, HttpServletRequest request) {
+        ApiError body = ApiError.of(ErrorCode.NOT_FOUND, "No endpoint " + request.getMethod() + " "
+                + request.getRequestURI(), correlationId(request), null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    /** Right path, wrong verb — 405, again so it isn't reported as a crash. */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex,
+                                                             HttpServletRequest request) {
+        ApiError body = ApiError.of(ErrorCode.VALIDATION_ERROR,
+                request.getMethod() + " is not supported for this endpoint", correlationId(request), null);
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
     }
 
     /** Anything uncaught: log with the correlation id, return an opaque 500. */
