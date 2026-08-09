@@ -75,6 +75,15 @@ public class DispatchingEmailService implements EmailService {
         String provider = settings.provider().name();
         try {
             senderFor(settings).send(settings, to, subject, body);
+            if (settings.provider() == EmailSettings.Provider.CONSOLE) {
+                // The console transport cannot fail, because it only writes to the log — so reporting
+                // it as delivered would tell someone to check an inbox nothing is coming to. The link
+                // is still in the dev mailbox and the log; the caller just mustn't promise delivery.
+                log.debug("Wrote email '{}' for {} to the log; no mail provider is configured", subject, to);
+                return EmailResult.failed(provider,
+                        "No mail provider is configured, so nothing was delivered — the message was "
+                                + "only written to the server log.");
+            }
             log.debug("Sent email '{}' to {} via {}", subject, to, provider);
             return EmailResult.ok(provider);
         } catch (Exception ex) {

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
-import { api, ApiError, isLive } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { registerSchema, passwordStrength, type RegisterInput } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +14,16 @@ import { Alert } from "@/components/ui/alert";
 
 const STRENGTH_LABELS = ["Too weak", "Weak", "Fair", "Good", "Strong"];
 
-// The dev mailbox is a local-development convenience that doesn't exist on a deployed backend
-// (its controller is registered only under the `embedded` profile). Pointing a real customer at
-// it sends them to a page that can only confuse them.
-const showDevMailbox = !isLive || process.env.NODE_ENV !== "production";
-
 export default function RegisterPage() {
   const router = useRouter();
+  // Whether to offer the mail-capture page is a fact about the backend, not about how the frontend
+  // was built — a staging deploy is a production build talking to a non-prod API, so asking is the
+  // only way to get it right in both directions. Pointing a real customer at a page that doesn't
+  // exist is as bad as hiding it from someone who needs it.
+  const [showDevMailbox, setShowDevMailbox] = useState(false);
+  useEffect(() => {
+    void api.devMailboxAvailable().then(setShowDevMailbox);
+  }, []);
   const [values, setValues] = useState<RegisterInput>({
     companyName: "",
     firstName: "",
@@ -123,9 +126,9 @@ export default function RegisterPage() {
           )}
           {showDevMailbox && (
             <Alert tone="info">
-              Local dev uses a mock mailbox — open{" "}
+              This environment captures mail instead of sending it — open the{" "}
               <Link href="/dev/mailbox" className="underline">
-                /dev/mailbox
+                mailbox
               </Link>{" "}
               to click your verification link.
             </Alert>

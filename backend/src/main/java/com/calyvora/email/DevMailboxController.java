@@ -10,13 +10,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Local-dev mailbox endpoint ({@code embedded} profile only) so the frontend {@code /dev/mailbox}
- * page can show verification/invite links in live mode — no SMTP needed. Public (see SecurityConfig)
- * and never registered in prod, where this bean does not exist.
+ * Serves the captured mailbox so the frontend {@code /dev/mailbox} page can show verification and
+ * invite links with no mail provider configured. Public (see SecurityConfig), and registered in every
+ * profile except {@code prod} — including staging, where a demo needs the link and real delivery is
+ * usually not set up. See {@link DevMailbox} for why that is safe only outside prod.
  */
 @RestController
 @RequestMapping("/api/v1/dev/mailbox")
-@Profile("embedded")
+@Profile("!prod")
 public class DevMailboxController {
 
     private final DevMailbox mailbox;

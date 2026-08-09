@@ -41,6 +41,18 @@ public class PlatformEmailSettingsResolver implements EmailSettingsResolver {
         String apiUrl = props.mail().resend().apiUrl();
 
         EmailSettings.Provider provider = choose(configuredProvider, apiKey, username);
+
+        // A provider named but not credentialed is the worst of both worlds: auto-detection is
+        // skipped, so every send throws and the deployment mails nothing at all. Falling back keeps
+        // the app coherent — links still reach the dev mailbox and the log — and says why, loudly.
+        String missing = missingCredential(provider, apiKey, username);
+        if (missing != null) {
+            log.error("MAIL_PROVIDER is set to {} but {} is not configured, so no email can be sent. "
+                    + "Falling back to the console transport. Set {} to deliver mail for real.",
+                    provider, missing, missing);
+            provider = EmailSettings.Provider.CONSOLE;
+        }
+
         this.settings = switch (provider) {
             case RESEND -> EmailSettings.resend(from, apiKey, apiUrl);
             case SMTP -> EmailSettings.smtp(from, host, port, username, password, auth, starttls, ssl);
@@ -54,6 +66,15 @@ public class PlatformEmailSettingsResolver implements EmailSettingsResolver {
                     + "written to this log and never delivered. Set RESEND_API_KEY (recommended — it "
                     + "sends over HTTPS, which hosts don't block) or the MAIL_* SMTP variables.");
         }
+    }
+
+    /** The credential an explicitly named provider needs and hasn't got, or null when it can send. */
+    private static String missingCredential(EmailSettings.Provider provider, String apiKey, String smtpUsername) {
+        return switch (provider) {
+            case RESEND -> apiKey == null || apiKey.isBlank() ? "RESEND_API_KEY" : null;
+            case SMTP -> smtpUsername == null || smtpUsername.isBlank() ? "MAIL_USERNAME" : null;
+            case CONSOLE -> null;
+        };
     }
 
     @Override

@@ -951,6 +951,21 @@ export const api = {
     mockBackend.reset();
     return Promise.resolve();
   },
+  /**
+   * Whether this backend captures mail links (every profile but prod). Asked at runtime rather than
+   * guessed from NODE_ENV: a staging deployment is a production build of the frontend talking to a
+   * non-prod backend, so the build flag pointed people away from the mailbox exactly where they
+   * needed it — and would have offered it against a prod backend that has no such page.
+   */
+  async devMailboxAvailable(): Promise<boolean> {
+    if (!LIVE) return true;
+    try {
+      await http<MailMessage[]>("/dev/mailbox");
+      return true;
+    } catch {
+      return false;
+    }
+  },
 };
 
 export { ApiError };
