@@ -76,6 +76,22 @@ class DispatchingEmailServiceTest {
     }
 
     @Test
+    void the_console_transport_never_claims_to_have_delivered_anything() {
+        // It only writes to the log, so it cannot fail — which is exactly why "sent" would be a lie.
+        // Signup showed "check your email" on the back of this and left people waiting on nothing.
+        DevMailbox mailbox = new DevMailbox();
+        DispatchingEmailService service = service(new ConsoleSender(), mailbox);
+
+        EmailResult result = service.sendVerificationEmail("someone@example.com", "http://x/verify?token=a");
+
+        assertThat(result.delivered()).isFalse();
+        assertThat(result.error()).contains("No mail provider is configured");
+        // The link is still recoverable, which is the whole point of capturing it.
+        assertThat(mailbox.list()).singleElement()
+                .satisfies(m -> assertThat(m.link()).endsWith("token=a"));
+    }
+
+    @Test
     void the_diagnostic_send_propagates_the_failure() {
         // /dev/test-email exists to show the real error, so this one path must not swallow it.
         DispatchingEmailService service = service(new FailingSender(), null);

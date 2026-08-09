@@ -162,6 +162,18 @@ and never delivered, and the app says so loudly at startup rather than pretendin
 | `smtp` | `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM` | Your own server, or a host that allows SMTP |
 | `console` | nothing | Local development |
 
+**A provider named but not credentialed falls back to console**, loudly:
+
+```
+ERROR ... MAIL_PROVIDER is set to RESEND but RESEND_API_KEY is not configured, so no email can be
+          sent. Falling back to the console transport. Set RESEND_API_KEY to deliver mail for real.
+```
+
+This is the case the blueprint creates by default — `render.yaml` pins `MAIL_PROVIDER=resend` while
+`RESEND_API_KEY` is `sync: false`, so it is unset until you fill it in. Pinning a provider used to
+skip inference and make *every* send throw, so the deployment mailed nothing at all until someone
+went looking. It now degrades to capture-and-log instead of failing.
+
 For SMTP, `MAIL_FROM` must equal `MAIL_USERNAME` — providers reject a `From:` that differs from the
 authenticated mailbox ("sender denied"). Port 587 uses `MAIL_SMTP_STARTTLS=true`; port 465 uses
 `MAIL_SMTP_SSL=true` with STARTTLS off.
@@ -180,6 +192,20 @@ send path runs — the same one a deployment uses. A signup against `POST /api/v
 sends a genuine verification email, so you can prove the whole flow before it matters in front of a
 customer. Registration also returns `{"emailSent": true|false}`, and the signup screen tells the user
 the truth either way instead of always claiming "check your email".
+
+#### Demoing verification with no mail provider at all
+
+Every captured link is also served from **`GET /api/v1/dev/mailbox`** and rendered at
+**`/dev/mailbox`** in the app, in every profile except `prod`. So the full round trip — register,
+open the link, account verified — is demonstrable on a staging deployment with nothing configured.
+The signup screen links to it automatically: the frontend asks the backend whether the mailbox exists
+rather than inferring it from its own build, which is why it now appears on staging (a production
+frontend build talking to a non-prod API) and never against a `prod` backend.
+
+> ⚠️ The mailbox is **unauthenticated by design** — the person who needs a verification link is the
+> one who cannot log in yet. Anyone who can reach a non-prod deployment can therefore read pending
+> verification and invite links and act on them. That is fine for a demo tenant and is exactly why
+> the bean does not exist under the `prod` profile. Run `prod` for anything holding real customer data.
 
 > **Per-tenant sending** (each customer sending from their own mailbox) is not wired up yet, but the
 > layer is built for it: `EmailSettingsResolver` chooses the mailbox per company and everything else

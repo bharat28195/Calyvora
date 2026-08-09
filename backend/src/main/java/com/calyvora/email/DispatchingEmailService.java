@@ -74,11 +74,14 @@ public class DispatchingEmailService implements EmailService {
         EmailSettings settings = resolver.resolve(TenantContext.getCompanyIdOrNull());
         String provider = settings.provider().name();
         try {
-            senderFor(settings).send(settings, to, subject, body);
-            if (settings.provider() == EmailSettings.Provider.CONSOLE) {
+            EmailSender sender = senderFor(settings);
+            sender.send(settings, to, subject, body);
+            if (sender instanceof ConsoleSender) {
                 // The console transport cannot fail, because it only writes to the log — so reporting
                 // it as delivered would tell someone to check an inbox nothing is coming to. The link
                 // is still in the dev mailbox and the log; the caller just mustn't promise delivery.
+                // Keyed on the transport rather than the provider name so a stub registered under any
+                // provider still reports what it actually did.
                 log.debug("Wrote email '{}' for {} to the log; no mail provider is configured", subject, to);
                 return EmailResult.failed(provider,
                         "No mail provider is configured, so nothing was delivered — the message was "
