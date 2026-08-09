@@ -25,13 +25,16 @@ public class CompanySubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final SeatRequestRepository seatRequestRepository;
     private final UserRepository userRepository;
+    private final com.calyvora.billing.PricingService pricingService;
 
     public CompanySubscriptionService(SubscriptionRepository subscriptionRepository,
                                       SeatRequestRepository seatRequestRepository,
-                                      UserRepository userRepository) {
+                                      UserRepository userRepository,
+                                      com.calyvora.billing.PricingService pricingService) {
         this.subscriptionRepository = subscriptionRepository;
         this.seatRequestRepository = seatRequestRepository;
         this.userRepository = userRepository;
+        this.pricingService = pricingService;
     }
 
     @Transactional(readOnly = true)
@@ -45,12 +48,19 @@ public class CompanySubscriptionService {
 
         if (sub == null) {
             // No subscription row (e.g. the platform company itself) — treat as open, never locked.
-            return new SubscriptionView("NONE", 0, seatsUsed, null, null, false, pending, null, "INR");
+            return new SubscriptionView("NONE", 0, seatsUsed, null, null, false, pending, null, null, "INR");
         }
         Long daysLeft = sub.getEndsAt() == null ? null : ChronoUnit.DAYS.between(LocalDate.now(), sub.getEndsAt());
+        // The rate the next hire is charged at, and the bill that rate actually produces. Both come
+        // from PricingService so this page and the owner console can never quote different numbers;
+        // a cancelled subscription is charged nothing, matching the console's revenue line.
+        java.time.YearMonth thisMonth = java.time.YearMonth.now();
+        java.math.BigDecimal rate = pricingService.rateFor(sub, seatsUsed, thisMonth);
+        java.math.BigDecimal monthlyCharge = sub.isLocked()
+                ? java.math.BigDecimal.ZERO : pricingService.monthlyFor(sub, seatsUsed, thisMonth);
         return new SubscriptionView(sub.getStatus().name(), sub.getSeats(), seatsUsed,
                 sub.getEndsAt() == null ? null : sub.getEndsAt().toString(), daysLeft, sub.isLocked(),
-                pending, sub.getPricePerEmployee(), sub.getCurrency());
+                pending, rate, monthlyCharge, sub.getCurrency());
     }
 
     @Transactional

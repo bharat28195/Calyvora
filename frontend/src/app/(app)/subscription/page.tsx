@@ -45,7 +45,7 @@ export default function SubscriptionPage() {
       </div>
 
       <Card className="mt-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle>Plan</CardTitle>
             <p className="mt-1 text-sm text-fg/60">
@@ -53,6 +53,17 @@ export default function SubscriptionPage() {
               {" · "}{sub.seats} seat{sub.seats === 1 ? "" : "s"}
             </p>
           </div>
+          {/* The rate alone doesn't answer "what are we spending on this?" — an admin owns that
+              number, so show the bill it produces, billed on people in use rather than seats held. */}
+          {sub.monthlyCharge != null && (
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wide text-fg/40">This month</p>
+              <p className="text-2xl font-semibold tabular-nums tracking-tight">{money(sub.monthlyCharge)}</p>
+              <p className="text-xs text-fg/40">
+                {sub.locked ? "Subscription ended" : `${sub.seatsUsed} employee${sub.seatsUsed === 1 ? "" : "s"} in use`}
+              </p>
+            </div>
+          )}
         </div>
 
         {sub.pendingRequestSeats != null ? (

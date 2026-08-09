@@ -285,7 +285,7 @@ export const api = {
   mySubscription(): Promise<SubscriptionView> {
     return LIVE
       ? http<SubscriptionView>("/subscription/me")
-      : Promise.resolve({ status: "NONE", seats: 0, seatsUsed: 0, endsAt: null, daysLeft: null, locked: false, pendingRequestSeats: null, pricePerEmployee: null, currency: "INR" });
+      : Promise.resolve({ status: "NONE", seats: 0, seatsUsed: 0, endsAt: null, daysLeft: null, locked: false, pendingRequestSeats: null, pricePerEmployee: null, monthlyCharge: null, currency: "INR" });
   },
   requestSeats(seats: number, note?: string): Promise<SubscriptionView> {
     return LIVE ? http<SubscriptionView>("/subscription/request-seats", { method: "POST", body: JSON.stringify({ seats, note }) }) : Promise.reject(new Error("live only"));

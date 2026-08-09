@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -147,6 +148,38 @@ class SubscriptionEnforcementTest extends IntegrationTestBase {
                         .header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("months", -12))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void the_admin_sees_the_same_monthly_bill_the_owner_console_quotes() throws Exception {
+        seedPlatform();
+        Session owner = login(OWNER, PW);
+        Session admin = login("admin@acme.demo", PW);
+
+        JsonNode console = null;
+        for (JsonNode c : getJson("/api/v1/platform/companies", owner)) {
+            if (c.get("name").asText().equals("Acme Logistics")) console = c;
+        }
+        JsonNode mine = getJson("/api/v1/subscription/me", admin);
+
+        // Two screens deriving the number separately is how they end up disagreeing, so both read it
+        // from PricingService. The admin owns this figure — they are the one who has to justify it.
+        assertThat(mine.get("monthlyCharge").decimalValue())
+                .isEqualByComparingTo(console.get("monthlyRevenue").decimalValue());
+        assertThat(mine.get("monthlyCharge").asDouble()).isGreaterThan(0);
+    }
+
+    @Test
+    void an_ended_subscription_is_billed_nothing() throws Exception {
+        seedPlatform();
+        Session owner = login(OWNER, PW);
+        String companyId = companyIdOf(owner, "Acme Logistics");
+        mockMvc.perform(post("/api/v1/platform/companies/" + companyId + "/end")
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk());
+
+        Session admin = login("admin@acme.demo", PW);
+        assertThat(getJson("/api/v1/subscription/me", admin).get("monthlyCharge").asDouble()).isZero();
     }
 
     private void seedPlatform() throws Exception {

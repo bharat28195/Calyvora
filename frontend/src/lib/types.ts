@@ -600,6 +600,8 @@ export interface SubscriptionView {
   locked: boolean;
   pendingRequestSeats: number | null;
   pricePerEmployee: number | null;
+  /** What the company is billed this month at that rate — zero once the subscription has ended. */
+  monthlyCharge: number | null;
   currency: string;
 }
 
