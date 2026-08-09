@@ -304,14 +304,49 @@ The frontend reads (at **build** time): `NEXT_PUBLIC_API_MODE=live` and `BACKEND
 
 ---
 
+## Your own domain (`app.calyvora.in`)
+
+`render.yaml` already declares the domain, so a blueprint sync registers it and provisions the TLS
+certificate — no dashboard clicking. **Render cannot create the DNS record for you**, and that is the
+one step that makes it actually resolve:
+
+1. At your registrar (Hostinger → Domains → DNS zone editor), add a **CNAME**:
+
+   | Type | Name | Points to |
+   |------|------|-----------|
+   | CNAME | `app` | `calyvora-frontend.onrender.com` |
+
+2. Wait for Render → `calyvora-frontend` → Settings → Custom Domains to show **Verified** (usually
+   minutes; DNS can take up to an hour).
+
+That's it. The service **keeps its `onrender.com` url as well**, so both addresses work and nothing
+breaks while DNS propagates.
+
+**The one thing to get the right way round:** `FRONTEND_BASE_URL` (backend) is stamped into every
+invitation and verification link. It is now `https://app.calyvora.in`, so **if you deploy before the
+DNS record exists, emailed links will point at a hostname that doesn't resolve yet.** The app itself
+is unaffected — it still serves on `onrender.com`. If you need to deploy first, set
+`FRONTEND_BASE_URL` back to `https://calyvora-frontend.onrender.com` until DNS is live.
+
+The marketing site's Sign in / Start free trial buttons already point at `https://app.calyvora.in`.
+
+### Where the two halves live
+
+| | Host | Why |
+|---|------|-----|
+| `calyvora.in` (marketing site) | Hostinger shared hosting | Three static files — `index.html`, `hr-services.html`, `orbit.css`. Upload them into `public_html`; no build step. |
+| `app.calyvora.in` (the product) | Render | Needs Java, Node and Postgres. Shared hosting cannot run it. |
+
+---
+
 ## Going from "test" to "real customers"
 
 When you're done testing and want a real production instance:
 1. Switch the backend to `SPRING_PROFILES_ACTIVE=prod` (this disables the demo-seed endpoints and Swagger).
 2. Upgrade off the free plans (no sleeping, database won't expire).
-3. Configure a real SMTP provider (`MAIL_*`) so invitation/verification emails actually send.
-4. Point your custom domain at the frontend (Render/Railway both have a "Custom Domain" setting with
-   free HTTPS).
+3. Set `RESEND_API_KEY` + `MAIL_FROM` so invitation/verification emails actually send (see the email
+   section above — **do not** use SMTP on Render).
+4. Point `app.calyvora.in` at the frontend (see the section above; `render.yaml` already declares it).
 
 ---
 
