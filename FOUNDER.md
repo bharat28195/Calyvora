@@ -250,6 +250,39 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-16 · 2026-08-09 · Commercial rules bind on the server, not in the UI
+- **Context:** a full QA pass over the deployed build (243 checks across 14 modules, all four roles, two
+  tenants) came back with reads and tenant isolation completely clean — and the *commercial* model
+  unenforced. Ending a company's subscription set a flag the frontend chose to respect while the API
+  kept serving that tenant reads, writes and fresh logins; the seat limit was displayed everywhere and
+  consulted nowhere, so a one-seat company could invite without limit.
+- **Decision:** Every commercial term is enforced in the backend. A `SubscriptionLockFilter` rejects a
+  locked tenant with `402 SUBSCRIPTION_INACTIVE` on everything except the surface the lock screen needs
+  (sign in/out, who am I, read my subscription) — **login deliberately still succeeds**, because the
+  product's answer to a lapsed subscription is an explanatory screen, which it cannot show if the
+  credentials themselves start failing. Seats are consumed by active members *and* pending invitations,
+  checked when the invitation is issued. Owner-console values are validated rather than silently
+  clamped.
+- **Alternatives considered:** blocking login outright for a locked tenant (rejected — the customer then
+  sees "wrong password" instead of "your subscription ended", and support pays for it); checking seats
+  only at accept time (rejected — the error arrives for the invitee, who can do nothing about it, long
+  after the admin who could).
+- **Trade-offs / debt:** the lock is evaluated per request against the subscription row — one indexed
+  lookup on a hot path, un-cached for now. Payroll run is still O(employees) serial payslip builds
+  (~10 s for six people) and needs batching before a real customer.
+- **Also fixed in the same pass:** payslips printed **USD** on an INR company because the currency was
+  read from the salary row (which defaults to USD) rather than company settings; `PATCH
+  /company/settings` was a full replace that erased the legal name and address — which print on every
+  payslip — when a client sent only the localisation fields; IFSC/PAN/UAN rejected ordinary input
+  (lower case, spaced digits) instead of normalising it, and the UI showed a bare "Validation failed"
+  while the API had been returning per-field messages all along; attendance stamped punches in server
+  UTC rather than the company timezone, putting an early-morning IST punch on the previous day.
+- **Final outcome:** _Fixed on `product/hr-platform` with regression tests covering each defect._
+  Outstanding and **not** code: `RESEND_API_KEY` is unset on Render, so every invitation and
+  verification email fails silently — invitations still work only because the API hands the join link
+  back to the admin.
+
+
 ### PD-15 · 2026-08-09 · Pricing is data the owner edits, and price changes are never retroactive
 - **Context:** founder asked whether changing rates would always mean a full deploy, and said to do
   whatever is best for the product.

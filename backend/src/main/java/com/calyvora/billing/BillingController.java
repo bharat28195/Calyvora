@@ -9,15 +9,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Subscription &amp; billing, platform-owner only. Base {@code /api/v1/billing}.
+ * A company's own subscription &amp; billing view. Base {@code /api/v1/billing}. Tenant-scoped: it
+ * reports the bill for the caller's own company, so it is only meaningful to that company's admin.
  *
- * <p>Company admins deliberately have no billing surface (PD-10 pt 3): they see the end date and can
- * request more seats, and the vendor does the charging. ADMIN used to be allowed here, which exposed
- * pricing and let a customer's own admin act on invoices.
+ * <p><b>Open question (QA 2026-08-09):</b> PD-10 pt 3 removed billing management from admins in favour
+ * of the read-only {@code /subscription/me} view, but this endpoint still exposes pricing and invoice
+ * actions to ADMIN. It is currently unreachable from the admin navigation. Restricting it to OWNER is
+ * not the fix — the owner belongs to the platform company, so OWNER-only would return the vendor's own
+ * bill instead. Either the endpoint is retired or admins keep it deliberately; that is a product call.
  */
 @RestController
 @RequestMapping("/api/v1/billing")
-@PreAuthorize("hasRole('OWNER')")
+@PreAuthorize("hasAnyRole('OWNER','ADMIN')")
 public class BillingController {
 
     private final BillingService service;
