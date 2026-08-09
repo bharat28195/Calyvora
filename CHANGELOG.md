@@ -4,6 +4,24 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-08-09 — Brand icon in the browser tab
+**Symptom:** every tab — marketing site and app alike — showed the browser's blank-globe placeholder.
+No favicon had ever been added, so `/favicon.ico` 404'd and the browser fell back to its default.
+
+- **`website/orbit/favicon.svg`** is the source of truth: the same geometry as the `.logo` element in
+  `orbit.css` (gradient rounded square, inset ring, haloed satellite), so the tab matches the header
+  mark. SVG rather than a bitmap because it stays sharp at every size and follows a colour change by
+  editing two gradient stops.
+- **`favicon.ico` (16/32/48) and `apple-touch-icon.png` (180)** ship alongside it. SVG favicons need
+  Safari 16.4+, and iOS home-screen icons never accept SVG — without these the fallback is the blank
+  globe again on exactly the devices a client is most likely to demo on. No image library is installed,
+  so `scripts/gen-icons.js` rasterises the mark by signed distance and encodes the PNG over `zlib`.
+  Re-run it if the mark ever changes: `node scripts/gen-icons.js website/orbit frontend/public`.
+- **One set of files serves both**: the app declares them through `metadata.icons` in
+  `app/layout.tsx` pointing at `/public`, rather than the app-router `icon.svg` file convention, so
+  there's a single place to change the mark instead of two that can drift.
+- `theme-color: #0b0b12` added so mobile browser chrome matches the page instead of flashing white.
+
 ### 2026-08-09 — Monthly minimum + annual prepay discount
 **Two commercial terms that protect the business without pricing startups out. Both live on the
 versioned price list, so they change from the console and don't rewrite past invoices.**
