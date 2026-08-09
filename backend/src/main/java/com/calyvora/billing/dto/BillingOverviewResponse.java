@@ -25,6 +25,12 @@ public record BillingOverviewResponse(
          * rate. Null for a company on a negotiated flat rate, where there is nothing to explain.
          */
         List<PriceTier> tiers,
+        /** The floor for this company, and whether it's what they're actually paying this month. */
+        BigDecimal monthlyMinimum,
+        boolean minimumApplied,
+        /** Cost of paying a year upfront, and what that saves against twelve monthly payments. */
+        BigDecimal annualChargePrepaid,
+        BigDecimal annualSaving,
         List<Invoice> invoices
 ) {
     public record Invoice(String month, long headcount, BigDecimal amount, String status) {}

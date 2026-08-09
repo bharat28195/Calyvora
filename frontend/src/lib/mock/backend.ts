@@ -3328,13 +3328,24 @@ const PRICE_TIERS: { fromEmployee: number; toEmployee: number | null; rate: numb
   { fromEmployee: 101, toEmployee: null, rate: 99 },
 ];
 
-function monthlyForHeadcount(headcount: number): number {
+/** Floor a company pays regardless of headcount, and the months charged for a prepaid year. */
+const MONTHLY_MINIMUM = 1299;
+const ANNUAL_MONTHS_CHARGED = 10;
+
+/** The metered total before the floor is applied. */
+function meteredForHeadcount(headcount: number): number {
   let total = 0;
   for (const t of PRICE_TIERS) {
     const inTier = Math.max(0, Math.min(headcount, t.toEmployee ?? headcount) - (t.fromEmployee - 1));
     total += inTier * t.rate;
   }
   return total;
+}
+
+function monthlyForHeadcount(headcount: number): number {
+  const metered = meteredForHeadcount(headcount);
+  // A company with nobody in it owes nothing; the floor is for real, small customers.
+  return headcount === 0 ? 0 : Math.max(metered, MONTHLY_MINIMUM);
 }
 
 /** The rate the next employee is charged at — what a customer means by "our price". */
@@ -3366,7 +3377,12 @@ function buildBilling(db: DB, companyId: string): BillingOverview {
     pricePerEmployeePerYear: rate * 12, currency: sub.currency,
     trialEndsAt: sub.trialEndsAt, trialActive: sub.status === "TRIALING",
     billableEmployees: billable, monthlyCharge: monthly, annualCharge: monthly * 12,
-    currentMonth, paidThrough: sub.paidThrough, tiers: PRICE_TIERS, invoices,
+    currentMonth, paidThrough: sub.paidThrough, tiers: PRICE_TIERS,
+    monthlyMinimum: MONTHLY_MINIMUM,
+    minimumApplied: billable > 0 && meteredForHeadcount(billable) < MONTHLY_MINIMUM,
+    annualChargePrepaid: monthly * ANNUAL_MONTHS_CHARGED,
+    annualSaving: monthly * (12 - ANNUAL_MONTHS_CHARGED),
+    invoices,
   };
 }
 

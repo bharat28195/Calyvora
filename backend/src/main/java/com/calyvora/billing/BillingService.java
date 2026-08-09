@@ -59,6 +59,7 @@ public class BillingService {
         BigDecimal rate = pricingService.rateFor(sub, billable, now);
         BigDecimal monthly = pricingService.monthlyFor(sub, billable, now);
         BigDecimal annual = monthly.multiply(BigDecimal.valueOf(12));
+        BigDecimal prepaid = pricingService.annualPrepaidFor(sub, billable, now);
 
         return new BillingOverviewResponse(
                 sub.getPlan(), sub.getStatus().name(), rate, rate.multiply(BigDecimal.valueOf(12)),
@@ -68,6 +69,9 @@ public class BillingService {
                 billable, monthly, annual,
                 now.toString(), sub.getPaidThrough(),
                 sub.isCustomPrice() ? null : tierBreakdown(now),
+                sub.isCustomPrice() ? null : pricingService.listFor(now).getMonthlyMinimum(),
+                pricingService.minimumApplies(sub, billable, now),
+                prepaid, annual.subtract(prepaid),
                 invoices(companyId, sub, now));
     }
 

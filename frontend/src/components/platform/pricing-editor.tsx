@@ -25,6 +25,8 @@ export function PricingEditor() {
   const [tiers, setTiers] = useState<DraftTier[]>([]);
   const [effectiveFrom, setEffectiveFrom] = useState(today());
   const [note, setNote] = useState("");
+  const [minimum, setMinimum] = useState("0");
+  const [annualMonths, setAnnualMonths] = useState("12");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,6 +41,8 @@ export function PricingEditor() {
             toEmployee: t.toEmployee == null ? "" : String(t.toEmployee),
             rate: String(t.rate),
           })));
+          setMinimum(String(current.monthlyMinimum ?? 0));
+          setAnnualMonths(String(current.annualMonthsCharged ?? 12));
         }
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load pricing"));
@@ -62,6 +66,8 @@ export function PricingEditor() {
           toEmployee: i === tiers.length - 1 ? null : Number(t.toEmployee),
           rate: Number(t.rate),
         })),
+        monthlyMinimum: Number(minimum || 0),
+        annualMonthsCharged: Number(annualMonths || 12),
       });
       setSaved(true);
       setNote("");
@@ -165,6 +171,33 @@ export function PricingEditor() {
             </Button>
           </div>
 
+          {/* Commercial terms that aren't per-employee rates but belong to the same versioned list. */}
+          <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-fg/10 pt-5">
+            <Field
+              label="Monthly minimum"
+              htmlFor="minimum"
+              className="w-48"
+              hint="The floor, whatever the headcount. 0 = none."
+            >
+              <Input id="minimum" type="number" min={0} step="1" value={minimum}
+                onChange={(e) => { setMinimum(e.target.value); setSaved(false); }} />
+            </Field>
+            <Field
+              label="Annual billing charges"
+              htmlFor="annualMonths"
+              className="w-56"
+              hint="Months per prepaid year. 10 = two months free."
+            >
+              <Input id="annualMonths" type="number" min={1} max={12} value={annualMonths}
+                onChange={(e) => { setAnnualMonths(e.target.value); setSaved(false); }} />
+            </Field>
+            <p className="mb-2 text-xs text-fg/40">
+              {Number(annualMonths) < 12
+                ? `Paying yearly costs ${12 - Number(annualMonths)} month${12 - Number(annualMonths) === 1 ? "" : "s"} less than paying monthly.`
+                : "No discount for paying yearly."}
+            </p>
+          </div>
+
           <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-fg/10 pt-5">
             <Field
               label="Takes effect from"
@@ -204,6 +237,8 @@ export function PricingEditor() {
                       {v.tiers.map((t) =>
                         t.toEmployee ? `≤${t.toEmployee}: ${money(t.rate)}` : `then ${money(t.rate)}`,
                       ).join(" · ")}
+                      {v.monthlyMinimum > 0 && ` · min ${money(v.monthlyMinimum)}`}
+                      {v.annualMonthsCharged < 12 && ` · yearly ×${v.annualMonthsCharged}`}
                     </span>
                   </div>
                 ))}

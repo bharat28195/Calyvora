@@ -245,7 +245,7 @@ export const api = {
     return LIVE ? http<PriceListVersion[]>("/platform/pricing") : Promise.reject(new Error("live only"));
   },
   /** Publish a new price list — live immediately, no deploy. Owner only. */
-  publishPricing(input: { effectiveFrom: string; note?: string; tiers: { toEmployee: number | null; rate: number }[] }): Promise<PriceListVersion> {
+  publishPricing(input: { effectiveFrom: string; note?: string; tiers: { toEmployee: number | null; rate: number }[]; monthlyMinimum: number; annualMonthsCharged: number }): Promise<PriceListVersion> {
     return LIVE
       ? http<PriceListVersion>("/platform/pricing", { method: "POST", body: JSON.stringify(input) })
       : Promise.reject(new Error("live only"));

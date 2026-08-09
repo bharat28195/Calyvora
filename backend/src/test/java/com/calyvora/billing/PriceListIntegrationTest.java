@@ -145,6 +145,78 @@ class PriceListIntegrationTest extends IntegrationTestBase {
         }
     }
 
+    /**
+     * The floor is what stops the smallest accounts costing more in support than they pay. A
+     * four-person company at ₹149 would otherwise bill ₹596 a month.
+     */
+    @Test
+    void a_small_company_pays_the_monthly_minimum() {
+        YearMonth month = YearMonth.now();
+        pricingService.publish(month.atDay(1), "with a floor",
+                List.of(new PricingService.TierInput(null, new BigDecimal("149"))),
+                new BigDecimal("1299"), 10);
+
+        assertThat(pricingService.monthlyFor(null, 4, month)).isEqualByComparingTo("1299");
+        assertThat(pricingService.minimumApplies(null, 4, month)).isTrue();
+    }
+
+    @Test
+    void the_minimum_stops_applying_once_usage_passes_it() {
+        YearMonth month = YearMonth.now();
+        pricingService.publish(month.atDay(1), "with a floor",
+                List.of(new PricingService.TierInput(null, new BigDecimal("149"))),
+                new BigDecimal("1299"), 10);
+
+        // 10 × 149 = 1,490, comfortably over the floor.
+        assertThat(pricingService.monthlyFor(null, 10, month)).isEqualByComparingTo("1490");
+        assertThat(pricingService.minimumApplies(null, 10, month)).isFalse();
+    }
+
+    @Test
+    void an_empty_company_is_not_charged_the_minimum() {
+        // A floor is for real customers — billing a company with nobody in it would be a bug.
+        YearMonth month = YearMonth.now();
+        pricingService.publish(month.atDay(1), "with a floor",
+                List.of(new PricingService.TierInput(null, new BigDecimal("149"))),
+                new BigDecimal("1299"), 10);
+
+        assertThat(pricingService.monthlyFor(null, 0, month)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void paying_yearly_charges_the_configured_number_of_months() {
+        YearMonth month = YearMonth.now();
+        pricingService.publish(month.atDay(1), "two months free",
+                List.of(new PricingService.TierInput(null, new BigDecimal("100"))),
+                BigDecimal.ZERO, 10);
+
+        // 10 people × ₹100 = ₹1,000/month → ₹10,000 a year instead of ₹12,000.
+        assertThat(pricingService.annualPrepaidFor(null, 10, month)).isEqualByComparingTo("10000");
+    }
+
+    @Test
+    void annual_billing_cannot_charge_more_than_twelve_months() {
+        // Above 12 would make prepaying cost more than paying monthly.
+        YearMonth month = YearMonth.now();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        pricingService.publish(month.atDay(1), "bad",
+                                List.of(new PricingService.TierInput(null, new BigDecimal("100"))),
+                                BigDecimal.ZERO, 13))
+                .hasMessageContaining("between 1 and 12");
+    }
+
+    @Test
+    void a_negotiated_rate_ignores_the_minimum() {
+        // A quoted flat rate is the whole agreement; adding a floor on top would charge more than
+        // was agreed with that customer.
+        Subscription custom = new Subscription(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(),
+                new BigDecimal("80"), "INR", java.time.Instant.now());
+        custom.setCustomPrice(true);
+
+        assertThat(pricingService.monthlyFor(custom, 2, YearMonth.now())).isEqualByComparingTo("160");
+        assertThat(pricingService.minimumApplies(custom, 2, YearMonth.now())).isFalse();
+    }
+
     @Test
     void a_negotiated_rate_ignores_the_price_list() {
         Subscription custom = new Subscription(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(),

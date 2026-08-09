@@ -221,7 +221,8 @@ public class PlatformService {
         List<com.calyvora.billing.PricingService.TierInput> tiers = request.tiers().stream()
                 .map(t -> new com.calyvora.billing.PricingService.TierInput(t.toEmployee(), t.rate()))
                 .toList();
-        var saved = pricingService.publish(effectiveFrom, request.note(), tiers);
+        var saved = pricingService.publish(effectiveFrom, request.note(), tiers,
+                request.monthlyMinimum(), request.annualMonthsCharged());
         return com.calyvora.platform.dto.PriceListResponse.of(
                 saved, saved.getId().equals(pricingService.current().getId()));
     }

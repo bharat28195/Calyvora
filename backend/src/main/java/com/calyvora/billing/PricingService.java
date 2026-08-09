@@ -33,14 +33,19 @@ public class PricingService {
         this.priceListRepository = priceListRepository;
     }
 
-    /** The tiers governing a given month — the last day is what decides which list applies. */
+    /** The list governing a given month — the last day is what decides which one applies. */
     @Transactional(readOnly = true)
-    public List<PriceListTier> tiersFor(YearMonth month) {
+    public PriceList listFor(YearMonth month) {
         return priceListRepository
                 .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(month.atEndOfMonth())
-                .map(PriceList::getTiers)
                 .orElseThrow(() -> new IllegalStateException(
                         "No price list is effective for " + month + " — V37 seeds one from 2020-01-01"));
+    }
+
+    /** The tiers governing a given month. */
+    @Transactional(readOnly = true)
+    public List<PriceListTier> tiersFor(YearMonth month) {
+        return listFor(month).getTiers();
     }
 
     /** Today's list, for the console and for pricing the current month. */
@@ -56,13 +61,43 @@ public class PricingService {
         return priceListRepository.findAllByOrderByEffectiveFromDesc();
     }
 
-    /** What this company pays for a month at this headcount. */
+    /**
+     * What this company pays for a month at this headcount, including the monthly minimum.
+     *
+     * <p>The floor doesn't apply to a company on a negotiated rate — that rate <em>is</em> its terms,
+     * and quietly adding a minimum on top would charge more than was agreed.
+     */
     @Transactional(readOnly = true)
     public BigDecimal monthlyFor(Subscription sub, long headcount, YearMonth month) {
         if (sub != null && sub.isCustomPrice()) {
             return sub.getPricePerEmployee().multiply(BigDecimal.valueOf(headcount));
         }
-        return applyTiers(tiersFor(month), headcount);
+        PriceList list = listFor(month);
+        BigDecimal metered = applyTiers(list.getTiers(), headcount);
+        // A company with nobody in it owes nothing; the floor is for real, small customers.
+        return headcount == 0 ? metered : metered.max(list.getMonthlyMinimum());
+    }
+
+    /** True when the minimum is what this company is actually paying, so the UI can say so. */
+    @Transactional(readOnly = true)
+    public boolean minimumApplies(Subscription sub, long headcount, YearMonth month) {
+        if (sub != null && sub.isCustomPrice() || headcount == 0) {
+            return false;
+        }
+        PriceList list = listFor(month);
+        return applyTiers(list.getTiers(), headcount).compareTo(list.getMonthlyMinimum()) < 0;
+    }
+
+    /**
+     * The cost of paying a year upfront — {@code annualMonthsCharged} months rather than twelve.
+     * A customer who has prepaid is markedly less likely to drift away, which is worth more than the
+     * two months given up.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal annualPrepaidFor(Subscription sub, long headcount, YearMonth month) {
+        BigDecimal monthly = monthlyFor(sub, headcount, month);
+        int months = sub != null && sub.isCustomPrice() ? 12 : listFor(month).getAnnualMonthsCharged();
+        return monthly.multiply(BigDecimal.valueOf(months));
     }
 
     /**
@@ -115,8 +150,9 @@ public class PricingService {
      *                      have already been invoiced, so the caller must mean it.
      */
     @Transactional
-    public PriceList publish(LocalDate effectiveFrom, String note, List<TierInput> tiers) {
-        validate(effectiveFrom, tiers);
+    public PriceList publish(LocalDate effectiveFrom, String note, List<TierInput> tiers,
+                             BigDecimal monthlyMinimum, Integer annualMonthsCharged) {
+        validate(effectiveFrom, tiers, monthlyMinimum, annualMonthsCharged);
         PriceList list = priceListRepository.findByEffectiveFrom(effectiveFrom)
                 .orElseGet(() -> new PriceList(UUID.randomUUID(), effectiveFrom, note));
         // Re-publishing the same start date replaces that version rather than creating a duplicate
@@ -125,12 +161,29 @@ public class PricingService {
         for (TierInput t : tiers) {
             list.addTier(new PriceListTier(UUID.randomUUID(), t.upTo(), t.rate()));
         }
+        list.setMonthlyMinimum(monthlyMinimum == null ? BigDecimal.ZERO : monthlyMinimum);
+        list.setAnnualMonthsCharged(annualMonthsCharged == null ? 12 : annualMonthsCharged);
         return priceListRepository.save(list);
     }
 
-    private void validate(LocalDate effectiveFrom, List<TierInput> tiers) {
+    /** Convenience for callers with no commercial terms to set — keeps the floor off. */
+    @Transactional
+    public PriceList publish(LocalDate effectiveFrom, String note, List<TierInput> tiers) {
+        return publish(effectiveFrom, note, tiers, BigDecimal.ZERO, 12);
+    }
+
+    private void validate(LocalDate effectiveFrom, List<TierInput> tiers,
+                          BigDecimal monthlyMinimum, Integer annualMonthsCharged) {
         if (effectiveFrom == null) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "A price list needs a start date");
+        }
+        if (monthlyMinimum != null && monthlyMinimum.signum() < 0) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "A monthly minimum can't be negative");
+        }
+        if (annualMonthsCharged != null && (annualMonthsCharged < 1 || annualMonthsCharged > 12)) {
+            // Above 12 would charge more for prepaying than for paying monthly.
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "Annual billing must charge between 1 and 12 months");
         }
         if (tiers == null || tiers.isEmpty()) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "A price list needs at least one tier");

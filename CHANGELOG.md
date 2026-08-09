@@ -4,6 +4,24 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-08-09 — Monthly minimum + annual prepay discount
+**Two commercial terms that protect the business without pricing startups out. Both live on the
+versioned price list, so they change from the console and don't rewrite past invoices.**
+
+- **Monthly minimum, set to ₹1,299** (Flyway V39). Without a floor a four-person customer bills ~₹600
+  a month and costs far more than that in support — the standard way a per-seat SaaS loses money on
+  its smallest accounts. It's still roughly **5× below Keka's ₹6,999/month minimum**, which is the
+  whole reason a startup would choose us. A company with nobody in it is never charged it, and a
+  customer on a negotiated flat rate is exempt — that rate is their whole agreement.
+- **Annual prepay charges 10 months instead of 12** — two months free. Cash upfront, and a customer
+  who has paid for a year is markedly less likely to drift away, which is worth more than the two
+  months given up. Rejected above 12, which would make prepaying cost more than paying monthly.
+- **The billing page explains both**: it says when the minimum is what you're paying and that it stops
+  applying once usage passes it, and shows the annual price with the saving spelled out. A number that
+  isn't headcount × rate needs a reason next to it.
+- Website updated: "from ₹1,299/month, two months free annually, no setup fee, excl. GST".
+- 6 new tests covering the floor, the zero-headcount case, the annual term and its validation.
+
 ### 2026-08-09 — Joining a company no longer depends on email arriving
 **The invitation link existed only inside the email. With outbound SMTP blocked, an invited person
 could never get in — and the admin had no way to help them.**

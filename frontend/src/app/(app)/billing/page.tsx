@@ -67,6 +67,19 @@ export default function BillingPage() {
                 ? `${data.billableEmployees} employees · ${tierSummary(data)}`
                 : `${data.billableEmployees} employees × ${money(data.pricePerEmployee)}/mo`}
             </p>
+            {/* Say why the number isn't headcount × rate, rather than leaving them to work it out. */}
+            {data.minimumApplied && data.monthlyMinimum != null && (
+              <p className="mt-1 text-sm text-amber-300/90">
+                Your team is below the {money(data.monthlyMinimum)} monthly minimum, so that&apos;s
+                what you pay. It stops applying once your usage passes it.
+              </p>
+            )}
+            {data.annualSaving > 0 && (
+              <p className="mt-1 text-sm text-emerald-400/90">
+                Pay for a year upfront: {money(data.annualChargePrepaid)} — saves{" "}
+                {money(data.annualSaving)}.
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             {data.status !== "ACTIVE" && (

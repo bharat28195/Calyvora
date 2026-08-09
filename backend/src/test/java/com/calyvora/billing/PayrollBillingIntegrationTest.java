@@ -58,8 +58,12 @@ class PayrollBillingIntegrationTest extends IntegrationTestBase {
         assertThat(b.get("pricePerEmployee").asDouble()).isEqualTo(149.0);
         assertThat(b.get("pricePerEmployeePerYear").asDouble()).isEqualTo(1788.0);
         assertThat(b.get("billableEmployees").asInt()).isEqualTo(6);
-        assertThat(b.get("monthlyCharge").asDouble()).isEqualTo(894.0);   // 6 × 149
-        assertThat(b.get("annualCharge").asDouble()).isEqualTo(10728.0);
+        // 6 × ₹149 is ₹894, below the ₹1,299 monthly minimum — so the floor is what they pay.
+        assertThat(b.get("monthlyCharge").asDouble()).isEqualTo(1299.0);
+        assertThat(b.get("minimumApplied").asBoolean()).isTrue();
+        assertThat(b.get("annualCharge").asDouble()).isEqualTo(15588.0);        // 12 months
+        assertThat(b.get("annualChargePrepaid").asDouble()).isEqualTo(12990.0); // 10 months
+        assertThat(b.get("annualSaving").asDouble()).isEqualTo(2598.0);
         // The tier ladder is sent so the UI can explain a bill that isn't headcount × one rate.
         assertThat(b.get("tiers")).hasSize(2);
         // The demo seeds Northwind with a live (ACTIVE) subscription so it shows up real in the

@@ -9,6 +9,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -35,6 +36,17 @@ public class PriceList {
 
     @Column(length = 200)
     private String note;
+
+    /**
+     * The floor a company pays regardless of headcount. Protects against the smallest accounts
+     * costing more in support than they pay; zero disables it.
+     */
+    @Column(name = "monthly_minimum", nullable = false)
+    private BigDecimal monthlyMinimum = BigDecimal.ZERO;
+
+    /** Months charged for an annual prepayment — 10 means two months free. 12 is no discount. */
+    @Column(name = "annual_months_charged", nullable = false)
+    private int annualMonthsCharged = 12;
 
     @OneToMany(mappedBy = "priceList", cascade = CascadeType.ALL, orphanRemoval = true,
             fetch = FetchType.EAGER)
@@ -73,6 +85,22 @@ public class PriceList {
 
     public List<PriceListTier> getTiers() {
         return tiers;
+    }
+
+    public BigDecimal getMonthlyMinimum() {
+        return monthlyMinimum;
+    }
+
+    public void setMonthlyMinimum(BigDecimal monthlyMinimum) {
+        this.monthlyMinimum = monthlyMinimum == null ? BigDecimal.ZERO : monthlyMinimum;
+    }
+
+    public int getAnnualMonthsCharged() {
+        return annualMonthsCharged;
+    }
+
+    public void setAnnualMonthsCharged(int annualMonthsCharged) {
+        this.annualMonthsCharged = annualMonthsCharged;
     }
 
     public Instant getCreatedAt() {

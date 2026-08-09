@@ -18,7 +18,11 @@ import java.util.List;
 public record PublishPriceListRequest(
         @NotNull String effectiveFrom,
         @Size(max = 200) String note,
-        @NotEmpty List<Tier> tiers
+        @NotEmpty List<Tier> tiers,
+        /** Floor a company pays regardless of headcount. Zero or null disables it. */
+        BigDecimal monthlyMinimum,
+        /** Months charged for an annual prepayment — 10 means two months free, 12 means no discount. */
+        Integer annualMonthsCharged
 ) {
     public record Tier(Integer toEmployee, @NotNull BigDecimal rate) {}
 }

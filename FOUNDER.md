@@ -282,6 +282,24 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   verification email fails silently — invitations still work only because the API hands the join link
   back to the admin.
 
+### PD-16 · 2026-08-09 · A ₹1,299 floor and two months free on annual — the shape of the offer
+- **Context:** founder wanted pricing low enough for startups but not low enough to go broke, and asked
+  for research against the market.
+- **What the market does:** Keka ₹90–180/employee but with a **₹6,999/month minimum** and a 2% setup
+  fee; Zoho People ₹50–230 but payroll is a separate ₹33 add-on (₹85–180 bundled); greytHR free to 25
+  then a ₹2,495+ base.
+- **What it actually costs us:** the app is multi-tenant, so one backend and one database serve every
+  customer. Render is ~$20/month all in. **Break-even is ~35 employees across all customers — two
+  small companies.** Infrastructure is not the risk; support time and having no floor are.
+- **Decision:** keep ₹149/₹99 but add a **₹1,299 monthly minimum**. A four-person customer at ₹149
+  pays ₹596 and will cost more than that in support. At ₹1,299 we are still 5× under Keka's floor,
+  which is precisely the wedge — a 15-person startup pays us ₹2,235 against their ₹6,999.
+- **Decision:** **annual prepay charges 10 months, not 12.** Cash upfront when it matters most, and a
+  prepaid customer is much less likely to churn — worth more than the two months.
+- **Decision:** quote **excluding GST**. B2B customers reclaim it; quoting inclusive would hand over
+  18% of every rupee for nothing.
+- **Considered, not done:** free tier up to 10 employees without payroll, to counter greytHR's free-25
+  and make payroll the upgrade trigger. Worth revisiting once there are real signups to learn from.
 
 ### PD-15 · 2026-08-09 · Pricing is data the owner edits, and price changes are never retroactive
 - **Context:** founder asked whether changing rates would always mean a full deploy, and said to do

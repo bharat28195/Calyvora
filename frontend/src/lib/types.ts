@@ -674,6 +674,12 @@ export interface BillingOverview {
    * company on a negotiated flat rate, where there's nothing to explain.
    */
   tiers: { fromEmployee: number; toEmployee: number | null; rate: number }[] | null;
+  /** The floor for this company, and whether it's what they're actually paying this month. */
+  monthlyMinimum: number | null;
+  minimumApplied: boolean;
+  /** Cost of paying a year upfront, and what that saves against twelve monthly payments. */
+  annualChargePrepaid: number;
+  annualSaving: number;
   invoices: { month: string; headcount: number; amount: number; status: "PAID" | "DUE" | "OVERDUE" }[];
 }
 
@@ -688,6 +694,10 @@ export interface PriceListVersion {
   current: boolean;
   /** `toEmployee` is null on the final, open-ended tier. */
   tiers: { fromEmployee: number; toEmployee: number | null; rate: number }[];
+  /** Floor a company pays regardless of headcount; 0 disables it. */
+  monthlyMinimum: number;
+  /** Months charged for an annual prepayment — 10 means two months free. */
+  annualMonthsCharged: number;
 }
 
 /** Configurable payslip template (feedback: "add template for creating payslip"). */
