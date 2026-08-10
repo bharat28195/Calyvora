@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Building2, Users, CheckCircle2, XCircle, Clock, Wallet } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { CompanySummary, SeatRequest } from "@/lib/types";
+import type { AgencySummary, CompanySummary, SeatRequest } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import { PricingEditor } from "@/components/platform/pricing-editor";
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-500/15 text-emerald-400",
   TRIALING: "bg-sky-500/15 text-sky-400",
+  // Created by an agency and waiting on you to switch billing on.
+  PENDING: "bg-amber-500/15 text-amber-300",
   PAST_DUE: "bg-amber-500/15 text-amber-300",
   CANCELLED: "bg-red-500/15 text-red-400",
   NONE: "bg-fg/10 text-fg/50",
@@ -91,6 +93,8 @@ export default function PlatformPage() {
             </Card>
           )}
 
+          <AgenciesSection onChanged={load} />
+
           <PricingEditor />
 
           <Card className="mt-6 overflow-x-auto p-0">
@@ -98,6 +102,7 @@ export default function PlatformPage() {
               <thead>
                 <tr className="border-b border-fg/10 text-left text-xs uppercase tracking-wide text-fg/40">
                   <th className="px-5 py-3 font-medium">Company</th>
+                  <th className="px-3 py-3 font-medium">Sold via</th>
                   <th className="px-3 py-3 font-medium">Admin</th>
                   <th className="px-3 py-3 font-medium">Seats</th>
                   <th className="px-3 py-3 font-medium">Billing</th>
@@ -108,12 +113,18 @@ export default function PlatformPage() {
               </thead>
               <tbody>
                 {companies.length === 0 ? (
-                  <tr><td colSpan={7} className="px-5 py-8 text-center text-fg/50">No companies yet. Create your first customer.</td></tr>
+                  <tr><td colSpan={8} className="px-5 py-8 text-center text-fg/50">No companies yet. Create your first customer.</td></tr>
                 ) : companies.map((c) => (
                   <tr key={c.companyId} className="border-b border-fg/5 last:border-0">
                     <td className="px-5 py-3">
                       <p className="font-medium">{c.name}</p>
                       <p className="text-xs text-fg/40">{c.headcount} employee{c.headcount === 1 ? "" : "s"}</p>
+                    </td>
+                    {/* Direct sale or through a group — the two ways a company gets here. */}
+                    <td className="px-3 py-3">
+                      {c.agencyName
+                        ? <span className="rounded-full bg-violet/15 px-2 py-0.5 text-xs font-medium text-violet">{c.agencyName}</span>
+                        : <span className="text-xs text-fg/40">Direct</span>}
                     </td>
                     <td className="px-3 py-3">
                       <p className="text-fg/80">{c.adminName}</p>
@@ -129,7 +140,9 @@ export default function PlatformPage() {
                     </td>
                     <td className="px-3 py-3">
                       <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_TONE[c.subscriptionStatus] ?? STATUS_TONE.NONE)}>
-                        {c.locked ? "Ended" : c.subscriptionStatus.toLowerCase()}
+                        {/* PENDING is locked too, but "Ended" would be wrong — it never started. */}
+                        {c.subscriptionStatus === "PENDING" ? "awaiting activation"
+                          : c.locked ? "Ended" : c.subscriptionStatus.toLowerCase()}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-fg/70">
@@ -143,7 +156,9 @@ export default function PlatformPage() {
                     <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-1.5">
                         {c.locked ? (
-                          <Button size="sm" disabled={busyId === c.companyId} onClick={() => act(c.companyId, () => api.renewCompanySubscription(c.companyId, 12))}>Reactivate</Button>
+                          <Button size="sm" disabled={busyId === c.companyId} onClick={() => act(c.companyId, () => api.renewCompanySubscription(c.companyId, 12))}>
+                            {c.subscriptionStatus === "PENDING" ? "Activate" : "Reactivate"}
+                          </Button>
                         ) : (
                           <Button size="sm" variant="ghost" disabled={busyId === c.companyId} onClick={() => act(c.companyId, () => api.endCompanySubscription(c.companyId))}><XCircle className="h-3.5 w-3.5" /> End</Button>
                         )}
@@ -164,6 +179,125 @@ export default function PlatformPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Agencies — customers who run several companies (PD-18). Optional: a company sold direct has no
+ * agency and simply appears in the table below as "Direct". This section only exists once you sell
+ * to a group, so the console stays quiet for the common case.
+ */
+function AgenciesSection({ onChanged }: { onChanged: () => void }) {
+  const [agencies, setAgencies] = useState<AgencySummary[] | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const load = () => void api.platformAgencies().then(setAgencies).catch(() => setAgencies([]));
+  useEffect(() => { load(); }, []);
+
+  return (
+    <Card className="mt-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <CardTitle>Agencies</CardTitle>
+          <p className="mt-1 text-xs text-fg/40">
+            Groups that run several companies. They provision their own companies; you decide when
+            billing starts.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => setCreating((v) => !v)}>
+          <Plus className="h-4 w-4" /> New agency
+        </Button>
+      </div>
+
+      {creating && (
+        <CreateAgencyForm
+          onCreated={() => { setCreating(false); load(); onChanged(); }}
+          onCancel={() => setCreating(false)}
+        />
+      )}
+
+      {agencies && agencies.length > 0 && (
+        <div className="mt-3 flex flex-col divide-y divide-fg/5">
+          {agencies.map((a) => (
+            <div key={a.agencyId} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{a.name}</p>
+                <p className="truncate text-xs text-fg/40">{a.ownerName} · {a.ownerEmail}</p>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-fg/60">{a.companyCount} companies</span>
+                <span className="text-fg/60">{a.headcount} employees</span>
+                <span className="tabular-nums text-emerald-400">{money(a.monthlyRevenue ?? 0)}/mo</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {agencies && agencies.length === 0 && !creating && (
+        <p className="mt-3 text-sm text-fg/50">
+          No agencies yet — every company is sold direct.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function CreateAgencyForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
+  const [v, setV] = useState({ agencyName: "", ownerFirstName: "", ownerLastName: "", ownerEmail: "", password: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setV((prev) => ({ ...prev, [k]: e.target.value }));
+    setFieldErrors((f) => (f[k] ? { ...f, [k]: "" } : f));
+  };
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setError(null); setFieldErrors({});
+    try {
+      await api.createAgency(v);
+      onCreated();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.keys(err.fieldErrors).length === 0 ? err.message : "Please correct the highlighted fields.");
+      } else {
+        setError("Couldn't create the agency");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-4 flex flex-col gap-4 rounded-xl border border-fg/10 p-4">
+      {error && <Alert tone="error">{error}</Alert>}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Agency name" htmlFor="agencyName" error={fieldErrors.agencyName}>
+          <Input id="agencyName" value={v.agencyName} onChange={set("agencyName")} />
+        </Field>
+        <Field label="Owner email" htmlFor="ownerEmail" error={fieldErrors.ownerEmail}>
+          <Input id="ownerEmail" type="email" value={v.ownerEmail} onChange={set("ownerEmail")} />
+        </Field>
+        <Field label="Owner first name" htmlFor="ownerFirstName" error={fieldErrors.ownerFirstName}>
+          <Input id="ownerFirstName" value={v.ownerFirstName} onChange={set("ownerFirstName")} />
+        </Field>
+        <Field label="Owner last name" htmlFor="ownerLastName" error={fieldErrors.ownerLastName}>
+          <Input id="ownerLastName" value={v.ownerLastName} onChange={set("ownerLastName")} />
+        </Field>
+        <Field label="Temporary password" htmlFor="agencyPassword" error={fieldErrors.password}>
+          <Input id="agencyPassword" value={v.password} onChange={set("password")} />
+        </Field>
+      </div>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={saving}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Create agency
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
   );
 }
 

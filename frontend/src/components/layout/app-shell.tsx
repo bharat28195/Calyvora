@@ -39,6 +39,8 @@ const MANAGES: Role[] = ["ADMIN", "HR", "MANAGER"]; // people who approve their 
 const COMPANY: Role[] = ["ADMIN", "HR", "MANAGER", "MEMBER"]; // any company user (not the platform OWNER)
 const NAV: NavItem[] = [
   { href: "/platform", label: "Platform", icon: Building2, roles: ["OWNER"] },
+  // An agency sees only this — no company surface at all, because it holds no employees of its own.
+  { href: "/agency", label: "My companies", icon: Building2, roles: ["AGENCY_OWNER"] },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS },
   {

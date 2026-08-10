@@ -20,6 +20,9 @@ import {
   type RosterEntry,
   type CompanySummary,
   type CreateCompanyInput,
+  type AgencySummary,
+  type CreateAgencyInput,
+  type AgencyOverview,
   type SeatRequest,
   type SubscriptionView,
   type HelpdeskTicket,
@@ -271,6 +274,29 @@ export const api = {
   setCompanyPrice(companyId: string, price: number): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/price`, { method: "POST", body: JSON.stringify({ price }) }) : Promise.reject(new Error("live only"));
   },
+  platformAgencies(): Promise<AgencySummary[]> {
+    return LIVE ? http<AgencySummary[]>("/platform/agencies") : Promise.reject(new Error("live only"));
+  },
+  createAgency(input: CreateAgencyInput): Promise<AgencySummary> {
+    return LIVE ? http<AgencySummary>("/platform/agencies", { method: "POST", body: JSON.stringify(input) }) : Promise.reject(new Error("live only"));
+  },
+
+  // --- agency console (a customer running several companies — PD-18) ---
+  agencyOverview(): Promise<AgencyOverview> {
+    return LIVE ? http<AgencyOverview>("/agency/overview") : Promise.reject(new Error("The agency console requires the live backend."));
+  },
+  agencyCompanies(): Promise<CompanySummary[]> {
+    return LIVE ? http<CompanySummary[]>("/agency/companies") : Promise.reject(new Error("The agency console requires the live backend."));
+  },
+  agencyCreateCompany(input: CreateCompanyInput): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>("/agency/companies", { method: "POST", body: JSON.stringify(input) }) : Promise.reject(new Error("live only"));
+  },
+  agencyRequestSeats(companyId: string, seats: number, note?: string): Promise<CompanySummary> {
+    return LIVE
+      ? http<CompanySummary>(`/agency/companies/${companyId}/request-seats`, { method: "POST", body: JSON.stringify({ seats, note }) })
+      : Promise.reject(new Error("live only"));
+  },
+
   platformSeatRequests(): Promise<SeatRequest[]> {
     return LIVE ? http<SeatRequest[]>("/platform/seat-requests") : Promise.reject(new Error("live only"));
   },

@@ -250,6 +250,45 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-18 · 2026-08-10 · Three tiers: the vendor, the agency, the company — and only the vendor sells
+- **Context:** the site sells "manage every company from one console" to agencies and groups, and the
+  only thing that fitted was the **platform-owner console** — our own view, which reads every tenant
+  on the system and can start and end subscriptions. Giving that to a customer who runs several
+  companies would expose every other customer and let them switch on their own billing.
+- **Decision:** a third tier between the two. The platform owner (`ownerorbit@calyvora.in`, one
+  account, ours) creates an **agency**; the agency creates its own companies and asks for seats; the
+  vendor alone activates billing. A company an agency creates is `PENDING` and therefore **locked**
+  until we activate it — its admin can sign in and see why, and nothing else works. Selling directly
+  to a company is unchanged and stays the common case: those simply have no agency and show as
+  "Direct" in the owner console, so both ways of selling live in one list.
+- **Alternatives considered:** giving agencies the platform console with a filter (rejected — one
+  bug in the filter exposes every customer, and the console can end subscriptions); pooled seats
+  across an agency (rejected — needs a new billing model to buy flexibility nobody has asked for);
+  letting agencies self-sign-up (rejected — we would be approving billing for strangers).
+- **Scope of what an agency can see: company-level summaries only** — headcount, seats, status, end
+  date, cost. No employee, payroll or personal data. This is not a limitation we imposed reluctantly;
+  it is what makes the tier safe to build at all. RLS binds one `company_id` per connection, so the
+  agency console reads only `companies`/`users`/`subscriptions` — the three tables V12 deliberately
+  leaves outside RLS — and a member company's HR data is unreachable *by construction*, because the
+  agency's own tenant binding is its workspace. Deeper drill-down would mean a real cross-tenant read
+  path, and that is a much larger security surface than the feature is worth today.
+- **Shape:** an agency is a `Company` row flagged `is_agency`, its members holding `AGENCY_OWNER` —
+  the same pattern V35 established for the platform company, where the console is granted by
+  *membership*, not by the role alone. Member companies carry a nullable `agency_id`. Reusing that
+  shape avoided a second identity model; the agency owner needs a home company for `users.company_id`
+  and the tenant binding either way.
+- **Also:** the platform owner moved out of the dev-only seeder into `PlatformOwnerBootstrap`, which
+  runs in every profile — the one account that can see every customer should not depend on someone
+  remembering to call a seeding endpoint, nor carry a demo password. `owner@priorityhr.app` is
+  deleted by V40.
+- **Trade-offs / debt:** an agency owner has no way to open one of its companies as that company's
+  admin, which a real agency will eventually want. Company-scoped endpoints without an explicit role
+  gate (the people directory) are reachable by an agency but bound to its own empty workspace, so
+  they return nothing useful — untidy rather than unsafe, and worth tightening.
+- **Final outcome:** _Shipped on `product/hr-platform` with 7 isolation tests: agency A cannot see
+  agency B's companies by list or by id, cannot reach the platform console, cannot activate or end
+  billing, and cannot read a member company's people._
+
 ### PD-16 · 2026-08-09 · Commercial rules bind on the server, not in the UI
 - **Context:** a full QA pass over the deployed build (243 checks across 14 modules, all four roles, two
   tenants) came back with reads and tenant isolation completely clean — and the *commercial* model

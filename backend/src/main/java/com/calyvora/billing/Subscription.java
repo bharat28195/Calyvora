@@ -126,9 +126,14 @@ public class Subscription {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 
-    /** The app is locked when the owner has ended the subscription or its end date has passed. */
+    /**
+     * The app is locked when the subscription was never activated, the owner has ended it, or its end
+     * date has passed. {@code PENDING} is included so a company an agency creates is unusable until the
+     * platform owner turns billing on — the agency provisions, the vendor activates (PD-18).
+     */
     public boolean isLocked() {
         return status == SubscriptionStatus.CANCELLED
+                || status == SubscriptionStatus.PENDING
                 || (endsAt != null && endsAt.isBefore(java.time.LocalDate.now()));
     }
 }

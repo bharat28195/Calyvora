@@ -62,6 +62,23 @@ public class PlatformController {
         return service.createCompany(req);
     }
 
+    /** Every agency, each with its company count and what those companies bill per month. */
+    @GetMapping("/agencies")
+    public List<com.calyvora.platform.dto.AgencySummaryResponse> agencies() {
+        return service.agencies();
+    }
+
+    /**
+     * Set up an agency and the person who runs it. Only the vendor does this — an agency cannot create
+     * another, and there is no self-signup, so the middle tier only ever exists because you sold it.
+     */
+    @PostMapping("/agencies")
+    @ResponseStatus(HttpStatus.CREATED)
+    public com.calyvora.platform.dto.AgencySummaryResponse createAgency(
+            @Valid @RequestBody com.calyvora.platform.dto.CreateAgencyRequest req) {
+        return service.createAgency(req);
+    }
+
     @PostMapping("/companies/{id}/end")
     public CompanySummaryResponse endSubscription(@PathVariable UUID id) {
         return service.endSubscription(id);

@@ -76,7 +76,7 @@ class SignupActivationIntegrationTest extends IntegrationTestBase {
     void the_seeded_platform_owner_still_reaches_the_console() throws Exception {
         // The lock must not have been tightened so far that the person it's for is shut out.
         mockMvc.perform(post("/api/v1/dev/seed-demo")).andExpect(status().isOk());
-        Session owner = login("owner@priorityhr.app", "demopass123");
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
 
         mockMvc.perform(get("/api/v1/platform/companies")
                         .header("Authorization", "Bearer " + owner.accessToken()))

@@ -21,12 +21,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SubscriptionEnforcementTest extends IntegrationTestBase {
 
     private static final String PW = "demopass123";
-    private static final String OWNER = "owner@priorityhr.app";
 
     @Test
     void a_company_whose_subscription_has_ended_can_no_longer_read_or_write_its_data() throws Exception {
         seedPlatform();
-        Session owner = login(OWNER, PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         String companyId = companyIdOf(owner, "Acme Logistics");
         Session admin = login("admin@acme.demo", PW);
 
@@ -54,7 +53,7 @@ class SubscriptionEnforcementTest extends IntegrationTestBase {
     @Test
     void a_locked_company_can_still_sign_in_and_read_why_it_is_locked() throws Exception {
         seedPlatform();
-        Session owner = login(OWNER, PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         String companyId = companyIdOf(owner, "Acme Logistics");
         mockMvc.perform(post("/api/v1/platform/companies/" + companyId + "/end")
                         .header("Authorization", "Bearer " + owner.accessToken()))
@@ -72,7 +71,7 @@ class SubscriptionEnforcementTest extends IntegrationTestBase {
     @Test
     void an_invitation_beyond_the_seat_limit_is_refused_with_a_useful_message() throws Exception {
         seedPlatform();
-        Session owner = login(OWNER, PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         String companyId = companyIdOf(owner, "Acme Logistics");
         Session admin = login("admin@acme.demo", PW);
 
@@ -95,7 +94,7 @@ class SubscriptionEnforcementTest extends IntegrationTestBase {
     @Test
     void a_pending_invitation_holds_its_seat_so_the_limit_cannot_be_oversubscribed() throws Exception {
         seedPlatform();
-        Session owner = login(OWNER, PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         String companyId = companyIdOf(owner, "Acme Logistics");
         Session admin = login("admin@acme.demo", PW);
 
@@ -124,7 +123,7 @@ class SubscriptionEnforcementTest extends IntegrationTestBase {
     @Test
     void the_owner_console_refuses_nonsense_commercial_values_instead_of_silently_changing_them() throws Exception {
         seedPlatform();
-        Session owner = login(OWNER, PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         String companyId = companyIdOf(owner, "Acme Logistics");
         String auth = "Bearer " + owner.accessToken();
 
@@ -153,7 +152,7 @@ class SubscriptionEnforcementTest extends IntegrationTestBase {
     @Test
     void the_admin_sees_the_same_monthly_bill_the_owner_console_quotes() throws Exception {
         seedPlatform();
-        Session owner = login(OWNER, PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         Session admin = login("admin@acme.demo", PW);
 
         JsonNode console = null;
@@ -172,7 +171,7 @@ class SubscriptionEnforcementTest extends IntegrationTestBase {
     @Test
     void an_ended_subscription_is_billed_nothing() throws Exception {
         seedPlatform();
-        Session owner = login(OWNER, PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         String companyId = companyIdOf(owner, "Acme Logistics");
         mockMvc.perform(post("/api/v1/platform/companies/" + companyId + "/end")
                         .header("Authorization", "Bearer " + owner.accessToken()))

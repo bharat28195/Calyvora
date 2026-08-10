@@ -72,8 +72,9 @@ public class DemoSeedService {
     private static final String COMPANY = "Northwind Robotics";
     private static final String OWNER_EMAIL = "ava.chen@northwind.demo";
     private static final String DEMO_PASSWORD = "demopass123";
-    private static final String PLATFORM_COMPANY = "Priority HR (Platform)";
-    private static final String PLATFORM_OWNER_EMAIL = "owner@priorityhr.app";
+    // The platform owner is not seeded here any more — PlatformOwnerBootstrap creates it at startup so
+    // it exists in prod too, where this dev-only seeder never runs.
+    private static final String AGENCY_OWNER_EMAIL = "owner@vertexgroup.demo";
 
     private final CompanyRepository companyRepository;
     private final CompanySettingsRepository companySettingsRepository;
@@ -189,10 +190,9 @@ public class DemoSeedService {
             TenantContext.clear();
         }
 
-        // Northwind's own subscription, so it shows up live in the owner console.
+        // Northwind's own subscription, so it shows up live in the owner console. Sold direct, so it
+        // has no agency — the vendor account itself is bootstrapped at startup, not seeded.
         activeSubscription(company.getId(), 10, 10);
-        // The platform vendor sits above every company.
-        createPlatformOwner();
 
         log.info("Seeded demo company '{}' ({} users) — owner {}", COMPANY, 6, OWNER_EMAIL);
         return new DemoCredentials(COMPANY, OWNER_EMAIL, DEMO_PASSWORD, false);
@@ -250,24 +250,37 @@ public class DemoSeedService {
         return s == null || s.isBlank();
     }
 
-    /** The platform vendor (OWNER) in its own company — above all customer companies. Idempotent. */
-    private void createPlatformOwner() {
-        if (userRepository.existsByEmail(PLATFORM_OWNER_EMAIL)) {
+    /**
+     * One sample agency with two companies under it, so the owner console shows both ways of selling:
+     * five companies sold direct, and a group whose companies sit underneath it. Idempotent.
+     *
+     * <p>The platform owner itself is no longer seeded here — it is bootstrapped at startup by
+     * {@code PlatformOwnerBootstrap}, so it exists in prod too, where this seeder does not run.
+     */
+    private void seedSampleAgency(java.util.List<String> logins) {
+        if (userRepository.existsByEmail(AGENCY_OWNER_EMAIL)) {
             return;
         }
-        // Marked as the platform company — membership of it, not the OWNER role alone, is what
-        // unlocks the owner console (see PlatformAccess / V35).
-        Company platformCompany = new Company(UUID.randomUUID(), PLATFORM_COMPANY,
-                uniqueSlug(PLATFORM_COMPANY), CompanyStatus.ACTIVE);
-        platformCompany.setPlatform(true);
-        Company platform = companyRepository.save(platformCompany);
-        companySettingsRepository.save(new CompanySettings(platform.getId()));
-        User owner = new User(UUID.randomUUID(), platform.getId(), PLATFORM_OWNER_EMAIL,
-                "Priority", "Owner", Role.OWNER, UserStatus.ACTIVE);
-        owner.setPasswordHash(passwordEncoder.encode(DEMO_PASSWORD));
-        owner.setEmailVerifiedAt(Instant.now());
-        userRepository.save(owner);
-        log.info("Seeded platform owner {}", PLATFORM_OWNER_EMAIL);
+        var agency = platformService.createAgency(new com.calyvora.platform.dto.CreateAgencyRequest(
+                "Vertex Group", "Meera", "Kapoor", AGENCY_OWNER_EMAIL, DEMO_PASSWORD));
+        UUID agencyId = UUID.fromString(agency.agencyId());
+
+        record Member(String name, String email, String first, String last, int seats) {}
+        for (Member m : java.util.List.of(
+                new Member("Vertex Labs", "admin@vertexlabs.demo", "Ishaan", "Bose", 10),
+                new Member("Meridian Care", "admin@meridian.demo", "Tara", "Menon", 6))) {
+            var company = platformService.createCompany(new com.calyvora.platform.dto.CreateCompanyRequest(
+                    m.name(), m.first(), m.last(), m.email(), DEMO_PASSWORD, m.seats(), 6,
+                    agencyId.toString()));
+            UUID cid = UUID.fromString(company.companyId());
+            for (int i = 1; i <= Math.max(1, m.seats() - 4); i++) {
+                createUser(cid, "emp" + i + "@" + company.slug() + ".demo", "Employee",
+                        String.valueOf(i), Role.MEMBER);
+            }
+            logins.add(m.email() + " / " + DEMO_PASSWORD + "  (" + m.name() + ", admin — under Vertex Group)");
+        }
+        logins.add(AGENCY_OWNER_EMAIL + " / " + DEMO_PASSWORD + "  (Vertex Group, agency owner)");
+        log.info("Seeded sample agency Vertex Group with 2 companies");
     }
 
     /** Give a company an ACTIVE subscription with a seat limit ending {@code months} out. */
@@ -286,10 +299,13 @@ public class DemoSeedService {
      * Provision 5 sample customer companies with varied states so the owner console tells a story:
      * healthy, near-expiry (triggers the admin's renewal nudge), near seat-limit, one with a pending
      * seat request to approve, and one whose subscription has ended (its app is locked). Idempotent.
+     *
+     * <p>Plus one agency running two more companies, so the console shows both ways of selling at
+     * once: direct customers standing alone, and a group with its companies underneath.
      */
     public java.util.List<String> seedPlatformSamples() {
-        createPlatformOwner();
         java.util.List<String> logins = new java.util.ArrayList<>();
+        seedSampleAgency(logins);
         if (companyRepository.existsBySlug("acme-logistics")) {
             return logins; // already seeded
         }
@@ -304,8 +320,11 @@ public class DemoSeedService {
                 new Spec("Orbit Retail", "admin@orbit.demo", "Rohan", "Gupta", 8, 6, 6, 100, "ended"));
 
         for (Spec s : specs) {
+            // Sold direct — no agency. The agency-run companies are seeded separately below, so the
+            // console shows both kinds side by side, which is how it will really look.
             var summary = platformService.createCompany(new com.calyvora.platform.dto.CreateCompanyRequest(
-                    s.name(), s.first(), s.last(), s.email(), DEMO_PASSWORD, s.seats(), Math.max(1, s.months())));
+                    s.name(), s.first(), s.last(), s.email(), DEMO_PASSWORD, s.seats(),
+                    Math.max(1, s.months()), null));
             UUID cid = UUID.fromString(summary.companyId());
             String slug = summary.slug();
             platformService.setPrice(cid, java.math.BigDecimal.valueOf(s.price()));

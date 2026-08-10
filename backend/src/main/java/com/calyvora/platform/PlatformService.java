@@ -17,7 +17,9 @@ import com.calyvora.identity.Role;
 import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
 import com.calyvora.identity.UserStatus;
+import com.calyvora.platform.dto.AgencySummaryResponse;
 import com.calyvora.platform.dto.CompanySummaryResponse;
+import com.calyvora.platform.dto.CreateAgencyRequest;
 import com.calyvora.platform.dto.CreateCompanyRequest;
 import com.calyvora.platform.dto.SeatRequestResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -72,25 +74,49 @@ public class PlatformService {
 
     // ---- companies ----
 
-    /** Every customer company (excluding the owner's own platform company). */
+    /**
+     * Every customer company — those sold direct and those under an agency alike, so the owner sees the
+     * whole book in one place. Excludes the vendor's own company and the agency workspaces, which are
+     * company rows for identity's sake but are not customers and are never billed.
+     */
     @Transactional(readOnly = true)
     public List<CompanySummaryResponse> companies(UUID platformCompanyId) {
         return companyRepository.findAll().stream()
                 .filter(c -> !c.getId().equals(platformCompanyId))
+                .filter(c -> !c.isPlatform() && !c.isAgency())
                 .map(this::summarize)
                 .sorted(Comparator.comparing(CompanySummaryResponse::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
+    /**
+     * The owner provisions a customer directly. {@code agencyId} is optional: null is a company sold
+     * direct, which is most of them; set it to file the company under an agency instead (PD-18).
+     */
     @Transactional
     public CompanySummaryResponse createCompany(CreateCompanyRequest req) {
+        UUID agencyId = req.agencyId() == null || req.agencyId().isBlank()
+                ? null : requireAgency(UUID.fromString(req.agencyId())).getId();
+        return summarize(provision(req, agencyId, true));
+    }
+
+    /**
+     * Create the company, its first ADMIN and its subscription.
+     *
+     * <p>Shared with the agency console, which provisions the same way but cannot switch billing on:
+     * {@code activate} is false there, leaving the subscription {@code PENDING} — and therefore locked
+     * — until the platform owner activates it. Selling is the vendor's to do, in both routes.
+     */
+    @Transactional
+    public Company provision(CreateCompanyRequest req, UUID agencyId, boolean activate) {
         String email = req.adminEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(email)) {
             throw new ConflictException("That email is already registered");
         }
-        Company company = companyRepository.save(
-                new Company(UUID.randomUUID(), req.companyName().trim(), uniqueSlug(req.companyName()),
-                        CompanyStatus.ACTIVE));
+        Company company = new Company(UUID.randomUUID(), req.companyName().trim(),
+                uniqueSlug(req.companyName()), CompanyStatus.ACTIVE);
+        company.setAgencyId(agencyId);
+        companyRepository.save(company);
 
         CompanySettings settings = new CompanySettings(company.getId());
         settings.setTimezone("Asia/Kolkata");
@@ -104,13 +130,83 @@ public class PlatformService {
         userRepository.save(admin);
 
         Subscription sub = new Subscription(UUID.randomUUID(), company.getId(), DEFAULT_PRICE, "INR", null);
-        sub.setStatus(SubscriptionStatus.ACTIVE);
-        sub.setStartedAt(Instant.now());
         sub.setSeats(Math.max(1, req.seats()));
-        sub.setEndsAt(LocalDate.now().plusMonths(Math.max(1, req.months())));
+        if (activate) {
+            sub.setStatus(SubscriptionStatus.ACTIVE);
+            sub.setStartedAt(Instant.now());
+            sub.setEndsAt(LocalDate.now().plusMonths(Math.max(1, req.months())));
+        } else {
+            sub.setStatus(SubscriptionStatus.PENDING);
+        }
         subscriptionRepository.save(sub);
 
-        return summarize(company);
+        return company;
+    }
+
+    // ---- agencies ----
+
+    /**
+     * Create an agency and its owner. An agency is a workspace company flagged {@code is_agency} whose
+     * member holds {@code AGENCY_OWNER} — the same shape as the platform company, so the console is
+     * granted by membership rather than by the role alone.
+     */
+    @Transactional
+    public AgencySummaryResponse createAgency(CreateAgencyRequest req) {
+        String email = req.ownerEmail().trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            throw new ConflictException("That email is already registered");
+        }
+        Company workspace = new Company(UUID.randomUUID(), req.agencyName().trim(),
+                uniqueSlug(req.agencyName()), CompanyStatus.ACTIVE);
+        workspace.setAgency(true);
+        companyRepository.save(workspace);
+
+        CompanySettings settings = new CompanySettings(workspace.getId());
+        settings.setTimezone("Asia/Kolkata");
+        settings.setCurrency("INR");
+        settingsRepository.save(settings);
+
+        User owner = new User(UUID.randomUUID(), workspace.getId(), email,
+                req.ownerFirstName().trim(), req.ownerLastName().trim(), Role.AGENCY_OWNER, UserStatus.ACTIVE);
+        owner.setPasswordHash(passwordEncoder.encode(req.password()));
+        owner.setEmailVerifiedAt(Instant.now());
+        userRepository.save(owner);
+
+        // Deliberately no subscription row: an agency workspace holds no HR data and is never billed.
+        // Its companies are, each on its own subscription.
+        return summarizeAgency(workspace);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AgencySummaryResponse> agencies() {
+        return companyRepository.findByAgencyTrueOrderByNameAsc().stream()
+                .map(this::summarizeAgency)
+                .toList();
+    }
+
+    private AgencySummaryResponse summarizeAgency(Company workspace) {
+        List<Company> members = companyRepository.findByAgencyIdOrderByNameAsc(workspace.getId());
+        long headcount = 0;
+        BigDecimal revenue = BigDecimal.ZERO;
+        for (Company member : members) {
+            CompanySummaryResponse s = summarize(member);
+            headcount += s.headcount();
+            revenue = revenue.add(s.monthlyRevenue() == null ? BigDecimal.ZERO : s.monthlyRevenue());
+        }
+        User owner = userRepository.findByCompanyIdOrderByCreatedAtAsc(workspace.getId())
+                .stream().findFirst().orElse(null);
+        return new AgencySummaryResponse(
+                workspace.getId().toString(), workspace.getName(), workspace.getSlug(),
+                owner == null ? "—" : (owner.getFirstName() + " " + owner.getLastName()).trim(),
+                owner == null ? "—" : owner.getEmail(),
+                members.size(), headcount, revenue, "INR",
+                workspace.getCreatedAt() == null ? null : workspace.getCreatedAt().toString());
+    }
+
+    private Company requireAgency(UUID agencyId) {
+        return companyRepository.findById(agencyId)
+                .filter(Company::isAgency)
+                .orElseThrow(() -> new NotFoundException("Agency not found"));
     }
 
     /** Owner ends a company's subscription — its app locks immediately. */
@@ -269,7 +365,12 @@ public class PlatformService {
         return java.util.List.of(new com.calyvora.common.error.ApiError.FieldError(field, message));
     }
 
-    private CompanySummaryResponse summarize(Company company) {
+    /**
+     * One company's console row. Public so the agency console renders the identical figures rather
+     * than deriving its own — two views quoting different numbers for the same company is exactly the
+     * class of bug this avoids. It exposes nothing an agency may not see: headcount and money only.
+     */
+    public CompanySummaryResponse summarize(Company company) {
         long headcount = userRepository.countByCompanyIdAndStatus(company.getId(), UserStatus.ACTIVE);
         Subscription sub = subscriptionRepository.findByCompanyId(company.getId()).orElse(null);
         User admin = userRepository.findByCompanyIdOrderByCreatedAtAsc(company.getId()).stream()
@@ -287,6 +388,9 @@ public class PlatformService {
         BigDecimal price = sub == null ? null : pricingService.rateFor(sub, headcount, thisMonth);
         BigDecimal revenue = (sub == null || sub.isLocked())
                 ? BigDecimal.ZERO : pricingService.monthlyFor(sub, headcount, thisMonth);
+        // Null for a company sold direct — the console groups by this to separate the two kinds.
+        Company agency = company.getAgencyId() == null ? null
+                : companyRepository.findById(company.getAgencyId()).orElse(null);
         return new CompanySummaryResponse(
                 company.getId().toString(), company.getName(), company.getSlug(), company.getStatus().name(),
                 admin == null ? "—" : (admin.getFirstName() + " " + admin.getLastName()).trim(),
@@ -297,7 +401,9 @@ public class PlatformService {
                 endsAt, daysLeft,
                 sub != null && sub.isLocked(),
                 price, revenue, sub == null ? "INR" : sub.getCurrency(),
-                company.getCreatedAt() == null ? null : company.getCreatedAt().toString());
+                company.getCreatedAt() == null ? null : company.getCreatedAt().toString(),
+                agency == null ? null : agency.getId().toString(),
+                agency == null ? null : agency.getName());
     }
 
     private Company requireCompany(UUID companyId) {

@@ -67,7 +67,7 @@ class PriceListIntegrationTest extends IntegrationTestBase {
     @Test
     void the_owner_can_read_and_publish_the_price_list() throws Exception {
         seed();
-        Session owner = login("owner@priorityhr.app", PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
 
         JsonNode lists = getJson("/api/v1/platform/pricing", owner);
         assertThat(lists).isNotEmpty();
@@ -101,7 +101,7 @@ class PriceListIntegrationTest extends IntegrationTestBase {
     @Test
     void tiers_must_increase_and_end_open_ended() throws Exception {
         seed();
-        Session owner = login("owner@priorityhr.app", PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
 
         // Limits going backwards would leave a headcount matching two tiers.
         mockMvc.perform(post("/api/v1/platform/pricing")

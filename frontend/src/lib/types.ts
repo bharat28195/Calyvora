@@ -1,6 +1,8 @@
 // API contract types (Sprint1 §7). Kept in sync with backend DTOs.
 
-export type Role = "OWNER" | "ADMIN" | "HR" | "MANAGER" | "MEMBER";
+// OWNER is the platform vendor; AGENCY_OWNER is a customer running several companies (PD-18). Both
+// sit above a single company — the rest are roles within one.
+export type Role = "OWNER" | "AGENCY_OWNER" | "ADMIN" | "HR" | "MANAGER" | "MEMBER";
 export type UserStatus = "PENDING_VERIFICATION" | "INVITED" | "ACTIVE" | "DISABLED";
 export type CompanyStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
@@ -571,7 +573,43 @@ export interface CompanySummary {
   monthlyRevenue: number | null;
   currency: string;
   createdAt: string | null;
+  /** Null for a company sold direct; set when it belongs to an agency. */
+  agencyId: string | null;
+  agencyName: string | null;
 }
+
+/** An agency (a customer running several companies) as the platform owner sees it. */
+export interface AgencySummary {
+  agencyId: string;
+  name: string;
+  slug: string;
+  ownerName: string;
+  ownerEmail: string;
+  companyCount: number;
+  headcount: number;
+  monthlyRevenue: number | null;
+  currency: string;
+  createdAt: string | null;
+}
+export interface CreateAgencyInput {
+  agencyName: string;
+  ownerFirstName: string;
+  ownerLastName: string;
+  ownerEmail: string;
+  password: string;
+}
+
+/** The agency's own headline figures. `monthlySpend` is what they are billed, not what they earn. */
+export interface AgencyOverview {
+  agencyName: string;
+  companies: number;
+  headcount: number;
+  seats: number;
+  lockedCompanies: number;
+  monthlySpend: number | null;
+  currency: string;
+}
+
 export interface CreateCompanyInput {
   companyName: string;
   adminFirstName: string;
@@ -580,6 +618,8 @@ export interface CreateCompanyInput {
   password: string;
   seats: number;
   months: number;
+  /** Owner console only: file the company under an agency. Omit to sell direct. */
+  agencyId?: string | null;
 }
 export interface SeatRequest {
   id: string;

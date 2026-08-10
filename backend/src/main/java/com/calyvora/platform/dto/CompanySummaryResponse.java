@@ -1,6 +1,12 @@
 package com.calyvora.platform.dto;
 
-/** One company as the platform owner sees it in the console. */
+/**
+ * One company as a console sees it. Shared by the platform owner's view and an agency's, which is
+ * safe because it is deliberately company-level only — headcount and money, never an employee.
+ *
+ * <p>{@code agencyId}/{@code agencyName} are null for a company sold direct, which is how the owner
+ * console tells the two kinds apart: direct customers stand alone, agency ones group underneath.
+ */
 public record CompanySummaryResponse(
         String companyId,
         String name,
@@ -17,6 +23,8 @@ public record CompanySummaryResponse(
         java.math.BigDecimal pricePerEmployee,
         java.math.BigDecimal monthlyRevenue,
         String currency,
-        String createdAt
+        String createdAt,
+        String agencyId,
+        String agencyName
 ) {
 }

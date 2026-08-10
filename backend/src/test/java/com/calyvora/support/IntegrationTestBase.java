@@ -41,9 +41,26 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected RecordingEmailService email;
 
+    @Autowired
+    protected com.calyvora.platform.PlatformOwnerBootstrap platformOwner;
+
+    /** The platform vendor. Real infrastructure, not demo data — created at startup (PD-18). */
+    protected static final String PLATFORM_OWNER_EMAIL = "ownerorbit@calyvora.in";
+    protected static final String PLATFORM_OWNER_PASSWORD = "OwnerOrbit@123#";
+
     @BeforeEach
     void clearEmail() {
         email.clear();
+    }
+
+    /**
+     * The owner is created once when the context starts, but this suite refreshes the database
+     * between test methods — which deletes it. Re-establishing it here means every test can sign in
+     * as the vendor without each one knowing why it would otherwise be missing.
+     */
+    @BeforeEach
+    void ensurePlatformOwner() {
+        platformOwner.ensurePlatformOwner();
     }
 
     protected String json(Object value) throws Exception {

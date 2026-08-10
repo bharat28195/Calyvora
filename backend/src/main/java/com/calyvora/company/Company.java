@@ -38,6 +38,21 @@ public class Company {
     @Column(name = "is_platform", nullable = false)
     private boolean platform;
 
+    /**
+     * True for an agency's own workspace company — the row an {@code AGENCY_OWNER} belongs to. Same
+     * pattern as {@link #platform} and for the same reason: the console is granted by membership of
+     * this company, not by the role alone (PD-18).
+     */
+    @Column(name = "is_agency", nullable = false)
+    private boolean agency;
+
+    /**
+     * The agency workspace this company belongs to, or null for a direct customer. Set once when an
+     * agency creates the company; it decides who may see the company's summary.
+     */
+    @Column(name = "agency_id")
+    private UUID agencyId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -96,6 +111,22 @@ public class Company {
 
     public void setPlatform(boolean platform) {
         this.platform = platform;
+    }
+
+    public boolean isAgency() {
+        return agency;
+    }
+
+    public void setAgency(boolean agency) {
+        this.agency = agency;
+    }
+
+    public UUID getAgencyId() {
+        return agencyId;
+    }
+
+    public void setAgencyId(UUID agencyId) {
+        this.agencyId = agencyId;
     }
 
     public Instant getCreatedAt() {

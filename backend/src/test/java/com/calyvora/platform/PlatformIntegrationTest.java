@@ -21,7 +21,7 @@ class PlatformIntegrationTest extends IntegrationTestBase {
     @Test
     void owner_provisions_a_company_ends_it_and_the_company_sees_the_lock() throws Exception {
         seedDemo();
-        Session owner = login("owner@priorityhr.app", PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
 
         // The seed's Northwind shows up in the console (excluding the owner's own platform company).
         JsonNode companies = getJson("/api/v1/platform/companies", owner);
@@ -46,7 +46,7 @@ class PlatformIntegrationTest extends IntegrationTestBase {
     @Test
     void seat_request_flows_from_admin_to_owner_and_bumps_the_limit() throws Exception {
         seedDemo();
-        Session owner = login("owner@priorityhr.app", PW);
+        Session owner = login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);
         postJson(owner, "/api/v1/platform/companies", Map.of(
                 "companyName", "Seatco", "adminFirstName", "Sam", "adminLastName", "Admin",
                 "adminEmail", "admin@seatco.demo", "password", PW, "seats", 5, "months", 6));
