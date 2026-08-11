@@ -10,6 +10,17 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="theme-color" content="#0b0b12" />
 <link rel="stylesheet" href="orbit.css" />
+<script>
+  // A missing photo falls back to initials instead of a broken-image icon, so the page still looks
+  // finished if a filename hasn't been uploaded yet. Declared in the head deliberately: an img's
+  // onerror fires while the document is still parsing, long before a script at the end would run.
+  function initials(img, letters) {
+    const span = document.createElement("span");
+    span.className = "p-photo p-initials";
+    span.textContent = letters;
+    img.replaceWith(span);
+  }
+</script>
 </head>
 <body>
 <div class="glow a"></div><div class="glow b"></div>
@@ -102,45 +113,46 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="eyebrow"><span class="dot"></span>Leadership</span>
-      <h2>Two directors, two clear remits.</h2>
-      <p>One runs the services business and everything a client experiences. One runs the company and
-        the product. Both are reachable — this is not a company where you get an account manager.</p>
+      <h2>Two directors. Both reachable.</h2>
+      <p>One runs the services business and everything a client experiences; one runs the company and
+        the product. Call either of them — this is not a company where you get an account manager.</p>
     </div>
 
+    <!-- ===================================================================================
+         EDIT HERE. Each card is a photo, a name, a role, a phone number and an email.
+
+         Photo:  put the file next to this page (in public_html) and use its name in src.
+                 Square images work best — 600×600 or larger. If the file is missing the
+                 card falls back to initials, so a wrong filename is untidy, never broken.
+         Phone:  change BOTH places — the tel: link and the text after it.
+                 ⚠ The numbers below are placeholders. Replace them before this goes live.
+         =================================================================================== -->
     <div class="people">
+
+      <!-- ---- Director 1 ---- -->
       <div class="person reveal">
-        <div class="p-head">
-          <span class="p-av">K</span>
-          <div>
-            <h3>Khushboo</h3>
-            <span class="p-role">Director — Calyvora</span>
-          </div>
+        <img class="p-photo" src="khushboo.jpg" alt="Khushboo" onerror="initials(this,'K')" />
+        <h3>Khushboo</h3>
+        <span class="p-role">Director — Calyvora</span>
+        <p class="p-line">The company and the Orbit platform.</p>
+        <div class="p-contact">
+          <a href="tel:+910000000000">+91 00000 00000</a>
+          <a href="mailto:connect@calyvora.in">connect@calyvora.in</a>
         </div>
-        <p>Runs the parent company: the Orbit platform, the roadmap and how the group is built. The
-          decision to turn a working HR services business into a product company is theirs.</p>
-        <ul class="p-remit">
-          <li>Company direction &amp; the Orbit product</li>
-          <li>Platform partnerships and agency accounts</li>
-          <li>Engineering, security and customer data</li>
-        </ul>
       </div>
 
+      <!-- ---- Director 2 ---- -->
       <div class="person reveal">
-        <div class="p-head">
-          <span class="p-av alt">RR</span>
-          <div>
-            <h3>Renu Rao</h3>
-            <span class="p-role">Director — HR Services</span>
-          </div>
+        <img class="p-photo" src="renu-rao.jpg" alt="Renu Rao" onerror="initials(this,'RR')" />
+        <h3>Renu Rao</h3>
+        <span class="p-role">Director — HR Services</span>
+        <p class="p-line">All hiring and client delivery at Priority HR Services.</p>
+        <div class="p-contact">
+          <a href="tel:+910000000000">+91 00000 00000</a>
+          <a href="mailto:connect@calyvora.in">connect@calyvora.in</a>
         </div>
-        <p>Runs Priority HR Services end to end — every mandate, every shortlist, every placement.
-          The client relationships the group is built on are ones they hold.</p>
-        <ul class="p-remit">
-          <li>All HR services and client delivery</li>
-          <li>Blue-collar and white-collar hiring practices</li>
-          <li>Screening standards and the replacement guarantee</li>
-        </ul>
       </div>
+
     </div>
   </div>
 </section>

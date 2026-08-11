@@ -269,24 +269,30 @@
   .org-note{max-width:640px;margin:36px auto 0;text-align:center;color:var(--fg-3);font-size:14px}
 
   /* Directors. Two people, so two columns — a grid built for more would make the company look
-     like it is pretending to have a bench it does not have. */
-  .people{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px;margin:0 auto}
-  .person{border:1px solid var(--line);border-radius:var(--radius);padding:30px;
+     like it is pretending to have a bench it does not have.
+
+     Photo-led and centred: on a page whose job is "who are these people", the face is the content
+     and everything under it is a caption. Deliberately short — a name, a role, one line, and a way
+     to reach them. */
+  .people{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:760px;margin:0 auto}
+  .person{border:1px solid var(--line);border-radius:var(--radius);padding:34px 28px;text-align:center;
     background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
     transition:transform .2s,border-color .2s,box-shadow .3s}
   .person:hover{transform:translateY(-4px);border-color:rgba(124,92,255,.4);box-shadow:0 20px 50px -20px rgba(124,92,255,.4)}
-  .p-head{display:flex;align-items:center;gap:16px;margin-bottom:18px}
-  .p-av{width:56px;height:56px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
-    background:var(--grad);color:#0a0a12;font-weight:800;font-size:19px;letter-spacing:.02em;
-    box-shadow:0 8px 24px -8px rgba(124,92,255,.7)}
-  .p-av.alt{background:linear-gradient(120deg,#22d3ee,#3b82f6);box-shadow:0 8px 24px -8px rgba(34,211,238,.7)}
-  .person h3{font-size:20px;letter-spacing:-.02em;font-weight:700}
-  .p-role{display:block;font-size:13.5px;color:var(--aqua);font-weight:600;margin-top:2px}
-  .person p{color:var(--fg-2);font-size:14.5px}
-  .p-remit{list-style:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--line);display:grid;gap:10px}
-  .p-remit li{color:var(--fg-2);font-size:14px;padding-left:24px;position:relative;line-height:1.5}
-  .p-remit li::before{content:"";position:absolute;left:0;top:7px;width:13px;height:7px;
-    border-left:2px solid var(--violet);border-bottom:2px solid var(--violet);transform:rotate(-45deg)}
+  .p-photo{width:132px;height:132px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 18px;
+    border:2px solid rgba(255,255,255,.1);background:var(--panel-2)}
+  /* The fallback when the image file isn't there yet. Same box, so the layout never shifts. */
+  .p-initials{display:flex;align-items:center;justify-content:center;background:var(--grad);
+    color:#0a0a12;font-weight:800;font-size:38px;letter-spacing:.02em;border:0;
+    box-shadow:0 12px 30px -10px rgba(124,92,255,.7)}
+  .person h3{font-size:21px;letter-spacing:-.02em;font-weight:700}
+  .p-role{display:block;font-size:13.5px;color:var(--aqua);font-weight:600;margin-top:3px}
+  .p-line{color:var(--fg-2);font-size:14.5px;margin-top:12px}
+  .p-contact{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);
+    display:flex;flex-direction:column;gap:6px}
+  .p-contact a{font-size:14.5px;color:var(--fg-2);transition:color .2s}
+  .p-contact a:first-child{font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
+  .p-contact a:hover{color:var(--aqua)}
 
   .grid.four{grid-template-columns:repeat(4,1fr)}
 
