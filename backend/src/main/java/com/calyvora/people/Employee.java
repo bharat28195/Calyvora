@@ -70,6 +70,13 @@ public class Employee {
     @Column(name = "employment_status", nullable = false, length = 24)
     private EmploymentStatus employmentStatus = EmploymentStatus.ACTIVE;
 
+    /** Why they are leaving, and when the exit was started (PD-20). {@link #endDate} stays the last working day. */
+    @Column(name = "exit_reason", length = 200)
+    private String exitReason;
+
+    @Column(name = "exit_started_at")
+    private Instant exitStartedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -175,6 +182,22 @@ public class Employee {
 
     public LocalDate getEndDate() {
         return endDate;
+    }
+
+    public String getExitReason() {
+        return exitReason;
+    }
+
+    public void setExitReason(String exitReason) {
+        this.exitReason = exitReason;
+    }
+
+    public Instant getExitStartedAt() {
+        return exitStartedAt;
+    }
+
+    public void setExitStartedAt(Instant exitStartedAt) {
+        this.exitStartedAt = exitStartedAt;
     }
 
     public void setEndDate(LocalDate endDate) {

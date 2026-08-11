@@ -2,6 +2,8 @@ package com.calyvora.people;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -9,7 +11,13 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A single onboarding checklist item for an employee (People OS slice P3). */
+/**
+ * A single checklist item for an employee (People OS slice P3; exits added in PD-20).
+ *
+ * <p>The table is still called {@code onboarding_tasks} — renaming it would have meant rewriting the
+ * RLS policy and every index for a name, which is not worth an outage. {@link #kind} is what says
+ * whether this item is about someone arriving or leaving.
+ */
 @Entity
 @Table(name = "onboarding_tasks")
 public class OnboardingTask {
@@ -22,6 +30,10 @@ public class OnboardingTask {
 
     @Column(name = "employee_id", nullable = false)
     private UUID employeeId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private ChecklistKind kind = ChecklistKind.ONBOARDING;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -41,10 +53,12 @@ public class OnboardingTask {
     protected OnboardingTask() {
     }
 
-    public OnboardingTask(UUID id, UUID companyId, UUID employeeId, String title, int sortOrder) {
+    public OnboardingTask(UUID id, UUID companyId, UUID employeeId, ChecklistKind kind,
+                          String title, int sortOrder) {
         this.id = id;
         this.companyId = companyId;
         this.employeeId = employeeId;
+        this.kind = kind;
         this.title = title;
         this.sortOrder = sortOrder;
         this.createdAt = Instant.now();
@@ -72,6 +86,10 @@ public class OnboardingTask {
 
     public UUID getEmployeeId() {
         return employeeId;
+    }
+
+    public ChecklistKind getKind() {
+        return kind;
     }
 
     public String getTitle() {

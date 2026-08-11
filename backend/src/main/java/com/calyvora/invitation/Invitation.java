@@ -46,6 +46,22 @@ public class Invitation {
     @Column(name = "accepted_at")
     private Instant acceptedAt;
 
+    // The role agreed when someone is hired out of the recruitment pipeline (PD-20). An employee row
+    // needs a user, and a user does not exist until this invitation is accepted — so the agreed
+    // details wait here and are applied when the profile is first created.
+    @Column(name = "job_title", length = 120)
+    private String jobTitle;
+
+    @Column(name = "start_date")
+    private java.time.LocalDate startDate;
+
+    @Column(name = "department_id")
+    private UUID departmentId;
+
+    /** Guards against seeding the joining checklist twice if the profile is recreated. */
+    @Column(name = "onboarding_seeded", nullable = false)
+    private boolean onboardingSeeded;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -64,6 +80,38 @@ public class Invitation {
         // Set at construction (not @PrePersist): Spring Data save() merges assigned-id entities, so
         // reading createdAt on the passed instance right after save() would otherwise be null.
         this.createdAt = Instant.now();
+    }
+
+    /** Attach the role agreed at hire time, so accepting produces a real employee, not a bare login. */
+    public void setHireDetails(String jobTitle, java.time.LocalDate startDate, UUID departmentId) {
+        this.jobTitle = jobTitle;
+        this.startDate = startDate;
+        this.departmentId = departmentId;
+    }
+
+    /** True when this invitation came out of the recruitment pipeline and carries a job to apply. */
+    public boolean hasHireDetails() {
+        return jobTitle != null || startDate != null || departmentId != null;
+    }
+
+    public String getJobTitle() {
+        return jobTitle;
+    }
+
+    public java.time.LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public UUID getDepartmentId() {
+        return departmentId;
+    }
+
+    public boolean isOnboardingSeeded() {
+        return onboardingSeeded;
+    }
+
+    public void setOnboardingSeeded(boolean onboardingSeeded) {
+        this.onboardingSeeded = onboardingSeeded;
     }
 
     public boolean isExpired(Instant now) {

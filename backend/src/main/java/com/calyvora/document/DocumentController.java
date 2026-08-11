@@ -4,6 +4,8 @@ import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.CurrentUser;
 import com.calyvora.document.dto.DocumentResponse;
 import com.calyvora.document.dto.GenerateRequest;
+import com.calyvora.document.dto.LetterheadPayload;
+import com.calyvora.document.dto.LetterheadResponse;
 import com.calyvora.document.dto.PreviewResponse;
 import com.calyvora.document.dto.TemplatePayload;
 import com.calyvora.document.dto.TemplateResponse;
@@ -34,9 +36,27 @@ import java.util.UUID;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final LetterheadService letterheadService;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService, LetterheadService letterheadService) {
         this.documentService = documentService;
+        this.letterheadService = letterheadService;
+    }
+
+    // ---- letterhead ----
+
+    /**
+     * The company letterpad. Always answers — a company that has never configured one gets the
+     * defaults with its own name, so there is no "not set up yet" state to handle in the client.
+     */
+    @GetMapping("/letterhead")
+    public LetterheadResponse letterhead() {
+        return letterheadService.get();
+    }
+
+    @PatchMapping("/letterhead")
+    public LetterheadResponse updateLetterhead(@Valid @RequestBody LetterheadPayload payload) {
+        return letterheadService.update(payload);
     }
 
     // ---- templates ----

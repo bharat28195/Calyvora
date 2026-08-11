@@ -110,6 +110,7 @@ public class DocumentService {
         if (p.body() != null && !p.body().isBlank()) t.setBody(p.body());
         if (p.description() != null) t.setDescription(blankToNull(p.description()));
         if (p.kind() != null) t.setKind(DocumentKind.valueOf(p.kind()));
+        if (p.useLetterhead() != null) t.setUseLetterhead(p.useLetterhead());
         return TemplateResponse.of(t);
     }
 
@@ -135,7 +136,8 @@ public class DocumentService {
             String v = values.get(key);
             if (v == null || v.isBlank()) missing.add(key);
         }
-        return new PreviewResponse(titleFor(t, req, values), MergeFields.render(t.getBody(), values), values, missing);
+        return new PreviewResponse(titleFor(t, req, values), MergeFields.render(t.getBody(), values),
+                t.isUseLetterhead(), values, missing);
     }
 
     @Transactional
@@ -147,9 +149,40 @@ public class DocumentService {
                 ? null : UUID.fromString(req.employeeId());
 
         GeneratedDocument doc = new GeneratedDocument(UUID.randomUUID(), companyId, t.getId(), employeeId,
-                titleFor(t, req, values), t.getKind(), MergeFields.render(t.getBody(), values), principal.userId());
+                titleFor(t, req, values), t.getKind(), MergeFields.render(t.getBody(), values),
+                t.isUseLetterhead(), principal.userId());
         documentRepository.save(doc);
         return DocumentResponse.of(doc, values.get("employee.fullName"), values.get("signatory.name"));
+    }
+
+    /**
+     * Issue the company's letter of a given kind without the caller naming a template — how the
+     * joining, relieving and offer letters get raised automatically (PD-20).
+     *
+     * <p>Returns empty rather than throwing when no template of that kind exists. A company that
+     * deleted its joining letter has said something by doing so, and failing a hire because a
+     * template is missing would be the wrong trade: the employee record matters, the letter can be
+     * raised by hand afterwards.
+     */
+    @Transactional
+    public java.util.Optional<DocumentResponse> issueByKind(DocumentKind kind, UUID employeeId,
+                                                            Map<String, String> overrides,
+                                                            AuthPrincipal principal) {
+        UUID companyId = TenantContext.getCompanyId();
+        if (templateRepository.countByCompanyId(companyId) == 0) {
+            seedStarters(companyId, principal.userId());
+        }
+        return templateRepository.findFirstByCompanyIdAndKindOrderByBuiltInAscNameAsc(companyId, kind)
+                .map(t -> {
+                    GenerateRequest req = new GenerateRequest(t.getId().toString(),
+                            employeeId == null ? null : employeeId.toString(), null, overrides);
+                    Map<String, String> values = resolve(t, req, principal);
+                    GeneratedDocument doc = new GeneratedDocument(UUID.randomUUID(), companyId, t.getId(),
+                            employeeId, titleFor(t, req, values), t.getKind(),
+                            MergeFields.render(t.getBody(), values), t.isUseLetterhead(), principal.userId());
+                    documentRepository.save(doc);
+                    return DocumentResponse.of(doc, values.get("employee.fullName"), values.get("signatory.name"));
+                });
     }
 
     @Transactional(readOnly = true)

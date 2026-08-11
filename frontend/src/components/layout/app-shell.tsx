@@ -7,7 +7,7 @@ import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
-  CalendarClock, Building2, LifeBuoy,
+  CalendarClock, Building2, LifeBuoy, DoorOpen,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -59,6 +59,9 @@ const NAV: NavItem[] = [
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
   { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY },
   { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: MANAGES },
+  // Top-level rather than under People, which is HR-only: exit clearance is a manager's job, and
+  // they would never see it nested under a section their role cannot open.
+  { href: "/people/exits", label: "Exits", icon: DoorOpen, roles: MANAGES },
   {
     href: "/people", label: "People", icon: Users, roles: HR_PLUS,
     children: [
@@ -87,6 +90,7 @@ const NAV: NavItem[] = [
       { href: "/documents", label: "Issued" },
       { href: "/documents/new", label: "Generate" },
       { href: "/documents/templates", label: "Templates" },
+      { href: "/documents/letterhead", label: "Letterpad" },
     ],
   },
   { href: "/members", label: "Members", icon: UserCog, roles: ["ADMIN"] },

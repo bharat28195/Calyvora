@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, FileSignature, Sparkles, AlertTriangle, Plus, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { DocumentPreview, DocumentTemplate, Employee, MergeField } from "@/lib/types";
+import type { DocumentPreview, DocumentTemplate, Employee, Letterhead, MergeField } from "@/lib/types";
 import { KIND_LABELS } from "@/lib/documents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ export default function GenerateDocumentPage() {
   const [title, setTitle] = useState("");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<DocumentPreview | null>(null);
+  const [letterhead, setLetterhead] = useState<Letterhead | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [issuing, setIssuing] = useState(false);
 
@@ -46,6 +47,8 @@ export default function GenerateDocumentPage() {
         setTemplateId(t.find((x) => x.id === wanted)?.id ?? t[0]?.id ?? "");
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load templates"));
+    // So the preview is the letter as it will actually print, stationery included.
+    api.letterhead().then(setLetterhead).catch(() => setLetterhead(null));
   }, []);
 
   // Live preview — re-renders whenever the template, the person, or an override changes.
@@ -180,7 +183,7 @@ export default function GenerateDocumentPage() {
               </Button>
             </div>
             {preview ? (
-              <LetterSheet body={preview.body} />
+              <LetterSheet body={preview.body} letterhead={preview.useLetterhead ? letterhead : null} />
             ) : (
               <Card className="text-sm text-fg/50">
                 {template ? "Rendering…" : "Pick a template to see the letter."}

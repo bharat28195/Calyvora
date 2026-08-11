@@ -40,6 +40,10 @@ public class DocumentTemplate {
     @Column(name = "built_in", nullable = false)
     private boolean builtIn;
 
+    /** Print this template on the company letterpad. Off for memos that carry their own heading. */
+    @Column(name = "use_letterhead", nullable = false)
+    private boolean useLetterhead = true;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -87,6 +91,8 @@ public class DocumentTemplate {
     public void setBody(String body) { this.body = body; }
     public boolean isBuiltIn() { return builtIn; }
     public void setBuiltIn(boolean builtIn) { this.builtIn = builtIn; }
+    public boolean isUseLetterhead() { return useLetterhead; }
+    public void setUseLetterhead(boolean useLetterhead) { this.useLetterhead = useLetterhead; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

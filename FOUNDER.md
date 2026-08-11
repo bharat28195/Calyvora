@@ -250,6 +250,101 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### L-1 · 2026-08-11 · A migration that passes every test can still fail the only database that matters
+- **What happened:** V40 (PD-18) deleted the demo platform owner with a bare
+  `delete from users where email = 'owner@priorityhr.app'`. Green across 264 tests, then the deploy
+  died on `refresh_tokens_user_id_fkey`. The backend never started; Render kept the previous container
+  running, so the app stayed up and the only symptom was that the new owner login didn't work.
+- **Why the tests could not have caught it:** every test database is built from empty by Flyway and
+  then used. A destructive migration therefore always runs against data *it* created. The deployment's
+  database had an account that had been **used** — signed in, so a refresh token pointed at it. There
+  was no test in the suite that migrated *over* pre-existing data, so this class of bug had no way to
+  surface.
+- **Fix:** clear the session artefacts first (right regardless — it revokes the old credential), then
+  delete inside a `do $$ … exception when foreign_key_violation` block that retires the account
+  instead when something still references it. Plus `V40LegacyOwnerRemovalTest`, which cleans to V39,
+  plants realistic rows, and only then applies V40.
+- **The rule to keep:** *any migration that deletes or rewrites existing rows gets a test that plants
+  the data first.* Adding a column does not need one; touching rows a customer created does.
+- **Second lesson, cheaper but real:** a failed deploy on Render is silent from outside — health stays
+  UP because the old container keeps serving. "The site works" is not evidence the deploy landed.
+  Check that something *from the new build* answers.
+
+### PD-20 · 2026-08-10 · The letterpad, and letters that raise themselves
+- **Context:** Documents already had templates, merge fields and a paper-like preview, but every
+  letter came out on blank paper — no logo, no address, no colour, one typeface — so nobody would
+  actually send one to a candidate. And the two moments that produce letters, somebody joining and
+  somebody leaving, were entirely manual: HR had to remember the sequence, find the template, fill
+  it in, and separately remember to chase the laptop back. The ask was to take that load off a human.
+- **Decision, three parts.**
+  1. **A letterpad per company** (`letterheads`, one row keyed by company id): logo, heading, address
+     block, footer strip, brand colour, one of three typefaces, and a rule. Set once; every letter
+     prints on it. Per-template opt-out for memos that carry their own heading.
+  2. **Offer and hire raise their own letters.** "Make an offer" moves the candidate to OFFER and
+     issues the offer letter from the candidate's own details — no employee record required, because
+     the merge engine already takes overrides. "Hire" invites them, marks them HIRED, and issues the
+     joining letter.
+  3. **Exit formalities as a checklist a manager works.** Starting an exit records the last working
+     day, moves the employee to a new `NOTICE` status and raises a ten-item clearance list. Completing
+     it issues the relieving letter and the experience certificate.
+- **Editor: a toolbar over the existing text format, not a WYSIWYG.** Considered storing HTML and
+  editing on the page as in Word — closer to what was asked for. Rejected for now: it means
+  sanitising untrusted HTML before every render, migrating every existing template, and roughly
+  double the build, to buy formatting nobody had asked for beyond bold, headings and lists. What is
+  saved stays plain text a person can read and repair, and `dangerouslySetInnerHTML` never sees
+  anything a user wrote. Revisit if tables in letters turn out to matter.
+- **The constraint that shaped the hire flow:** an employee row needs a `user_id`, and the user does
+  not exist until the invitation is accepted — while acceptance is a public call with no tenant bound,
+  so it cannot write to `employees` under RLS at all. So the agreed job title, start date and
+  department ride on the invitation row and are applied by `EmployeeService.provision` the first time
+  the profile is created, which also seeds the joining checklist. Both ends of that are real
+  constraints, not preference.
+- **Refusing to complete an exit while clearance is open** is the one hard rule. A relieving letter
+  certifies that company property came back and dues were settled; issuing it before that is true is
+  a statement the company cannot stand behind. Overridable with `force=true`, because reality has
+  exceptions — but never by accident.
+- **Who may tick what:** onboarding items belong to the joiner (or an admin); exit items belong to the
+  leaver's **manager**, HR or an admin, and explicitly not to the leaver, who would otherwise be
+  signing off that they returned their own laptop.
+- **Also:** exits are a top-level nav item rather than a child of People, which is HR-only — a manager
+  would never have found a page nested under a section their role cannot open.
+- **Trade-offs / debt:** the letterpad is applied at render time, so an old letter re-renders on
+  today's stationery (the *words* stay frozen, which is what was signed — but a company that rebrands
+  will see its old letters change). Output is browser print / Save-as-PDF; no server-rendered PDF and
+  no "email this letter to the candidate" yet. There is no offboarding equivalent of the checklist
+  templates — the ten items are a constant, not per-company configuration.
+- **Final outcome:** _Shipped with 15 integration tests covering the letterpad's PATCH semantics and
+  tenant isolation, the exit lifecycle including the clearance guard, and the hire flow through to the
+  profile and checklist appearing after acceptance._
+
+### PD-19 · 2026-08-10 · Calyvora is the parent; Priority HR Services is the business inside it
+- **Context:** the revenue today is Priority HR Services — real clients, real placements. The product
+  is newer than the business that pays for it. The site said nothing about how the two relate, so a
+  visitor could not tell whether Orbit and Priority HR Services were one company, a partnership, or a
+  reseller arrangement, and existing service clients had no reason to trust a software brand.
+- **Decision:** present Calyvora as the **parent company** with two arms under it — **Orbit** (the
+  product) and **Priority HR Services** (the services business, and today's clients). Two directors
+  with separate remits: **Khushboo, Director — Calyvora** (the company and the platform) and
+  **Renu Rao, Director — HR Services** (all client delivery and hiring). A new `about.html` states
+  this as an org tree rather than a paragraph, and every page's footer now carries "Priority HR
+  Services is part of the Calyvora group."
+- **Why this way round:** the services business is the credibility and the product is the leverage.
+  Making the product company the parent lets Orbit be sold to companies that will never buy hiring —
+  the whole point of becoming a product company — while the services arm keeps its own name and its
+  own client relationships instead of being absorbed into a brand those clients never bought.
+- **Alternatives considered:** one merged brand (rejected — throws away the name existing clients
+  signed with); Priority HR Services as the parent with Orbit as its tool (rejected — a services
+  company selling software to other services companies is a harder story, and it caps the product);
+  saying nothing about the structure (rejected — that ambiguity is what the page exists to remove).
+- **Open, and a real one:** this is currently a **presentational** group structure. Whether Priority
+  HR Services becomes a legal subsidiary of a Calyvora entity is a registration question with tax and
+  contract consequences that the website cannot settle. The copy is deliberately worded as "part of
+  the Calyvora group" and "operates as part of" rather than naming a shareholding, so nothing on the
+  site has to be retracted if the paperwork lands differently. **Confirm with an accountant before
+  claiming a parent/subsidiary relationship in a contract or an invoice.**
+- **Final outcome:** _Shipped — `website/orbit/about.html`, linked from the nav and footer of every
+  page._
+
 ### PD-18 · 2026-08-10 · Three tiers: the vendor, the agency, the company — and only the vendor sells
 - **Context:** the site sells "manage every company from one console" to agencies and groups, and the
   only thing that fitted was the **platform-owner console** — our own view, which reads every tenant

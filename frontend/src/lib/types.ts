@@ -62,7 +62,8 @@ export interface Invitation {
 }
 
 export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN";
-export type EmploymentStatus = "ONBOARDING" | "ACTIVE" | "TERMINATED";
+/** NOTICE = exit started, last working day not yet reached (PD-20). */
+export type EmploymentStatus = "ONBOARDING" | "ACTIVE" | "NOTICE" | "TERMINATED";
 
 export interface Employee {
   id: string;
@@ -355,10 +356,34 @@ export interface DocumentTemplate {
   description: string | null;
   body: string;
   builtIn: boolean;
+  /** Print this one on the company letterpad. */
+  useLetterhead: boolean;
   /** The merge fields this body actually references. */
   placeholders: string[];
   updatedAt: string;
 }
+
+/** Which typeface the letterpad prints in. Mapped to real font stacks in `lib/documents`. */
+export type LetterheadFont = "SERIF" | "SANS" | "SLAB";
+
+/**
+ * The company letterpad. Always present — a company that has never opened the editor gets defaults
+ * with its own name, so there is no "not configured" state to render.
+ */
+export interface Letterhead {
+  logoUrl: string | null;
+  /** Already resolved to the company name when it was left blank. */
+  heading: string | null;
+  addressLines: string | null;
+  footerText: string | null;
+  brandColor: string;
+  fontFamily: LetterheadFont;
+  showDivider: boolean;
+  signatureName: string | null;
+  signatureTitle: string | null;
+  updatedAt: string;
+}
+export type LetterheadInput = Partial<Omit<Letterhead, "updatedAt">>;
 export interface MergeField {
   key: string;
   label: string;
@@ -371,12 +396,14 @@ export interface GeneratedDoc {
   employeeName: string | null;
   templateId: string | null;
   body: string;
+  useLetterhead: boolean;
   generatedBy: string | null;
   createdAt: string;
 }
 export interface DocumentPreview {
   title: string;
   body: string;
+  useLetterhead: boolean;
   values: Record<string, string>;
   /** Fields the profile couldn't fill — fix or override before issuing. */
   missing: string[];
@@ -825,13 +852,66 @@ export interface LeaveBalance {
   pendingDays: number;
 }
 
+export type ChecklistKind = "ONBOARDING" | "EXIT";
+
 export interface OnboardingTask {
   id: string;
   employeeId: string;
+  kind: ChecklistKind;
   title: string;
   sortOrder: number;
   completed: boolean;
   completedAt: string | null;
+}
+
+/** One person's exit: where they are, how far clearance has got, and what has been issued. */
+export interface ExitView {
+  employeeId: string;
+  employeeName: string | null;
+  employmentStatus: EmploymentStatus;
+  lastWorkingDay: string | null;
+  reason: string | null;
+  exitStartedAt: string | null;
+  managerName: string | null;
+  tasksDone: number;
+  tasksTotal: number;
+  checklistComplete: boolean;
+  checklist: OnboardingTask[];
+  letters: { id: string; kind: DocumentKind; title: string; createdAt: string }[];
+}
+export interface StartExitInput {
+  lastWorkingDay: string;
+  reason?: string;
+  seedChecklist?: boolean;
+}
+
+export interface MakeOfferInput {
+  jobTitle?: string;
+  startDate?: string;
+  workLocation?: string;
+  employmentType?: string;
+  annualSalary?: number;
+  currency?: string;
+  departmentId?: string;
+}
+export interface OfferResult {
+  candidate: Candidate;
+  documentId: string | null;
+  documentTitle: string | null;
+  /** Set when no template of that kind exists, so the screen can say so instead of silently doing nothing. */
+  letterNote: string | null;
+}
+export interface HireInput {
+  role?: "ADMIN" | "HR" | "MANAGER" | "MEMBER";
+  jobTitle?: string;
+  startDate?: string;
+  departmentId?: string;
+  issueJoiningLetter?: boolean;
+}
+export interface HireResult extends OfferResult {
+  invitationId: string;
+  /** Returned as well as emailed — onboarding must not depend on mail being deliverable. */
+  joinLink: string | null;
 }
 
 export type TaskStatusT = "TODO" | "IN_PROGRESS" | "DONE";

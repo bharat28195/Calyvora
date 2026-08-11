@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2, Save, FileSignature, Lock } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { DocumentKind, DocumentTemplate, MergeField } from "@/lib/types";
+import type { DocumentKind, DocumentTemplate, Letterhead, MergeField } from "@/lib/types";
 import { KIND_LABELS, renderTemplate, placeholdersIn } from "@/lib/documents";
+import { FormatToolbar } from "@/components/documents/format-toolbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -25,6 +26,7 @@ const selectCls =
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<DocumentTemplate[] | null>(null);
   const [fields, setFields] = useState<MergeField[]>([]);
+  const [letterhead, setLetterhead] = useState<Letterhead | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +38,13 @@ export default function TemplatesPage() {
       setSelectedId((cur) => keep ?? cur ?? t[0]?.id ?? null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load templates");
+    }
+    // Separate and forgiving: the letterpad is live-only, and not having one is no reason to stop
+    // someone editing their templates.
+    try {
+      setLetterhead(await api.letterhead());
+    } catch {
+      setLetterhead(null);
     }
   }, []);
 
@@ -102,6 +111,7 @@ export default function TemplatesPage() {
               key={selected.id}
               template={selected}
               fields={fields}
+              letterhead={letterhead}
               onSaved={(t) => load(t.id)}
               onDelete={() => remove(selected)}
             />
@@ -115,10 +125,11 @@ export default function TemplatesPage() {
 }
 
 function TemplateEditor({
-  template, fields, onSaved, onDelete,
+  template, fields, letterhead, onSaved, onDelete,
 }: {
   template: DocumentTemplate;
   fields: MergeField[];
+  letterhead: Letterhead | null;
   onSaved: (t: DocumentTemplate) => void;
   onDelete: () => void;
 }) {
@@ -126,12 +137,14 @@ function TemplateEditor({
   const [kind, setKind] = useState<DocumentKind>(template.kind);
   const [description, setDescription] = useState(template.description ?? "");
   const [body, setBody] = useState(template.body);
+  const [useLetterhead, setUseLetterhead] = useState(template.useLetterhead);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const dirty =
     name !== template.name || kind !== template.kind || body !== template.body ||
+    useLetterhead !== template.useLetterhead ||
     description !== (template.description ?? "");
 
   /** Sample values so the preview reads like a letter instead of a form. */
@@ -162,7 +175,7 @@ function TemplateEditor({
     setSaving(true);
     setError(null);
     try {
-      onSaved(await api.updateDocTemplate(template.id, { name, kind, description, body }));
+      onSaved(await api.updateDocTemplate(template.id, { name, kind, description, body, useLetterhead }));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to save");
     } finally {
@@ -209,6 +222,10 @@ function TemplateEditor({
           </div>
         </div>
 
+        <div className="mt-3">
+          <FormatToolbar textareaRef={bodyRef} value={body} onChange={setBody} />
+        </div>
+
         <p className="mt-3 text-xs text-fg/40">Click a field to insert it at the cursor:</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {fields.map((f) => (
@@ -230,11 +247,24 @@ function TemplateEditor({
           spellCheck={false}
           className="mt-4 h-80 w-full rounded-lg border border-fg/15 bg-fg/5 p-3 font-mono text-xs leading-relaxed text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
         />
+
+        <label className="mt-4 flex items-center gap-2.5 text-sm text-fg/70">
+          <input
+            type="checkbox"
+            checked={useLetterhead}
+            onChange={(e) => setUseLetterhead(e.target.checked)}
+            className="h-4 w-4 rounded border-fg/20 bg-fg/5 accent-violet"
+          />
+          Print on the company letterpad
+          <Link href="/documents/letterhead" className="text-xs font-medium text-violet hover:underline">
+            Edit letterpad
+          </Link>
+        </label>
       </Card>
 
       <div>
         <p className="mb-2 text-sm font-medium uppercase tracking-wide text-fg/40">Sample</p>
-        <LetterSheet body={sample} />
+        <LetterSheet body={sample} letterhead={useLetterhead ? letterhead : null} />
       </div>
     </div>
   );

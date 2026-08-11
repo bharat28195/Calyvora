@@ -5,6 +5,7 @@ import com.calyvora.people.OnboardingTask;
 public record OnboardingTaskResponse(
         String id,
         String employeeId,
+        String kind,
         String title,
         int sortOrder,
         boolean completed,
@@ -12,7 +13,7 @@ public record OnboardingTaskResponse(
 ) {
     public static OnboardingTaskResponse of(OnboardingTask t) {
         return new OnboardingTaskResponse(
-                t.getId().toString(), t.getEmployeeId().toString(), t.getTitle(),
+                t.getId().toString(), t.getEmployeeId().toString(), t.getKind().name(), t.getTitle(),
                 t.getSortOrder(), t.isCompleted(),
                 t.getCompletedAt() == null ? null : t.getCompletedAt().toString());
     }

@@ -11,6 +11,7 @@ public record DocumentResponse(
         String employeeName,
         String templateId,
         String body,
+        boolean useLetterhead,
         String generatedBy,
         String createdAt
 ) {
@@ -18,6 +19,6 @@ public record DocumentResponse(
         return new DocumentResponse(d.getId().toString(), d.getTitle(), d.getKind().name(),
                 d.getEmployeeId() == null ? null : d.getEmployeeId().toString(), employeeName,
                 d.getTemplateId() == null ? null : d.getTemplateId().toString(),
-                d.getBody(), generatedBy, d.getCreatedAt().toString());
+                d.getBody(), d.isUseLetterhead(), generatedBy, d.getCreatedAt().toString());
     }
 }

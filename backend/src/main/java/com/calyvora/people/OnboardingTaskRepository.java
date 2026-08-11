@@ -8,11 +8,13 @@ import java.util.UUID;
 
 public interface OnboardingTaskRepository extends JpaRepository<OnboardingTask, UUID> {
 
-    List<OnboardingTask> findByEmployeeIdOrderBySortOrderAscCreatedAtAsc(UUID employeeId);
+    // Every read is scoped by kind: an exit clearance item has no business appearing on a joiner's
+    // checklist, and the two lists are shown on different screens to different people.
+    List<OnboardingTask> findByEmployeeIdAndKindOrderBySortOrderAscCreatedAtAsc(UUID employeeId, ChecklistKind kind);
 
     Optional<OnboardingTask> findByIdAndCompanyId(UUID id, UUID companyId);
 
-    long countByEmployeeId(UUID employeeId);
+    long countByEmployeeIdAndKind(UUID employeeId, ChecklistKind kind);
 
-    long countByEmployeeIdAndCompletedTrue(UUID employeeId);
+    long countByEmployeeIdAndKindAndCompletedTrue(UUID employeeId, ChecklistKind kind);
 }

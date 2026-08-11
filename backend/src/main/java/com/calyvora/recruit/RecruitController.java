@@ -4,8 +4,12 @@ import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.CurrentUser;
 import com.calyvora.recruit.dto.CandidatePayload;
 import com.calyvora.recruit.dto.CandidateResponse;
+import com.calyvora.recruit.dto.HireRequest;
+import com.calyvora.recruit.dto.HireResponse;
 import com.calyvora.recruit.dto.JobOpeningPayload;
 import com.calyvora.recruit.dto.JobOpeningResponse;
+import com.calyvora.recruit.dto.MakeOfferRequest;
+import com.calyvora.recruit.dto.OfferResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -92,5 +96,21 @@ public class RecruitController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCandidate(@PathVariable UUID id) {
         service.deleteCandidate(id);
+    }
+
+    // ---- offer & hire (PD-20) ----
+
+    /** Move to OFFER and raise the offer letter in one step. */
+    @PostMapping("/candidates/{id}/offer")
+    public OfferResponse makeOffer(@PathVariable UUID id, @Valid @RequestBody MakeOfferRequest req,
+                                   @CurrentUser AuthPrincipal principal) {
+        return service.makeOffer(id, req, principal);
+    }
+
+    /** Invite them, attach the agreed role, mark them HIRED and raise the joining letter. */
+    @PostMapping("/candidates/{id}/hire")
+    public HireResponse hire(@PathVariable UUID id, @Valid @RequestBody HireRequest req,
+                             @CurrentUser AuthPrincipal principal) {
+        return service.hire(id, req, principal);
     }
 }

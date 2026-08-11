@@ -3,7 +3,7 @@
  * `MergeFields` / `StarterTemplates` (feedback D2/D3). Kept in sync deliberately: the mock backend
  * has to produce the same letter the real one would, or the demo lies about the product.
  */
-import type { DocumentKind, MergeField } from "@/lib/types";
+import type { DocumentKind, Letterhead, LetterheadFont, MergeField } from "@/lib/types";
 
 const TOKEN = /\{\{\s*([\w.]+)\s*\}\}/g;
 
@@ -80,6 +80,43 @@ export const MERGE_FIELDS: MergeField[] = [
   { key: "signatory.name", label: "Signed by (you)" },
   { key: "signatory.title", label: "Signatory's title" },
 ];
+
+/**
+ * The three faces a letterpad can print in. Deliberately system stacks rather than webfonts: a
+ * letter is printed and emailed as often as it is viewed, and a font that fails to load would change
+ * the document rather than the page.
+ */
+export const LETTERHEAD_FONTS: Record<LetterheadFont, { label: string; stack: string; note: string }> = {
+  SERIF: {
+    label: "Serif",
+    stack: 'Georgia, "Times New Roman", "Nimbus Roman", serif',
+    note: "Traditional and formal — the usual choice for letters",
+  },
+  SANS: {
+    label: "Sans",
+    stack: '"Segoe UI", Inter, Helvetica, Arial, sans-serif',
+    note: "Clean and modern, matches most brand guidelines",
+  },
+  SLAB: {
+    label: "Slab",
+    stack: '"Rockwell", "Roboto Slab", "Courier New", Georgia, serif',
+    note: "Heavier and more distinctive — good with a strong logo",
+  },
+};
+
+/** What a company that has never opened the editor prints on. */
+export const DEFAULT_LETTERHEAD: Letterhead = {
+  logoUrl: null,
+  heading: null,
+  addressLines: null,
+  footerText: null,
+  brandColor: "#7c5cff",
+  fontFamily: "SERIF",
+  showDivider: true,
+  signatureName: null,
+  signatureTitle: null,
+  updatedAt: "",
+};
 
 /** Human labels for the document kinds. */
 export const KIND_LABELS: Record<DocumentKind, string> = {

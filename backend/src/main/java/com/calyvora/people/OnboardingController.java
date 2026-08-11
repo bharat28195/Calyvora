@@ -34,22 +34,54 @@ public class OnboardingController {
 
     @GetMapping("/employees/{employeeId}/onboarding")
     public List<OnboardingTaskResponse> list(@PathVariable UUID employeeId, @CurrentUser AuthPrincipal principal) {
-        return onboardingService.list(employeeId, principal);
+        return onboardingService.list(employeeId, ChecklistKind.ONBOARDING, principal);
     }
 
     @PostMapping("/employees/{employeeId}/onboarding")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public ResponseEntity<OnboardingTaskResponse> add(@PathVariable UUID employeeId,
                                                       @Valid @RequestBody AddOnboardingTaskRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(onboardingService.add(employeeId, request.title()));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(onboardingService.add(employeeId, ChecklistKind.ONBOARDING, request.title()));
     }
 
     @PostMapping("/employees/{employeeId}/onboarding/seed-defaults")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public List<OnboardingTaskResponse> seedDefaults(@PathVariable UUID employeeId) {
-        return onboardingService.seedDefaults(employeeId);
+        return onboardingService.seedDefaults(employeeId, ChecklistKind.ONBOARDING);
     }
 
+    // ---- exit checklist (PD-20) ----
+    //
+    // Separate paths rather than a ?kind= parameter on the onboarding ones: these are worked by a
+    // different person, on a different screen, and the manager role gate below only makes sense for
+    // the exit list. A shared endpoint would have to explain that in a conditional.
+
+    /** The leaver's manager, HR or an admin — enforced in the service, which knows who manages whom. */
+    @GetMapping("/employees/{employeeId}/exit-checklist")
+    public List<OnboardingTaskResponse> exitChecklist(@PathVariable UUID employeeId,
+                                                      @CurrentUser AuthPrincipal principal) {
+        return onboardingService.list(employeeId, ChecklistKind.EXIT, principal);
+    }
+
+    @PostMapping("/employees/{employeeId}/exit-checklist")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    public ResponseEntity<OnboardingTaskResponse> addExitTask(@PathVariable UUID employeeId,
+                                                              @Valid @RequestBody AddOnboardingTaskRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(onboardingService.add(employeeId, ChecklistKind.EXIT, request.title()));
+    }
+
+    @PostMapping("/employees/{employeeId}/exit-checklist/seed-defaults")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    public List<OnboardingTaskResponse> seedExitDefaults(@PathVariable UUID employeeId) {
+        return onboardingService.seedDefaults(employeeId, ChecklistKind.EXIT);
+    }
+
+    /**
+     * Ticking works for both checklists through one route — the task knows which list it is on, and
+     * the service applies that list's rule about who may tick it.
+     */
     @PatchMapping("/onboarding/{taskId}")
     public OnboardingTaskResponse toggle(@PathVariable UUID taskId,
                                          @Valid @RequestBody ToggleOnboardingTaskRequest request,

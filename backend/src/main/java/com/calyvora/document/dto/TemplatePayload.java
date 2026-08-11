@@ -9,5 +9,7 @@ public record TemplatePayload(
         @Pattern(regexp = "OFFER_LETTER|JOINING_LETTER|RELIEVING_LETTER|EXPERIENCE_LETTER|PROMOTION_LETTER|CUSTOM",
                 message = "invalid kind") String kind,
         @Size(max = 400) String description,
-        String body
+        String body,
+        /** Null leaves the current setting alone; most letters want the company letterpad. */
+        Boolean useLetterhead
 ) {}

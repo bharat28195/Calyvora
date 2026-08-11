@@ -1227,7 +1227,7 @@ export const mockBackend = {
       // Same first-open path as the real backend: seed the starter library once.
       mockTemplates[user.companyId] = STARTER_TEMPLATES.map((s) => ({
         id: crypto.randomUUID(), name: s.name, kind: s.kind, description: s.description,
-        body: s.body, builtIn: true, placeholders: placeholdersIn(s.body),
+        body: s.body, builtIn: true, useLetterhead: true, placeholders: placeholdersIn(s.body),
         updatedAt: new Date().toISOString(),
       }));
     }
@@ -1240,7 +1240,7 @@ export const mockBackend = {
     requireAdmin(user);
     const t: DocumentTemplate = {
       id: crypto.randomUUID(), name: input.name, kind: (input.kind as DocumentTemplate["kind"]) ?? "CUSTOM",
-      description: input.description ?? null, body: input.body, builtIn: false,
+      description: input.description ?? null, body: input.body, builtIn: false, useLetterhead: true,
       placeholders: placeholdersIn(input.body), updatedAt: new Date().toISOString(),
     };
     mockTemplates[user.companyId] = [...(mockTemplates[user.companyId] ?? []), t];
@@ -1279,7 +1279,8 @@ export const mockBackend = {
     if (!t) throw err(404, "NOT_FOUND", "Template not found");
     const values = resolveMergeValues(db, user, input);
     const missing = placeholdersIn(t.body).filter((k) => !values[k] || !values[k].trim());
-    return { title: docTitle(t.name, input, values), body: renderTemplate(t.body, values), values, missing };
+    return { title: docTitle(t.name, input, values), body: renderTemplate(t.body, values),
+      useLetterhead: t.useLetterhead, values, missing };
   },
   async generateDoc(accessToken: string | null, input: GenerateDocInput): Promise<GeneratedDoc> {
     await delay();
@@ -1293,6 +1294,7 @@ export const mockBackend = {
       id: crypto.randomUUID(), title: docTitle(t.name, input, values), kind: t.kind,
       employeeId: input.employeeId ?? null, employeeName: values["employee.fullName"] ?? null,
       templateId: t.id, body: renderTemplate(t.body, values),   // frozen at issue time
+      useLetterhead: t.useLetterhead,
       generatedBy: values["signatory.name"] ?? null, createdAt: new Date().toISOString(),
     };
     mockDocs[user.companyId] = [doc, ...(mockDocs[user.companyId] ?? [])];
@@ -3094,6 +3096,8 @@ function toOnboarding(row: OnboardRow): OnboardingTask {
   return {
     id: row.id,
     employeeId: row.employeeId,
+    // The mock only ever holds joining checklists; exits are live-only (see `liveOnly` in api.ts).
+    kind: "ONBOARDING",
     title: row.title,
     sortOrder: row.sortOrder,
     completed: row.completed,

@@ -41,6 +41,10 @@ public class GeneratedDocument {
     @Column(nullable = false, columnDefinition = "text")
     private String body;
 
+    /** How it was headed, copied from the template at issue time — see V41. */
+    @Column(name = "use_letterhead", nullable = false)
+    private boolean useLetterhead = true;
+
     @Column(name = "generated_by")
     private UUID generatedBy;
 
@@ -51,7 +55,8 @@ public class GeneratedDocument {
     }
 
     public GeneratedDocument(UUID id, UUID companyId, UUID templateId, UUID employeeId, String title,
-                             DocumentKind kind, String body, UUID generatedBy) {
+                             DocumentKind kind, String body, boolean useLetterhead, UUID generatedBy) {
+        this.useLetterhead = useLetterhead;
         this.id = id;
         this.companyId = companyId;
         this.templateId = templateId;
@@ -75,5 +80,6 @@ public class GeneratedDocument {
     public String getTitle() { return title; }
     public DocumentKind getKind() { return kind; }
     public String getBody() { return body; }
+    public boolean isUseLetterhead() { return useLetterhead; }
     public Instant getCreatedAt() { return createdAt; }
 }

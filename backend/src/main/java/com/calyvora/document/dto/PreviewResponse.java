@@ -10,6 +10,7 @@ import java.util.Map;
 public record PreviewResponse(
         String title,
         String body,
+        boolean useLetterhead,
         Map<String, String> values,
         List<String> missing
 ) {}

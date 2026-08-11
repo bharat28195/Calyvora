@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Printer, Copy, Check, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { GeneratedDoc } from "@/lib/types";
+import type { GeneratedDoc, Letterhead } from "@/lib/types";
 import { KIND_LABELS } from "@/lib/documents";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -16,6 +16,7 @@ export default function DocumentPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [doc, setDoc] = useState<GeneratedDoc | null>(null);
+  const [letterhead, setLetterhead] = useState<Letterhead | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -23,6 +24,9 @@ export default function DocumentPage() {
     api.document(id)
       .then(setDoc)
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load the document"));
+    // The letterpad is current, not frozen: the words someone signed are fixed, the stationery is
+    // whatever the company uses today.
+    api.letterhead().then(setLetterhead).catch(() => setLetterhead(null));
   }, [id]);
 
   async function copy() {
@@ -69,7 +73,7 @@ export default function DocumentPage() {
         </div>
       </div>
 
-      <LetterSheet body={doc.body} className="mt-6" />
+      <LetterSheet body={doc.body} letterhead={doc.useLetterhead ? letterhead : null} className="mt-6" />
     </div>
   );
 }

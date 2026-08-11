@@ -84,11 +84,30 @@ import {
   type Role,
   type SearchResponse,
   type AssistantResponse,
+  type Letterhead,
+  type LetterheadInput,
+  type ExitView,
+  type StartExitInput,
+  type MakeOfferInput,
+  type OfferResult,
+  type HireInput,
+  type HireResult,
 } from "@/lib/types";
 import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
 // Frontend-first: mock is the default. Set NEXT_PUBLIC_API_MODE=live to hit the real backend.
 const LIVE = process.env.NEXT_PUBLIC_API_MODE === "live";
+
+/**
+ * For features with no mock: say so, rather than resolving with something invented. Used where the
+ * call has real-world weight — company stationery, an employment record, an invitation.
+ */
+function liveOnly<T>(what: string): Promise<T> {
+  return Promise.reject(new ApiError({
+    timestamp: "", status: 400, code: "VALIDATION_ERROR",
+    message: `${what} needs the live backend. Set NEXT_PUBLIC_API_MODE=live and start the backend.`,
+  }));
+}
 /** True when the app is wired to the real backend (enables demo seeding, dev mailbox, etc.). */
 export const isLive = LIVE;
 const BASE = "/api/v1";
@@ -959,6 +978,63 @@ export const api = {
   },
   deleteDocument(id: string): Promise<void> {
     return LIVE ? http<void>(`/documents/${id}`, { method: "DELETE" }) : mockBackend.deleteDocument(accessToken, id);
+  },
+
+  // --- letterhead, exits and hiring (PD-20) ---
+  // Live-only, like demo seeding above: these read and write real company stationery and real
+  // employment records, and a mock that pretended to would be worse than one that says so.
+  letterhead(): Promise<Letterhead> {
+    return LIVE ? http<Letterhead>("/documents/letterhead") : liveOnly("The letterpad");
+  },
+  saveLetterhead(input: LetterheadInput): Promise<Letterhead> {
+    return LIVE
+      ? http<Letterhead>("/documents/letterhead", { method: "PATCH", body: JSON.stringify(input) })
+      : liveOnly("The letterpad");
+  },
+
+  exits(): Promise<ExitView[]> {
+    return LIVE ? http<ExitView[]>("/people/exits") : liveOnly("Exits");
+  },
+  exit(employeeId: string): Promise<ExitView> {
+    return LIVE ? http<ExitView>(`/people/employees/${employeeId}/exit`) : liveOnly("Exits");
+  },
+  startExit(employeeId: string, input: StartExitInput): Promise<ExitView> {
+    return LIVE
+      ? http<ExitView>(`/people/employees/${employeeId}/exit`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Exits");
+  },
+  cancelExit(employeeId: string): Promise<ExitView> {
+    return LIVE
+      ? http<ExitView>(`/people/employees/${employeeId}/exit`, { method: "DELETE" })
+      : liveOnly("Exits");
+  },
+  /** `force` skips the "clearance outstanding" guard — a deliberate act, never a default. */
+  completeExit(employeeId: string, force = false): Promise<ExitView> {
+    return LIVE
+      ? http<ExitView>(`/people/employees/${employeeId}/exit/complete?force=${force}`, { method: "POST" })
+      : liveOnly("Exits");
+  },
+  toggleExitTask(taskId: string, completed: boolean): Promise<OnboardingTask> {
+    // Same route as onboarding on purpose: the task knows which checklist it is on.
+    return LIVE
+      ? http<OnboardingTask>(`/people/onboarding/${taskId}`, { method: "PATCH", body: JSON.stringify({ completed }) })
+      : liveOnly("Exits");
+  },
+  addExitTask(employeeId: string, title: string): Promise<OnboardingTask> {
+    return LIVE
+      ? http<OnboardingTask>(`/people/employees/${employeeId}/exit-checklist`, { method: "POST", body: JSON.stringify({ title }) })
+      : liveOnly("Exits");
+  },
+
+  makeOffer(candidateId: string, input: MakeOfferInput): Promise<OfferResult> {
+    return LIVE
+      ? http<OfferResult>(`/recruit/candidates/${candidateId}/offer`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Offers");
+  },
+  hireCandidate(candidateId: string, input: HireInput): Promise<HireResult> {
+    return LIVE
+      ? http<HireResult>(`/recruit/candidates/${candidateId}/hire`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Hiring");
   },
 
   // --- cross-app AI assistant ---

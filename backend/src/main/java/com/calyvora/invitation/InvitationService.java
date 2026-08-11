@@ -82,6 +82,17 @@ public class InvitationService {
 
     @Transactional
     public InvitationResponse create(CreateInvitationRequest request, AuthPrincipal principal) {
+        return create(request, null, principal);
+    }
+
+    /**
+     * Invite someone, optionally carrying the role agreed when they were hired (PD-20).
+     *
+     * @param hire the job title, start date and department to apply once they accept; null for an
+     *             ordinary invitation
+     */
+    @Transactional
+    public InvitationResponse create(CreateInvitationRequest request, HireDetails hire, AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         String email = request.email().trim().toLowerCase();
         Role role = Role.valueOf(request.role());
@@ -99,6 +110,9 @@ public class InvitationService {
         Invitation invitation = new Invitation(UUID.randomUUID(), companyId, email, role,
                 TokenGenerator.sha256(rawToken), principal.userId(),
                 Instant.now().plus(props.security().invitation().ttl()));
+        if (hire != null) {
+            invitation.setHireDetails(hire.jobTitle(), hire.startDate(), hire.departmentId());
+        }
         invitationRepository.save(invitation);
 
         Company company = companyRepository.findById(companyId)

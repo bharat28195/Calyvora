@@ -31,12 +31,64 @@ public class EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
+    private final com.calyvora.invitation.InvitationRepository invitationRepository;
+    private final OnboardingTaskRepository onboardingTaskRepository;
 
     public EmployeeService(EmployeeRepository employeeRepository, UserRepository userRepository,
-                           DepartmentRepository departmentRepository) {
+                           DepartmentRepository departmentRepository,
+                           com.calyvora.invitation.InvitationRepository invitationRepository,
+                           OnboardingTaskRepository onboardingTaskRepository) {
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
         this.departmentRepository = departmentRepository;
+        this.invitationRepository = invitationRepository;
+        this.onboardingTaskRepository = onboardingTaskRepository;
+    }
+
+    /**
+     * Create the profile for a user who does not have one yet — the single place a profile comes into
+     * existence, so the hire details agreed in recruitment are applied exactly once (PD-20).
+     *
+     * <p>Why here and not at invitation-accept time: accepting is a public, unauthenticated call with
+     * no tenant bound, and {@code employees} is under Row-Level Security, so an insert there has no
+     * company to belong to. The first authenticated read of the directory does have one.
+     */
+    private Employee provision(UUID companyId, UUID userId) {
+        Employee employee = new Employee(UUID.randomUUID(), companyId, userId);
+        userRepository.findByIdAndCompanyId(userId, companyId)
+                .flatMap(u -> invitationRepository.findByCompanyIdAndEmailAndStatus(companyId, u.getEmail(),
+                        com.calyvora.invitation.InvitationStatus.ACCEPTED))
+                .filter(com.calyvora.invitation.Invitation::hasHireDetails)
+                .ifPresent(invitation -> {
+                    employee.setJobTitle(invitation.getJobTitle());
+                    employee.setStartDate(invitation.getStartDate());
+                    employee.setDepartmentId(invitation.getDepartmentId());
+                    employee.setEmploymentStatus(EmploymentStatus.ONBOARDING);
+                    employeeRepository.save(employee);
+                    if (!invitation.isOnboardingSeeded()) {
+                        seedJoiningChecklist(companyId, employee.getId());
+                        invitation.setOnboardingSeeded(true);
+                        invitationRepository.save(invitation);
+                    }
+                });
+        return employeeRepository.save(employee);
+    }
+
+    /**
+     * The joining checklist, seeded inline rather than through {@code OnboardingService} to keep the
+     * dependency one-way — that service already depends on this package's repositories.
+     */
+    private void seedJoiningChecklist(UUID companyId, UUID employeeId) {
+        int order = 0;
+        for (String title : List.of(
+                "Sign employment paperwork",
+                "Set up laptop & accounts",
+                "Complete IT security training",
+                "Meet your team",
+                "Read the company handbook")) {
+            onboardingTaskRepository.save(new OnboardingTask(UUID.randomUUID(), companyId, employeeId,
+                    ChecklistKind.ONBOARDING, title, order++));
+        }
     }
 
     @Transactional
@@ -72,8 +124,7 @@ public class EmployeeService {
                 byUser.put(e.getUserId(), e);
             }
             for (User u : userPage.getContent()) {
-                byUser.computeIfAbsent(u.getId(),
-                        uid -> employeeRepository.save(new Employee(UUID.randomUUID(), companyId, uid)));
+                byUser.computeIfAbsent(u.getId(), uid -> provision(companyId, uid));
             }
         }
         return com.calyvora.common.dto.PageResponse.of(userPage, u -> EmployeeResponse.of(u, byUser.get(u.getId())));
@@ -166,7 +217,7 @@ public class EmployeeService {
 
     private Employee getOrCreate(UUID companyId, UUID userId) {
         return employeeRepository.findByUserId(userId)
-                .orElseGet(() -> employeeRepository.save(new Employee(UUID.randomUUID(), companyId, userId)));
+                .orElseGet(() -> provision(companyId, userId));
     }
 
     private Map<UUID, Employee> ensureProfiles(UUID companyId, List<User> users) {
@@ -175,8 +226,7 @@ public class EmployeeService {
             byUser.put(e.getUserId(), e);
         }
         for (User u : users) {
-            byUser.computeIfAbsent(u.getId(),
-                    uid -> employeeRepository.save(new Employee(UUID.randomUUID(), companyId, uid)));
+            byUser.computeIfAbsent(u.getId(), uid -> provision(companyId, uid));
         }
         return byUser;
     }
