@@ -166,6 +166,11 @@
   .foot .brand{margin-bottom:14px}
   .foot .tagline{color:var(--fg-3);font-size:14px;max-width:34ch}
   .foot-bottom{margin-top:44px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;color:var(--fg-3);font-size:13px}
+  /* The standing note that the site is information, not an offer. Quiet but not hidden — small
+     print that cannot be read is worth nothing, so it keeps real contrast and line height. */
+  .foot-note{margin-top:40px;padding-top:22px;border-top:1px solid var(--line);
+    color:var(--fg-3);font-size:12.5px;line-height:1.6;max-width:82ch}
+  .foot-note + .foot-bottom{margin-top:20px;padding-top:18px}
 
   /* reveal */
   .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
