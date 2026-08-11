@@ -235,3 +235,71 @@
   @media(max-width:560px){
     .steps{grid-template-columns:1fr}
   }
+
+  /* ---- About page -------------------------------------------------------------------------
+     The group structure is the whole point of this page, so it is drawn as an actual tree rather
+     than described in a paragraph: a visitor who arrives asking "is Priority HR Services the same
+     company as Orbit?" should get the answer from the shape before reading a word.
+
+     The connector is CSS, not SVG, so it reflows with the grid. The horizontal bar spans centre to
+     centre of the two children: with `1fr 1fr` and a 20px gap each centre sits 5px inside the 25%
+     mark, hence the calc(). Change the gap and that 5px (gap ÷ 4) changes with it. */
+  .org{max-width:900px;margin:0 auto}
+  .org-parent{border:1px solid rgba(124,92,255,.45);border-radius:var(--radius);padding:28px 30px;text-align:center;
+    background:radial-gradient(120% 160% at 50% 0%,rgba(124,92,255,.2),transparent 65%),var(--panel);
+    box-shadow:0 24px 60px -34px rgba(124,92,255,.7)}
+  .org-parent h3{font-size:26px;letter-spacing:-.02em;font-weight:800;margin-top:12px}
+  .org-parent p{color:var(--fg-2);font-size:15px;margin:10px auto 0;max-width:52ch}
+  .org-tag{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--fg-3);border:1px solid var(--line);padding:4px 12px;border-radius:100px}
+  .org-stem{width:1px;height:34px;margin:0 auto;background:linear-gradient(180deg,rgba(124,92,255,.7),var(--line))}
+  .org-children{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding-top:34px;position:relative;align-items:stretch}
+  .org-children::before{content:"";position:absolute;top:0;left:calc(25% - 5px);right:calc(25% - 5px);height:1px;background:var(--line)}
+  .org-node{position:relative;border:1px solid var(--line);border-radius:var(--radius);padding:28px;
+    background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+    display:flex;flex-direction:column;overflow:hidden}
+  .org-node::before{content:"";position:absolute;top:-34px;left:50%;width:1px;height:34px;background:var(--line)}
+  .org-node::after{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--node-accent)}
+  .org-node.product{--node-accent:linear-gradient(90deg,#7c5cff,#c084fc)}
+  .org-node.services{--node-accent:linear-gradient(90deg,#22d3ee,#3b82f6)}
+  .org-node h3{font-size:21px;letter-spacing:-.02em;font-weight:700;margin-top:12px}
+  .org-node p{color:var(--fg-2);font-size:14.5px;margin-top:10px;flex:1}
+  .org-link{display:inline-block;margin-top:18px;color:var(--aqua);font-size:14px;font-weight:600}
+  .org-link:hover{text-decoration:underline}
+  .org-note{max-width:640px;margin:36px auto 0;text-align:center;color:var(--fg-3);font-size:14px}
+
+  /* Directors. Two people, so two columns — a grid built for more would make the company look
+     like it is pretending to have a bench it does not have. */
+  .people{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px;margin:0 auto}
+  .person{border:1px solid var(--line);border-radius:var(--radius);padding:30px;
+    background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+    transition:transform .2s,border-color .2s,box-shadow .3s}
+  .person:hover{transform:translateY(-4px);border-color:rgba(124,92,255,.4);box-shadow:0 20px 50px -20px rgba(124,92,255,.4)}
+  .p-head{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+  .p-av{width:56px;height:56px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    background:var(--grad);color:#0a0a12;font-weight:800;font-size:19px;letter-spacing:.02em;
+    box-shadow:0 8px 24px -8px rgba(124,92,255,.7)}
+  .p-av.alt{background:linear-gradient(120deg,#22d3ee,#3b82f6);box-shadow:0 8px 24px -8px rgba(34,211,238,.7)}
+  .person h3{font-size:20px;letter-spacing:-.02em;font-weight:700}
+  .p-role{display:block;font-size:13.5px;color:var(--aqua);font-weight:600;margin-top:2px}
+  .person p{color:var(--fg-2);font-size:14.5px}
+  .p-remit{list-style:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--line);display:grid;gap:10px}
+  .p-remit li{color:var(--fg-2);font-size:14px;padding-left:24px;position:relative;line-height:1.5}
+  .p-remit li::before{content:"";position:absolute;left:0;top:7px;width:13px;height:7px;
+    border-left:2px solid var(--violet);border-bottom:2px solid var(--violet);transform:rotate(-45deg)}
+
+  .grid.four{grid-template-columns:repeat(4,1fr)}
+
+  @media(max-width:900px){
+    .grid.four{grid-template-columns:1fr 1fr}
+    /* Stacked, the tree becomes a spine: the 34px gap is exactly the stem length, so each node's
+       connector spans the space above it instead of overlapping the card there. */
+    .org-children{grid-template-columns:1fr;gap:34px}
+    .org-children::before{display:none}
+    .people{grid-template-columns:1fr}
+  }
+  @media(max-width:640px){
+    .grid.four{grid-template-columns:1fr}
+    .org-parent{padding:26px 20px}
+    .org-node,.person{padding:24px 20px}
+  }
