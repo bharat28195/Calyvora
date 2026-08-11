@@ -334,8 +334,26 @@ The marketing site's Sign in / Start free trial buttons already point at `https:
 
 | | Host | Why |
 |---|------|-----|
-| `calyvora.in` (marketing site) | Hostinger shared hosting | Three static files — `index.html`, `hr-services.html`, `orbit.css`. Upload them into `public_html`; no build step. |
+| `calyvora.in` (marketing site) | Hostinger shared hosting | Static files, uploaded by hand into `public_html`. No build step — **and no git deploy: pushing does not update it.** |
 | `app.calyvora.in` (the product) | Render | Needs Java, Node and Postgres. Shared hosting cannot run it. |
+
+### Updating the marketing site
+
+Everything in `website/orbit/` goes into `public_html`, keeping the same filenames:
+
+| File | |
+|---|---|
+| `index.html` | the home page |
+| `hr-services.html` | Priority HR Services |
+| `about.html` | the group and its directors (added 2026-08-11, PD-19) |
+| `orbit.css` | shared stylesheet for all three |
+| `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | the tab icon |
+
+Upload via Hostinger's **File Manager** (hPanel → Files → File Manager → `public_html` → Upload) or
+FTP. Overwrite what's there. Nothing is generated, so what you upload is exactly what is served.
+
+**Upload `orbit.css` whenever you upload a page** — the pages share it, and a new page with an old
+stylesheet renders unstyled sections rather than failing visibly.
 
 ---
 
