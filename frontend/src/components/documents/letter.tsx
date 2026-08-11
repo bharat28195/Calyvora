@@ -48,8 +48,9 @@ function Letterpad({ letterhead, accent }: { letterhead: Letterhead; accent: str
     <header className="mb-8">
       <div className="flex items-start justify-between gap-6">
         {letterhead.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element -- the logo is an arbitrary external
-          // URL the company pasted in; next/image would need every host allow-listed up front.
+          /* An arbitrary external URL the company pasted in, so next/image is not an option: it
+             would need every possible host allow-listed up front. */
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={letterhead.logoUrl}
             alt=""

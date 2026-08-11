@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Plus, Trash2, Save, FileSignature, Lock } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, FileSignature, Lock, Braces, ChevronDown, Eye } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { DocumentKind, DocumentTemplate, Letterhead, MergeField } from "@/lib/types";
 import { KIND_LABELS, renderTemplate, placeholdersIn } from "@/lib/documents";
@@ -10,7 +10,7 @@ import { FormatToolbar } from "@/components/documents/format-toolbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { LetterSheet } from "@/components/documents/letter";
 
@@ -85,7 +85,8 @@ export default function TemplatesPage() {
       {templates === null ? (
         <div className="mt-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
       ) : (
-        <div className="mt-8 grid gap-6 lg:grid-cols-[18rem_1fr]">
+        // The list stays narrow — the editor and the letter beside it are what the screen is for.
+        <div className="mt-8 grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
           <div className="flex flex-col gap-1.5">
             {templates.map((t) => (
               <button
@@ -187,88 +188,157 @@ function TemplateEditor({
     <div className="flex flex-col gap-4">
       {error && <Alert tone="error">{error}</Alert>}
 
-      <Card>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Name" htmlFor="t-name">
+      {/* One bar for the whole template: what it is, and what you can do with it. */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3">
+          <Field label="Name" htmlFor="t-name" className="min-w-[14rem] flex-1">
             <Input id="t-name" value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Kind" htmlFor="t-kind">
+          <Field label="Kind" htmlFor="t-kind" className="w-52">
             <select id="t-kind" className={selectCls} value={kind} onChange={(e) => setKind(e.target.value as DocumentKind)}>
               {KINDS.map((k) => <option key={k} value={k} className="bg-surface">{KIND_LABELS[k]}</option>)}
             </select>
           </Field>
         </div>
-        <div className="mt-3">
-          <Field label="Description" htmlFor="t-desc">
+        <div className="flex gap-2 pb-0.5">
+          <Link href={`/documents/new?template=${template.id}`}>
+            <Button variant="secondary"><FileSignature className="h-4 w-4" /> Use</Button>
+          </Link>
+          <Button onClick={save} disabled={!dirty || saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
+          </Button>
+          <Button variant="ghost" onClick={onDelete} aria-label="Delete template">
+            <Trash2 className="h-4 w-4 text-red-400/80" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Editor beside the page it produces. Side by side rather than stacked: you are writing a
+          letter, and the only question while writing is what it looks like. */}
+      <div className="grid gap-5 xl:grid-cols-2">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <FormatToolbar textareaRef={bodyRef} value={body} onChange={setBody} />
+            <FieldPicker fields={fields} onPick={insert} />
+          </div>
+
+          <textarea
+            ref={bodyRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            spellCheck
+            aria-label="Letter body"
+            className="min-h-[32rem] w-full flex-1 resize-y rounded-xl border border-fg/15 bg-fg/5 p-5 text-[15px] leading-[1.75] text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2.5 text-sm text-fg/70">
+              <input
+                type="checkbox"
+                checked={useLetterhead}
+                onChange={(e) => setUseLetterhead(e.target.checked)}
+                className="h-4 w-4 rounded border-fg/20 bg-fg/5 accent-violet"
+              />
+              Print on the company letterpad
+              <Link href="/documents/letterhead" className="text-xs font-medium text-violet hover:underline">
+                Edit
+              </Link>
+            </label>
+            <span className="text-xs text-fg/35">
+              **bold** · *italic* · # heading · - list · {"{{field}}"}
+            </span>
+          </div>
+
+          <Field label="When to use this" htmlFor="t-desc">
             <Input id="t-desc" value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="When should someone reach for this template?" />
+              placeholder="e.g. Sent once a candidate accepts verbally" />
           </Field>
         </div>
-      </Card>
 
-      <Card>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle>Body</CardTitle>
-          <div className="flex gap-2">
-            <Link href={`/documents/new?template=${template.id}`}>
-              <Button variant="secondary" size="sm"><FileSignature className="h-4 w-4" /> Use</Button>
-            </Link>
-            <Button size="sm" onClick={save} disabled={!dirty || saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete} aria-label="Delete template">
-              <Trash2 className="h-4 w-4 text-red-400/80" />
-            </Button>
-          </div>
+        {/* Sticky so the letter stays in view while you scroll a long body. */}
+        <div className="xl:sticky xl:top-4 xl:self-start">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg/40">
+            <Eye className="h-3.5 w-3.5" /> How it will look
+          </p>
+          <LetterSheet body={sample} letterhead={useLetterhead ? letterhead : null} />
+          <p className="mt-2 text-xs text-fg/35">
+            Filled in with sample values. The real names and figures come from the employee you pick
+            when you issue it.
+          </p>
         </div>
-
-        <div className="mt-3">
-          <FormatToolbar textareaRef={bodyRef} value={body} onChange={setBody} />
-        </div>
-
-        <p className="mt-3 text-xs text-fg/40">Click a field to insert it at the cursor:</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {fields.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => insert(f.key)}
-              title={`{{${f.key}}}`}
-              className="rounded-full border border-fg/10 px-2 py-0.5 text-xs text-fg/60 hover:border-violet/40 hover:bg-violet/10 hover:text-violet"
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <textarea
-          ref={bodyRef}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          spellCheck={false}
-          className="mt-4 h-80 w-full rounded-lg border border-fg/15 bg-fg/5 p-3 font-mono text-xs leading-relaxed text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
-        />
-
-        <label className="mt-4 flex items-center gap-2.5 text-sm text-fg/70">
-          <input
-            type="checkbox"
-            checked={useLetterhead}
-            onChange={(e) => setUseLetterhead(e.target.checked)}
-            className="h-4 w-4 rounded border-fg/20 bg-fg/5 accent-violet"
-          />
-          Print on the company letterpad
-          <Link href="/documents/letterhead" className="text-xs font-medium text-violet hover:underline">
-            Edit letterpad
-          </Link>
-        </label>
-      </Card>
-
-      <div>
-        <p className="mb-2 text-sm font-medium uppercase tracking-wide text-fg/40">Sample</p>
-        <LetterSheet body={sample} letterhead={useLetterhead ? letterhead : null} />
       </div>
     </div>
   );
 }
+
+/**
+ * The merge fields, grouped and behind a menu.
+ *
+ * <p>They were twenty-two chips in a row above the editor, which read as noise and pushed the letter
+ * itself off the screen. Grouping by what they describe — the person, their pay, the company — turns
+ * scanning a list into picking from three short ones.
+ */
+function FieldPicker({ fields, onPick }: { fields: MergeField[]; onPick: (key: string) => void }) {
+  const [open, setOpen] = useState(false);
+
+  const groups = useMemo(() => {
+    const by = new Map<string, MergeField[]>();
+    for (const f of fields) {
+      // "employee.jobTitle" -> "employee"; a key with no dot ("today") groups under Other.
+      const prefix = f.key.includes(".") ? f.key.split(".")[0] : "other";
+      (by.get(prefix) ?? by.set(prefix, []).get(prefix)!).push(f);
+    }
+    return [...by.entries()].sort((a, b) => GROUP_ORDER.indexOf(a[0]) - GROUP_ORDER.indexOf(b[0]));
+  }, [fields]);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-[38px] items-center gap-1.5 rounded-lg border border-fg/10 bg-fg/5 px-3 text-sm text-fg/70 transition-colors hover:border-violet/40 hover:text-violet"
+      >
+        <Braces className="h-4 w-4" /> Insert field
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          {/* Click-away, behind the menu but above everything else. */}
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute left-0 top-full z-20 mt-1 max-h-96 w-64 overflow-y-auto rounded-xl border border-fg/15 bg-surface p-1.5 shadow-xl">
+            {groups.map(([prefix, list]) => (
+              <div key={prefix} className="mb-1.5 last:mb-0">
+                <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-fg/35">
+                  {GROUP_LABELS[prefix] ?? prefix}
+                </p>
+                {list.map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => { onPick(f.key); setOpen(false); }}
+                    title={`{{${f.key}}}`}
+                    className="block w-full rounded-md px-2 py-1.5 text-left text-sm text-fg/75 hover:bg-violet/10 hover:text-violet"
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const GROUP_ORDER = ["employee", "salary", "company", "signatory", "other"];
+const GROUP_LABELS: Record<string, string> = {
+  employee: "The person",
+  salary: "Their pay",
+  company: "Your company",
+  signatory: "Who signs it",
+  other: "Other",
+};
 
 /** Stand-in values for the editor preview — never used when a real letter is generated. */
 const SAMPLE: Record<string, string> = {
