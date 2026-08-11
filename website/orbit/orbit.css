@@ -294,10 +294,41 @@
   .p-contact a:first-child{font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
   .p-contact a:hover{color:var(--aqua)}
 
+  /* Four figures across. Tabular numerals so the row reads as a set rather than four unrelated
+     numbers — the digits line up on the same rhythm even at different widths. */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+  .stat{border:1px solid var(--line);border-radius:var(--radius);padding:28px 24px;text-align:center;
+    background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))}
+  .s-n{font-size:clamp(34px,4.4vw,46px);font-weight:800;letter-spacing:-.035em;line-height:1;
+    font-variant-numeric:tabular-nums;background:var(--grad);-webkit-background-clip:text;
+    background-clip:text;-webkit-text-fill-color:transparent}
+  .s-n span{font-size:.5em;font-weight:700;letter-spacing:-.01em}
+  .s-l{margin-top:12px;font-size:15px;font-weight:600}
+  .s-s{margin-top:5px;font-size:13px;color:var(--fg-3);line-height:1.45}
+
+  /* Vision and mission side by side: they are two halves of one statement, and stacking them makes
+     the second look like an afterthought. */
+  .vm{display:grid;grid-template-columns:1fr 1fr;gap:52px;border:1px solid var(--line);border-radius:26px;
+    padding:52px;background:
+      radial-gradient(120% 120% at 0% 0%,rgba(124,92,255,.14),transparent 55%),
+      radial-gradient(120% 120% at 100% 100%,rgba(34,211,238,.12),transparent 55%),var(--panel)}
+  .vm h2{font-size:clamp(24px,3.2vw,32px);letter-spacing:-.025em;font-weight:800;line-height:1.14;margin-top:16px}
+  .vm p{color:var(--fg-2);font-size:15.5px;margin-top:14px}
+  .vm-list{list-style:none;margin-top:16px;display:grid;gap:11px}
+  .vm-list li{color:var(--fg-2);font-size:15px;padding-left:26px;position:relative;line-height:1.5}
+  .vm-list li::before{content:"";position:absolute;left:0;top:8px;width:13px;height:7px;
+    border-left:2px solid var(--aqua);border-bottom:2px solid var(--aqua);transform:rotate(-45deg)}
+
   .grid.four{grid-template-columns:repeat(4,1fr)}
+  /* The counter is the point: a closed list of four, not four things that happen to be nearby. */
+  .grid.principles{counter-reset:principle}
+  .grid.principles .card{counter-increment:principle;padding-top:22px}
+  .grid.principles .card::before{content:counter(principle,decimal-leading-zero);display:block;
+    font-size:12.5px;font-weight:700;letter-spacing:.1em;color:var(--aqua);margin-bottom:10px}
 
   @media(max-width:900px){
-    .grid.four{grid-template-columns:1fr 1fr}
+    .grid.four,.stats{grid-template-columns:1fr 1fr}
+    .vm{grid-template-columns:1fr;gap:36px;padding:36px 26px}
     /* Stacked, the tree becomes a spine: the 34px gap is exactly the stem length, so each node's
        connector spans the space above it instead of overlapping the card there. */
     .org-children{grid-template-columns:1fr;gap:34px}
@@ -306,6 +337,9 @@
   }
   @media(max-width:640px){
     .grid.four{grid-template-columns:1fr}
+    .stats{grid-template-columns:1fr 1fr;gap:12px}
+    .stat{padding:20px 14px}
     .org-parent{padding:26px 20px}
     .org-node,.person{padding:24px 20px}
+    .vm{padding:30px 20px}
   }
