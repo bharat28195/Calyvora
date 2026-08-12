@@ -9,6 +9,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
+import { EvidencePanel } from "@/components/performance/evidence-panel";
 import { cn } from "@/lib/utils";
 
 const STATUS_META: Record<ReviewStatus, { label: string; tone: string }> = {
@@ -68,6 +69,9 @@ export function ReviewCard({
       </div>
 
       <GoalsRollup review={review} />
+
+      {/* The evidence pack (PD-22, D1) — what they actually shipped, so nobody reviews from memory. */}
+      <EvidencePanel reviewId={review.id} />
 
       {review.currentSalary != null && (
         <p className="mt-3 flex items-center gap-1.5 text-sm text-fg/60">

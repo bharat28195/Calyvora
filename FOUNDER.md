@@ -250,6 +250,51 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 > One entry per major product decision. Newest first.
 
+### PD-22 · 2026-08-12 · We compete on the work↔people join, not on the HR checklist
+- **Context:** founder asked how our HR suite compares to Zoho People, Keka, and BambooHR, and which
+  features would stand out to clients. A feature-by-feature scan of all three against the codebase
+  produced a long gap list (e-signature, surveys, offboarding, benefits, custom fields, workflow
+  builder, LMS, India statutory payroll, compensation planning, integrations, SSO).
+- **Decision:** Treat that gap list as **defensive**, not as the roadmap. We lead with six features
+  that exploit the one thing none of the three can copy quickly — `work`, `client`, `knowledge`, and
+  `people` sharing one schema, one tenant, one permission model. Ranked: **D1 evidence-based
+  performance reviews** (the review pre-filled with what the person actually shipped), D2
+  cost-to-revenue per person/project, D3 the already-built cross-domain assistant (currently
+  undersold as a chatbot), D4 onboarding that provisions real work, D5 knowledge-deflected helpdesk,
+  D6 staffing-agency mode. Checklist:
+  [docs/HR-Differentiator-Backlog.md](docs/HR-Differentiator-Backlog.md). This is
+  [docs/12](docs/12-differentiators.md)'s architectural argument made concrete inside People OS.
+- **Alternatives considered:** chasing feature parity first (rejected — a decade behind on their
+  checklist makes us a worse Keka, and parity features don't get demoed); leading with India
+  statutory payroll (rejected as a *differentiator* — it is table stakes and Keka's moat, so it goes
+  in §B as price-of-entry, not §A).
+- **Explicitly not building:** LMS, salary benchmarking, pay-equity analysis, asset management —
+  each expensive, each needing data or partnerships we lack, none deal-winning against an incumbent
+  that has had it for ten years.
+- **Trade-offs / debt:** differentiators win deals but missing table stakes lose them before the
+  demo, so §B still has to be closed in parallel — we are choosing the *order*, not skipping it. The
+  comparison also weighs competitor marketing pages against our source code, which overstates the
+  gaps (several of their headline modules are paid add-ons). D2 assumes Keka's PSA does not already
+  join compensation to project margin; verify on a trial account before pitching it.
+- **Working method:** built on `feature/orbit-differentiators` in a **separate git worktree**
+  (`../Calyvora-differentiators`) because several sessions share this checkout — a plain
+  `git checkout -b` moves every one of them onto the new branch. See L-2.
+- **Final outcome:** _In progress — D1 first._
+
+### L-2 · 2026-08-12 · One checkout, many sessions — branch with a worktree, never with checkout
+- **What happened:** several AI sessions were working in this same directory at once. One of them ran
+  `git checkout -b feature/orbit-differentiators` to start a new line of work, which moved *every*
+  session onto that branch — their in-flight edits were suddenly staged against the wrong history,
+  and two sessions independently wrote a `PD-16`.
+- **Decision:** when a session needs its own branch in a shared checkout, it uses
+  `git worktree add -b <branch> ../<dir> product/hr-platform`. The shared directory then never leaves
+  its branch and the other sessions cannot be disturbed. `git checkout -b` in the shared tree is
+  banned.
+- **Also learned:** parallel sessions collide on *numbers*, not just files — PD entries and Flyway
+  versions are both append-a-number registries with no locking. This branch's migration had to be
+  renumbered twice (V38 → V40 → V43) as other sessions landed V39–V42, and the decision entry moved
+  PD-17 → PD-22. Check the current maximum immediately before committing, not when you start.
+
 ### L-1 · 2026-08-11 · A migration that passes every test can still fail the only database that matters
 - **What happened:** V40 (PD-18) deleted the demo platform owner with a bare
   `delete from users where email = 'owner@priorityhr.app'`. Green across 264 tests, then the deploy

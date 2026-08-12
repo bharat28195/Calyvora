@@ -6,6 +6,7 @@ import com.calyvora.performance.dto.CreateCycleRequest;
 import com.calyvora.performance.dto.ManagerReviewRequest;
 import com.calyvora.performance.dto.PerformanceReviewResponse;
 import com.calyvora.performance.dto.ReviewCycleResponse;
+import com.calyvora.performance.dto.ReviewEvidenceResponse;
 import com.calyvora.performance.dto.SelfAssessmentRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,9 +33,11 @@ import java.util.UUID;
 public class PerformanceController {
 
     private final PerformanceReviewService service;
+    private final PerformanceEvidenceService evidenceService;
 
-    public PerformanceController(PerformanceReviewService service) {
+    public PerformanceController(PerformanceReviewService service, PerformanceEvidenceService evidenceService) {
         this.service = service;
+        this.evidenceService = evidenceService;
     }
 
     // ---- cycles (admin) ----
@@ -83,6 +86,15 @@ public class PerformanceController {
     @GetMapping("/reviews/{id}")
     public PerformanceReviewResponse get(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return service.get(id, principal);
+    }
+
+    /**
+     * What this person actually delivered during the cycle's period (PD-22, D1) — the review opens
+     * pre-filled instead of asking the manager to remember. Same audience as the review itself.
+     */
+    @GetMapping("/reviews/{id}/evidence")
+    public ReviewEvidenceResponse evidence(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
+        return evidenceService.forReview(id, principal);
     }
 
     @PatchMapping("/reviews/{id}/self")

@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,4 +50,8 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     @Query("select coalesce(max(t.number), 0) from Task t where t.projectId = :projectId")
     int maxNumberForProject(@Param("projectId") UUID projectId);
+
+    /** What this person actually delivered inside a review period — the evidence pack (PD-17, D1). */
+    List<Task> findByCompanyIdAndAssigneeIdAndCompletedAtBetweenOrderByCompletedAtDesc(
+            UUID companyId, UUID assigneeId, Instant from, Instant to);
 }

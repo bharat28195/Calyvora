@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,4 +31,8 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
 
     @Query("select coalesce(max(t.number), 0) from Ticket t where t.projectId = :projectId")
     int maxNumberForProject(@Param("projectId") UUID projectId);
+
+    /** Tickets this person resolved inside a review period — the evidence pack (PD-17, D1). */
+    List<Ticket> findByCompanyIdAndAssigneeIdAndResolvedAtBetweenOrderByResolvedAtDesc(
+            UUID companyId, UUID assigneeId, Instant from, Instant to);
 }

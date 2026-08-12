@@ -478,6 +478,57 @@ export interface PerformanceReview {
   goals: Goal[];
 }
 
+/** One thing the person finished during the review period, ready to link to (PD-22, D1). */
+export interface ContributionItem {
+  ref: string;
+  title: string;
+  projectId: string;
+  projectName: string | null;
+  link: string;
+  finishedOn: string | null;
+  storyPoints: number | null;
+}
+
+/** A sprint they delivered into, carrying *their* share of it rather than the team's totals. */
+export interface ContributionSprint {
+  sprintId: string;
+  name: string;
+  projectName: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: string;
+  itemsDelivered: number;
+  pointsDelivered: number;
+}
+
+/**
+ * The factual record behind a review: what they actually shipped in the period. Never a score —
+ * it exists so a manager judges from evidence instead of from memory.
+ */
+export interface ReviewEvidence {
+  reviewId: string;
+  employeeName: string;
+  periodStart: string;
+  periodEnd: string;
+  work: {
+    tasks: ContributionItem[];
+    tickets: ContributionItem[];
+    sprints: ContributionSprint[];
+    tasksDelivered: number;
+    ticketsResolved: number;
+    storyPointsDelivered: number;
+  };
+  attendance: {
+    daysRecorded: number;
+    daysPresent: number;
+    daysWorkFromHome: number;
+    daysHalfDay: number;
+    daysOnLeave: number;
+    daysAbsent: number;
+  };
+  empty: boolean;
+}
+
 export interface CreateCycleInput {
   name: string;
   periodStart: string;

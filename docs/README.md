@@ -38,6 +38,19 @@ Read in order the first time. After that, jump by concern.
 | 14 | [Engineering Standards](14-engineering-standards.md) | How we name, branch, test, review, and ship |
 | 15 | [Final Recommendation](15-final-recommendation.md) | The CTO's build-order and what to avoid |
 
+## Working documents
+
+Not part of the constitution — these change every sprint and are not governed by the amendment
+process below.
+
+| Document | Read if you care about… |
+|----------|--------------------------|
+| [HR Differentiator Backlog](HR-Differentiator-Backlog.md) | What we're building to win HR deals vs Zoho People, Keka, BambooHR |
+| [HR Modules](HR-Modules.md) | The People OS module inventory |
+| [Founder Feedback Backlog](Founder-Feedback-Backlog.md) | Open feedback items awaiting build |
+| [Deploy](DEPLOY.md) | How the app is deployed |
+| Sprint&nbsp;[1](Sprint1.md) · [2](Sprint2-PeopleOS.md) · [3](Sprint3-WorkOS.md) · [4](Sprint4-KnowledgeOS.md) · [5](Sprint5-WorkOS-Sprints.md) | What shipped, sprint by sprint |
+
 ## How this constitution is governed
 
 - **This is code.** The docs live in the same monorepo as the platform, are reviewed via

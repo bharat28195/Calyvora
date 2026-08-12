@@ -42,6 +42,7 @@ import {
   type Goal,
   type ReviewCycle,
   type PerformanceReview,
+  type ReviewEvidence,
   type CreateCycleInput,
   type SelfAssessmentInput,
   type ManagerReviewInput,
@@ -515,6 +516,11 @@ export const api = {
   },
   getReview(reviewId: string): Promise<PerformanceReview> {
     return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}`) : mockBackend.getReview(accessToken, reviewId);
+  },
+  /** What they actually shipped during the cycle's period (PD-22, D1). */
+  reviewEvidence(reviewId: string): Promise<ReviewEvidence> {
+    return LIVE ? http<ReviewEvidence>(`/performance/reviews/${reviewId}/evidence`)
+      : mockBackend.reviewEvidence(accessToken, reviewId);
   },
   saveSelfAssessment(reviewId: string, input: SelfAssessmentInput): Promise<PerformanceReview> {
     return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/self`, { method: "PATCH", body: JSON.stringify(input) })

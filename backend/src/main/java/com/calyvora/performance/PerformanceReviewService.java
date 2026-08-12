@@ -149,9 +149,19 @@ public class PerformanceReviewService {
 
     @Transactional(readOnly = true)
     public PerformanceReviewResponse get(UUID reviewId, AuthPrincipal principal) {
+        return toResponse(requireViewable(reviewId, principal));
+    }
+
+    /**
+     * The review, if this caller may see it — tenant-scoped, then employee/manager/admin.
+     * Shared with {@link PerformanceEvidenceService} so the evidence pack cannot drift onto a
+     * different (weaker) authorization rule than the review it describes (PD-22, D1).
+     */
+    @Transactional(readOnly = true)
+    public PerformanceReview requireViewable(UUID reviewId, AuthPrincipal principal) {
         PerformanceReview review = requireReview(reviewId);
         requireCanView(review, principal);
-        return toResponse(review);
+        return review;
     }
 
     /** Member saves/submits their self-assessment. */

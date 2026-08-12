@@ -39,6 +39,7 @@ import {
   type ReviewStatus,
   type HikeType,
   type PerformanceReview,
+  type ReviewEvidence,
   type CreateCycleInput,
   type SelfAssessmentInput,
   type ManagerReviewInput,
@@ -2142,6 +2143,87 @@ export const mockBackend = {
     const r = requireReview(db, user, reviewId);
     if (!canViewReview(db, user, r)) throw err(403, "FORBIDDEN", "You can't view this review");
     return renderReview(db, r);
+  },
+  /**
+   * The evidence pack (PD-22, D1). The mock has no completion timestamp on a task, so it reports
+   * everything currently DONE for the employee rather than filtering to the period — enough to
+   * exercise the UI, while the live backend does the real date-bounded query.
+   */
+  async reviewEvidence(accessToken: string | null, reviewId: string): Promise<ReviewEvidence> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    const r = requireReview(db, user, reviewId);
+    if (!canViewReview(db, user, r)) throw err(403, "FORBIDDEN", "You can't view this review");
+
+    const cycle = mockReviewCycles.find((c) => c.id === r.cycleId);
+    const employee = db.employees.find((e) => e.id === r.employeeId);
+    const empUser = employee ? db.users.find((u) => u.id === employee.userId) : undefined;
+    const projectName = (projectId: string) => db.projects.find((p) => p.id === projectId)?.name ?? null;
+    const projectKey = (projectId: string) => db.projects.find((p) => p.id === projectId)?.key ?? null;
+
+    const done = db.tasks.filter(
+      (t) => t.companyId === user.companyId && t.assigneeId === r.employeeId && t.status === "DONE",
+    );
+    const tasks = done.map((t) => ({
+      ref: `${projectKey(t.projectId) ?? "#"}-${t.number}`,
+      title: t.title,
+      projectId: t.projectId,
+      projectName: projectName(t.projectId),
+      link: `/work/${t.projectId}`,
+      finishedOn: t.dueDate,
+      storyPoints: t.storyPoints ?? null,
+    }));
+    const resolved = db.tickets.filter(
+      (t) => t.companyId === user.companyId && t.assigneeId === r.employeeId
+        && (t.status === "RESOLVED" || t.status === "CLOSED"),
+    );
+    const tickets = resolved.map((t) => ({
+      ref: `${projectKey(t.projectId) ?? "#"}-${t.number}`,
+      title: t.subject,
+      projectId: t.projectId,
+      projectName: projectName(t.projectId),
+      link: `/work/${t.projectId}`,
+      finishedOn: null,
+      storyPoints: null,
+    }));
+
+    // Their share of each sprint they delivered into.
+    const bySprint = new Map<string, { items: number; points: number }>();
+    for (const t of done) {
+      if (!t.sprintId) continue;
+      const tally = bySprint.get(t.sprintId) ?? { items: 0, points: 0 };
+      tally.items += 1;
+      tally.points += t.storyPoints ?? 0;
+      bySprint.set(t.sprintId, tally);
+    }
+    const sprints = [...bySprint.entries()].flatMap(([sprintId, tally]) => {
+      const s = db.sprints.find((x) => x.id === sprintId);
+      if (!s) return [];
+      return [{
+        sprintId, name: s.name, projectName: projectName(s.projectId),
+        startDate: s.startDate ?? null, endDate: s.endDate ?? null, status: s.status,
+        itemsDelivered: tally.items, pointsDelivered: tally.points,
+      }];
+    });
+
+    return {
+      reviewId: r.id,
+      employeeName: empUser ? `${empUser.firstName} ${empUser.lastName}` : "Employee",
+      periodStart: cycle?.periodStart ?? "",
+      periodEnd: cycle?.periodEnd ?? "",
+      work: {
+        tasks, tickets, sprints,
+        tasksDelivered: tasks.length,
+        ticketsResolved: tickets.length,
+        storyPointsDelivered: done.reduce((sum, t) => sum + (t.storyPoints ?? 0), 0),
+      },
+      attendance: {
+        daysRecorded: 0, daysPresent: 0, daysWorkFromHome: 0,
+        daysHalfDay: 0, daysOnLeave: 0, daysAbsent: 0,
+      },
+      empty: tasks.length === 0 && tickets.length === 0,
+    };
   },
   async saveSelfAssessment(accessToken: string | null, reviewId: string, input: SelfAssessmentInput): Promise<PerformanceReview> {
     await delay();

@@ -58,6 +58,13 @@ public class Ticket {
     @Column(name = "created_by", nullable = false)
     private UUID createdBy;
 
+    /**
+     * When the ticket was resolved. Distinct from {@code updatedAt}, which any later edit moves —
+     * a review period needs "resolved on", not "last touched" (V38).
+     */
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -143,8 +150,30 @@ public class Ticket {
         return status;
     }
 
+    /**
+     * Setting the status also maintains {@link #resolvedAt} — stamped when the ticket first reaches
+     * RESOLVED or CLOSED, cleared if it is reopened. In the entity so no caller can bypass it (V38,
+     * PD-17). A RESOLVED→CLOSED move keeps the original resolution time; that is when the work
+     * happened, and closing is often just housekeeping.
+     */
     public void setStatus(TicketStatus status) {
+        boolean wasFinished = isFinished(this.status);
+        boolean nowFinished = isFinished(status);
+        if (nowFinished && !wasFinished) {
+            this.resolvedAt = Instant.now();
+        } else if (!nowFinished) {
+            this.resolvedAt = null;
+        }
         this.status = status;
+    }
+
+    private static boolean isFinished(TicketStatus status) {
+        return status == TicketStatus.RESOLVED || status == TicketStatus.CLOSED;
+    }
+
+    /** When this ticket was resolved, or null while it is still open. */
+    public Instant getResolvedAt() {
+        return resolvedAt;
     }
 
     public TaskPriority getPriority() {

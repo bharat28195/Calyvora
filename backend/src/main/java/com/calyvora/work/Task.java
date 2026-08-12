@@ -63,6 +63,13 @@ public class Task {
     @Column(name = "story_points")
     private Integer storyPoints;
 
+    /**
+     * When the task reached DONE. Distinct from {@code updatedAt}, which any later edit moves —
+     * a review period needs "delivered on", not "last touched" (V38).
+     */
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -132,8 +139,25 @@ public class Task {
         return status;
     }
 
+    /**
+     * Setting the status also maintains {@link #completedAt} — stamped when the task first reaches
+     * DONE, cleared when it is reopened. Kept in the entity rather than the service so no future
+     * caller can move a task to DONE without the review evidence learning about it (V38, PD-17).
+     */
     public void setStatus(TaskStatus status) {
+        if (status == TaskStatus.DONE) {
+            if (this.status != TaskStatus.DONE) {
+                this.completedAt = Instant.now();   // first completion wins; re-saving DONE won't move it
+            }
+        } else {
+            this.completedAt = null;
+        }
         this.status = status;
+    }
+
+    /** When this task was finished, or null while it is still open. */
+    public Instant getCompletedAt() {
+        return completedAt;
     }
 
     public TaskPriority getPriority() {
