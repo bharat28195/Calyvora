@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Star, Check, Target, CircleDollarSign } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { PerformanceReview, HikeType, ReviewStatus } from "@/lib/types";
@@ -52,6 +52,13 @@ export function ReviewCard({
   const managerEditable = perspective === "manager" && cycleOpen && review.status !== "APPROVED"
     && review.status !== "CLOSED";
 
+  // "Cite this" (PD-22, D1): drop an evidence line into whichever narrative the viewer is writing,
+  // so the review references the record rather than paraphrasing it from memory. The counter makes
+  // each click a distinct event — citing the same line twice must insert it twice.
+  const [citation, setCitation] = useState<{ text: string; seq: number } | null>(null);
+  const cite = (text: string) => setCitation((prev) => ({ text, seq: (prev?.seq ?? 0) + 1 }));
+  const citeTarget = selfEditable || managerEditable ? cite : undefined;
+
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -71,7 +78,7 @@ export function ReviewCard({
       <GoalsRollup review={review} />
 
       {/* The evidence pack (PD-22, D1) — what they actually shipped, so nobody reviews from memory. */}
-      <EvidencePanel reviewId={review.id} />
+      <EvidencePanel reviewId={review.id} onCite={citeTarget} />
 
       {review.currentSalary != null && (
         <p className="mt-3 flex items-center gap-1.5 text-sm text-fg/60">
@@ -80,14 +87,33 @@ export function ReviewCard({
         </p>
       )}
 
-      <SelfSection review={review} editable={selfEditable} onChange={onChange} />
-      <ManagerSection review={review} editable={managerEditable} onChange={onChange} />
+      <SelfSection review={review} editable={selfEditable} onChange={onChange}
+        citation={selfEditable ? citation : null} />
+      <ManagerSection review={review} editable={managerEditable} onChange={onChange}
+        citation={managerEditable ? citation : null} />
 
       {canApprove && review.status === "SUBMITTED" && (
         <ApproveBar review={review} onChange={onChange} />
       )}
     </Card>
   );
+}
+
+/** A "cite this" click: the line to insert, plus a sequence so repeat clicks stay distinct. */
+type Citation = { text: string; seq: number };
+
+/**
+ * Append a cited evidence line to a narrative field, on its own line, without clobbering what the
+ * writer has already typed. Keyed on `seq` rather than `text` so citing the same item twice inserts
+ * it twice — and so a re-render never re-inserts the last one.
+ */
+function useCitation(citation: Citation | null | undefined, setText: (fn: (prev: string) => string) => void) {
+  const lastSeq = useRef(0);
+  useEffect(() => {
+    if (!citation || citation.seq === lastSeq.current) return;
+    lastSeq.current = citation.seq;
+    setText((prev) => (prev.trim() ? `${prev.replace(/\s+$/, "")}\n${citation.text}` : citation.text));
+  }, [citation, setText]);
 }
 
 function GoalsRollup({ review }: { review: PerformanceReview }) {
@@ -116,12 +142,14 @@ function GoalsRollup({ review }: { review: PerformanceReview }) {
   );
 }
 
-function SelfSection({ review, editable, onChange }: {
+function SelfSection({ review, editable, onChange, citation }: {
   review: PerformanceReview; editable: boolean; onChange: (r: PerformanceReview) => void;
+  citation?: Citation | null;
 }) {
   const [text, setText] = useState(review.selfAssessment ?? "");
   const [busy, setBusy] = useState<"save" | "submit" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useCitation(citation, setText);
 
   async function persist(submit: boolean) {
     setBusy(submit ? "submit" : "save"); setError(null);
@@ -159,11 +187,13 @@ function SelfSection({ review, editable, onChange }: {
   );
 }
 
-function ManagerSection({ review, editable, onChange }: {
+function ManagerSection({ review, editable, onChange, citation }: {
   review: PerformanceReview; editable: boolean; onChange: (r: PerformanceReview) => void;
+  citation?: Citation | null;
 }) {
   const [rating, setRating] = useState<number>(review.rating ?? 0);
   const [summary, setSummary] = useState(review.summary ?? "");
+  useCitation(citation, setSummary);
   const [strengths, setStrengths] = useState(review.strengths ?? "");
   const [improvements, setImprovements] = useState(review.improvements ?? "");
   const [hikeType, setHikeType] = useState<HikeType>(review.hikeType ?? "NONE");

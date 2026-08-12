@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Loader2, Ticket as TicketIcon, CheckCircle2, Flag } from "lucide-react";
+import { ChevronDown, Loader2, Quote, Ticket as TicketIcon, CheckCircle2, Flag } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { ContributionItem, ReviewEvidence } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,12 @@ import { cn } from "@/lib/utils";
  * here feeds the rating, and the copy is careful never to imply that more items means better work.
  * Collapsed by default so the review form stays the primary thing on the page.
  */
-export function EvidencePanel({ reviewId, className }: { reviewId: string; className?: string }) {
+export function EvidencePanel({ reviewId, className, onCite }: {
+  reviewId: string;
+  className?: string;
+  /** Present only when the viewer has a narrative open to cite into. */
+  onCite?: (line: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [evidence, setEvidence] = useState<ReviewEvidence | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +81,13 @@ export function EvidencePanel({ reviewId, className }: { reviewId: string; class
                   title="Tasks completed"
                   icon={<CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
                   items={evidence.work.tasks}
+                  onCite={onCite}
                 />
                 <ItemList
                   title="Tickets resolved"
                   icon={<TicketIcon className="h-3.5 w-3.5 text-aqua" />}
                   items={evidence.work.tickets}
+                  onCite={onCite}
                 />
 
                 {evidence.work.sprints.length > 0 && (
@@ -123,7 +130,9 @@ export function EvidencePanel({ reviewId, className }: { reviewId: string; class
   );
 }
 
-function ItemList({ title, icon, items }: { title: string; icon: React.ReactNode; items: ContributionItem[] }) {
+function ItemList({ title, icon, items, onCite }: {
+  title: string; icon: React.ReactNode; items: ContributionItem[]; onCite?: (line: string) => void;
+}) {
   if (items.length === 0) return null;
   return (
     <div>
@@ -132,7 +141,7 @@ function ItemList({ title, icon, items }: { title: string; icon: React.ReactNode
       </p>
       <div className="space-y-1">
         {items.map((item) => (
-          <div key={`${item.ref}-${item.title}`} className="flex items-baseline gap-2 text-sm">
+          <div key={`${item.ref}-${item.title}`} className="group flex items-baseline gap-2 text-sm">
             <Link
               href={item.link}
               className="shrink-0 font-mono text-xs text-violet hover:underline"
@@ -146,6 +155,16 @@ function ItemList({ title, icon, items }: { title: string; icon: React.ReactNode
             )}
             {item.finishedOn && (
               <span className="shrink-0 text-xs tabular-nums text-fg/35">{item.finishedOn}</span>
+            )}
+            {onCite && (
+              <button
+                type="button"
+                onClick={() => onCite(`${item.ref} — ${item.title}`)}
+                title="Add this line to what you're writing"
+                className="shrink-0 rounded px-1.5 py-0.5 text-xs text-fg/0 transition-colors group-hover:text-fg/50 hover:!text-violet focus-visible:text-violet focus-visible:outline-none"
+              >
+                <span className="flex items-center gap-1"><Quote className="h-3 w-3" />Cite</span>
+              </button>
             )}
           </div>
         ))}

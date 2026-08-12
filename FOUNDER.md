@@ -281,6 +281,22 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   `git checkout -b` moves every one of them onto the new branch. See L-2.
 - **Final outcome:** _In progress — D1 first._
 
+### L-3 · 2026-08-12 · A timezone bug fixed in one module is a timezone bug still waiting in the others
+- **What happened:** PD-16 fixed attendance stamping punches in server UTC rather than company time,
+  and the fix lived as a private `zone()` helper inside `AttendanceService`. The very next feature to
+  turn a date into an instant — review-period bounds in `ContributionService` — reintroduced the same
+  bug, because there was nothing to inherit. For an IST tenant the opening five and a half hours of a
+  review period fell outside their own review.
+- **Decision:** the rule moved to `company.CompanyZone` (`forCurrentTenant`, `startOfDay`,
+  `endOfDayExclusive`), and `AttendanceService` now delegates to it. Any future feature that converts
+  a tenant's calendar date to an instant uses it rather than `ZoneOffset.UTC`.
+- **Lesson:** a bug fixed *locally* in the module that discovered it is a bug the next module will
+  rediscover. When a fix encodes a rule about the tenant rather than about the feature, it belongs
+  somewhere shared on the same day it is written — the second occurrence is the one that tells you.
+- **Testing note:** the regression test picks its timezone at runtime (Kiritimati +14 or Niue −11,
+  whichever currently differs from the UTC date) so it discriminates at every hour of the day rather
+  than only some of them.
+
 ### L-2 · 2026-08-12 · One checkout, many sessions — branch with a worktree, never with checkout
 - **What happened:** several AI sessions were working in this same directory at once. One of them ran
   `git checkout -b feature/orbit-differentiators` to start a new line of work, which moved *every*

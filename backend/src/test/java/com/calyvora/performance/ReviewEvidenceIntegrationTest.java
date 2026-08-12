@@ -6,6 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +108,45 @@ class ReviewEvidenceIntegrationTest extends IntegrationTestBase {
         JsonNode ev = evidence(owner, reviewId);
         assertThat(ev.get("work").get("tasksDelivered").asInt()).isEqualTo(deliveredBefore);
         assertThat(titles(ev)).doesNotContain("Thought we were done");
+    }
+
+    /**
+     * The period is a pair of dates; completion is an instant. Converting between them on the
+     * server's clock instead of the company's puts hours of work on the wrong side of the boundary —
+     * for an IST tenant, the first five and a half hours of the opening day fall outside their own
+     * review. Attendance learned this in PD-16; this pins it for evidence too.
+     *
+     * <p>The zone is chosen at runtime so the company's calendar date is always a different day from
+     * UTC's — otherwise the assertion would pass under the bug for part of the day.
+     */
+    @Test
+    void the_period_is_read_on_the_companys_clock_not_the_servers() throws Exception {
+        seedDemo();
+        Session owner = login("ava.chen@northwind.demo", DEMO_PW);
+
+        // Kiritimati (+14) is already tomorrow late in the UTC day; Niue (-11) is still yesterday
+        // early in it. The ranges overlap, so one of them always differs from the UTC date.
+        String zoneId = Instant.now().atZone(ZoneOffset.UTC).getHour() >= 10
+                ? "Pacific/Kiritimati" : "Pacific/Niue";
+        ZoneId zone = ZoneId.of(zoneId);
+        LocalDate companyToday = LocalDate.now(zone);
+        assertThat(companyToday).isNotEqualTo(LocalDate.now(ZoneOffset.UTC));   // the test must discriminate
+
+        patchJson("/api/v1/company/settings", owner, Map.of(
+                "timezone", zoneId, "locale", "en", "currency", "USD"));
+
+        // A cycle covering exactly the company's today — work finished right now belongs to it.
+        String cycleId = createCycle(owner, "Clock Cycle", companyToday.toString(), companyToday.toString());
+        JsonNode priya = reviewFor(owner, cycleId, "Priya Nair");
+
+        String projectId = createProject(owner, "Clock Project", "CLK");
+        finishTask(owner, createTask(owner, projectId, "Finished just now", priya.get("employeeId").asText(), 1));
+
+        JsonNode ev = evidence(owner, priya.get("id").asText());
+        assertThat(titles(ev)).contains("Finished just now");
+        // …and it is dated on the company's calendar, not the server's.
+        assertThat(itemTitled(ev, "Finished just now").get("finishedOn").asText())
+                .isEqualTo(companyToday.toString());
     }
 
     @Test

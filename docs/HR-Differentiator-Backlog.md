@@ -52,16 +52,24 @@ shipped, each line linking back to the source record. The manager judges; they d
 - [x] Integration tests: period boundary, reopened work, self/manager/stranger, cross-tenant (5/5)
 - [x] Employee sees their own evidence pack before writing their self-assessment
 - [x] Mock backend implementation, so the offline demo shows the panel too
-- [ ] "Cite this" — pull an evidence line into the review narrative
-- [ ] Goals in the pack — deliberately skipped: `PerformanceReviewResponse` already carries them, so
-      repeating them here only duplicates payload. Revisit if the panel should show goal progress
-      *as at period close* rather than as it stands today.
-- [ ] Backfill caveat: existing DONE rows took `updated_at` as their completion date, so the first
-      cycle's evidence is approximate for work finished before V43. New transitions are exact.
-- [ ] Period boundaries are computed in **UTC**, while attendance is stamped in the company timezone
-      (PD-16). For an IST tenant, work finished in the first ~5.5 hours of the period's first day
-      falls just outside it. Harmless mid-period, wrong exactly at the edges — resolve by reading
-      company timezone in `ContributionService` the way `AttendanceService` already does.
+- [x] "Cite this" — drops an evidence line into whichever narrative the viewer has open (the member's
+      self-assessment, or the manager's summary), appended on its own line without clobbering what
+      they have typed. Citing the same line twice inserts it twice.
+- [x] Period bounds read the **company's** clock, not the server's. `CompanyZone` now owns that rule
+      for the whole app and `AttendanceService` uses it too, so the two cannot drift. Covered by a
+      test that picks a zone at runtime whose calendar date differs from UTC's, and so fails against
+      the old UTC arithmetic whichever way the offset falls.
+
+**Known limits, deliberately left:**
+
+- **Backfilled rows are approximate.** Work finished before V43 took `updated_at` as its completion
+  date. There is no better source — the information was never recorded — so the first cycle's
+  evidence is imprecise for older items. Every transition after V43 is exact. Not fixable in code;
+  it fades as history accumulates.
+- **Goals are not repeated in the pack.** `PerformanceReviewResponse` already carries them and the
+  card already renders them, so including them here would only duplicate payload. The open question
+  is different and needs schema: showing goal progress *as at period close* rather than as it stands
+  today would require goal history, which we do not store.
 
 ### D2 · Cost-to-revenue per person and per project
 We hold compensation, attendance, projects, and clients. Nobody else holds all four. Join them:

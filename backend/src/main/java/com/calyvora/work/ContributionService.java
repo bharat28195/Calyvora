@@ -1,13 +1,13 @@
 package com.calyvora.work;
 
 import com.calyvora.common.security.TenantContext;
+import com.calyvora.company.CompanyZone;
 import com.calyvora.work.dto.ContributionResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,13 +31,16 @@ public class ContributionService {
     private final TicketRepository ticketRepository;
     private final ProjectRepository projectRepository;
     private final SprintRepository sprintRepository;
+    private final CompanyZone companyZone;
 
     public ContributionService(TaskRepository taskRepository, TicketRepository ticketRepository,
-                               ProjectRepository projectRepository, SprintRepository sprintRepository) {
+                               ProjectRepository projectRepository, SprintRepository sprintRepository,
+                               CompanyZone companyZone) {
         this.taskRepository = taskRepository;
         this.ticketRepository = ticketRepository;
         this.projectRepository = projectRepository;
         this.sprintRepository = sprintRepository;
+        this.companyZone = companyZone;
     }
 
     /**
@@ -51,10 +54,13 @@ public class ContributionService {
         }
         UUID companyId = TenantContext.getCompanyId();
 
-        // A review period is given in dates; completion is stamped as an instant. Take the whole of
-        // the last day, or work delivered on the final afternoon falls outside its own review.
-        Instant start = from.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant end = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        // A review period is given in dates; completion is stamped as an instant. Convert on the
+        // *company's* clock, not the server's: for an IST tenant, resolving in UTC would push the
+        // first five and a half hours of the opening day outside its own review, and pull the same
+        // slice of the day after the close back into it. Same lesson attendance learned (PD-16).
+        // The whole of the last day counts, so the window closes at the final instant.
+        Instant start = companyZone.startOfDay(from);
+        Instant end = companyZone.endOfDayExclusive(to);
 
         Map<UUID, Project> projects = projectRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
                 .stream().collect(Collectors.toMap(Project::getId, Function.identity()));
@@ -125,7 +131,8 @@ public class ContributionService {
         return project == null ? "#" + number : project.getKey() + "-" + number;
     }
 
-    private static String day(Instant instant) {
-        return instant == null ? null : instant.atZone(ZoneOffset.UTC).toLocalDate().toString();
+    /** The calendar date a completion falls on, as the company reads its own calendar. */
+    private String day(Instant instant) {
+        return instant == null ? null : instant.atZone(companyZone.forCurrentTenant()).toLocalDate().toString();
     }
 }

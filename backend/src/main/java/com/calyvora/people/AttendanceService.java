@@ -49,13 +49,13 @@ public class AttendanceService {
     private final HolidayRepository holidayRepository;
     private final UserRepository userRepository;
     private final LeaveRequestRepository leaveRepository;
-    private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
+    private final com.calyvora.company.CompanyZone companyZone;
 
     public AttendanceService(AttendanceRepository attendanceRepository, EmployeeRepository employeeRepository,
                              EmployeeService employeeService, DepartmentRepository departmentRepository,
                              HolidayRepository holidayRepository,
                              UserRepository userRepository, LeaveRequestRepository leaveRepository,
-                             com.calyvora.company.CompanySettingsRepository companySettingsRepository) {
+                             com.calyvora.company.CompanyZone companyZone) {
         this.holidayRepository = holidayRepository;
         this.attendanceRepository = attendanceRepository;
         this.employeeRepository = employeeRepository;
@@ -63,26 +63,17 @@ public class AttendanceService {
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
         this.leaveRepository = leaveRepository;
-        this.companySettingsRepository = companySettingsRepository;
+        this.companyZone = companyZone;
     }
 
     /**
-     * "Now" as the company experiences it. Attendance is the one place where the server's own clock is
-     * the wrong clock: on a UTC host, an Indian employee clocking in at 04:15 IST was recorded at 22:45
-     * on the <em>previous</em> day, putting the punch on the wrong date and the wrong payslip.
+     * "Now" as the company experiences it. Attendance is where the server's own clock first proved to
+     * be the wrong clock: on a UTC host, an Indian employee clocking in at 04:15 IST was recorded at
+     * 22:45 on the <em>previous</em> day, putting the punch on the wrong date and the wrong payslip.
+     * The rule now lives in {@link CompanyZone} so features added later inherit it.
      */
     private java.time.ZoneId zone() {
-        return companySettingsRepository.findById(TenantContext.getCompanyId())
-                .map(com.calyvora.company.CompanySettings::getTimezone)
-                .filter(tz -> tz != null && !tz.isBlank())
-                .map(tz -> {
-                    try {
-                        return java.time.ZoneId.of(tz);
-                    } catch (RuntimeException badZone) {
-                        return java.time.ZoneOffset.UTC;
-                    }
-                })
-                .orElse(java.time.ZoneOffset.UTC);
+        return companyZone.forCurrentTenant();
     }
 
     /** Today's date in the company's timezone. */
