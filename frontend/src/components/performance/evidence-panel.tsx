@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, Loader2, Quote, Ticket as TicketIcon, CheckCircle2, Flag } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
@@ -26,16 +26,28 @@ export function EvidencePanel({ reviewId, className, onCite }: {
   const [loading, setLoading] = useState(false);
 
   // Fetch on first expand — a review list would otherwise fire one request per card.
+  //
+  // The guard is a ref, not `loading`/`evidence` state. Depending on state this effect also *writes*
+  // is a deadlock: setLoading(true) re-runs the effect, the cleanup cancels the in-flight request so
+  // its finally() is skipped, and the re-run then bails because loading is still true — leaving the
+  // panel spinning forever on the very first expand.
+  const fetchedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!open || evidence || loading) return;
+    if (!open || fetchedFor.current === reviewId) return;
+    fetchedFor.current = reviewId;
     let cancelled = false;
     setLoading(true);
+    setError(null);
     api.reviewEvidence(reviewId)
       .then((e) => { if (!cancelled) setEvidence(e); })
-      .catch((e) => { if (!cancelled) setError(e instanceof ApiError ? e.message : "Couldn't load the work record."); })
+      .catch((e) => {
+        if (cancelled) return;
+        fetchedFor.current = null;   // a failure should be retryable by collapsing and reopening
+        setError(e instanceof ApiError ? e.message : "Couldn't load the work record.");
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [open, evidence, loading, reviewId]);
+  }, [open, reviewId]);
 
   const summary = evidence
     ? [
