@@ -338,6 +338,25 @@
   .vm-list li::before{content:"";position:absolute;left:0;top:8px;width:13px;height:7px;
     border-left:2px solid var(--aqua);border-bottom:2px solid var(--aqua);transform:rotate(-45deg)}
 
+  /* ---- Straight answers ------------------------------------------------------------------
+     Question-and-answer, laid out as plain blocks rather than an accordion. An accordion hides
+     the answers, and the whole point of this section is that a cautious buyer can see we are not
+     hiding them — half the persuasion is that the awkward question is printed at all.
+     The rule to the left of each block does the grouping so the questions need no bullets. */
+  .qa{display:grid;grid-template-columns:1fr 1fr;gap:22px 48px;max-width:1000px;margin:0 auto}
+  .qa-item{padding-left:20px;border-left:2px solid rgba(124,92,255,.35)}
+  .qa-q{font-size:16.5px;font-weight:700;letter-spacing:-.01em;line-height:1.35}
+  .qa-a{color:var(--fg-2);font-size:14.5px;line-height:1.6;margin-top:9px}
+  /* The last answer is the one about money and it reads better across the full width. */
+  .qa-item.wide{grid-column:1 / -1}
+
+  /* A single line of secondary business kept out of its own section — careers under the contact
+     block. It was a full section; for someone evaluating software it is noise, and for someone
+     looking for a job one clear line is enough. */
+  .aside-line{text-align:center;margin-top:26px;color:var(--fg-3);font-size:14px}
+  .aside-line a{color:var(--aqua);text-decoration:none;border-bottom:1px solid rgba(34,211,238,.35)}
+  .aside-line a:hover{border-bottom-color:var(--aqua)}
+
   .grid.four{grid-template-columns:repeat(4,1fr)}
   /* The counter is the point: a closed list of four, not four things that happen to be nearby. */
   .grid.principles{counter-reset:principle}
@@ -345,32 +364,10 @@
   .grid.principles .card::before{content:counter(principle,decimal-leading-zero);display:block;
     font-size:12.5px;font-weight:700;letter-spacing:.1em;color:var(--aqua);margin-bottom:10px}
 
-  /* ---- Timeline -------------------------------------------------------------------------
-     A rail down the left with a marker per entry. Deliberately not the two-sided zig-zag most
-     "milestones" sections use: that layout only works when there are many entries and it forces
-     the reader's eye across the page for no gain. One column reads top-to-bottom, which is what
-     a sequence is.
-     The rail fades out at the bottom rather than stopping at a measured height: the last entry's
-     length isn't knowable from CSS, and a hard stop that misses the final marker looks broken in a
-     way a fade never does. */
-  .tl{position:relative;max-width:760px;margin:0 auto;padding-left:34px}
-  .tl::before{content:"";position:absolute;left:5px;top:9px;bottom:0;
-    width:1px;background:linear-gradient(180deg,var(--violet),rgba(34,211,238,.5),transparent)}
-  .tl-item{position:relative;padding-bottom:34px}
-  .tl-item:last-child{padding-bottom:0}
-  .tl-item::before{content:"";position:absolute;left:-34px;top:7px;width:11px;height:11px;
-    border-radius:50%;background:var(--ink);border:2px solid var(--violet)}
-  /* The current stage gets a filled, haloed marker — on a list where every row looks the same,
-     "where we are now" is the one thing the reader actually wants to find. */
-  .tl-item.now::before{background:var(--violet);box-shadow:0 0 0 5px rgba(124,92,255,.18)}
-  .tl-item.next::before{border-color:var(--fg-3)}
-  .tl-when{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-    color:var(--aqua);font-variant-numeric:tabular-nums}
-  .tl-item.next .tl-when{color:var(--fg-3)}
-  .tl-item h3{font-size:19px;letter-spacing:-.02em;font-weight:700;margin-top:7px}
-  .tl-item p{color:var(--fg-2);font-size:14.5px;margin-top:8px;line-height:1.55}
-
   @media(max-width:900px){
+    /* Two columns of question-and-answer become one long one on a tablet; side by side at this
+       width the answers get too narrow to read as prose. */
+    .qa{grid-template-columns:1fr;gap:22px}
     .grid.four,.stats{grid-template-columns:1fr 1fr}
     .vm{grid-template-columns:1fr;gap:36px;padding:36px 26px}
     /* Stacked, the tree becomes a spine: the 34px gap is exactly the stem length, so each node's
