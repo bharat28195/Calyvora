@@ -80,6 +80,13 @@ services:
       - key: MAIL_FROM
         sync: false
 
+      # Where "someone wants a free trial" lands (PD-21). sync: false because it's a real inbox that
+      # may change; unset, the app falls back to the platform owner's login address, so an enquiry is
+      # never silently dropped. Note that until RESEND_API_KEY above is set, the notification is only
+      # written to the log — a trial request nobody hears about is exactly the failure this guards.
+      - key: TRIAL_NOTIFY_EMAIL
+        sync: false
+
   # ---- Frontend: Next.js (native Node) ----
   - type: web
     name: calyvora-frontend

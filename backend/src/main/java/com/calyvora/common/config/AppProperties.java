@@ -15,8 +15,17 @@ public record AppProperties(
         String frontendBaseUrl,
         List<String> corsAllowedOrigins,
         Mail mail,
-        Security security
+        Security security,
+        Trial trial
 ) {
+    /**
+     * Where "someone wants a free trial" lands (PD-21).
+     *
+     * @param notifyEmail the vendor's own inbox. Blank falls back to the platform owner's login
+     *                    address, so a deployment that never configured this still tells someone.
+     */
+    public record Trial(String notifyEmail) {}
+
     /**
      * Outgoing mail. {@code provider} pins the transport ({@code resend} / {@code smtp} /
      * {@code console}); left blank it is inferred from whichever credentials are present.
@@ -26,7 +35,17 @@ public record AppProperties(
     /** Resend's HTTPS API — the transport that survives hosts which block outbound SMTP. */
     public record Resend(String apiKey, String apiUrl) {}
 
-    public record Security(Jwt jwt, Refresh refresh, Verification verification, Invitation invitation) {}
+    public record Security(Jwt jwt, Refresh refresh, Verification verification, Invitation invitation,
+                          Registration registration) {}
+
+    /**
+     * @param open whether anyone may create a workspace from the public {@code /auth/register}
+     *             endpoint. <b>False by default</b> (PD-21): Orbit is sold by a person, so the trial
+     *             button raises a request the vendor approves, and no account exists until then.
+     *             Turning this on restores open self-signup — which also means anyone who finds the
+     *             URL gets a live workspace, so it is a deliberate commercial decision, not a default.
+     */
+    public record Registration(boolean open) {}
 
     /**
      * RS256 asymmetric signing (SD-5). {@code activeKid} names the key used to sign new tokens;

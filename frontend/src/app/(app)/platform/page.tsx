@@ -12,6 +12,7 @@ import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
 import { PricingEditor } from "@/components/platform/pricing-editor";
+import { TrialRequestsSection } from "@/components/platform/trial-requests";
 
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-500/15 text-emerald-400",
@@ -92,6 +93,8 @@ export default function PlatformPage() {
               </div>
             </Card>
           )}
+
+          <TrialRequestsSection onChanged={load} />
 
           <AgenciesSection onChanged={load} />
 

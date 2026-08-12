@@ -26,7 +26,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Postgres (Zonky — no Docker required); Flyway builds the schema fresh before each test method.
  * The recording email service captures verification/invite tokens.
  */
-@SpringBootTest
+// Self-signup is closed in production (PD-21) — a workspace now comes from a trial request the vendor
+// approves. It stays switched on here because {@link #onboardOwner} is how nearly every test in this
+// suite conjures a tenant, and rewriting all of them to provision through the owner console would be
+// a large change that tests the console rather than the feature each one is about. The production
+// default is asserted directly, and hard, in TrialRequestFlowTest.
+@SpringBootTest(properties = "calyvora.security.registration.open=true")
 @AutoConfigureMockMvc
 @AutoConfigureEmbeddedDatabase(provider = ZONKY, refresh = AFTER_EACH_TEST_METHOD)
 @Import(RecordingEmailService.class)

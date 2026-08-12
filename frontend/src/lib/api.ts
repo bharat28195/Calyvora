@@ -24,6 +24,8 @@ import {
   type CreateAgencyInput,
   type AgencyOverview,
   type SeatRequest,
+  type TrialRequest,
+  type TrialRequestInput,
   type SubscriptionView,
   type HelpdeskTicket,
   type HelpdeskComment,
@@ -159,6 +161,18 @@ export const api = {
     const result = await http<RegisterResult | null>("/auth/register", { method: "POST", body: JSON.stringify(input) });
     // Older backends answered 201 with an empty body; treat that as "sent" rather than alarming.
     return { emailSent: result?.emailSent ?? true };
+  },
+  /**
+   * Ask for a free trial (PD-21). Public — no session, and nothing here creates an account.
+   *
+   * <p>In mock mode there is no vendor to email, so it resolves as if the request went through: the
+   * page under test is the form, and failing it locally would only train people to ignore the error.
+   */
+  async requestTrial(input: TrialRequestInput): Promise<{ received: boolean; emailSent: boolean }> {
+    if (!LIVE) return { received: true, emailSent: false };
+    const result = await http<{ received: boolean; emailSent: boolean } | null>(
+      "/trial-requests", { method: "POST", body: JSON.stringify(input) });
+    return { received: true, emailSent: result?.emailSent ?? false };
   },
   verifyEmail(token: string) {
     return LIVE ? http<void>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }) : mockBackend.verifyEmail(token);
@@ -324,6 +338,22 @@ export const api = {
   },
   declineSeatRequest(id: string): Promise<void> {
     return LIVE ? http<void>(`/platform/seat-requests/${id}/decline`, { method: "POST" }) : Promise.reject(new Error("live only"));
+  },
+
+  // --- trial requests: the queue behind the website's "free trial" button (PD-21) ---
+  platformTrialRequests(): Promise<TrialRequest[]> {
+    return LIVE ? http<TrialRequest[]>("/platform/trial-requests") : liveOnly("The trial queue");
+  },
+  /** Approving provisions the company on these terms — this is the moment a login starts existing. */
+  approveTrialRequest(id: string, terms: { password: string; seats: number; months: number }): Promise<CompanySummary> {
+    return LIVE
+      ? http<CompanySummary>(`/platform/trial-requests/${id}/approve`, { method: "POST", body: JSON.stringify(terms) })
+      : liveOnly("Approving a trial");
+  },
+  declineTrialRequest(id: string): Promise<TrialRequest> {
+    return LIVE
+      ? http<TrialRequest>(`/platform/trial-requests/${id}/decline`, { method: "POST" })
+      : liveOnly("Declining a trial");
   },
 
   // --- a company's own subscription (admin read-only + app-lock check) ---

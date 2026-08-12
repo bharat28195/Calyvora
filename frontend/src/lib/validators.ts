@@ -22,6 +22,24 @@ export const registerSchema = z.object({
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
+/**
+ * The public "request a free trial" form (PD-21). Notice what isn't here: a password. Nothing this
+ * form submits creates an account, so there is no credential to set — the vendor provisions the
+ * workspace on approval and hands the sign-in details over then.
+ *
+ * Only the three fields a human needs to act on the enquiry are required. Asking for a phone number
+ * or a headcount before someone has decided they're interested loses more people than it qualifies.
+ */
+export const trialRequestSchema = z.object({
+  companyName: z.string().trim().min(2, "Company name is too short").max(200),
+  contactName: z.string().trim().min(2, "Please tell us your name").max(200),
+  email,
+  phone: z.string().trim().max(40).optional(),
+  teamSize: z.string().trim().max(40).optional(),
+  note: z.string().trim().max(2000).optional(),
+});
+export type TrialRequestFormInput = z.infer<typeof trialRequestSchema>;
+
 export const loginSchema = z.object({
   email,
   password: z.string().min(1, "Password is required"),

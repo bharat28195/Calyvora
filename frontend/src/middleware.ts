@@ -13,6 +13,7 @@ const PUBLIC = [
   "/",
   "/login",
   "/register",
+  "/request-trial",
   "/verify-email",
   "/accept-invite",
   "/forgot-password",

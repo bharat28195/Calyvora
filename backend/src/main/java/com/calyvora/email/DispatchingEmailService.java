@@ -55,6 +55,27 @@ public class DispatchingEmailService implements EmailService {
         return send(to, message.subject(), message.body());
     }
 
+    @Override
+    public EmailResult sendTrialRequestNotification(String to, TrialEnquiry enquiry) {
+        EmailMessages.Message message = EmailMessages.trialEnquiry(enquiry);
+        record(to, message.subject(), enquiry.consoleUrl());
+        return send(to, message.subject(), message.body());
+    }
+
+    @Override
+    public EmailResult sendTrialRequestAcknowledgement(String to, String contactName) {
+        EmailMessages.Message message = EmailMessages.trialAcknowledgement(contactName);
+        record(to, message.subject(), null);
+        return send(to, message.subject(), message.body());
+    }
+
+    @Override
+    public EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl) {
+        EmailMessages.Message message = EmailMessages.trialApproved(companyName, loginUrl);
+        record(to, message.subject(), loginUrl);
+        return send(to, message.subject(), message.body());
+    }
+
     /** The settings a send from the current tenant would use — for the diagnostic endpoint. */
     public EmailSettings currentSettings() {
         return resolver.resolve(TenantContext.getCompanyIdOrNull());

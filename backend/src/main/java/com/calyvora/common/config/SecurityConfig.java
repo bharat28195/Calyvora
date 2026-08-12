@@ -37,6 +37,9 @@ public class SecurityConfig {
             "/api/v1/auth/login",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
+            // Anyone may ask for a trial; only the vendor can read or act on the queue, which lives
+            // under /api/v1/platform. Nothing here creates an account (PD-21).
+            "/api/v1/trial-requests",
             "/api/v1/invitations/accept",
             "/api/v1/invitations/preview",
             "/api/v1/dev/**",

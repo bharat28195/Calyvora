@@ -299,6 +299,8 @@ The backend reads everything from env vars (base config in `application.yml`):
 | `MAIL_FROM` | `From:` header — must equal `MAIL_USERNAME`. | `no-reply@yourdomain.com` |
 | `MAIL_SMTP_AUTH` / `MAIL_SMTP_STARTTLS` / `MAIL_SMTP_SSL` | `true`/`true`/`false` for port 587; `true`/`false`/`true` for port 465. | |
 | `MAIL_TIMEOUT_MS` | SMTP connect/read/write timeout. Keeps a dead mail host from stalling signup. | `10000` |
+| `TRIAL_NOTIFY_EMAIL` | Who gets the "someone wants a free trial" email. Unset ⇒ the platform owner's login address. | `connect@calyvora.in` |
+| `OPEN_REGISTRATION` | `true` reopens public self-signup at `/auth/register`. **Leave unset.** With it off (the default), a workspace only exists because you approved a trial request. | `false` |
 
 The frontend reads (at **build** time): `NEXT_PUBLIC_API_MODE=live` and `BACKEND_ORIGIN=<backend URL>`.
 

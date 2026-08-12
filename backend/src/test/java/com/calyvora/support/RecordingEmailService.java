@@ -21,6 +21,9 @@ public class RecordingEmailService implements EmailService {
 
     private final List<Sent> verifications = new ArrayList<>();
     private final List<Sent> invitations = new ArrayList<>();
+    private final List<Sent> trialNotifications = new ArrayList<>();
+    private final List<Sent> trialAcknowledgements = new ArrayList<>();
+    private final List<Sent> trialApprovals = new ArrayList<>();
 
     @Override
     public EmailResult sendVerificationEmail(String to, String verificationUrl) {
@@ -32,6 +35,39 @@ public class RecordingEmailService implements EmailService {
     public EmailResult sendInvitationEmail(String to, String companyName, String acceptUrl) {
         invitations.add(new Sent(to, acceptUrl));
         return EmailResult.ok("RECORDING");
+    }
+
+    @Override
+    public EmailResult sendTrialRequestNotification(String to, com.calyvora.email.TrialEnquiry enquiry) {
+        // The whole point of the vendor notification is *who* asked, so the recorded "url" is the
+        // enquiry itself — a test that only saw the console link could not tell one request from
+        // another, which is exactly what it needs to assert.
+        trialNotifications.add(new Sent(to, enquiry.companyName() + " <" + enquiry.email() + ">"));
+        return EmailResult.ok("RECORDING");
+    }
+
+    @Override
+    public EmailResult sendTrialRequestAcknowledgement(String to, String contactName) {
+        trialAcknowledgements.add(new Sent(to, contactName));
+        return EmailResult.ok("RECORDING");
+    }
+
+    @Override
+    public EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl) {
+        trialApprovals.add(new Sent(to, loginUrl));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> trialNotifications() {
+        return trialNotifications;
+    }
+
+    public List<Sent> trialAcknowledgements() {
+        return trialAcknowledgements;
+    }
+
+    public List<Sent> trialApprovals() {
+        return trialApprovals;
     }
 
     public String lastVerificationToken() {
@@ -53,6 +89,9 @@ public class RecordingEmailService implements EmailService {
     public void clear() {
         verifications.clear();
         invitations.clear();
+        trialNotifications.clear();
+        trialAcknowledgements.clear();
+        trialApprovals.clear();
     }
 
     private static String tokenParam(String url) {

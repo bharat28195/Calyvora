@@ -109,8 +109,8 @@ function LoginInner() {
 
       <p className="mt-5 text-center text-sm text-fg/50">
         New here?{" "}
-        <Link href="/register" className="text-fg hover:underline">
-          Create a workspace
+        <Link href="/request-trial?from=login" className="text-fg hover:underline">
+          Request a free trial
         </Link>
       </p>
     </Card>

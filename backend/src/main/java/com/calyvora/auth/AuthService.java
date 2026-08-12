@@ -79,6 +79,16 @@ public class AuthService {
      */
     @Transactional
     public boolean register(RegisterRequest request) {
+        // The door is bolted by default (PD-21). Open self-signup created a live company and an ADMIN
+        // who could sign in that second — so "start free trial" on the website was, in effect, a
+        // handout to anyone who found the URL. Trials are now requested and granted by a person; see
+        // TrialRequestService. The endpoint stays (and stays public) so this refusal is an explicit,
+        // explainable 403 rather than a 404 that reads like a broken site.
+        if (!props.security().registration().open()) {
+            throw new ForbiddenException(
+                    "Orbit accounts are set up by us. Request a free trial and we'll be in touch — "
+                            + "you'll get your sign-in details once it's approved.");
+        }
         String email = normalize(request.email());
         if (userRepository.existsByEmail(email)) {
             throw new ConflictException("That email is already registered");

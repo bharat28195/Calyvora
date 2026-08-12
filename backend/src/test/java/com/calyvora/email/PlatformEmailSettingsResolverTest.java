@@ -43,7 +43,7 @@ class PlatformEmailSettingsResolverTest {
                 "http://localhost:3000", java.util.List.of(),
                 new AppProperties.Mail(configuredProvider, "no-reply@calyvora.test",
                         new AppProperties.Resend(apiKey, "https://api.resend.com/emails")),
-                null);
+                null, null);
         return new PlatformEmailSettingsResolver(props, configuredProvider, "localhost", 1025,
                 smtpUsername, "", false, false, false).resolve(null);
     }

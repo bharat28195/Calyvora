@@ -313,6 +313,46 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   will see its old letters change). Output is browser print / Save-as-PDF; no server-rendered PDF and
   no "email this letter to the candidate" yet. There is no offboarding equivalent of the checklist
   templates — the ten items are a constant, not per-company configuration.
+
+### PD-21 · 2026-08-12 · "Start free trial" asks; it does not admit
+- **Context:** the trial button on the marketing site pointed at `/register`, which created a company
+  and an ADMIN who could sign in that second. Nobody sold anything, nobody was told, and nobody
+  approved it — anyone who found the URL had a live workspace. The founder's instruction was plain:
+  nobody gets in until I give permission, and I want an email when someone asks.
+- **Decision:** the public surface stores an **enquiry**, not an account. `POST /api/v1/trial-requests`
+  is open to anyone, takes company, name, email and three optional fields, and creates a row in
+  `trial_requests`. There is no password on the form because there is nothing to set one on. The
+  vendor is emailed, the asker is acknowledged, and the request sits in the platform console until the
+  owner approves it — at which point the workspace is provisioned through
+  `PlatformService.provision`, the same path "New company" already used.
+- **Self-signup is closed by config, not deleted.** `calyvora.security.registration.open` defaults to
+  false and `/auth/register` answers 403 with an explanation. Kept as a flag because it is a
+  commercial decision, not an architectural one — if we ever want open signup back it is one
+  environment variable, and because deleting the endpoint would have turned every old link into a
+  mystery instead of a message. `/register` in the app redirects to `/request-trial` for the same
+  reason: that address was the site's call to action for months.
+- **Why the password is typed by the owner, not emailed.** Approval asks for a starting password,
+  seats and trial length. The customer's email says the workspace is ready and where to sign in; the
+  credential is handed over by the person who sold the trial. Mailing a password would have been less
+  work and worse. The alternative — a set-your-own-password token — needs machinery this codebase
+  does not have yet (there is still no password-reset flow), and inventing it here would have made
+  this change twice the size. **That is the debt to pay next**, and it pays for forgotten passwords
+  too.
+- **One open request per address**, enforced by a partial unique index rather than application logic.
+  Someone who clicks twice because nothing visibly happened gets the same quiet 202, and the vendor's
+  queue stays one row per person. Partial, so a customer turned down in March may ask again in
+  September.
+- **Trade-offs / debt:** the endpoint has no rate limit or captcha, so the queue can be spammed — the
+  duplicate index blunts it but does not stop a script with a thousand addresses. Nothing here is
+  RLS-protected (it cannot be: the caller has no tenant), so the vendor's sales queue is guarded by
+  the platform console's role check alone. Declining sends no email, deliberately: turning someone
+  down is a conversation, not an automated brush-off.
+- **A note on the test suite.** Closing signup broke the way nearly every integration test conjures a
+  tenant. Rather than rewrite ~250 tests to provision through the owner console — which would have
+  made them all tests of the console — `IntegrationTestBase` keeps registration switched on and
+  `TrialRequestFlowTest` re-declares `@SpringBootTest` without the override, so the shipped default is
+  asserted directly. Worth knowing: the suite is not, by default, exercising the production auth
+  posture. One class is.
 - **Final outcome:** _Shipped with 15 integration tests covering the letterpad's PATCH semantics and
   tenant isolation, the exit lifecycle including the clearance guard, and the hire flow through to the
   profile and checklist appearing after acceptance._

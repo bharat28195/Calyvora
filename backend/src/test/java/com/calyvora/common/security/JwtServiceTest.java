@@ -213,7 +213,7 @@ class JwtServiceTest {
 
     private static AppProperties props(AppProperties.Jwt jwt) {
         return new AppProperties(null, null, null,
-                new AppProperties.Security(jwt, null, null, null));
+                new AppProperties.Security(jwt, null, null, null, null), null);
     }
 
     private static KeyPair generate() {

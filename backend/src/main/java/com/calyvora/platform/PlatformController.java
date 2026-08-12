@@ -29,9 +29,12 @@ import java.util.UUID;
 public class PlatformController {
 
     private final PlatformService service;
+    private final com.calyvora.trial.TrialRequestService trialRequests;
 
-    public PlatformController(PlatformService service) {
+    public PlatformController(PlatformService service,
+                              com.calyvora.trial.TrialRequestService trialRequests) {
         this.service = service;
+        this.trialRequests = trialRequests;
     }
 
     @GetMapping("/companies")
@@ -121,5 +124,26 @@ public class PlatformController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void decline(@PathVariable UUID id) {
         service.declineSeatRequest(id);
+    }
+
+    // ---- trial requests (PD-21) ----
+    // The queue behind the website's "free trial" button. Anyone can join it; only the vendor can see
+    // it, and only approving here turns an enquiry into a workspace someone can sign in to.
+
+    @GetMapping("/trial-requests")
+    public List<com.calyvora.trial.dto.TrialRequestResponse> trialRequests() {
+        return trialRequests.all();
+    }
+
+    @PostMapping("/trial-requests/{id}/approve")
+    public CompanySummaryResponse approveTrial(
+            @PathVariable UUID id,
+            @Valid @RequestBody com.calyvora.trial.dto.ApproveTrialRequest terms) {
+        return trialRequests.approve(id, terms);
+    }
+
+    @PostMapping("/trial-requests/{id}/decline")
+    public com.calyvora.trial.dto.TrialRequestResponse declineTrial(@PathVariable UUID id) {
+        return trialRequests.decline(id);
     }
 }

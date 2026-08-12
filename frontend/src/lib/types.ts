@@ -648,6 +648,33 @@ export interface CreateCompanyInput {
   /** Owner console only: file the company under an agency. Omit to sell direct. */
   agencyId?: string | null;
 }
+/**
+ * Someone who asked for a free trial (PD-21). Not a customer yet — until the vendor approves it there
+ * is no company and no login, which is the whole point of the type existing.
+ */
+export interface TrialRequest {
+  id: string;
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string | null;
+  teamSize: string | null;
+  note: string | null;
+  status: "NEW" | "APPROVED" | "DECLINED";
+  source: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  companyId: string | null;
+}
+export interface TrialRequestInput {
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone?: string;
+  teamSize?: string;
+  note?: string;
+  source?: string;
+}
 export interface SeatRequest {
   id: string;
   companyId: string;

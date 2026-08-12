@@ -105,6 +105,15 @@ calyvora:
       required: ${REQUIRE_EMAIL_VERIFICATION:false}
     invitation:
       ttl: ${INVITATION_TTL:P7D}
+    registration:
+      # Closed by default (PD-21). The marketing site's "free trial" button raises a request that the
+      # platform owner approves; until then no company, no user and nothing to log in to. Set
+      # OPEN_REGISTRATION=true only if you actually want anyone who finds /register to get a live
+      # workspace with no human in the loop.
+      open: ${OPEN_REGISTRATION:false}
+  trial:
+    # Who gets told when someone asks for a trial. Blank means the platform owner's own login address.
+    notify-email: ${TRIAL_NOTIFY_EMAIL:}
 
 springdoc:
   swagger-ui:
