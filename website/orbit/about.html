@@ -50,37 +50,82 @@
 
 <span id="top"></span>
 
-<!-- HERO -->
+<!-- ============================================================================================
+     PAGE SHAPE — read this before adding a section.
+
+     This page was rebuilt against how Zoho and Keka write theirs. The lesson from both was not
+     that we were missing content; it was that we had too much. Zoho's About is a short intro, a
+     handful of beliefs and a timeline, with a great deal of air around it. Keka's opens with one
+     question and stays conversational. Ours had ten sections and told its origin story twice —
+     once as prose, once as a timeline — which is what made it read as busy rather than serious.
+
+     Now seven blocks, each with one job:
+       1. Hero            — who we are, in two sentences, with the four numbers under it
+       2. The group       — the org tree (the genuinely distinctive thing on this page)
+       3. Why we built it — the origin story, told once, as a timeline
+       4. What we believe — vision and mission, then the four things we hold to
+       5. Leadership      — two directors, reachable
+       6. Working here    — careers
+       7. Contact
+
+     Before adding an eighth: is it a new job, or a second telling of one of these?
+     ============================================================================================ -->
+
+<!-- 1. HERO -->
 <section class="page-hero">
   <div class="wrap">
     <span class="eyebrow reveal"><span class="dot"></span>About us</span>
     <h1 class="reveal">We did the work first. Then we built the <span class="grad-text">software</span>.</h1>
-    <p class="sub reveal">Calyvora is a product company with an HR services business inside it. Priority
-      HR Services hires people for real clients every week — Orbit is the platform we built because
-      doing that work properly needed one.</p>
+    <p class="sub reveal">Calyvora is a product company with a hiring business inside it. Priority HR
+      Services places people for real clients. Orbit is the platform we built because doing that
+      properly needed one.</p>
     <div class="hero-cta reveal">
       <a href="#group" class="btn btn-primary">How the group fits together →</a>
       <a href="#leadership" class="btn btn-ghost">Meet the directors</a>
     </div>
+
+    <!-- The four numbers, moved out of their own section and under the headline where they act as
+         evidence for it rather than as a separate claim.
+
+         Rule for anything added here: it must describe what we ARE, not what we will DO for you.
+         "Two hiring practices" is a fact about us. "Filled in two weeks" is a promise, and promises
+         belong in an engagement letter where they can be scoped and negotiated. -->
+    <div class="stats slim reveal">
+      <div class="stat">
+        <div class="s-n">2</div>
+        <div class="s-l">Hiring practices</div>
+      </div>
+      <div class="stat">
+        <div class="s-n">15</div>
+        <div class="s-l">Modules in Orbit</div>
+      </div>
+      <div class="stat">
+        <div class="s-n">1</div>
+        <div class="s-l">Record per employee</div>
+      </div>
+      <div class="stat">
+        <div class="s-n">0</div>
+        <div class="s-l">Spreadsheets between</div>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- GROUP STRUCTURE -->
+<!-- 2. THE GROUP -->
 <section class="pad" id="group">
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="eyebrow"><span class="dot"></span>The group</span>
       <h2>One parent. A product and a services business under it.</h2>
-      <p>Two businesses that need each other. The services arm is where we learn what HR actually
-        breaks on; the product arm is where we fix it for everyone else.</p>
+      <p>The services arm is where we learn what HR actually breaks on. The product arm is where we
+        fix it for everyone else.</p>
     </div>
 
     <div class="org reveal">
       <div class="org-parent">
         <span class="org-tag">Parent company</span>
         <h3>Calyvora</h3>
-        <p>The product company. Owns the platform, the brand and the roadmap — and the standard both
-          businesses are held to.</p>
+        <p>The product company. Owns the platform, the brand and the roadmap.</p>
       </div>
 
       <div class="org-stem" aria-hidden="true"></div>
@@ -89,15 +134,15 @@
         <div class="org-node product">
           <span class="org-tag">Product</span>
           <h3>Orbit</h3>
-          <p>The HR platform. Attendance, leave, payroll, helpdesk and people ops for growing
-            companies — sold directly, or through agencies running several companies at once.</p>
+          <p>The HR platform. Attendance, leave, payroll, helpdesk and people ops — sold directly, or
+            through agencies running several companies at once.</p>
           <a href="index.html#features" class="org-link">See the platform →</a>
         </div>
         <div class="org-node services">
           <span class="org-tag">Services</span>
           <h3>Priority HR Services</h3>
           <p>The hiring business, and the one with clients today. Blue-collar and white-collar
-            recruitment — and every hire lands already set up inside the client's Orbit workspace.</p>
+            recruitment, with every hire landing inside the client's Orbit workspace.</p>
           <a href="hr-services.html" class="org-link">See the services →</a>
         </div>
       </div>
@@ -108,82 +153,130 @@
   </div>
 </section>
 
-<!-- HOW WE'RE BUILT ======================================================================
-     Deliberately facts about the shape of the business, not commitments to a client.
+<!-- 3. WHY WE BUILT IT ==========================================================================
+     The origin story and the milestones used to be two separate sections saying the same thing in
+     two formats. One section now: the timeline carries the story, the diagram carries the handover
+     it describes. A reader gets it once, in the form that suits them.
 
-     An earlier version of this row carried guarantee periods and fee terms. Those belong in
-     an engagement letter, where they can be scoped, negotiated and qualified — not on a
-     marketing page, where they read as an open promise to everyone who visits.
+     The first entry deliberately has no year. Inventing a founding date for Priority HR Services
+     would be a factual claim about the business; "Before Orbit" is true and reads fine. If you want
+     the real year, replace the words in that tl-when line (e.g. "2019").
 
-     Rule for anything added here: it must describe what we ARE, not what we will DO for you.
-     "Two hiring practices" is a fact about us. "Filled in two weeks" is a promise.
-     ====================================================================================== -->
-<section class="pad" id="numbers">
+     Deliberately NOT on this page, and it should stay off: client logos, star ratings, press cards,
+     "trusted by N companies". Every competitor's About page has them and every one is checkable.
+     A logo goes up when that client has agreed in writing to be named.
+     ============================================================================================ -->
+<section class="pad" id="journey">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow"><span class="dot"></span>How we're built</span>
-      <h2>A services business and a product, under one roof.</h2>
-      <p>The shape of the company, in four numbers. What any of it means for a particular
-        engagement is a conversation, not a page.</p>
+      <span class="eyebrow"><span class="dot"></span>Why we built Orbit</span>
+      <h2>A hiring business that got tired of the handover.</h2>
+      <p>We placed good people into companies that then lost them in a spreadsheet. Short history,
+        honestly told.</p>
     </div>
-    <div class="stats reveal">
-      <div class="stat">
-        <div class="s-n">2</div>
-        <div class="s-l">Hiring practices</div>
-        <div class="s-s">Blue-collar and white-collar, run separately</div>
+
+    <div class="split">
+      <div class="tl reveal">
+        <div class="tl-item">
+          <div class="tl-when">Before Orbit</div>
+          <h3>Priority HR Services, hiring for clients</h3>
+          <p>Blue-collar and white-collar recruitment, run as two practices because they are two
+            different jobs. Sourcing, screening, document checks.</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-when">2026</div>
+          <h3>We built the thing that was missing</h3>
+          <p>Every good hire became somebody's admin problem: keyed into a spreadsheet, keyed again
+            for payroll, documents we had already verified lost in between. Orbit started as the
+            system we needed ourselves.</p>
+        </div>
+        <div class="tl-item now">
+          <div class="tl-when">2026 · now</div>
+          <h3>Calyvora becomes the parent</h3>
+          <p>Priority HR Services carries on exactly as it is, for the clients it already has. Orbit
+            can now be sold to companies that will never need us to hire for them.</p>
+        </div>
+        <div class="tl-item next">
+          <div class="tl-when">Next</div>
+          <h3>Fewer things anyone has to remember</h3>
+          <p>Letters that raise themselves, exit clearance a manager works through, a company's own
+            letterhead on all of it.</p>
+        </div>
       </div>
-      <div class="stat">
-        <div class="s-n">15</div>
-        <div class="s-l">Modules in Orbit</div>
-        <div class="s-s">Attendance through payroll, one system</div>
-      </div>
-      <div class="stat">
-        <div class="s-n">1</div>
-        <div class="s-l">Record per employee</div>
-        <div class="s-s">Hired and managed in the same place</div>
-      </div>
-      <div class="stat">
-        <div class="s-n">0</div>
-        <div class="s-l">Spreadsheets in between</div>
-        <div class="s-s">Attendance feeds payroll directly</div>
+
+      <div class="flow reveal">
+        <div class="frow"><span>A role opens</span><span class="r">Client</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Sourced, screened, verified</span><span class="r" style="color:#22d3ee">Priority HR</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Documents checked once</span><span class="r">PAN · bank · prior employment</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow" style="border-color:rgba(124,92,255,.5)"><span>Day one, already set up</span><span class="r grad-text" style="font-size:17px">Orbit</span></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- VISION & MISSION -->
-<section class="pad" id="vision">
+<!-- 4. WHAT WE BELIEVE =========================================================================
+     Vision, mission and the four principles were three separate sections making one argument.
+     Merged: the panel states the direction, the numbered cards state what that means in practice.
+     ============================================================================================ -->
+<section class="pad" id="believe">
   <div class="wrap">
     <div class="vm reveal">
       <div>
         <span class="eyebrow"><span class="dot"></span>Vision</span>
         <h2>HR work that nobody has to chase.</h2>
-        <p>An offer, a joining letter, a laptop returned, a full and final settlement — every one of
-          them is somebody remembering. We want a company where the remembering is the software's
-          job, and the people work on the parts that need judgement.</p>
+        <p>An offer, a joining letter, a laptop returned, a final settlement — every one of them is
+          somebody remembering. We want the remembering to be the software's job, so the people can
+          work on the parts that need judgement.</p>
       </div>
       <div>
         <span class="eyebrow"><span class="dot"></span>Mission</span>
         <h2>Hire them, and run them, in one place.</h2>
         <ul class="vm-list">
-          <li>Fill the role — blue-collar or white-collar, on terms agreed before we start</li>
-          <li>Hand over an employee, not a CV: documents verified once, profile already made</li>
-          <li>Run the month — attendance, leave, payroll — without a spreadsheet in between</li>
-          <li>Close it properly when someone leaves, letters and clearance included</li>
+          <li>Fill the role — on terms agreed before we start</li>
+          <li>Hand over an employee, not a CV: documents verified once</li>
+          <li>Run the month — attendance, leave, payroll — with nothing in between</li>
+          <li>Close it properly when someone leaves</li>
         </ul>
+      </div>
+    </div>
+
+    <!-- Numbered because the list is deliberately closed — "these four and no more" is the claim. -->
+    <div class="grid four principles" style="margin-top:26px">
+      <div class="card reveal">
+        <h3>Your data is yours</h3>
+        <p>Each company's data is isolated at the database, not by a filter someone remembered to
+          write. Leaving us never means leaving your records behind.</p>
+      </div>
+      <div class="card reveal">
+        <h3>We own the screening</h3>
+        <p>We would rather carry the risk of a hire not working out than argue about whose fault it
+          was. Where that lands commercially, we agree up front.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Pricing you can read</h3>
+        <p>A rate per employee for the platform, a stated fee per hire for the service — quoted
+          before we start.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Salary stays private</h3>
+        <p>Colleagues can look each other up in the directory. Pay, PAN and bank details are theirs
+          alone — built that way, not configured that way.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- LEADERSHIP -->
+<!-- 5. LEADERSHIP -->
 <section class="pad" id="leadership">
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="eyebrow"><span class="dot"></span>Leadership</span>
       <h2>Two directors. Both reachable.</h2>
-      <p>One runs the services business and everything a client experiences; one runs the company and
-        the product. Call either of them — this is not a company where you get an account manager.</p>
+      <p>One runs the services business and everything a client experiences. One runs the company and
+        the product. You will not get an account manager.</p>
     </div>
 
     <!-- ===================================================================================
@@ -225,150 +318,24 @@
   </div>
 </section>
 
-<!-- STORY -->
-<section class="pad" id="story">
-  <div class="wrap">
-    <div class="split">
-      <div class="reveal">
-        <span class="eyebrow"><span class="dot"></span>Why we built Orbit</span>
-        <h2>You can't run HR well on someone else's spreadsheet.</h2>
-        <p>Priority HR Services placed people into companies that then tracked them in a spreadsheet,
-          keyed them into a second system for payroll, and lost the documents we had already verified.
-          We watched a good hire become an admin problem, over and over.</p>
-        <p>So we built the thing that was missing. Orbit is the HR platform we needed ourselves — which
-          is why a hire we make arrives already in it: profile, documents, attendance and payroll, from
-          the first day.</p>
-        <p>Making Calyvora the parent is the same idea, one level up. The services business keeps doing
-          what it does for its clients. The product company can now sell to companies that will never
-          need us to hire for them.</p>
-      </div>
-      <div class="flow reveal">
-        <div class="frow"><span>A role opens</span><span class="r">Client</span></div>
-        <div class="arrow">↓</div>
-        <div class="frow"><span>Sourced, screened, verified</span><span class="r" style="color:#22d3ee">Priority HR</span></div>
-        <div class="arrow">↓</div>
-        <div class="frow"><span>Documents checked once</span><span class="r">PAN · bank · prior employment</span></div>
-        <div class="arrow">↓</div>
-        <div class="frow" style="border-color:rgba(124,92,255,.5)"><span>Day one, already set up</span><span class="r grad-text" style="font-size:17px">Orbit</span></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- HOW WE GOT HERE ======================================================================
-     A milestones timeline, borrowed in shape from the consultancy About pages that do this well.
-
-     What is deliberately different: theirs run on years, because they have ten of them. Ours
-     doesn't open with a founding date, because inventing one would be a factual claim about the
-     business, and the honest first entry is "before Orbit existed" — which is true and reads fine.
-
-     If you want the real founding year of Priority HR Services in the first entry, replace the
-     words "Before Orbit" in the tl-when line below with it (e.g. "2019").
-
-     What is deliberately NOT on this page, and should stay off it: client logos, star ratings,
-     press-release cards, "trusted by 500 companies". Every consultancy About page has them and
-     every one is a claim someone can check. Add a logo only when that client has agreed in
-     writing to be named.
-     ====================================================================================== -->
-<section class="pad" id="journey">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <span class="eyebrow"><span class="dot"></span>How we got here</span>
-      <h2>A hiring business that got tired of the handover.</h2>
-      <p>Short history, honestly told. We are a young product company built on top of an older
-        services habit — and we would rather you knew which is which.</p>
-    </div>
-
-    <div class="tl reveal">
-      <div class="tl-item">
-        <div class="tl-when">Before Orbit</div>
-        <h3>Priority HR Services, hiring for clients</h3>
-        <p>Blue-collar and white-collar recruitment, run as two separate practices because they are
-          two different jobs. Sourcing, screening, document checks — the part of hiring that has to
-          be done by people who have done it before.</p>
-      </div>
-      <div class="tl-item">
-        <div class="tl-when">2026</div>
-        <h3>We built the thing that was missing</h3>
-        <p>Every good hire became someone else's admin problem: keyed into a spreadsheet, keyed
-          again for payroll, documents we had already verified lost in between. Orbit started as the
-          system we needed ourselves — attendance through payroll, one record per employee.</p>
-      </div>
-      <div class="tl-item now">
-        <div class="tl-when">2026 · now</div>
-        <h3>Calyvora becomes the parent</h3>
-        <p>A product company with the services business inside it. Priority HR Services carries on
-          exactly as it is, for the clients it already has. Orbit can now be sold to companies that
-          will never need us to hire for them — including through agencies running several companies
-          at once.</p>
-      </div>
-      <div class="tl-item next">
-        <div class="tl-when">Next</div>
-        <h3>Fewer things anyone has to remember</h3>
-        <p>Offer and joining letters that raise themselves, exit clearance a manager can work
-          through, and a company's own letterhead on all of it. The direction is always the same one:
-          move the remembering out of a person's head and into the software.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- WHAT WE HOLD TO -->
-<section class="pad" id="values">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <span class="eyebrow"><span class="dot"></span>What we hold to</span>
-      <h2>Four things we work to.</h2>
-      <p>Short list on purpose — how we prefer to operate, and what we look for in the work we take
-        on. How any of it applies to a particular engagement is set out in that engagement's terms.</p>
-    </div>
-    <!-- Numbered because the list is deliberately closed — "these four and no more" is the claim. -->
-    <div class="grid four principles">
-      <div class="card reveal">
-        <h3>Your data is yours</h3>
-        <p>Every company's data is isolated at the database, not by a filter someone remembered to
-          write. It is built so that leaving us never means leaving your records behind.</p>
-      </div>
-      <div class="card reveal">
-        <h3>We own the screening</h3>
-        <p>We would rather carry the risk of a hire not working out than argue about whose fault it
-          was. Where that lands commercially is something we agree with each client up front.</p>
-      </div>
-      <div class="card reveal">
-        <h3>Pricing you can read</h3>
-        <p>A rate per employee for the platform and a stated fee per hire for the service — quoted
-          before we start, so there is no invoice that needs a meeting to explain.</p>
-      </div>
-      <div class="card reveal">
-        <h3>Salary stays private</h3>
-        <p>Colleagues can look each other up in the directory. What someone earns, their PAN and their
-          bank details are theirs alone — the product is built that way, not configured that way.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- CAREERS =============================================================================
-     Every consultancy About page ends up with one of these, and it earns its place: the people
-     reading an About page are as often looking for a job as for a supplier.
-
-     Kept honest by describing the company rather than advertising openings we may not have. No
-     "we're hiring across 12 roles", no perks list. If there is a specific vacancy, add it here as
-     a line of its own — and take it down the day it's filled.
-     ===================================================================================== -->
+<!-- 6. WORKING HERE ============================================================================
+     Three areas of work rather than advertised vacancies, so nothing here goes stale and nothing
+     is promised. If there is a specific opening, add it as a line of its own — and take it down
+     the day it is filled.
+     ============================================================================================ -->
 <section class="pad" id="careers">
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="eyebrow"><span class="dot"></span>Working here</span>
       <h2>Small company. Very little of it is decoration.</h2>
-      <p>We are early, which is the honest pitch: the work is broad, the feedback is immediate, and
-        what you build is in front of real clients quickly rather than eventually.</p>
+      <p>We are early, which is the honest pitch: the work is broad, and what you build is in front
+        of real clients quickly rather than eventually.</p>
     </div>
     <div class="grid">
       <div class="card reveal">
         <h3>Recruitment</h3>
-        <p>Sourcing and screening for live client roles, blue-collar and white-collar. You'll own
-          candidates end to end rather than passing them down a line.</p>
+        <p>Sourcing and screening for live client roles. You own candidates end to end rather than
+          passing them down a line.</p>
       </div>
       <div class="card reveal">
         <h3>Product &amp; engineering</h3>
@@ -377,17 +344,17 @@
       </div>
       <div class="card reveal">
         <h3>Client delivery</h3>
-        <p>Getting a company set up and keeping it running — the part where software meets an actual
-          payroll cycle and has to survive it.</p>
+        <p>Getting a company set up and keeping it running — where software meets an actual payroll
+          cycle and has to survive it.</p>
       </div>
     </div>
-    <p class="org-note reveal">Interested? Send a CV and a line about what you want to work on to
+    <p class="org-note reveal">Send a CV and a line about what you want to work on to
       <a href="mailto:connect@calyvora.in?subject=Working%20at%20Calyvora">connect@calyvora.in</a>.
       We read everything and reply either way.</p>
   </div>
 </section>
 
-<!-- CONTACT -->
+<!-- 7. CONTACT -->
 <section class="pad" id="contact">
   <div class="wrap">
     <div class="final reveal">

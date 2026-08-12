@@ -314,6 +314,16 @@
   .s-n span{font-size:.5em;font-weight:700;letter-spacing:-.01em}
   .s-l{margin-top:12px;font-size:15px;font-weight:600}
   .s-s{margin-top:5px;font-size:13px;color:var(--fg-3);line-height:1.45}
+  /* Slim variant: the same four numbers with the boxes taken off, sitting directly under a hero.
+     Four bordered cards immediately below a headline compete with it — hairline dividers say
+     "these belong together" without drawing four more rectangles on the page. */
+  .stats.slim{border-top:1px solid var(--line);border-bottom:1px solid var(--line);gap:0;
+    max-width:900px;margin:44px auto 0}
+  .stats.slim .stat{border:0;background:none;border-radius:0;padding:26px 18px;
+    border-left:1px solid var(--line)}
+  .stats.slim .stat:first-child{border-left:0}
+  .stats.slim .s-n{font-size:clamp(28px,3.4vw,38px)}
+  .stats.slim .s-l{margin-top:9px;font-size:14px}
 
   /* Vision and mission side by side: they are two halves of one statement, and stacking them makes
      the second look like an afterthought. */
@@ -372,6 +382,11 @@
   @media(max-width:640px){
     .grid.four{grid-template-columns:1fr}
     .stats{grid-template-columns:1fr 1fr;gap:12px}
+    /* Two-up on a phone, so the vertical rules have to become a grid of them rather than a row. */
+    .stats.slim{gap:0}
+    .stats.slim .stat{padding:20px 10px;border-left:1px solid var(--line)}
+    .stats.slim .stat:nth-child(odd){border-left:0}
+    .stats.slim .stat:nth-child(n+3){border-top:1px solid var(--line)}
     .stat{padding:20px 14px}
     .org-parent{padding:26px 20px}
     .org-node,.person{padding:24px 20px}
