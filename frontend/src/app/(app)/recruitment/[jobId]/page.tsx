@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  Loader2, ArrowLeft, Plus, Star, Trash2, FileText, Mail, FileSignature, UserCheck, Copy, X,
+  Loader2, ArrowLeft, Plus, Star, Trash2, FileText, Mail, FileSignature, UserCheck, Copy, X, Search,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { JobOpening, Candidate, CandidateStage, HireResult, OfferResult } from "@/lib/types";
@@ -23,6 +23,38 @@ const STAGE_ACCENT: Record<CandidateStage, string> = {
   APPLIED: "text-fg/60", SCREENING: "text-aqua", INTERVIEW: "text-violet", OFFER: "text-amber-400",
   HIRED: "text-emerald-400", REJECTED: "text-rose-400",
 };
+/**
+ * The bar under each column heading. Colour is how a board of six near-identical columns becomes
+ * scannable — the eye finds "Offer" by its amber rule long before it reads the word.
+ */
+const STAGE_BAR: Record<CandidateStage, string> = {
+  APPLIED: "bg-fg/25", SCREENING: "bg-aqua", INTERVIEW: "bg-violet", OFFER: "bg-amber-400",
+  HIRED: "bg-emerald-400", REJECTED: "bg-rose-400",
+};
+/** The ring shown on a column while a card is dragged over it, in that column's own colour. */
+const STAGE_DROP: Record<CandidateStage, string> = {
+  APPLIED: "ring-fg/30 bg-fg/[0.06]", SCREENING: "ring-aqua/50 bg-aqua/[0.06]",
+  INTERVIEW: "ring-violet/50 bg-violet/[0.06]", OFFER: "ring-amber-400/50 bg-amber-400/[0.06]",
+  HIRED: "ring-emerald-400/50 bg-emerald-400/[0.06]", REJECTED: "ring-rose-400/50 bg-rose-400/[0.06]",
+};
+
+/** Six fixed hues for candidate avatars, picked from the name so the same person keeps the same one. */
+const AVATAR_TONES = [
+  "bg-violet/20 text-violet", "bg-aqua/20 text-aqua", "bg-amber-400/20 text-amber-300",
+  "bg-emerald-400/20 text-emerald-400", "bg-rose-400/20 text-rose-400", "bg-sky-400/20 text-sky-400",
+];
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return ((parts[0][0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "")).toUpperCase();
+}
+
+function toneOf(name: string): string {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_TONES[sum % AVATAR_TONES.length];
+}
 
 /** The hiring pipeline board for one opening — candidates in columns by stage. */
 export default function PipelinePage() {
@@ -33,6 +65,10 @@ export default function PipelinePage() {
   const [adding, setAdding] = useState(false);
   /** Which candidate is being offered or hired — the panel above the board (PD-20). */
   const [action, setAction] = useState<{ candidate: Candidate; kind: "OFFER" | "HIRE" } | null>(null);
+  /** Drag state. `dragId` is the card in flight; `overStage` is the column it is hovering. */
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overStage, setOverStage] = useState<CandidateStage | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     api.job(jobId).then(setJob).catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load"));
@@ -52,6 +88,20 @@ export default function PipelinePage() {
     try { await api.deleteCandidate(c.id); } catch { /* best-effort in demo */ }
   }
 
+  /** Finish a drag: move if it actually changed column, and clear the drag state either way. */
+  function drop(stage: CandidateStage) {
+    const c = candidates?.find((x) => x.id === dragId);
+    setDragId(null);
+    setOverStage(null);
+    if (c && c.stage !== stage) move(c, stage);
+  }
+
+  const needle = query.trim().toLowerCase();
+  const visible = needle
+    ? (candidates ?? []).filter((c) =>
+        c.name.toLowerCase().includes(needle) || (c.email ?? "").toLowerCase().includes(needle))
+    : candidates ?? [];
+
   return (
     <div>
       <Link href="/recruitment" className="inline-flex items-center gap-1 text-sm text-fg/50 hover:text-fg"><ArrowLeft className="h-4 w-4" /> Recruitment</Link>
@@ -63,7 +113,21 @@ export default function PipelinePage() {
             {job ? [job.department, job.location, `${job.positions} position${job.positions > 1 ? "s" : ""}`].filter(Boolean).join(" · ") : ""}
           </p>
         </div>
-        <Button onClick={() => setAdding((v) => !v)}><Plus className="h-4 w-4" /> Add candidate</Button>
+        <div className="flex items-center gap-2">
+          {/* Filters the board rather than a list: every column narrows at once, so you can see
+              where a named person actually is without opening six of them. */}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find a candidate"
+              aria-label="Find a candidate"
+              className="h-11 w-52 rounded-lg border border-fg/15 bg-fg/5 pl-9 pr-3 text-sm text-fg placeholder:text-fg/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+            />
+          </div>
+          <Button onClick={() => setAdding((v) => !v)}><Plus className="h-4 w-4" /> Add candidate</Button>
+        </div>
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
@@ -86,24 +150,48 @@ export default function PipelinePage() {
         <div className="mt-6 overflow-x-auto pb-2">
           <div className="flex gap-3" style={{ minWidth: "min-content" }}>
             {STAGES.map((stage) => {
-              const list = candidates.filter((c) => c.stage === stage);
+              const list = visible.filter((c) => c.stage === stage);
+              const isTarget = overStage === stage && dragId !== null;
               return (
                 <div key={stage} className="w-64 shrink-0">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <span className={cn("text-sm font-medium", STAGE_ACCENT[stage])}>{STAGE_LABEL[stage]}</span>
-                    <span className="text-xs text-fg/40">{list.length}</span>
+                  {/* Heading: the stage's own colour as a rule under it, and a count that stays put.
+                      Six grey columns all look alike; the rule is what makes them findable. */}
+                  <div className="mb-2 px-1">
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-sm font-medium", STAGE_ACCENT[stage])}>{STAGE_LABEL[stage]}</span>
+                      <span className="rounded-full bg-fg/10 px-1.5 text-xs tabular-nums text-fg/50">{list.length}</span>
+                    </div>
+                    <div className={cn("mt-1.5 h-0.5 w-full rounded-full opacity-60", STAGE_BAR[stage])} />
                   </div>
-                  <div className="flex min-h-[4rem] flex-col gap-2 rounded-xl bg-fg/[0.03] p-2">
+                  {/* The column is the drop target. dragOver must preventDefault or the browser
+                      refuses the drop outright — that single line is why HTML5 DnD "doesn't work"
+                      more often than not. */}
+                  <div
+                    onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverStage(stage); } }}
+                    onDragLeave={() => setOverStage((s) => (s === stage ? null : s))}
+                    onDrop={(e) => { e.preventDefault(); drop(stage); }}
+                    className={cn(
+                      "flex min-h-[6rem] flex-col gap-2 rounded-xl p-2 transition-colors",
+                      isTarget ? cn("ring-2", STAGE_DROP[stage]) : "bg-fg/[0.03]",
+                    )}
+                  >
                     {list.map((c) => (
                       <CandidateCard
                         key={c.id}
                         c={c}
+                        dragging={dragId === c.id}
+                        onDragStart={() => setDragId(c.id)}
+                        onDragEnd={() => { setDragId(null); setOverStage(null); }}
                         onMove={(s) => move(c, s)}
                         onRemove={() => remove(c)}
                         onAction={(kind) => setAction({ candidate: c, kind })}
                       />
                     ))}
-                    {list.length === 0 && <p className="px-1 py-3 text-center text-xs text-fg/30">—</p>}
+                    {list.length === 0 && (
+                      <p className="px-2 py-4 text-center text-xs text-fg/30">
+                        {isTarget ? "Drop here" : needle ? "No match" : "Nothing here yet"}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -115,29 +203,63 @@ export default function PipelinePage() {
   );
 }
 
-function CandidateCard({ c, onMove, onRemove, onAction }: {
+function CandidateCard({ c, dragging, onDragStart, onDragEnd, onMove, onRemove, onAction }: {
   c: Candidate;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
   onMove: (s: CandidateStage) => void;
   onRemove: () => void;
   onAction: (kind: "OFFER" | "HIRE") => void;
 }) {
   return (
-    <div className="rounded-lg border border-fg/10 bg-surface p-2.5 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 flex-1 truncate text-sm font-medium">{c.name}</p>
+    <div
+      draggable
+      onDragStart={(e) => {
+        // A drag begun on the select or a button would swallow the click that was actually meant.
+        // Refusing it there keeps every control on the card usable.
+        if ((e.target as HTMLElement).closest("select,button,a")) { e.preventDefault(); return; }
+        e.dataTransfer.effectAllowed = "move";
+        // Firefox will not start a drag unless some data is set.
+        e.dataTransfer.setData("text/plain", c.id);
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      className={cn(
+        "cursor-grab rounded-lg border border-fg/10 bg-surface p-2.5 shadow-sm transition",
+        "hover:border-fg/25 active:cursor-grabbing",
+        dragging && "opacity-40",
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <span className={cn(
+          "grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold",
+          toneOf(c.name),
+        )} aria-hidden>
+          {initialsOf(c.name)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{c.name}</p>
+          {c.email && <p className="flex items-center gap-1 truncate text-xs text-fg/40"><Mail className="h-3 w-3 shrink-0" />{c.email}</p>}
+        </div>
         <button onClick={onRemove} className="text-fg/25 hover:text-rose-400" aria-label="Remove"><Trash2 className="h-3.5 w-3.5" /></button>
       </div>
-      {c.email && <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-fg/40"><Mail className="h-3 w-3" />{c.email}</p>}
-      <div className="mt-1.5 flex items-center gap-2">
-        {c.rating != null && (
-          <span className="inline-flex items-center gap-0.5 text-xs text-amber-400">
-            {c.rating}<Star className="h-3 w-3 fill-amber-400" />
-          </span>
-        )}
-        {c.source && <span className="rounded-full bg-fg/10 px-1.5 py-0.5 text-[10px] text-fg/50">{c.source}</span>}
-        {c.resumeUrl && <a href={c.resumeUrl} target="_blank" rel="noreferrer" className="text-fg/40 hover:text-violet" aria-label="Resume"><FileText className="h-3.5 w-3.5" /></a>}
-      </div>
+      {(c.rating != null || c.source || c.resumeUrl) && (
+        <div className="mt-1.5 flex items-center gap-2 pl-9">
+          {c.rating != null && (
+            <span className="inline-flex items-center gap-0.5 text-xs text-amber-400">
+              {c.rating}<Star className="h-3 w-3 fill-amber-400" />
+            </span>
+          )}
+          {c.source && <span className="rounded-full bg-fg/10 px-1.5 py-0.5 text-[10px] text-fg/50">{c.source}</span>}
+          {c.resumeUrl && <a href={c.resumeUrl} target="_blank" rel="noreferrer" className="text-fg/40 hover:text-violet" aria-label="Resume"><FileText className="h-3.5 w-3.5" /></a>}
+        </div>
+      )}
+      {/* Kept, not replaced by the drag. Dragging is a mouse gesture: it is unavailable to anyone
+          on a keyboard and awkward on a touchscreen, so the select stays as the way that always
+          works. The board gains a faster path; it does not lose the reliable one. */}
       <select value={c.stage} onChange={(e) => onMove(e.target.value as CandidateStage)}
+        aria-label={`Move ${c.name} to another stage`}
         className="mt-2 w-full rounded-md border border-fg/10 bg-fg/5 px-1.5 py-1 text-xs text-fg/70">
         {STAGES.map((s) => <option key={s} value={s} className="bg-surface">Move to {STAGE_LABEL[s]}</option>)}
       </select>

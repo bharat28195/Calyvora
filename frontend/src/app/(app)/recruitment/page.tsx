@@ -32,6 +32,7 @@ export default function RecruitmentPage() {
 
   const openCount = jobs?.filter((j) => j.status === "OPEN").length ?? 0;
   const pipeline = jobs?.reduce((s, j) => s + j.candidateCount, 0) ?? 0;
+  const hired = jobs?.reduce((s, j) => s + j.hiredCount, 0) ?? 0;
 
   return (
     <div>
@@ -50,10 +51,13 @@ export default function RecruitmentPage() {
         <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Kpi label="Open roles" value={openCount} />
             <Kpi label="Total openings" value={jobs.length} />
             <Kpi label="In pipeline" value={pipeline} />
+            {/* Hires is the number the row was missing. The other three count work in progress;
+                this one counts work finished, which is the figure anyone actually reports on. */}
+            <Kpi label="Hired" value={hired} tone="text-emerald-400" />
           </div>
 
           {jobs.length === 0 ? (
@@ -76,10 +80,28 @@ export default function RecruitmentPage() {
                         {j.status.toLowerCase().replace("_", " ")}
                       </span>
                     </div>
+                    {/* How full the role is, which is the question the card exists to answer. A bar
+                        rather than "2/3" alone: a manager scanning ten openings finds the empty ones
+                        by shape, without reading a single fraction. */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-fg/50">
+                          {j.hiredCount} of {j.positions} filled
+                        </span>
+                        <span className="tabular-nums text-fg/40">
+                          {Math.min(100, Math.round((j.hiredCount / Math.max(1, j.positions)) * 100))}%
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-fg/10">
+                        <div
+                          className="h-full rounded-full bg-emerald-400/80"
+                          style={{ width: `${Math.min(100, (j.hiredCount / Math.max(1, j.positions)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
                     <div className="mt-3 flex items-center justify-between border-t border-fg/10 pt-3 text-sm">
                       <span className="inline-flex items-center gap-1.5 text-fg/60">
                         <Users className="h-4 w-4 text-violet" /> {j.candidateCount} candidate{j.candidateCount === 1 ? "" : "s"}
-                        {j.hiredCount > 0 && <span className="text-emerald-400"> · {j.hiredCount} hired</span>}
                       </span>
                       <span className="inline-flex items-center gap-1 text-violet">Pipeline <ArrowRight className="h-4 w-4" /></span>
                     </div>
@@ -153,11 +175,11 @@ function NewJobForm({ departments, onCreated, onCancel }: {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: number }) {
+function Kpi({ label, value, tone }: { label: string; value: number; tone?: string }) {
   return (
     <Card className="py-4">
       <p className="text-xs text-fg/50">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      <p className={cn("mt-1 text-2xl font-semibold tabular-nums", tone)}>{value}</p>
     </Card>
   );
 }
