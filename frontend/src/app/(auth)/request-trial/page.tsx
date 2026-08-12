@@ -15,6 +15,16 @@ import { Alert } from "@/components/ui/alert";
 const TEAM_SIZES = ["1–10", "11–50", "51–200", "201–500", "500+"];
 
 /**
+ * Matches <Input> exactly — same height, border, fill and focus ring — because the select sits in a
+ * two-column row beside the phone input and any difference reads as a mistake. The app's other
+ * selects use this same string; it is repeated rather than shared only because this page is in the
+ * public (auth) tree and imports nothing from the app shell.
+ */
+const SELECT_CLS =
+  "h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
+
+/**
  * "Start free trial" (PD-21). This page asks; it does not admit. Nothing submitted here creates a
  * company, a user or a password — the vendor is emailed, decides, and provisions the workspace, and
  * only then does a login exist. The old self-serve /register redirects here.
@@ -130,10 +140,14 @@ function RequestTrialInner() {
           </Field>
           <Field label="Team size" htmlFor="teamSize" hint="Optional">
             <select id="teamSize" value={values.teamSize ?? ""} onChange={set("teamSize")}
-              className="h-10 w-full rounded-lg border border-fg/15 bg-transparent px-3 text-sm outline-none focus:border-violet">
-              <option value="">Choose…</option>
+              className={SELECT_CLS}>
+              {/* Every option carries bg-surface. The open dropdown is drawn by the OS, not by the
+                  page, so it does not inherit our dark background — only the text colour. Left
+                  alone, that is light text on the platform's white popup: invisible until the
+                  highlight passes over a row. This is the convention the rest of the app uses. */}
+              <option value="" className="bg-surface">Choose…</option>
               {TEAM_SIZES.map((s) => (
-                <option key={s} value={s}>{s} people</option>
+                <option key={s} value={s} className="bg-surface">{s} people</option>
               ))}
             </select>
           </Field>
@@ -142,7 +156,8 @@ function RequestTrialInner() {
         <Field label="Anything we should know?" htmlFor="note" hint="Optional" error={errors.note}>
           <textarea id="note" value={values.note ?? ""} onChange={set("note")} rows={3}
             placeholder="What you're hoping to replace, when you'd like to start…"
-            className="w-full rounded-lg border border-fg/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-violet" />
+            className="w-full rounded-lg border border-fg/15 bg-fg/5 px-3 py-2 text-sm text-fg
+              placeholder:text-fg/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet" />
         </Field>
 
         <Button type="submit" size="lg" disabled={submitting} className="mt-2">
