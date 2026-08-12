@@ -51,43 +51,71 @@
       <a href="#flow" class="btn btn-ghost">See how it works</a>
     </div>
     <!-- The button used to open a signup form that created a live workspace on the spot. It now
-         raises a request we answer by hand, so the note under it has to say so — promising "set up in
-         minutes" and then asking someone to wait for a human is how a good first impression is lost. -->
-    <p class="hero-note reveal">No card needed · We set your workspace up and send your sign-in details</p>
+         raises a request we answer by hand, so the note under it says so.
 
-    <div class="trust reveal">
-      <span>Northwind</span><span>Vertex Labs</span><span>Meridian</span><span>Kite &amp; Co</span><span>Solstice</span>
-    </div>
+         "No card needed" was here until it was checked: there is no card processing anywhere in the
+         product — billing computes an amount from headcount and is invoiced by a person. So the line
+         was true the way "no fax needed" is true, and worse, it implied a card would be wanted later.
+         Describe the process instead; it is more reassuring than the claim was. -->
+    <p class="hero-note reveal">Tell us about your team and we'll set the workspace up · Sign-in details come by email</p>
+
+    <!-- A row of five company names used to sit here, styled as a customer logo wall. Three of them
+         (Northwind, Vertex Labs, Meridian) were the DEMO SEED TENANTS out of DemoSeedService.java;
+         the other two were invented. Removed 2026-08-12: a prospect who asks "can I speak to someone
+         at Meridian?" gets an answer we cannot give, and one unearned proof point costs more than it
+         earns on a site whose argument is that we tell the truth.
+         Put real names back only when that client has agreed in writing to be named. -->
   </div>
 
   <!-- PRODUCT MOCK -->
   <div class="wrap">
     <div class="mock reveal">
       <div class="mock-glow"></div>
+      <!-- ====================================================================================
+           This is drawn to match the REAL dashboard, screen for screen. It used to show a
+           "Good morning, Ava 👋" greeting, three KPIs and an approvals feed — none of which
+           exist in the product — on a domain (app.orbit.calyvora.com) we do not own.
+
+           If you change the dashboard, change this. The check is simple: open
+           frontend/src/app/(app)/dashboard/page.tsx and confirm each element below is there.
+             · heading           "Welcome, {firstName}."
+             · sub               "{Company} — your people, one place."
+             · four stat cards   People / Departments / Performance / Payroll
+             · quick access      six tiles, in this order
+           Sidebar labels and their order come from components/layout/app-shell.tsx.
+           ==================================================================================== -->
       <div class="window">
-        <div class="win-bar"><i></i><i></i><i></i><span class="url">app.orbit.calyvora.com/dashboard</span></div>
+        <div class="win-bar"><i></i><i></i><i></i><span class="url">app.calyvora.in/dashboard</span></div>
         <div class="win-body">
           <aside class="side">
             <div class="s-item active"><span class="ic"></span>Dashboard</div>
-            <div class="s-item"><span class="ic"></span>People</div>
-            <div class="s-item"><span class="ic"></span>Attendance</div>
-            <div class="s-item"><span class="ic"></span>Payroll</div>
+            <div class="s-item"><span class="ic"></span>Insights</div>
+            <div class="s-item"><span class="ic"></span>Me</div>
+            <div class="s-item"><span class="ic"></span>Inbox</div>
             <div class="s-item"><span class="ic"></span>Helpdesk</div>
+            <div class="s-item"><span class="ic"></span>People</div>
             <div class="s-item"><span class="ic"></span>Recruitment</div>
-            <div class="s-item"><span class="ic"></span>Documents</div>
+            <div class="s-item"><span class="ic"></span>Payroll</div>
           </aside>
           <div class="content">
-            <h4>Good morning, Ava 👋</h4>
-            <div class="muted">Here's what's happening at Northwind today.</div>
-            <div class="kpis">
-              <div class="kpi"><div class="n">142</div><div class="l">Employees</div></div>
-              <div class="kpi"><div class="n g">96%</div><div class="l">Checked in</div></div>
-              <div class="kpi"><div class="n">7</div><div class="l">Pending approvals</div></div>
+            <h4>Welcome, Ava.</h4>
+            <!-- Northwind Robotics is our own demo tenant, which is exactly what it is here:
+                 sample data inside a product shot, not a customer being named. -->
+            <div class="muted">Northwind Robotics — your people, one place.</div>
+            <div class="kpis four">
+              <div class="kpi"><div class="n">142</div><div class="l">People · 8 departments</div></div>
+              <div class="kpi"><div class="n">8</div><div class="l">Departments · org structure</div></div>
+              <div class="kpi"><div class="go">Open →</div><div class="l">Performance · review cycles</div></div>
+              <div class="kpi"><div class="go">Open →</div><div class="l">Payroll · salaries &amp; payslips</div></div>
             </div>
-            <div class="rows">
-              <div class="row"><div class="who"><span class="av">SO</span>Sara Okoro · Leave request</div><span class="pill warn">Pending</span><span>2 days</span></div>
-              <div class="row"><div class="who"><span class="av">MK</span>Marcus Kane · Regularization</div><span class="pill ok">Approved</span><span>Today</span></div>
-              <div class="row"><div class="who"><span class="av">PN</span>Priya Nair · Payslip ready</div><span class="pill ok">Sent</span><span>Jul</span></div>
+            <div class="sec-label">Quick access</div>
+            <div class="tiles">
+              <div class="tile"><span class="ti"></span>Attendance</div>
+              <div class="tile"><span class="ti"></span>Time off<small>12 days left</small></div>
+              <div class="tile"><span class="ti"></span>My pay</div>
+              <div class="tile"><span class="ti"></span>My review</div>
+              <div class="tile"><span class="ti"></span>Expenses</div>
+              <div class="tile"><span class="ti"></span>Inbox</div>
             </div>
           </div>
         </div>
