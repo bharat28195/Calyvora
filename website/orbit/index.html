@@ -11,7 +11,11 @@
 <link rel="icon" href="favicon.ico" sizes="48x48" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="theme-color" content="#0b0b12" />
-<link rel="stylesheet" href="orbit.css" />
+<!-- ?v= is a cache-buster. This site is uploaded by hand to shared hosting, which serves
+     orbit.css with a long cache life; without it a returning visitor gets new HTML against the
+     stylesheet they already have, and the page renders half-styled. Bump the number on any CSS
+     change. -->
+<link rel="stylesheet" href="orbit.css?v=2" />
 </head>
 <body>
 <div class="glow a"></div><div class="glow b"></div>
@@ -102,11 +106,14 @@
             <!-- Northwind Robotics is our own demo tenant, which is exactly what it is here:
                  sample data inside a product shot, not a customer being named. -->
             <div class="muted">Northwind Robotics — your people, one place.</div>
+            <!-- Card order and shape follow the real Stat component: labelled icon on top, then
+                 the value, then the sub-line. The two without a number show "Open →" because that
+                 is exactly what Performance and Payroll do in the product. -->
             <div class="kpis four">
-              <div class="kpi"><div class="n">142</div><div class="l">People · 8 departments</div></div>
-              <div class="kpi"><div class="n">8</div><div class="l">Departments · org structure</div></div>
-              <div class="kpi"><div class="go">Open →</div><div class="l">Performance · review cycles</div></div>
-              <div class="kpi"><div class="go">Open →</div><div class="l">Payroll · salaries &amp; payslips</div></div>
+              <div class="kpi"><div class="kl"><span class="ki v"></span>People</div><div class="n">142</div><div class="l">8 departments</div></div>
+              <div class="kpi"><div class="kl"><span class="ki a"></span>Departments</div><div class="n">8</div><div class="l">org structure</div></div>
+              <div class="kpi"><div class="kl"><span class="ki m"></span>Performance</div><div class="go">Open →</div><div class="l">review cycles</div></div>
+              <div class="kpi"><div class="kl"><span class="ki e"></span>Payroll</div><div class="go">Open →</div><div class="l">salaries &amp; payslips</div></div>
             </div>
             <div class="sec-label">Quick access</div>
             <div class="tiles">

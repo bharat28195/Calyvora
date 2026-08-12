@@ -9,7 +9,11 @@
 <link rel="icon" href="favicon.ico" sizes="48x48" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="theme-color" content="#0b0b12" />
-<link rel="stylesheet" href="orbit.css" />
+<!-- ?v= is a cache-buster. This site is uploaded by hand to shared hosting, which serves
+     orbit.css with a long cache life; without it a returning visitor gets new HTML against the
+     stylesheet they already have, and the page renders half-styled. Bump the number on any CSS
+     change. -->
+<link rel="stylesheet" href="orbit.css?v=2" />
 </head>
 <body>
 <div class="glow a"></div><div class="glow b"></div>
