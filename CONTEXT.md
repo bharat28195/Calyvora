@@ -26,7 +26,8 @@ nav (not deleted). Added there: **self-service payslips** + admin **Payroll**; *
 template** with payroll validation (V25); **subscription billing** — ₹100/employee/month, metered on
 headcount (V26); **directory pagination** (`/people/employees/page`, scales to 1,000+); and
 **Recruitment / ATS** — job openings + candidate pipeline (V27); **Shift scheduling** — templates +
-weekly roster (V28). Plus a marketing site in `website/priority-hr-services/`.
+weekly roster (V28). Plus a marketing site — since superseded by `website/orbit/`, which is the live
+site for calyvora.in (three pages, hand-uploaded to Hostinger; pushing does not deploy it).
 
 **SaaS pivot (PD-10, [[hr-platform-saas-pivot]]):** now a true multi-tenant SaaS. **OWNER = platform
 vendor** above all companies with a **Platform console** (V30): list companies + headcount/seats/sub

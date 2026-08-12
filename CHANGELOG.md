@@ -349,6 +349,8 @@ isolation, salary privacy, role gates and anonymous access were probed directly 
   pickers.)
 - **`website/priority-hr-services/`** — a self-contained marketing site (hero, services, modules,
   pricing at ₹100/employee/month, contact). No build step; deploy the folder to any static host.
+  *(Removed 2026-08-12: superseded by `website/orbit/`. Left in this entry because a changelog records
+  what happened, not what is currently true.)*
 - **[docs/HR-Modules.md](docs/HR-Modules.md)** — a module inventory (what's shipped) and a prioritized
   roadmap (shifts, HR helpdesk, offboarding, PF/ESI compliance, assets, LMS…) drawn from the competitor
   benchmark.
