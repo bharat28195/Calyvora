@@ -272,6 +272,10 @@
   .org-link{display:inline-block;margin-top:18px;color:var(--aqua);font-size:14px;font-weight:600}
   .org-link:hover{text-decoration:underline}
   .org-note{max-width:640px;margin:36px auto 0;text-align:center;color:var(--fg-3);font-size:14px}
+  /* The note under Careers carries the only "email us" in that section, so its link has to look
+     like one — at --fg-3 on a dark ground an unstyled anchor is nearly invisible. */
+  .org-note a{color:var(--aqua);text-decoration:none;border-bottom:1px solid rgba(34,211,238,.35)}
+  .org-note a:hover{border-bottom-color:var(--aqua)}
 
   /* Directors. Two people, so two columns — a grid built for more would make the company look
      like it is pretending to have a bench it does not have.
@@ -330,6 +334,31 @@
   .grid.principles .card{counter-increment:principle;padding-top:22px}
   .grid.principles .card::before{content:counter(principle,decimal-leading-zero);display:block;
     font-size:12.5px;font-weight:700;letter-spacing:.1em;color:var(--aqua);margin-bottom:10px}
+
+  /* ---- Timeline -------------------------------------------------------------------------
+     A rail down the left with a marker per entry. Deliberately not the two-sided zig-zag most
+     "milestones" sections use: that layout only works when there are many entries and it forces
+     the reader's eye across the page for no gain. One column reads top-to-bottom, which is what
+     a sequence is.
+     The rail fades out at the bottom rather than stopping at a measured height: the last entry's
+     length isn't knowable from CSS, and a hard stop that misses the final marker looks broken in a
+     way a fade never does. */
+  .tl{position:relative;max-width:760px;margin:0 auto;padding-left:34px}
+  .tl::before{content:"";position:absolute;left:5px;top:9px;bottom:0;
+    width:1px;background:linear-gradient(180deg,var(--violet),rgba(34,211,238,.5),transparent)}
+  .tl-item{position:relative;padding-bottom:34px}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-item::before{content:"";position:absolute;left:-34px;top:7px;width:11px;height:11px;
+    border-radius:50%;background:var(--ink);border:2px solid var(--violet)}
+  /* The current stage gets a filled, haloed marker — on a list where every row looks the same,
+     "where we are now" is the one thing the reader actually wants to find. */
+  .tl-item.now::before{background:var(--violet);box-shadow:0 0 0 5px rgba(124,92,255,.18)}
+  .tl-item.next::before{border-color:var(--fg-3)}
+  .tl-when{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--aqua);font-variant-numeric:tabular-nums}
+  .tl-item.next .tl-when{color:var(--fg-3)}
+  .tl-item h3{font-size:19px;letter-spacing:-.02em;font-weight:700;margin-top:7px}
+  .tl-item p{color:var(--fg-2);font-size:14.5px;margin-top:8px;line-height:1.55}
 
   @media(max-width:900px){
     .grid.four,.stats{grid-template-columns:1fr 1fr}
