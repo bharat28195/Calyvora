@@ -43,6 +43,7 @@ import {
   type ReviewCycle,
   type PerformanceReview,
   type ReviewEvidence,
+  type Profitability,
   type CreateCycleInput,
   type SelfAssessmentInput,
   type ManagerReviewInput,
@@ -233,6 +234,12 @@ export const api = {
   },
   analyticsOverview(): Promise<AnalyticsOverview> {
     return LIVE ? http<AnalyticsOverview>("/analytics/overview") : mockBackend.analyticsOverview(accessToken);
+  },
+  /** Delivery cost vs what it was sold for (D2). Defaults to the current month server-side. */
+  profitability(from?: string, to?: string): Promise<Profitability> {
+    const q = from && to ? `?from=${from}&to=${to}` : "";
+    return LIVE ? http<Profitability>(`/analytics/profitability${q}`)
+      : mockBackend.profitability(accessToken);
   },
   // --- billing (subscription: per employee, per month) ---
   billingOverview(): Promise<BillingOverview> {

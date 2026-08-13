@@ -80,14 +80,31 @@ from attendance plus real work activity.
 For any services business (agencies, IT services, consulting) this is the number the founder
 actually cares about, and no HR vendor gives it to them.
 
-- [ ] Cost rate per employee derived from compensation ÷ working days
-- [ ] Effort attribution: work-item activity → project, per employee, per period
-- [ ] Billable vs non-billable flag on projects and work items
-- [ ] Contract/rate value on `Client`
-- [ ] Project P&L: cost, billed, margin, trend
-- [ ] Per-person utilisation and realisation
-- [ ] Analytics page: margin by project, by client, by team
-- [ ] Guard: compensation figures visible only to roles that already see pay
+- [x] `V44` — projects gain a client link, a `billable` flag, and a `contract_value`. Internal is the
+      default: defaulting to billable would invent revenue that does not exist.
+- [x] Cost rate per employee from current compensation ÷ 250 working days, × days actually worked
+      (attendance; half days count half). A company that records no attendance falls back to the
+      period's weekdays rather than reporting everyone as free.
+- [x] Effort attribution: cost is allocated across the projects a person closed work in, weighted by
+      story points — or item count when nothing they closed was estimated
+- [x] Project P&L: cost, agreed fee, margin, margin %
+- [x] Per-person cost and **billable percentage** (share of their cost on sold work)
+- [x] `GET /analytics/profitability?from&to`, defaulting to the current month
+- [x] Guard: OWNER/ADMIN/HR only — the figures are derived from individual salaries, so the audience
+      is exactly the audience that can already read pay. Covered by a test.
+- [x] Insights page: "Delivery economics" section — KPI strip, per-project lines, per-person bars
+- [x] Integration tests (6): allocation ratio, sum-to-whole identity, margin, unestimated fallback,
+      permissions, tenant isolation, bad period
+- [x] **Unallocated cost is reported, not hidden.** Someone paid who closed nothing trackable would
+      otherwise make every project look cheaper than it was.
+- [ ] Trend over time (this is a single-period snapshot)
+- [ ] Margin by client and by team (only by project today)
+- [ ] Rate cards / milestone billing — one agreed fee per project is all we have evidence we need
+
+**The honest limit:** this is an *allocation* model, not a timesheet. We spread payroll across
+delivered work because that is the evidence we have. It is wrong for anyone whose valuable work is
+not tracked as closed items, and the API says so in a `basis` field that the UI renders verbatim
+rather than paraphrasing. Real timesheets would replace the allocation without changing the shape.
 
 ### D3 · Cross-domain AI assistant — *already built, badly undersold*
 [`AssistantService`](../backend/src/main/java/com/calyvora/assistant/AssistantService.java) already

@@ -24,12 +24,15 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final com.calyvora.client.ClientRepository clientRepository;
 
     public ProjectService(ProjectRepository projectRepository, TaskRepository taskRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          com.calyvora.client.ClientRepository clientRepository) {
         this.projectRepository = projectRepository;
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
+        this.clientRepository = clientRepository;
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +73,16 @@ public class ProjectService {
         if (request.leadUserId() != null) {
             project.setLeadUserId(resolveLead(project.getCompanyId(), request.leadUserId()));
         }
+        if (request.clientId() != null) {
+            project.setClientId(resolveClient(project.getCompanyId(), request.clientId()));
+        }
+        if (request.billable() != null) {
+            project.setBillable(request.billable());
+        }
+        if (request.contractValue() != null) {
+            // Negative clears the agreed fee; anything else is the fee itself.
+            project.setContractValue(request.contractValue().signum() < 0 ? null : request.contractValue());
+        }
         return toResponse(project);
     }
 
@@ -93,7 +106,9 @@ public class ProjectService {
                 : userRepository.findById(p.getLeadUserId()).map(User::fullName).orElse(null);
         long total = taskRepository.countByProjectId(p.getId());
         long open = taskRepository.countByProjectIdAndStatusNot(p.getId(), TaskStatus.DONE);
-        return ProjectResponse.of(p, leadName, total, open);
+        String clientName = p.getClientId() == null ? null
+                : clientRepository.findById(p.getClientId()).map(com.calyvora.client.Client::getName).orElse(null);
+        return ProjectResponse.of(p, leadName, total, open, clientName);
     }
 
     private UUID resolveLead(UUID companyId, String leadUserId) {
@@ -109,6 +124,22 @@ public class ProjectService {
         userRepository.findByIdAndCompanyId(lead, companyId)
                 .orElseThrow(() -> new NotFoundException("Lead user not found"));
         return lead;
+    }
+
+    /** Blank detaches the project from its client; anything else must be a client in this tenant. */
+    private UUID resolveClient(UUID companyId, String clientId) {
+        if (clientId.isBlank()) {
+            return null;
+        }
+        UUID id;
+        try {
+            id = UUID.fromString(clientId);
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Invalid client id");
+        }
+        clientRepository.findByIdAndCompanyId(id, companyId)
+                .orElseThrow(() -> new NotFoundException("Client not found"));
+        return id;
     }
 
     private static String blankToNull(String s) {

@@ -281,6 +281,34 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   `git checkout -b` moves every one of them onto the new branch. See L-2.
 - **Final outcome:** _In progress — D1 first._
 
+### L-5 · 2026-08-13 · Two numbers that look comparable, and aren't
+- **What happened:** project profitability shipped its first screen showing a 99.6% margin on every
+  engagement. The arithmetic was right and the meaning was wrong: it compared a *whole-engagement*
+  contract value against *one month's* allocated cost. Every young project looks almost pure profit
+  under that comparison, and the number would have been quoted at a customer before anyone noticed.
+- **Decision:** the response now carries both `cost` (the requested period) and `costToDate` (since
+  the engagement began), and margin is computed only against `costToDate`. The UI labels them "Cost
+  this period" and "Cost to date" so the comparison is legible on the screen, not just in the code.
+- **Lesson:** when a figure is a *rate* (per period) and another is a *total* (per engagement), the
+  type system will not save you — both are just money. Any subtraction between two money fields
+  deserves the question "over what span is each of these measured?" before it ships. Unit tests pass
+  happily on unit-mismatched arithmetic.
+- **Caught by:** running it against seeded data and reading the number, not by the six integration
+  tests, which all asserted the identity that was itself wrong. Same lesson as L-4.
+
+### L-4 · 2026-08-12 · A green suite is not a working feature
+- **What happened:** the review evidence panel shipped with 282 backend tests green and a clean
+  typecheck, and was **completely dead** in the browser — expanding it span forever on "Gathering the
+  record…". Its fetch effect listed `loading` in its dependency array *and* set it, so
+  `setLoading(true)` re-ran the effect, the cleanup cancelled the in-flight request before its
+  `finally` could clear the flag, and the re-run bailed because the flag was still set.
+- **Lesson:** our tests exercise the API, which was correct throughout. Nothing in the suite opens a
+  component. A feature is not done when the endpoint returns the right JSON — it is done when someone
+  has watched the screen render it. **Run the app before calling a UI feature finished**; it is the
+  only step that would have caught this, and it took two minutes.
+- **Standing rule:** any React effect that both reads and writes a piece of state needs a ref guard,
+  not a state guard. The state guard is a deadlock waiting for its first render.
+
 ### L-3 · 2026-08-12 · A timezone bug fixed in one module is a timezone bug still waiting in the others
 - **What happened:** PD-16 fixed attendance stamping punches in server UTC rather than company time,
   and the fix lived as a private `zone()` helper inside `AttendanceService`. The very next feature to

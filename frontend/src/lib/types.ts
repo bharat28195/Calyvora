@@ -1006,6 +1006,62 @@ export interface Project {
   taskCount: number;
   openTaskCount: number;
   createdAt: string;
+  // Commercials (D2) — who it's for and what it's worth.
+  clientId: string | null;
+  clientName: string | null;
+  billable: boolean;
+  contractValue: number | null;
+}
+
+/** One project's economics for a period (D2). */
+export interface ProfitabilityProject {
+  projectId: string;
+  projectKey: string;
+  projectName: string;
+  clientId: string | null;
+  clientName: string | null;
+  billable: boolean;
+  contractValue: number | null;
+  /** Allocated cost for the requested period. */
+  cost: number;
+  /** Allocated cost since the engagement began — what the fee is actually measured against. */
+  costToDate: number;
+  margin: number | null;
+  marginPercent: number | null;
+  itemsDelivered: number;
+  pointsDelivered: number;
+  contributors: number;
+}
+
+/** One person's cost for a period, and how much of it landed on sold work (D2). */
+export interface ProfitabilityPerson {
+  employeeId: string;
+  employeeName: string;
+  cost: number;
+  billablePercent: number;
+  daysWorked: number;
+  itemsDelivered: number;
+  pointsDelivered: number;
+  projectsTouched: number;
+}
+
+/**
+ * What delivery cost against what it was sold for. `basis` states the allocation model in the
+ * server's own words — render it, don't paraphrase it, so nobody reads these as billing figures.
+ */
+export interface Profitability {
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  basis: string;
+  totalCost: number;
+  totalContractValue: number;
+  totalMargin: number;
+  projectsCosted: number;
+  peopleCosted: number;
+  unallocatedCost: number;
+  projects: ProfitabilityProject[];
+  people: ProfitabilityPerson[];
 }
 
 export interface Task {

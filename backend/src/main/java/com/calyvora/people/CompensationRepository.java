@@ -9,4 +9,10 @@ public interface CompensationRepository extends JpaRepository<CompensationRecord
 
     /** Newest first (current pay is the first element). */
     List<CompensationRecord> findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(UUID employeeId);
+
+    /**
+     * Every pay record in the tenant, newest first. Builds the whole company's cost picture in one
+     * query instead of one per head (D2 profitability).
+     */
+    List<CompensationRecord> findByCompanyIdOrderByEffectiveDateDescCreatedAtDesc(UUID companyId);
 }

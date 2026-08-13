@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Users, Wallet, Gauge } from "lucide-react";
+import { Loader2, Users, Wallet, Gauge, Briefcase } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { AnalyticsOverview } from "@/lib/types";
+import type { AnalyticsOverview, Profitability } from "@/lib/types";
 import { money as fmtMoney } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
@@ -71,6 +71,9 @@ export default function AnalyticsPage() {
         </Panel>
       </div>
 
+      {/* Delivery economics (D2) — the join no other HR product can make. */}
+      <DeliveryEconomics />
+
       {/* Finance */}
       <SectionTitle icon={<Wallet className="h-5 w-5 text-emerald-400" />}>Finance</SectionTitle>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -89,6 +92,115 @@ export default function AnalyticsPage() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+/**
+ * What delivery cost against what it was sold for (D2).
+ *
+ * <p>Loaded separately from the overview so a company with no projects, or a slow first month, never
+ * blocks the rest of Insights. The server's `basis` string is rendered verbatim rather than
+ * paraphrased — these are allocated costs, and the screen has to say so where the numbers are.
+ */
+function DeliveryEconomics() {
+  const [data, setData] = useState<Profitability | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.profitability()
+      .then(setData)
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load delivery economics"));
+  }, []);
+
+  const money = (n: number) => fmtMoney(n);
+
+  return (
+    <>
+      <SectionTitle icon={<Briefcase className="h-5 w-5 text-aqua" />}>Delivery economics</SectionTitle>
+      {error && <Alert tone="error">{error}</Alert>}
+      {!error && !data && (
+        <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-violet" /></div>
+      )}
+      {data && (
+        <>
+          <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Kpi label="Delivery cost" value={money(data.totalCost)}
+              hint={`${data.periodStart} → ${data.periodEnd}`} />
+            <Kpi label="Contracted" value={money(data.totalContractValue)}
+              hint={`${data.projectsCosted} project${data.projectsCosted === 1 ? "" : "s"} costed`} />
+            <Kpi label="Margin" value={money(data.totalMargin)}
+              hint={data.totalContractValue === 0 ? "no fees agreed yet" : "contracted less cost"} />
+            <Kpi label="Unallocated" value={money(data.unallocatedCost)}
+              hint="paid, nothing closed" />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel title="By project" subtitle="Most expensive first">
+              {data.projects.length === 0 ? (
+                <Empty>No work was closed against a project in this period.</Empty>
+              ) : (
+                <div className="space-y-2">
+                  {data.projects.map((p) => (
+                    <div key={p.projectId} className="rounded-lg border border-fg/10 p-2.5">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono text-xs text-violet">{p.projectKey}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-fg/80">{p.projectName}</span>
+                        {p.billable
+                          ? <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">Billable</span>
+                          : <span className="shrink-0 rounded-full bg-fg/10 px-2 py-0.5 text-xs text-fg/40">Internal</span>}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-fg/50">
+                        <span>Cost this period <span className="tabular-nums text-fg/80">{money(p.cost)}</span></span>
+                        {p.contractValue != null && (
+                          <>
+                            <span>Fee <span className="tabular-nums text-fg/80">{money(p.contractValue)}</span></span>
+                            <span>Cost to date <span className="tabular-nums text-fg/80">{money(p.costToDate)}</span></span>
+                          </>
+                        )}
+                        {p.margin != null && (
+                          <span>
+                            Margin{" "}
+                            <span className={`tabular-nums ${p.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                              {money(p.margin)}{p.marginPercent != null && ` (${p.marginPercent}%)`}
+                            </span>
+                          </span>
+                        )}
+                        {p.clientName && <span className="text-fg/35">{p.clientName}</span>}
+                        <span className="text-fg/35">
+                          {p.itemsDelivered} item{p.itemsDelivered === 1 ? "" : "s"} · {p.contributors} contributor{p.contributors === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="By person" subtitle="Cost this period, and how much went to sold work">
+              {data.people.length === 0 ? (
+                <Empty>Nobody has pay on record for this period.</Empty>
+              ) : (
+                <div className="space-y-2">
+                  {data.people.map((p) => (
+                    <div key={p.employeeId} className="flex items-center gap-3 text-sm">
+                      <span className="min-w-0 flex-1 truncate text-fg/75">{p.employeeName}</span>
+                      <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-fg/10"
+                        title={`${p.billablePercent}% of cost on billable work`}>
+                        <div className="h-full rounded-full bg-emerald-400" style={{ width: `${p.billablePercent}%` }} />
+                      </div>
+                      <span className="w-12 shrink-0 text-right text-xs tabular-nums text-fg/40">{p.billablePercent}%</span>
+                      <span className="w-24 shrink-0 text-right text-xs tabular-nums text-fg/70">{money(p.cost)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          </div>
+
+          <p className="mt-2 text-xs leading-relaxed text-fg/35">{data.basis}</p>
+        </>
+      )}
+    </>
   );
 }
 

@@ -40,6 +40,7 @@ import {
   type HikeType,
   type PerformanceReview,
   type ReviewEvidence,
+  type Profitability,
   type CreateCycleInput,
   type SelfAssessmentInput,
   type ManagerReviewInput,
@@ -187,6 +188,10 @@ interface ProjectRow {
   status: Project["status"];
   leadUserId: string | null;
   createdAt: string;
+  /** Commercials (D2). Optional so rows persisted before this existed still load. */
+  clientId?: string | null;
+  billable?: boolean;
+  contractValue?: number | null;
 }
 interface TaskRow {
   id: string;
@@ -1361,6 +1366,87 @@ export const mockBackend = {
   },
 
   // --- analytics (mirrors AnalyticsService) ---------------------------------
+  /**
+   * Delivery economics (D2). The mock has no compensation history or attendance, so it costs each
+   * contributor at a flat notional rate and allocates by delivered items — enough to exercise the
+   * UI. The live backend does the real thing from salaries, attendance and story points.
+   */
+  async profitability(accessToken: string | null): Promise<Profitability> {
+    await delay();
+    const db = load();
+    const user = requireSession(db, accessToken);
+    requireAdmin(user);
+    const cid = user.companyId;
+
+    const now = new Date();
+    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const NOTIONAL_MONTHLY_COST = 80000;
+
+    const done = db.tasks.filter((t) => t.companyId === cid && t.status === "DONE" && t.assigneeId);
+    const byProject = new Map<string, { items: number; points: number; people: Set<string> }>();
+    const byPerson = new Map<string, { items: number; points: number; projects: Set<string> }>();
+    for (const t of done) {
+      const p = byProject.get(t.projectId) ?? { items: 0, points: 0, people: new Set<string>() };
+      p.items += 1; p.points += t.storyPoints ?? 0; p.people.add(t.assigneeId!);
+      byProject.set(t.projectId, p);
+      const q = byPerson.get(t.assigneeId!) ?? { items: 0, points: 0, projects: new Set<string>() };
+      q.items += 1; q.points += t.storyPoints ?? 0; q.projects.add(t.projectId);
+      byPerson.set(t.assigneeId!, q);
+    }
+
+    const totalItems = done.length || 1;
+    const pool = NOTIONAL_MONTHLY_COST * byPerson.size;
+    const projects = [...byProject.entries()].flatMap(([projectId, agg]) => {
+      const project = db.projects.find((p) => p.id === projectId);
+      if (!project) return [];
+      const cost = Math.round((pool * agg.items) / totalItems);
+      const fee = project.contractValue ?? null;
+      const client = project.clientId
+        ? (mockClients[cid] ?? []).find((c) => c.id === project.clientId) : undefined;
+      return [{
+        projectId, projectKey: project.key, projectName: project.name,
+        clientId: project.clientId ?? null, clientName: client?.name ?? null,
+        billable: project.billable ?? false,
+        contractValue: fee,
+        cost,
+        costToDate: cost,   // the mock has no history to accumulate, so the two coincide
+        margin: fee === null ? null : fee - cost,
+        marginPercent: fee === null || fee === 0 ? null : Math.round(((fee - cost) / fee) * 1000) / 10,
+        itemsDelivered: agg.items, pointsDelivered: agg.points, contributors: agg.people.size,
+      }];
+    }).sort((a, b) => b.cost - a.cost);
+
+    const people = [...byPerson.entries()].flatMap(([employeeId, agg]) => {
+      const employee = db.employees.find((e) => e.id === employeeId);
+      if (!employee) return [];
+      const u = db.users.find((x) => x.id === employee.userId);
+      const billableItems = done.filter((t) => t.assigneeId === employeeId
+        && db.projects.find((p) => p.id === t.projectId)?.billable).length;
+      return [{
+        employeeId,
+        employeeName: u ? `${u.firstName} ${u.lastName}` : "Employee",
+        cost: NOTIONAL_MONTHLY_COST,
+        billablePercent: agg.items === 0 ? 0 : Math.round((billableItems / agg.items) * 1000) / 10,
+        daysWorked: 20,
+        itemsDelivered: agg.items, pointsDelivered: agg.points, projectsTouched: agg.projects.size,
+      }];
+    }).sort((a, b) => b.cost - a.cost);
+
+    const totalCost = projects.reduce((s, p) => s + p.cost, 0);
+    const totalContractValue = projects.reduce((s, p) => s + (p.contractValue ?? 0), 0);
+    return {
+      periodStart, periodEnd,
+      currency: db.settings.find((s) => s.companyId === cid)?.currency ?? "INR",
+      basis: "Cost is allocated, not measured: each person's pay for the period is spread across the "
+        + "projects they closed work in, weighted by story points (or item count when unestimated). "
+        + "Work that isn't tracked as closed items won't appear here.",
+      totalCost, totalContractValue, totalMargin: totalContractValue - totalCost,
+      projectsCosted: projects.length, peopleCosted: people.length,
+      unallocatedCost: 0,
+      projects, people,
+    };
+  },
   async analyticsOverview(accessToken: string | null): Promise<AnalyticsOverview> {
     await delay();
     const db = load();
@@ -3219,6 +3305,12 @@ function toProject(db: DB, p: ProjectRow): Project {
     taskCount: tasks.length,
     openTaskCount: tasks.filter((t) => t.status !== "DONE").length,
     createdAt: p.createdAt,
+    clientId: p.clientId ?? null,
+    clientName: p.clientId
+      ? ((mockClients[p.companyId] ?? []).find((c) => c.id === p.clientId)?.name ?? null)
+      : null,
+    billable: p.billable ?? false,
+    contractValue: p.contractValue ?? null,
   };
 }
 

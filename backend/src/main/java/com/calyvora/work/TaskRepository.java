@@ -54,4 +54,7 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
     /** What this person actually delivered inside a review period — the evidence pack (PD-17, D1). */
     List<Task> findByCompanyIdAndAssigneeIdAndCompletedAtBetweenOrderByCompletedAtDesc(
             UUID companyId, UUID assigneeId, Instant from, Instant to);
+
+    /** Everything the whole company delivered in a window — the cost-allocation basis (D2). */
+    List<Task> findByCompanyIdAndCompletedAtBetween(UUID companyId, Instant from, Instant to);
 }

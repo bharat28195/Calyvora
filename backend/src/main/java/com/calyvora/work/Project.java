@@ -39,6 +39,18 @@ public class Project {
     @Column(name = "lead_user_id")
     private UUID leadUserId;
 
+    /** The client this is delivered for, or null for internal work (V44, D2). */
+    @Column(name = "client_id")
+    private UUID clientId;
+
+    /** Whether the work is sold. Internal by default — defaulting to billable would invent revenue. */
+    @Column(nullable = false)
+    private boolean billable = false;
+
+    /** The agreed fee for the whole engagement, in the company's currency. Null = not agreed yet. */
+    @Column(name = "contract_value")
+    private java.math.BigDecimal contractValue;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -114,6 +126,30 @@ public class Project {
 
     public void setLeadUserId(UUID leadUserId) {
         this.leadUserId = leadUserId;
+    }
+
+    public UUID getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(UUID clientId) {
+        this.clientId = clientId;
+    }
+
+    public boolean isBillable() {
+        return billable;
+    }
+
+    public void setBillable(boolean billable) {
+        this.billable = billable;
+    }
+
+    public java.math.BigDecimal getContractValue() {
+        return contractValue;
+    }
+
+    public void setContractValue(java.math.BigDecimal contractValue) {
+        this.contractValue = contractValue;
     }
 
     public Instant getCreatedAt() {
