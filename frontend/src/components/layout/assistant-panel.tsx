@@ -2,17 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Sparkles, X, Send, Loader2, FileText } from "lucide-react";
+import { Sparkles, X, Send, Loader2, FileText, ArrowUpRight } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { AssistantResponse, AssistantSource } from "@/lib/types";
 
 type Turn = { role: "user" } | ({ role: "assistant" } & AssistantResponse) | { role: "error"; answer: string };
 
+/**
+ * These four are the clearest signal of what the assistant can do, and the old set was quietly
+ * teaching the wrong thing: "How does our authentication work?" and "What's in the incident
+ * runbook?" are questions for an engineering wiki, so anyone who clicked one learned the assistant
+ * was a search box over documents. It now reads across the whole app, and these say so — one from
+ * people ops, one from approvals, one from hiring, one from the handbook.
+ *
+ * A question about something the caller's role can't see is answered honestly rather than with a
+ * zero, so it is safe to suggest the hiring one to everybody.
+ */
 const SUGGESTIONS = [
-  "How many open tickets do we have?",
-  "How does our authentication work?",
-  "Who's on the team?",
-  "What's in the incident runbook?",
+  "How many people are on notice?",
+  "What's waiting for approval?",
+  "How's hiring going?",
+  "What's our leave policy?",
 ];
 
 export function AssistantPanel() {
@@ -75,7 +85,9 @@ export function AssistantPanel() {
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
             {turns.length === 0 && (
               <div className="text-sm text-fg/50">
-                <p>Ask anything about your company — People, Work, or Knowledge. Answers are grounded in your real data.</p>
+                <p>Ask anything about your company — people, attendance, time off, hiring, approvals,
+                  letters or your handbook. Answers come from your real data, and only what your role
+                  can already see.</p>
                 <div className="mt-4 flex flex-col gap-2">
                   {SUGGESTIONS.map((s) => (
                     <button key={s} onClick={() => send(s)}
@@ -113,10 +125,16 @@ export function AssistantPanel() {
                   </div>
                   {!isError && "sources" in turn && turn.sources.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
+                      {/* Two kinds of source now. A page is where the answer was read from; a module
+                          is where the work is done. Same chip, different icon, so "Time off" reads as
+                          a place to go rather than a document that happens to be called that. */}
                       {turn.sources.map((s: AssistantSource, j: number) => (
                         <Link key={j} href={s.href} onClick={() => setOpen(false)}
                           className="inline-flex items-center gap-1 rounded-full border border-fg/10 bg-fg/5 px-2 py-1 text-xs text-fg/60 hover:bg-fg/10">
-                          <FileText className="h-3 w-3 text-emerald-400" /> {s.title}
+                          {s.kind === "module"
+                            ? <ArrowUpRight className="h-3 w-3 text-violet" />
+                            : <FileText className="h-3 w-3 text-emerald-400" />}
+                          {s.title}
                         </Link>
                       ))}
                     </div>

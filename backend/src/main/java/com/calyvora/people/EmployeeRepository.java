@@ -25,5 +25,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
     long countByManagerId(UUID managerId);
 
+    /** For the assistant: how many people are in a given employment state (notice, onboarding...). */
+    long countByCompanyIdAndEmploymentStatus(UUID companyId, EmploymentStatus employmentStatus);
+
     List<Employee> findByManagerId(UUID managerId);
 }

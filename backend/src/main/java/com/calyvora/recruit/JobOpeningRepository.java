@@ -11,4 +11,7 @@ public interface JobOpeningRepository extends JpaRepository<JobOpening, UUID> {
     List<JobOpening> findByCompanyIdOrderByCreatedAtDesc(UUID companyId);
 
     Optional<JobOpening> findByIdAndCompanyId(UUID id, UUID companyId);
+
+    /** For the assistant: roles actively being hired for. */
+    long countByCompanyIdAndStatus(UUID companyId, JobStatus status);
 }

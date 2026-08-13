@@ -15,4 +15,7 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, UUID
     Optional<LeaveRequest> findByIdAndCompanyId(UUID id, UUID companyId);
 
     List<LeaveRequest> findByEmployeeIdAndTypeAndStatus(UUID employeeId, LeaveType type, LeaveStatus status);
+
+    /** For the assistant: how many requests are sitting with an approver right now. */
+    long countByCompanyIdAndStatus(UUID companyId, LeaveStatus status);
 }

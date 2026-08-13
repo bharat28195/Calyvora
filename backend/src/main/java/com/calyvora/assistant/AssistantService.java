@@ -4,6 +4,7 @@ import com.calyvora.assistant.dto.AssistantResponse;
 import com.calyvora.assistant.dto.AssistantResponse.Source;
 import com.calyvora.common.error.ApiException;
 import com.calyvora.common.error.ErrorCode;
+import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.TenantContext;
 import com.calyvora.knowledge.Page;
 import com.calyvora.knowledge.PageRepository;
@@ -48,14 +49,16 @@ public class AssistantService {
     private final TicketRepository ticketRepository;
     private final SpaceRepository spaceRepository;
     private final PageRepository pageRepository;
+    private final CompanySnapshot snapshot;
     private final ClaudeAssistant claude;
     private final LocalGroundedAssistant local;
 
     public AssistantService(EmployeeService employeeService, DepartmentRepository departmentRepository,
                             ProjectRepository projectRepository, TaskRepository taskRepository,
                             TicketRepository ticketRepository, SpaceRepository spaceRepository,
-                            PageRepository pageRepository, ClaudeAssistant claude,
-                            LocalGroundedAssistant local) {
+                            PageRepository pageRepository, CompanySnapshot snapshot,
+                            ClaudeAssistant claude, LocalGroundedAssistant local) {
+        this.snapshot = snapshot;
         this.employeeService = employeeService;
         this.departmentRepository = departmentRepository;
         this.projectRepository = projectRepository;
@@ -68,12 +71,13 @@ public class AssistantService {
     }
 
     @Transactional(readOnly = true)
-    public AssistantResponse ask(String question) {
+    public AssistantResponse ask(String question, AuthPrincipal principal) {
         if (question == null || question.isBlank()) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Ask a question first.");
         }
         UUID companyId = TenantContext.getCompanyId();
-        AssistantContext ctx = buildContext(companyId, question.trim());
+        AssistantContext ctx = buildContext(companyId, question.trim(),
+                CompanySnapshot.Scope.of(principal == null ? null : principal.role()));
 
         // Prefer Claude when configured; fall back to the always-available local provider.
         String answer = null;
@@ -90,7 +94,7 @@ public class AssistantService {
         return new AssistantResponse(answer, mode, ctx.sources());
     }
 
-    private AssistantContext buildContext(UUID companyId, String question) {
+    private AssistantContext buildContext(UUID companyId, String question, CompanySnapshot.Scope scope) {
         Map<String, Long> metrics = new LinkedHashMap<>();
         metrics.put("members", (long) employeeDirectory(companyId).size());
         metrics.put("departments", departmentRepository.countByCompanyId(companyId));
@@ -101,6 +105,10 @@ public class AssistantService {
                 List.of(TicketStatus.OPEN, TicketStatus.PENDING)));
         metrics.put("spaces", spaceRepository.countByCompanyId(companyId));
         metrics.put("pages", pageRepository.countByCompanyId(companyId));
+        // The rest of the app — people ops, hiring, approvals, documents — added at whatever depth
+        // this caller is allowed. Before this, the assistant could only see Work and Knowledge, which
+        // is why it behaved as though the product were a docs tool with a task list attached.
+        metrics.putAll(snapshot.metrics(companyId, scope));
 
         List<String> people = new ArrayList<>();
         for (EmployeeResponse e : employeeDirectory(companyId)) {
@@ -120,8 +128,59 @@ public class AssistantService {
             snippets.add("**" + p.getTitle() + "**\n" + snippet(p.getBody(), question));
             sources.add(new Source("page", p.getTitle(), "/knowledge/" + p.getSpaceId()));
         }
+        sources.addAll(modulesFor(question, scope));
 
-        return new AssistantContext(question, prompt(metrics, people, snippets), metrics, people, snippets, sources);
+        return new AssistantContext(question,
+                prompt(metrics, people, snippets, snapshot.legend(scope)), metrics, people, snippets, sources);
+    }
+
+    /**
+     * The screen behind the answer. Citing a knowledge page was the only thing the assistant ever
+     * pointed at, which is what made it feel like a search box over the handbook — ask it about leave
+     * and it had nothing to show you. Now a question that touches a module links to that module, so
+     * the answer ends where the work is done rather than at a dead end.
+     *
+     * <p>Gated by the same scope as the metrics: offering a manager-only screen to someone who will
+     * be bounced by the nav is a worse experience than not mentioning it.
+     */
+    private List<Source> modulesFor(String question, CompanySnapshot.Scope scope) {
+        String q = question.toLowerCase();
+        List<Source> out = new ArrayList<>();
+        if (q.contains("leave") || q.contains("time off") || q.contains("holiday") || q.contains("absent")) {
+            out.add(new Source("module", "Time off", "/me/leave"));
+        }
+        if (q.contains("attendance") || q.contains("check in") || q.contains("checked in") || q.contains("present")) {
+            out.add(new Source("module", "Attendance", "/me/attendance"));
+        }
+        if (q.contains("payslip") || q.contains("salary slip") || q.contains("my pay")) {
+            out.add(new Source("module", "My pay", "/me/payslip"));
+        }
+        if (q.contains("expense") || q.contains("claim") || q.contains("reimburse")) {
+            out.add(new Source("module", "Expenses", "/me/expenses"));
+        }
+        if (q.contains("helpdesk") || q.contains("ticket") || q.contains("complaint")) {
+            out.add(new Source("module", "Helpdesk", "/helpdesk"));
+        }
+        if (scope.atLeast(CompanySnapshot.Scope.HR_PLUS)) {
+            if (q.contains("hiring") || q.contains("candidate") || q.contains("recruit")
+                    || q.contains("opening") || q.contains("vacancy") || q.contains("role")) {
+                out.add(new Source("module", "Recruitment", "/recruitment"));
+            }
+            if (q.contains("review") || q.contains("appraisal") || q.contains("performance")) {
+                out.add(new Source("module", "Performance", "/performance"));
+            }
+            if (q.contains("letter") || q.contains("offer") || q.contains("document") || q.contains("template")) {
+                out.add(new Source("module", "Documents", "/documents/templates"));
+            }
+            if (q.contains("payroll") || q.contains("salaries")) {
+                out.add(new Source("module", "Payroll", "/payroll"));
+            }
+        }
+        if (scope.atLeast(CompanySnapshot.Scope.MANAGES)
+                && (q.contains("exit") || q.contains("resign") || q.contains("notice") || q.contains("leaving"))) {
+            out.add(new Source("module", "Exits", "/people/exits"));
+        }
+        return out;
     }
 
     private List<EmployeeResponse> employeeDirectory(UUID companyId) {
@@ -172,16 +231,23 @@ public class AssistantService {
         return (start > 0 ? "…" : "") + clip + (end < body.length() ? "…" : "");
     }
 
-    private String prompt(Map<String, Long> metrics, List<String> people, List<String> snippets) {
+    private String prompt(Map<String, Long> metrics, List<String> people, List<String> snippets, String legend) {
         StringBuilder sb = new StringBuilder();
         sb.append("COMPANY METRICS:\n");
         metrics.forEach((k, v) -> sb.append("- ").append(k).append(": ").append(v).append('\n'));
+        // Without this the model has to guess what a key means, and it guesses confidently:
+        // "peopleOnNotice" reads as a disciplinary count rather than an exit in progress.
+        sb.append('\n').append(legend);
         if (!people.isEmpty()) {
             sb.append("\nPEOPLE:\n- ").append(String.join("\n- ", people)).append('\n');
         }
         if (!snippets.isEmpty()) {
             sb.append("\nRELEVANT KNOWLEDGE PAGES:\n\n").append(String.join("\n\n", snippets)).append('\n');
         }
+        // The scope is enforced by what was retrieved, not by asking the model nicely — but saying it
+        // stops the model filling a gap with a plausible number when a metric simply isn't present.
+        sb.append("\nIf a figure is not listed above, say you don't have access to it rather than "
+                + "estimating. Never state anyone's salary, PAN or bank details.\n");
         return sb.toString();
     }
 }

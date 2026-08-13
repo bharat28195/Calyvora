@@ -17,4 +17,9 @@ public interface CandidateRepository extends JpaRepository<Candidate, UUID> {
     long countByJobId(UUID jobId);
 
     long countByJobIdAndStage(UUID jobId, CandidateStage stage);
+
+    /** For the assistant: the whole pipeline across every opening. */
+    long countByCompanyId(UUID companyId);
+
+    long countByCompanyIdAndStageNotIn(UUID companyId, List<CandidateStage> stages);
 }

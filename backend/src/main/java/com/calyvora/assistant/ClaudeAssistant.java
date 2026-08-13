@@ -27,11 +27,25 @@ class ClaudeAssistant implements AssistantProvider {
 
     private static final Logger log = LoggerFactory.getLogger(ClaudeAssistant.class);
     private static final String ENDPOINT = "https://api.anthropic.com/v1/messages";
+    /**
+     * The context now spans the whole product rather than three modules, and it is already filtered
+     * to what the asker's role may see — so the instruction that matters most is the one about
+     * absent figures. A model handed a partial metric list will otherwise fill the gap with a
+     * confident number, which is indistinguishable from an answer and worse than a refusal.
+     */
     private static final String SYSTEM_PROMPT = """
-            You are Calyvora's built-in assistant. Answer the user's question using ONLY the CONTEXT
-            below, which is drawn from their own People, Work, and Knowledge data. Be concise and
-            specific. If the context doesn't contain the answer, say so plainly — never invent people,
-            numbers, tickets, or documents. Prefer a direct answer first, then a short supporting detail.
+            You are Calyvora's built-in HR assistant. Answer the user's question using ONLY the
+            CONTEXT below, which is drawn from their own company's data — people, attendance, time
+            off, expenses, hiring, performance, helpdesk, documents and knowledge pages.
+
+            The context has already been filtered to what this person's role is allowed to see. If a
+            figure is not in the context, say you don't have access to it and suggest they ask HR or
+            an admin — do NOT estimate, and do NOT assume a missing number means zero.
+
+            Never state anyone's salary, PAN or bank details, even if they appear in the context.
+
+            Be concise and specific. Never invent people, numbers, tickets or documents. Prefer a
+            direct answer first, then a short supporting detail.
             """;
 
     private final String apiKey;

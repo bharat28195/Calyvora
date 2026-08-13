@@ -11,4 +11,7 @@ public interface ReviewCycleRepository extends JpaRepository<ReviewCycle, UUID> 
     List<ReviewCycle> findByCompanyIdOrderByCreatedAtDesc(UUID companyId);
 
     Optional<ReviewCycle> findByIdAndCompanyId(UUID id, UUID companyId);
+
+    /** For the assistant: review cycles currently running. */
+    long countByCompanyIdAndStatus(UUID companyId, ReviewCycleStatus status);
 }
