@@ -45,7 +45,7 @@ public class TrialRequestService {
                                PlatformService platformService,
                                EmailService emailService,
                                AppProperties props,
-                               @Value("${calyvora.platform.owner-email:ownerorbit@calyvora.in}")
+                               @Value("${calyvora.platform.owner-email:bharat28195@calyvora.in}")
                                String platformOwnerEmail) {
         this.repository = repository;
         this.platformService = platformService;

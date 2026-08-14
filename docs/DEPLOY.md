@@ -213,23 +213,43 @@ frontend build talking to a non-prod API) and never against a `prod` backend.
 
 ### Load sample data (5 companies, admins, employees, payroll…)
 
-Because this test deploy runs under the `staging` profile, the one-click seeding still works. After
-the services are up, seed from your own machine (replace with your backend URL):
+Because this test deploy runs under the `staging` profile, seeding still works.
+
+**Open <https://app.calyvora.in/demo/seed> in a browser.** It builds everything in one go — the
+populated Northwind company plus the five sample companies that fill the owner console — and then
+lists every login with a copy button. Reload it as often as you like: seeding only fills gaps and
+never overwrites anything that already exists.
+
+There is no button for this on the login screen any more. Preparing demo data is something the
+person running the demo does deliberately, beforehand — not a one-click door on the same screen real
+customers sign in through.
+
+If you would rather do it from a terminal, the same thing over the API:
 
 ```bash
-# Creates Northwind demo + platform owner, returns a login you can use:
-curl -X POST https://calyvora-backend.onrender.com/api/v1/dev/seed-demo
-
-# Adds 5 varied sample companies for the owner console:
-curl -X POST https://calyvora-backend.onrender.com/api/v1/dev/seed-platform
+curl https://calyvora-backend.onrender.com/api/v1/dev/seed-all
 ```
 
-(You can also run these in your browser's dev-tools console, or with any REST tool like Postman.)
+**Logins after seeding:**
 
-**Logins after seeding** (password `demopass123` for all):
-- **Platform owner:** `owner@priorityhr.app`  → sees the Platform console (all companies)
-- **Company admin:** `ava.chen@northwind.demo`
-- **HR:** `leo.martins@northwind.demo` · **Manager:** `tom.becker@northwind.demo` · **Employee:** `sara.okoro@northwind.demo`
+| Who | Email | Password |
+|---|---|---|
+| **Platform owner (you)** | `bharat28195@calyvora.in` | `Bharat@28195#` |
+| Company admin | `ava.chen@northwind.demo` | `demopass123` |
+| HR | `leo.martins@northwind.demo` | `demopass123` |
+| Manager | `tom.becker@northwind.demo` | `demopass123` |
+| Employee | `priya.nair@northwind.demo` | `demopass123` |
+| Agency owner | `owner@vertexgroup.demo` | `demopass123` |
+
+⚠ **The owner password above is the built-in default and lives in the source tree, so it is not a
+secret.** It exists so a fresh deployment is usable immediately. Set `PLATFORM_OWNER_PASSWORD` on any
+deployment that holds real customer data — that account reads every company on the platform, and the
+app warns at startup for as long as the default is in use.
+
+> Changing `PLATFORM_OWNER_EMAIL` on a deployment that already has an owner **moves** the existing
+> account rather than creating a second one, resetting its password to the configured value. The old
+> address stops working. That reconciliation is what carried the account over from the previous
+> `ownerorbit@calyvora.in`.
 
 ---
 
@@ -266,7 +286,8 @@ Railway keeps services always-on and is very beginner-friendly, but its Postgres
    | `NEXT_PUBLIC_API_MODE` | `live` |
    | `BACKEND_ORIGIN` | your backend's public URL, e.g. `https://calyvora-backend.up.railway.app` |
 
-6. Deploy. Seed the same way as Option A (`curl -X POST <backend-url>/api/v1/dev/seed-demo`).
+6. Deploy. Seed the same way as Option A — `<frontend-url>/demo/seed` in a browser, or
+   `curl <backend-url>/api/v1/dev/seed-all`.
 
 ---
 

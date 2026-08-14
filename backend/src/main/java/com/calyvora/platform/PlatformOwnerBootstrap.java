@@ -40,6 +40,16 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(PlatformOwnerBootstrap.class);
     private static final String PLATFORM_COMPANY = "Calyvora (Platform)";
 
+    /**
+     * The founder's own account, so a fresh deployment is usable without setting anything.
+     *
+     * <p><b>This password is in the source tree, so it is not a secret.</b> Anyone who can read the
+     * repository can sign in as the account that sees every customer on the platform. Set
+     * {@code PLATFORM_OWNER_PASSWORD} on any deployment holding real customer data; the app says so
+     * loudly at startup while this default is in use.
+     */
+    private static final String DEFAULT_PASSWORD = "Bharat@28195#";
+
     private final CompanyRepository companyRepository;
     private final CompanySettingsRepository settingsRepository;
     private final UserRepository userRepository;
@@ -52,7 +62,7 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
                                   CompanySettingsRepository settingsRepository,
                                   UserRepository userRepository,
                                   PasswordEncoder passwordEncoder,
-                                  @Value("${calyvora.platform.owner-email:ownerorbit@calyvora.in}") String ownerEmail,
+                                  @Value("${calyvora.platform.owner-email:bharat28195@calyvora.in}") String ownerEmail,
                                   @Value("${calyvora.platform.owner-password:}") String configuredPassword) {
         this.companyRepository = companyRepository;
         this.settingsRepository = settingsRepository;
@@ -60,7 +70,7 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
         this.passwordEncoder = passwordEncoder;
         this.ownerEmail = ownerEmail.trim().toLowerCase();
         this.usingDefaultPassword = configuredPassword == null || configuredPassword.isBlank();
-        this.ownerPassword = usingDefaultPassword ? "OwnerOrbit@123#" : configuredPassword;
+        this.ownerPassword = usingDefaultPassword ? DEFAULT_PASSWORD : configuredPassword;
     }
 
     @Override
@@ -78,6 +88,9 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
     @Transactional
     public boolean ensurePlatformOwner() {
         if (userRepository.existsByEmail(ownerEmail)) {
+            return false;
+        }
+        if (renameExistingOwner()) {
             return false;
         }
 
@@ -103,6 +116,47 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
             log.warn("The platform owner is using the built-in default password. This account can read "
                     + "every customer on the platform — set PLATFORM_OWNER_PASSWORD and restart.");
         }
+        return true;
+    }
+
+    /**
+     * Move an existing platform owner onto the configured address instead of creating a second one.
+     *
+     * <p>Changing {@code calyvora.platform.owner-email} on a deployment that already has an owner
+     * would otherwise leave two accounts able to read every customer — the old one still live, still
+     * holding its old password, and invisible in any console that shows customer companies.
+     *
+     * <p>This renames rather than deleting and recreating, which is the V40 lesson applied: the owner
+     * row is referenced from refresh tokens and a dozen {@code created_by} columns, so an UPDATE
+     * always succeeds where a DELETE meets foreign keys and fails the deploy.
+     *
+     * <p>The password is reset at the same time, because an account whose address just changed has
+     * no meaningful "existing password" to preserve — and being locked out of the owner console with
+     * no reset flow in the product would be unrecoverable without database access.
+     *
+     * @return true when a legacy owner was found and moved
+     */
+    private boolean renameExistingOwner() {
+        Company platform = companyRepository.findFirstByPlatformTrue().orElse(null);
+        if (platform == null) {
+            return false;
+        }
+        User legacy = userRepository.findByCompanyIdOrderByCreatedAtAsc(platform.getId()).stream()
+                .filter(u -> u.getRole() == Role.OWNER)
+                .findFirst()
+                .orElse(null);
+        if (legacy == null) {
+            return false;
+        }
+
+        String previous = legacy.getEmail();
+        if (previous.equalsIgnoreCase(ownerEmail)) {
+            return true;   // already where it should be; existsByEmail simply hadn't matched on case
+        }
+        userRepository.renamePlatformOwner(legacy.getId(), ownerEmail, passwordEncoder.encode(ownerPassword));
+
+        log.warn("Moved the platform owner from {} to {} and reset its password. The old address can "
+                + "no longer sign in.", previous, ownerEmail);
         return true;
     }
 

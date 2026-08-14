@@ -196,20 +196,24 @@ export const api = {
     auth.set(result.accessToken);
     return result;
   },
-  /** One-click demo: provision a populated company (live backend), then sign in as its owner. */
-  async seedDemo(): Promise<DemoCredentials> {
+  /**
+   * Build the whole demo: the populated company and the sample companies that fill the owner
+   * console. Used by /demo/seed.
+   *
+   * <p>It deliberately does NOT sign anyone in. Its predecessor did — the login screen's
+   * "Explore the live demo" button seeded and then dropped you into the dashboard as the demo
+   * owner — which made preparing data and taking on an identity the same action. Whoever is running
+   * the demo picks the login they want to show afterwards.
+   */
+  async seedAll(): Promise<{ seeded: boolean; companies: string[] }> {
     if (!LIVE) {
       throw new ApiError({
         timestamp: "", status: 400, code: "VALIDATION_ERROR",
         message: "Demo data needs the live backend. Set NEXT_PUBLIC_API_MODE=live and start the backend.",
       });
     }
-    const creds = await http<DemoCredentials>("/dev/seed-demo", { method: "POST" });
-    const result = await http<LoginResult>("/auth/login", {
-      method: "POST", body: JSON.stringify({ email: creds.email, password: creds.password }),
-    });
-    auth.set(result.accessToken);
-    return creds;
+    const res = await http<{ seeded: boolean; companies: string[] } | null>("/dev/seed-all");
+    return { seeded: true, companies: res?.companies ?? [] };
   },
   async logout() {
     try {

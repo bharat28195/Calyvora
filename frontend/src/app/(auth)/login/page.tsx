@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { api, ApiError, isLive } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { loginSchema, type LoginInput } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,19 +20,6 @@ function LoginInner() {
   const [errors, setErrors] = useState<Partial<Record<keyof LoginInput, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [seeding, setSeeding] = useState(false);
-
-  async function onTryDemo() {
-    setFormError(null);
-    setSeeding(true);
-    try {
-      await api.seedDemo();
-      window.location.assign("/dashboard");
-    } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not load the demo. Is the backend running?");
-      setSeeding(false);
-    }
-  }
 
   const set = (key: keyof LoginInput) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -77,35 +64,16 @@ function LoginInner() {
             aria-invalid={!!errors.password} autoComplete="current-password" />
         </Field>
 
-        <Button type="submit" size="lg" disabled={submitting || seeding} className="mt-2">
+        <Button type="submit" size="lg" disabled={submitting} className="mt-2">
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitting ? "Logging in…" : "Log in"}
         </Button>
       </form>
 
-      {isLive && (
-        <div className="mt-5">
-          <div className="flex items-center gap-3 text-xs text-fg/30">
-            <span className="h-px flex-1 bg-fg/10" />
-            or
-            <span className="h-px flex-1 bg-fg/10" />
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="lg"
-            onClick={onTryDemo}
-            disabled={seeding || submitting}
-            className="mt-4 w-full"
-          >
-            {seeding && <Loader2 className="h-4 w-4 animate-spin" />}
-            {seeding ? "Preparing your demo…" : "✨ Explore the live demo"}
-          </Button>
-          <p className="mt-2 text-center text-xs text-fg/40">
-            Loads a fully populated company — no signup. One click.
-          </p>
-        </div>
-      )}
+      {/* "Explore the live demo" used to sit here. It was a sales affordance on the door a real
+          customer signs in through — one click and an anonymous visitor was inside a populated
+          company. Demo data is now prepared deliberately at /demo/seed by whoever is running the
+          demo, which keeps this screen doing one job. */}
 
       <p className="mt-5 text-center text-sm text-fg/50">
         New here?{" "}

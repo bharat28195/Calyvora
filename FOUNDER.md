@@ -353,6 +353,39 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   `TrialRequestFlowTest` re-declares `@SpringBootTest` without the override, so the shipped default is
   asserted directly. Worth knowing: the suite is not, by default, exercising the production auth
   posture. One class is.
+
+### PD-22 · 2026-08-13 · Preparing a demo is a deliberate act, not a button on the login screen
+- **Context:** "Explore the live demo" sat on `/login` under the sign-in form. One click seeded a
+  populated company and dropped an anonymous visitor straight into its dashboard as the demo owner.
+  It was a sales affordance placed on the one door real customers use, and it fused two different
+  actions — *build the data* and *become someone* — into a single click.
+- **Decision:** the button is gone. Demo data is now prepared at **`app.calyvora.in/demo/seed`**, a
+  page you open on purpose before anyone is watching. It seeds on arrival, then lists every login with
+  a copy button — because what you actually need thirty seconds before a demo is the credentials, not
+  a confirmation message. It signs nobody in; whoever is running the demo chooses the identity to show.
+- **A GET that writes,** deliberately. Seeding is idempotent and purely additive — it only fills gaps,
+  never overwrites or deletes — so a stray prefetch or a double-click can do no harm, and making it
+  POST would mean it could not be reached from the address bar, which is the whole point. Still
+  `@Profile("!prod")`: it must never exist on a deployment holding real customer data.
+- **The owner account moved** to `bharat28195@calyvora.in` / `Bharat@28195#`. **That password is in
+  the source tree, so it is not a secret** — anyone who can read the repo can sign in as the account
+  that sees every customer. It exists so a fresh deployment works immediately; `PLATFORM_OWNER_PASSWORD`
+  must be set on anything holding real data, and the app warns at every startup until it is.
+- **Renaming, not recreating.** Changing the configured owner email on a deployment that already has
+  an owner would have left *two* accounts able to read every customer — the old one still live, still
+  holding its old password, and invisible in a console that lists customer companies. The bootstrap
+  now moves the existing account instead. An UPDATE, not a DELETE-and-create: the owner row is
+  referenced from refresh tokens and a dozen `created_by` columns, which is exactly what broke the
+  V40 deploy (L-1). The password is reset during the move, because an address that just changed has no
+  meaningful old password and there is still no reset flow to recover with.
+- **Tested where it actually runs.** Every other test starts from an empty database, so the bootstrap
+  always takes its "create" branch; the rename only ever executes on the live deployment. That is the
+  precise shape of the V40 incident, so `PlatformOwnerRenameTest` builds the deployment's state
+  first — including a company ADMIN sitting in the platform company, to prove the reconciliation
+  matches on `OWNER` and not merely on "first user found".
+- **Trade-offs / debt:** the seed endpoint is unauthenticated on staging, so anyone who finds the URL
+  can populate demo data there. Acceptable for a demo deployment, unacceptable the day staging holds
+  anything real — at which point the profile must change to `prod` and the endpoint disappears.
 - **Final outcome:** _Shipped with 15 integration tests covering the letterpad's PATCH semantics and
   tenant isolation, the exit lifecycle including the clearance guard, and the hire flow through to the
   profile and checklist appearing after acceptance._

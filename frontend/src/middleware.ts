@@ -19,6 +19,8 @@ const PUBLIC = [
   "/forgot-password",
   "/reset-password",
   "/dev/mailbox",
+  // Preparing a demo happens before anyone is signed in — that is the point of it.
+  "/demo/seed",
 ];
 const SESSION_COOKIE = "calyvora_session"; // live: presence of refresh cookie; mock: a marker cookie
 

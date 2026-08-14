@@ -34,6 +34,30 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByCompanyIdAndEmail(UUID companyId, String email);
 
+    /**
+     * Move the platform-owner account onto a new address, credentials and all.
+     *
+     * <p>Deliberately a query rather than a {@code setEmail} on {@link User}: email is globally
+     * unique (SD-3) and the entity is kept anemic on purpose, so opening a setter would invite
+     * changing anyone's address from anywhere. This exists for exactly one caller —
+     * {@code PlatformOwnerBootstrap} reconciling a changed {@code PLATFORM_OWNER_EMAIL} — and its
+     * name says so.
+     */
+    // Carries its own transaction rather than relying on the caller's: a @Modifying query outside
+    // one throws InvalidDataAccessApiUsage, and that failure would surface at startup on a real
+    // deployment. flush + clear because the caller has usually just read the row it is updating,
+    // and would otherwise hold a stale copy for the rest of the transaction.
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("""
+            update User u set u.email = :email, u.passwordHash = :passwordHash,
+                              u.status = com.calyvora.identity.UserStatus.ACTIVE
+            where u.id = :id
+            """)
+    int renamePlatformOwner(@org.springframework.data.repository.query.Param("id") UUID id,
+                            @org.springframework.data.repository.query.Param("email") String email,
+                            @org.springframework.data.repository.query.Param("passwordHash") String passwordHash);
+
     /** Paged, optionally-filtered directory listing (scales the People directory to large companies). */
     @org.springframework.data.jpa.repository.Query("""
             select u from User u

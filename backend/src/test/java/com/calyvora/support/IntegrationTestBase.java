@@ -50,8 +50,8 @@ public abstract class IntegrationTestBase {
     protected com.calyvora.platform.PlatformOwnerBootstrap platformOwner;
 
     /** The platform vendor. Real infrastructure, not demo data — created at startup (PD-18). */
-    protected static final String PLATFORM_OWNER_EMAIL = "ownerorbit@calyvora.in";
-    protected static final String PLATFORM_OWNER_PASSWORD = "OwnerOrbit@123#";
+    protected static final String PLATFORM_OWNER_EMAIL = "bharat28195@calyvora.in";
+    protected static final String PLATFORM_OWNER_PASSWORD = "Bharat@28195#";
 
     @BeforeEach
     void clearEmail() {
