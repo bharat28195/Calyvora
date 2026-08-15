@@ -6,7 +6,7 @@ import { CheckCircle2, Loader2, AlertTriangle, Copy, Check } from "lucide-react"
 import { api, ApiError } from "@/lib/api";
 
 /**
- * Prepare a demo by visiting a URL: {@code app.calyvora.in/demo/seed}.
+ * Prepare a demo by visiting a URL: {@code orbit.calyvora.in/demo/seed}.
  *
  * <p>This replaced the "Explore the live demo" button that used to sit on the login screen. That
  * button was a sales affordance on the door real customers sign in through — one click and an

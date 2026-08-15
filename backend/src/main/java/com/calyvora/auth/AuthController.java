@@ -1,9 +1,11 @@
 package com.calyvora.auth;
 
+import com.calyvora.auth.dto.ForgotPasswordRequest;
 import com.calyvora.auth.dto.LoginRequest;
 import com.calyvora.auth.dto.LoginResponse;
 import com.calyvora.auth.dto.MeResponse;
 import com.calyvora.auth.dto.RegisterRequest;
+import com.calyvora.auth.dto.ResetPasswordRequest;
 import com.calyvora.auth.dto.ResendVerificationRequest;
 import com.calyvora.auth.dto.VerifyEmailRequest;
 import com.calyvora.common.config.AppProperties;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
@@ -30,10 +33,13 @@ import java.time.Duration;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
     private final AppProperties.Refresh refreshProps;
 
-    public AuthController(AuthService authService, AppProperties props) {
+    public AuthController(AuthService authService, PasswordResetService passwordResetService,
+                          AppProperties props) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
         this.refreshProps = props.security().refresh();
     }
 
@@ -60,6 +66,27 @@ public class AuthController {
     public ResponseEntity<Void> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
         authService.resendVerification(request.email());
         return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * Always 202, whether or not the address has an account (PD-23). Answering differently would turn
+     * this into a way to ask "does this person bank here?" one address at a time.
+     */
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestCode(request.email());
+    }
+
+    /** Spend the code and set the new password. Every session is signed out on success. */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.reset(request.email(), request.code(), request.newPassword());
+        return ResponseEntity.noContent()
+                // The browser may be holding a refresh cookie for a session just revoked. Clearing it
+                // means "sign in again" rather than a silent 401 on the next refresh.
+                .header(HttpHeaders.SET_COOKIE, clearRefreshCookie().toString())
+                .build();
     }
 
     @PostMapping("/login")

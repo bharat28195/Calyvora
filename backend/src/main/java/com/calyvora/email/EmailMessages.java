@@ -45,6 +45,19 @@ final class EmailMessages {
                 body.toString());
     }
 
+    /**
+     * The code goes in the subject line as well as the body. Most people read it off a notification
+     * without opening anything, and a subject that says only "Password reset" makes them open the
+     * mail to learn six digits.
+     */
+    static Message passwordReset(String code, long minutes) {
+        return new Message("Your Calyvora reset code is " + code,
+                "Use this code to set a new password:\n\n    " + code + "\n\n"
+                        + "It expires in " + minutes + " minutes and can be used once.\n\n"
+                        + "If you didn't ask to reset your password, you can ignore this — nothing has "
+                        + "changed, and whoever asked cannot get in without this code.");
+    }
+
     static Message trialAcknowledgement(String contactName) {
         return new Message("We've got your Orbit trial request",
                 "Hi " + contactName + ",\n\n"

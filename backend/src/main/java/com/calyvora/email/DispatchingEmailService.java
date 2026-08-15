@@ -56,6 +56,15 @@ public class DispatchingEmailService implements EmailService {
     }
 
     @Override
+    public EmailResult sendPasswordResetCode(String to, String code, long expiresInMinutes) {
+        EmailMessages.Message message = EmailMessages.passwordReset(code, expiresInMinutes);
+        // The dev mailbox holds the code itself rather than a link, which is the whole payload here —
+        // it is what makes the flow testable on a deployment with no mail provider configured.
+        record(to, message.subject(), code);
+        return send(to, message.subject(), message.body());
+    }
+
+    @Override
     public EmailResult sendTrialRequestNotification(String to, TrialEnquiry enquiry) {
         EmailMessages.Message message = EmailMessages.trialEnquiry(enquiry);
         record(to, message.subject(), enquiry.consoleUrl());

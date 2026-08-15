@@ -174,6 +174,22 @@ export const api = {
       "/trial-requests", { method: "POST", body: JSON.stringify(input) });
     return { received: true, emailSent: result?.emailSent ?? false };
   },
+  /**
+   * Ask for a one-time reset code (PD-23). Always resolves, whether or not the address has an
+   * account — the backend answers 202 either way so this endpoint cannot be used to discover who
+   * banks here, and the UI must not undo that by behaving differently.
+   */
+  forgotPassword(email: string): Promise<void> {
+    return LIVE
+      ? http<void>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) })
+      : Promise.resolve();
+  },
+  /** Spend the code and set the new password. Signs every existing session out. */
+  resetPassword(input: { email: string; code: string; newPassword: string }): Promise<void> {
+    return LIVE
+      ? http<void>("/auth/reset-password", { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Resetting a password");
+  },
   verifyEmail(token: string) {
     return LIVE ? http<void>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }) : mockBackend.verifyEmail(token);
   },

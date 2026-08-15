@@ -359,7 +359,7 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   populated company and dropped an anonymous visitor straight into its dashboard as the demo owner.
   It was a sales affordance placed on the one door real customers use, and it fused two different
   actions — *build the data* and *become someone* — into a single click.
-- **Decision:** the button is gone. Demo data is now prepared at **`app.calyvora.in/demo/seed`**, a
+- **Decision:** the button is gone. Demo data is now prepared at **`orbit.calyvora.in/demo/seed`**, a
   page you open on purpose before anyone is watching. It seeds on arrival, then lists every login with
   a copy button — because what you actually need thirty seconds before a demo is the credentials, not
   a confirmation message. It signs nobody in; whoever is running the demo chooses the identity to show.
@@ -386,6 +386,47 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Trade-offs / debt:** the seed endpoint is unauthenticated on staging, so anyone who finds the URL
   can populate demo data there. Acceptable for a demo deployment, unacceptable the day staging holds
   anything real — at which point the profile must change to `prod` and the endpoint disappears.
+
+### PD-23 · 2026-08-15 · A way back in, and the app moves to `orbit.calyvora.in`
+- **Context:** there was no password reset at all. A forgotten password meant asking an administrator
+  to set a new one, and the platform owner had nobody to ask. Every earlier change that touched
+  credentials — approving a trial, moving the owner account — had to hand passwords over out of band
+  precisely because of this hole. It has been on the debt list since PD-21.
+- **Asked for: OTP to a phone. Built: OTP to email.** Two facts decided it. No account has a phone
+  number — `users` holds email only, and the employee profile that does hold one is behind RLS, so it
+  is unreadable to someone who is not logged in; a phone-only reset would have locked out every
+  existing user including the founder. And Indian transactional SMS needs DLT registration (sender ID
+  and every template registered with a TRAI-approved platform) before a gateway delivers anything,
+  then costs per message. Email is already wired through Resend and free at this volume. The founder
+  chose email once the cost was clear.
+- **A six-digit code, not a link.** It can be read off one device and typed into another, which is
+  what people actually do — and it is exactly what an SMS would carry, so switching channel later
+  needs a sender, not a redesign. No `users.phone` column was added: schema for a feature nobody uses
+  is awkward to unwind (L-1), and it can be added against a real requirement on the day.
+- **The bug the tests caught, which I would otherwise have shipped.** The attempt cap did not work.
+  The obvious implementation increments the counter and then throws to reject the guess — and the
+  throw rolls the increment back. Every wrong guess was therefore the first wrong guess, and a
+  six-digit code, whose entire safety rests on the number of tries being small, was brute-forceable
+  at leisure. Fixed with a `REQUIRES_NEW` recorder, the same shape and the same reasoning as
+  `RefreshTokenRevoker`. **Worth remembering: any counter incremented on a path that then throws is
+  wrong by default.**
+- **What it refuses to do,** each pinned by a test: reveal whether an address has an account (unknown
+  addresses get the same answer, and a wrong code fails with the same words as a missing account);
+  accept a code twice; leave a previous code alive once a new one is asked for; allow more than five
+  requests an hour for one account; accept a weak password (this is a second front door, and the
+  weakest route decides what the password rules actually are); revive a DISABLED account; or leave
+  old sessions valid — resetting revokes every refresh token, because the likeliest reason to reset
+  is that a session is somewhere it should not be.
+- **The app moved to `orbit.calyvora.in`.** Which uncovered the real find: **`app.calyvora.in` never
+  existed.** `FRONTEND_BASE_URL` had pointed at it for weeks, so every invitation, verification and
+  trial-approval link sent in that time went to a hostname returning NXDOMAIN. The app was healthy,
+  every page loaded, the suite was green — and nobody could act on an email. It is the one setting
+  whose breakage is completely invisible from inside the system, and nothing in the app can detect
+  it. **Resolve it after changing it; do not trust it because the site loads.**
+- **Trade-offs / debt:** reset codes go nowhere until `RESEND_API_KEY` is set on Render — the second
+  feature now blocked on that one key, after trial notifications. Throttling is per account, not per
+  IP, so one attacker can still ask about many addresses; a rate limit at the edge is the fix if it
+  ever matters.
 - **Final outcome:** _Shipped with 15 integration tests covering the letterpad's PATCH semantics and
   tenant isolation, the exit lifecycle including the clearance guard, and the hire flow through to the
   profile and checklist appearing after acceptance._

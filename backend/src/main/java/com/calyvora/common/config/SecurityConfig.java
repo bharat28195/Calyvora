@@ -35,6 +35,10 @@ public class SecurityConfig {
             "/api/v1/auth/verify-email",
             "/api/v1/auth/resend-verification",
             "/api/v1/auth/login",
+            // Both public by necessity: someone who has forgotten their password cannot authenticate
+            // to ask for a way back in (PD-23).
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
             // Anyone may ask for a trial; only the vendor can read or act on the queue, which lives

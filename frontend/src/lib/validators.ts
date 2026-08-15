@@ -40,6 +40,17 @@ export const trialRequestSchema = z.object({
 });
 export type TrialRequestFormInput = z.infer<typeof trialRequestSchema>;
 
+/**
+ * Setting a new password from a reset code. The password rule is the same object the signup form
+ * uses — a second way in that accepted weaker passwords would quietly become the real rule.
+ */
+export const resetPasswordSchema = z.object({
+  email,
+  code: z.string().trim().regex(/^\d{6}$/, "The code is 6 digits"),
+  newPassword: password,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
 export const loginSchema = z.object({
   email,
   password: z.string().min(1, "Password is required"),

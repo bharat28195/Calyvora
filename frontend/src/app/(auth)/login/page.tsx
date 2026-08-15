@@ -64,6 +64,12 @@ function LoginInner() {
             aria-invalid={!!errors.password} autoComplete="current-password" />
         </Field>
 
+        {/* Beside the field it rescues, not buried in the footer: someone looking for this is
+            already stuck, and every extra second of hunting is a support message. */}
+        <Link href="/forgot-password" className="-mt-1 self-end text-sm text-fg/50 hover:text-fg">
+          Forgotten your password?
+        </Link>
+
         <Button type="submit" size="lg" disabled={submitting} className="mt-2">
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitting ? "Logging in…" : "Log in"}

@@ -24,6 +24,7 @@ public class RecordingEmailService implements EmailService {
     private final List<Sent> trialNotifications = new ArrayList<>();
     private final List<Sent> trialAcknowledgements = new ArrayList<>();
     private final List<Sent> trialApprovals = new ArrayList<>();
+    private final List<Sent> resetCodes = new ArrayList<>();
 
     @Override
     public EmailResult sendVerificationEmail(String to, String verificationUrl) {
@@ -35,6 +36,23 @@ public class RecordingEmailService implements EmailService {
     public EmailResult sendInvitationEmail(String to, String companyName, String acceptUrl) {
         invitations.add(new Sent(to, acceptUrl));
         return EmailResult.ok("RECORDING");
+    }
+
+    @Override
+    public EmailResult sendPasswordResetCode(String to, String code, long expiresInMinutes) {
+        // The "url" slot carries the code — tests need to read it back, and it is the only thing in
+        // this message that matters.
+        resetCodes.add(new Sent(to, code));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> resetCodes() {
+        return resetCodes;
+    }
+
+    /** The most recent one-time code, which is the only one that can still be used. */
+    public String lastResetCode() {
+        return resetCodes.get(resetCodes.size() - 1).url();
     }
 
     @Override
@@ -92,6 +110,7 @@ public class RecordingEmailService implements EmailService {
         trialNotifications.clear();
         trialAcknowledgements.clear();
         trialApprovals.clear();
+        resetCodes.clear();
     }
 
     private static String tokenParam(String url) {

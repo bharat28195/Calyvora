@@ -215,7 +215,7 @@ frontend build talking to a non-prod API) and never against a `prod` backend.
 
 Because this test deploy runs under the `staging` profile, seeding still works.
 
-**Open <https://app.calyvora.in/demo/seed> in a browser.** It builds everything in one go — the
+**Open <https://orbit.calyvora.in/demo/seed> in a browser.** It builds everything in one go — the
 populated Northwind company plus the five sample companies that fill the owner console — and then
 lists every login with a copy button. Reload it as often as you like: seeding only fills gaps and
 never overwrites anything that already exists.
@@ -327,38 +327,69 @@ The frontend reads (at **build** time): `NEXT_PUBLIC_API_MODE=live` and `BACKEND
 
 ---
 
-## Your own domain (`app.calyvora.in`)
+## Your own domain (`orbit.calyvora.in`)
 
 `render.yaml` already declares the domain, so a blueprint sync registers it and provisions the TLS
 certificate — no dashboard clicking. **Render cannot create the DNS record for you**, and that is the
 one step that makes it actually resolve:
 
-1. At your registrar (Hostinger → Domains → DNS zone editor), add a **CNAME**:
+1. **Hostinger → hPanel → Domains → `calyvora.in` → DNS / Nameservers** (the DNS zone editor).
+2. Click **Add record** and fill in:
 
-   | Type | Name | Points to |
-   |------|------|-----------|
-   | CNAME | `app` | `calyvora-frontend.onrender.com` |
+   | Field | Value |
+   |-------|-------|
+   | Type | `CNAME` |
+   | Name | `orbit` — just the word, **not** `orbit.calyvora.in`. Hostinger appends the domain itself; typing the full name creates `orbit.calyvora.in.calyvora.in`, which is the single most common mistake here. |
+   | Points to / Target | `calyvora-frontend.onrender.com` (no `https://`, no trailing slash) |
+   | TTL | leave the default (usually 14400) |
 
-2. Wait for Render → `calyvora-frontend` → Settings → Custom Domains to show **Verified** (usually
-   minutes; DNS can take up to an hour).
+3. Save. Then in Render → `calyvora-frontend` → **Settings → Custom Domains**, add
+   `orbit.calyvora.in` if the blueprint sync hasn't already, and wait for **Verified** — usually a few
+   minutes, occasionally up to an hour. Render issues the TLS certificate automatically once it
+   verifies; until then the address will show a certificate warning, which is expected and resolves
+   itself.
 
-That's it. The service **keeps its `onrender.com` url as well**, so both addresses work and nothing
-breaks while DNS propagates.
+To check from your own machine rather than guessing:
+
+```bash
+nslookup orbit.calyvora.in
+# should answer with calyvora-frontend.onrender.com
+```
+
+The service **keeps its `onrender.com` url as well**, so nothing breaks while DNS propagates.
+
+### A note on `app.calyvora.in`
+
+`FRONTEND_BASE_URL` pointed at `app.calyvora.in` until 2026-08-15, **but that DNS record was never
+created** — `app.calyvora.in` returns NXDOMAIN. Every invitation, verification and trial-approval link
+sent during that time therefore pointed at a hostname that does not resolve, and clicking one gave a
+browser error rather than the app.
+
+Nothing needs preserving, so the name is gone from `render.yaml` and from the CORS list. If anyone
+still holds one of those broken links, re-send the invitation rather than trying to rescue the URL.
+
+**The lesson worth keeping:** `FRONTEND_BASE_URL` is the one setting whose breakage is completely
+invisible from inside the app. The service is healthy, every page loads, tests pass — and yet nobody
+can act on an email. After changing it, resolve it before trusting it:
+
+```bash
+nslookup orbit.calyvora.in
+```
 
 **The one thing to get the right way round:** `FRONTEND_BASE_URL` (backend) is stamped into every
-invitation and verification link. It is now `https://app.calyvora.in`, so **if you deploy before the
+invitation and verification link. It is now `https://orbit.calyvora.in`, so **if you deploy before the
 DNS record exists, emailed links will point at a hostname that doesn't resolve yet.** The app itself
 is unaffected — it still serves on `onrender.com`. If you need to deploy first, set
 `FRONTEND_BASE_URL` back to `https://calyvora-frontend.onrender.com` until DNS is live.
 
-The marketing site's Sign in / Start free trial buttons already point at `https://app.calyvora.in`.
+The marketing site's Sign in / Start free trial buttons already point at `https://orbit.calyvora.in`.
 
 ### Where the two halves live
 
 | | Host | Why |
 |---|------|-----|
 | `calyvora.in` (marketing site) | Hostinger shared hosting | Static files, uploaded by hand into `public_html`. No build step — **and no git deploy: pushing does not update it.** |
-| `app.calyvora.in` (the product) | Render | Needs Java, Node and Postgres. Shared hosting cannot run it. |
+| `orbit.calyvora.in` (the product) | Render | Needs Java, Node and Postgres. Shared hosting cannot run it. |
 
 ### Updating the marketing site
 
@@ -388,7 +419,7 @@ When you're done testing and want a real production instance:
 2. Upgrade off the free plans (no sleeping, database won't expire).
 3. Set `RESEND_API_KEY` + `MAIL_FROM` so invitation/verification emails actually send (see the email
    section above — **do not** use SMTP on Render).
-4. Point `app.calyvora.in` at the frontend (see the section above; `render.yaml` already declares it).
+4. Point `orbit.calyvora.in` at the frontend (see the section above; `render.yaml` already declares it).
 
 ---
 

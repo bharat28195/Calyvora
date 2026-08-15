@@ -49,11 +49,16 @@ services:
       # itself is fine on its onrender.com url. If you need to deploy before DNS is ready, set this
       # back to https://calyvora-frontend.onrender.com temporarily.
       - key: FRONTEND_BASE_URL
-        value: https://app.calyvora.in
-      # Both origins: the custom domain for real use, and the onrender.com one so nothing breaks
-      # while DNS propagates or if you ever open the service url directly.
+        value: https://orbit.calyvora.in
+      # The custom domain plus the onrender.com url, which stays usable for opening the service
+      # directly and while DNS propagates.
+      #
+      # app.calyvora.in is deliberately NOT here. It was configured as FRONTEND_BASE_URL but its DNS
+      # record was never created — `app.calyvora.in` returns NXDOMAIN — so every invitation and
+      # verification link sent while it was set pointed at a hostname that does not resolve. Nothing
+      # to preserve, and listing a dead origin only suggests it once worked.
       - key: CORS_ALLOWED_ORIGINS
-        value: https://app.calyvora.in,https://calyvora-frontend.onrender.com
+        value: https://orbit.calyvora.in,https://calyvora-frontend.onrender.com
       # RS256 signing keys. sync: false = set these by hand in the Render dashboard; a private key
       # must never live in this file. Without them the app generates a throwaway keypair at boot and
       # every restart (including a free-tier wake) logs all users out. See docs/DEPLOY.md.
@@ -97,12 +102,13 @@ services:
     buildCommand: npm ci && npm run build
     startCommand: npm start
     # Declaring the domain here means a blueprint sync registers it and provisions the TLS
-    # certificate — no dashboard clicking. It does NOT create the DNS record: add a CNAME for `app`
-    # pointing at calyvora-frontend.onrender.com at your registrar (Hostinger), which is the one
-    # step Render can't do for you. The service keeps its onrender.com url either way, so adding
+    # certificate — no dashboard clicking. It does NOT create the DNS record: add a CNAME for
+    # `orbit` pointing at calyvora-frontend.onrender.com at your registrar (Hostinger), which is the
+    # one step Render can't do for you. The service keeps its onrender.com url either way, so adding
     # this breaks nothing if DNS isn't ready yet.
+    #
     domains:
-      - app.calyvora.in
+      - orbit.calyvora.in
     envVars:
       - key: NEXT_PUBLIC_API_MODE
         value: live

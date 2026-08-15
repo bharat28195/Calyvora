@@ -13,6 +13,9 @@ public interface EmailService {
 
     EmailResult sendInvitationEmail(String to, String companyName, String acceptUrl);
 
+    /** A one-time code for setting a new password (PD-23). */
+    EmailResult sendPasswordResetCode(String to, String code, long expiresInMinutes);
+
     /** To the vendor: a new trial enquiry is waiting for a decision (PD-21). */
     EmailResult sendTrialRequestNotification(String to, TrialEnquiry enquiry);
 

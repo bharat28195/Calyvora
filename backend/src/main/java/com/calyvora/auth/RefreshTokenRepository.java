@@ -17,4 +17,13 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     @Modifying
     @Query("update RefreshToken rt set rt.revokedAt = :now where rt.familyId = :familyId and rt.revokedAt is null")
     int revokeFamily(@Param("familyId") UUID familyId, @Param("now") Instant now);
+
+    /**
+     * Sign this person out everywhere. Used when a password is reset: the likeliest reason someone
+     * resets is that a session is somewhere it should not be, and leaving live refresh tokens behind
+     * would mean the new password changes nothing for whoever already has one.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update RefreshToken rt set rt.revokedAt = :now where rt.userId = :userId and rt.revokedAt is null")
+    int revokeAllForUser(@Param("userId") UUID userId, @Param("now") Instant now);
 }
