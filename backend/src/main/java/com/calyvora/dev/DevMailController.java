@@ -3,6 +3,7 @@ package com.calyvora.dev;
 import com.calyvora.email.DispatchingEmailService;
 import com.calyvora.email.EmailSettings;
 import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -57,6 +58,25 @@ public class DevMailController {
             return new Result(false, settings.provider().name(), DispatchingEmailService.describe(ex), config);
         }
     }
+
+    /**
+     * Read-only: can this deployment actually deliver mail? Separate from {@code /test-email}
+     * because that one SENDS, and a screen cannot ask a question whose answer costs an email.
+     *
+     * <p>It exists so the app can stop lying. With no provider configured, "check your email" is
+     * false and the person waits for a message that was written to a log file — so the UI needs a
+     * cheap way to know, and to say where the code actually went instead.
+     *
+     * <p>Leaks nothing per-user: this is a fact about the deployment, not about any account.
+     */
+    @GetMapping("/mail-status")
+    public MailStatus mailStatus() {
+        EmailSettings settings = emailService.currentSettings();
+        boolean delivers = settings.provider() != EmailSettings.Provider.CONSOLE;
+        return new MailStatus(settings.provider().name(), delivers, settings.from());
+    }
+
+    public record MailStatus(String provider, boolean delivers, String from) {}
 
     public record Result(boolean sent, String provider, String error, Config config) {}
 

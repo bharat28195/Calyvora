@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, MailCheck } from "lucide-react";
+import { Loader2, MailCheck, AlertTriangle } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,12 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  // Whether this deployment can actually deliver mail. A fact about the server, not the account, so
+  // asking costs nothing and gives nothing away. Null = unknown (production hides the endpoint).
+  const [delivers, setDelivers] = useState<boolean | null>(null);
+  useEffect(() => {
+    void api.mailStatus().then((s) => setDelivers(s ? s.delivers : null));
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,12 +53,29 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <Card className="text-center">
-        <MailCheck className="mx-auto h-10 w-10 text-emerald-400" />
-        <CardTitle className="mt-4">Check your email</CardTitle>
-        <CardDescription>
-          If <span className="text-fg">{email.trim()}</span> has an account, a 6-digit code is on its
-          way. It expires in 15 minutes.
-        </CardDescription>
+        {/* Only promise a delivery that could actually have happened. With no mail provider
+            configured the code exists but was written to the server log, and telling someone to
+            check an inbox leaves them waiting for a message that is never coming. */}
+        {delivers === false ? (
+          <>
+            <AlertTriangle className="mx-auto h-10 w-10 text-amber-400" />
+            <CardTitle className="mt-4">Your code was created &mdash; but not emailed</CardTitle>
+            <CardDescription>
+              This deployment has no mail provider configured, so nothing was sent to{" "}
+              <span className="text-fg">{email.trim()}</span>. The code is in the{" "}
+              <Link href="/dev/mailbox" className="text-violet underline">dev mailbox</Link>.
+            </CardDescription>
+          </>
+        ) : (
+          <>
+            <MailCheck className="mx-auto h-10 w-10 text-emerald-400" />
+            <CardTitle className="mt-4">Check your email</CardTitle>
+            <CardDescription>
+              If <span className="text-fg">{email.trim()}</span> has an account, a 6-digit code is on
+              its way. It expires in 15 minutes.
+            </CardDescription>
+          </>
+        )}
         <div className="mt-6 flex flex-col gap-3">
           <Button
             size="lg"

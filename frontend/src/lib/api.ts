@@ -174,6 +174,16 @@ export const api = {
       "/trial-requests", { method: "POST", body: JSON.stringify(input) });
     return { received: true, emailSent: result?.emailSent ?? false };
   },
+  /** Can this deployment actually deliver mail? Cheap, read-only, and safe to call from a public
+   *  page: it describes the deployment, never an account. Null when the endpoint is absent (prod). */
+  async mailStatus(): Promise<{ provider: string; delivers: boolean } | null> {
+    if (!LIVE) return null;
+    try {
+      return await http<{ provider: string; delivers: boolean }>("/dev/mail-status");
+    } catch {
+      return null;
+    }
+  },
   /**
    * Ask for a one-time reset code (PD-23). Always resolves, whether or not the address has an
    * account — the backend answers 202 either way so this endpoint cannot be used to discover who
