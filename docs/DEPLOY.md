@@ -104,13 +104,25 @@ Tokens signed by the old key keep verifying; drop the `_PREV` trio once they've 
 
 ### Turn on real email — otherwise nobody can finish signing up
 
-**Read this before anything else: do not use SMTP on Render.** Render (like many hosts) blocks
-outbound SMTP on every port — 25, 587 and 465 all just time out. It is not a credential problem and
-no amount of fiddling with STARTTLS fixes it. Because a mail failure is deliberately swallowed (an
-outage must never roll back a completed signup), the symptom is silent: registration returns success,
-the verification email goes nowhere, and the account can never be activated.
+Two transports are supported and both are fully wired: **Resend** (HTTPS) and **SMTP** (your own
+mailbox, e.g. Hostinger). Read the next paragraph before choosing.
 
-Use **Resend** instead. It sends over HTTPS on port 443, which no host blocks.
+**The deciding factor is the host, not the mailbox.** Hosting platforms commonly block outbound SMTP
+on 25, 587 and 465 to stop spam, and Render's free instances are expected to be among them — the
+connection simply times out, which is *not* a credential problem and no amount of fiddling with
+STARTTLS fixes. That failure is dangerous here because a mail failure is deliberately swallowed (an
+outage must never roll back a completed signup), so the symptom is silent: registration returns
+success, the verification email goes nowhere, the account can never be activated. **So never assume
+SMTP works — prove it with `/dev/test-email` below, which reports the connection error instead of
+hiding it.**
+
+Resend sends over HTTPS on port 443, which no host blocks, so it is the recommended choice on Render.
+
+**Owning a mailbox does not commit you to SMTP.** The mailbox provider and the sending transport are
+separate: with Resend you still send *from* `no-reply@calyvora.in`, and replies still land in your
+own Hostinger inbox. Resend only carries the outbound message.
+
+#### Option A — Resend (recommended on Render)
 
 1. Sign up at **https://resend.com** (free tier: 3,000 emails/month).
 2. **Add your domain** and paste the SPF/DKIM records it gives you into your DNS. Until the domain is
@@ -128,6 +140,38 @@ That's it — no host, port or TLS flags. The startup log confirms the choice:
 ```
 Outgoing email: provider=RESEND, from=no-reply@calyvora.in, endpoint=https://api.resend.com/emails
 ```
+
+#### Option B — a Hostinger mailbox over SMTP
+
+Use this if you'd rather send through the mailbox you already pay for, or once the app runs somewhere
+that permits outbound SMTP. Create the mailbox in **hPanel → Emails** first, then in Render →
+`calyvora-backend` → **Environment**:
+
+| Key | Value |
+|-----|-------|
+| `MAIL_HOST` | `smtp.hostinger.com` |
+| `MAIL_PORT` | `465` |
+| `MAIL_USERNAME` | the full mailbox address, e.g. `no-reply@calyvora.in` |
+| `MAIL_PASSWORD` | that mailbox's password |
+| `MAIL_FROM` | **the same address as `MAIL_USERNAME`** |
+| `MAIL_SMTP_AUTH` | `true` |
+| `MAIL_SMTP_SSL` | `true` |
+
+`MAIL_FROM` must equal `MAIL_USERNAME`: providers reject a `From:` that differs from the
+authenticated mailbox ("sender denied"). Use **either** port 465 with `MAIL_SMTP_SSL=true`, **or**
+port 587 with `MAIL_SMTP_STARTTLS=true` — never both flags at once. Leave `RESEND_API_KEY` unset, or
+it wins the inference. The startup log confirms:
+
+```
+Outgoing email: provider=SMTP, from=no-reply@calyvora.in, endpoint=smtp.hostinger.com:465
+```
+
+Then run the test call below. **`connect timed out` means Render is blocking outbound SMTP** — the
+credentials are irrelevant at that point; switch to Option A, keeping the same `MAIL_FROM`.
+
+One structural advantage of Resend worth knowing: a shared mailbox has a low hourly send cap and a
+reputation you also use for ordinary correspondence. A burst of invitations can trip that cap, and
+because sends are swallowed, the invitations vanish quietly.
 
 **Verify it in one call** (staging only, disabled in `prod`):
 
@@ -148,7 +192,11 @@ Common failures in the `error` field:
 - `Resend returned 403: The domain is not verified` → finish step 2; DNS can take a few minutes.
 - `Resend returned 401: API key is invalid` → wrong or rotated `RESEND_API_KEY`.
 - `Resend returned 422: from is not valid` → `MAIL_FROM` isn't at a domain you've verified.
-- `MailConnectException … connect timed out` (SMTP) → the host is blocking SMTP. Switch to Resend.
+- `MailConnectException … connect timed out` (SMTP) → the host is blocking outbound SMTP. Not fixable
+  with credentials or TLS flags; switch to Resend, keeping the same `MAIL_FROM`.
+- `AuthenticationFailedException … 535` (SMTP) → wrong `MAIL_USERNAME`/`MAIL_PASSWORD`. The username
+  is the **full address**, not the part before the `@`.
+- `SMTPSendFailedException … sender denied` (SMTP) → `MAIL_FROM` differs from `MAIL_USERNAME`.
 
 #### Choosing the transport explicitly
 
@@ -159,7 +207,7 @@ and never delivered, and the app says so loudly at startup rather than pretendin
 | `MAIL_PROVIDER` | Needs | Use when |
 |-----------------|-------|----------|
 | `resend` | `RESEND_API_KEY`, `MAIL_FROM` | Any hosted deployment — **recommended** |
-| `smtp` | `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM` | Your own server, or a host that allows SMTP |
+| `smtp` | `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM` | Your own mailbox (Hostinger, Zoho…), on a host that allows outbound SMTP |
 | `console` | nothing | Local development |
 
 **A provider named but not credentialed falls back to console**, loudly:
@@ -169,14 +217,12 @@ ERROR ... MAIL_PROVIDER is set to RESEND but RESEND_API_KEY is not configured, s
           sent. Falling back to the console transport. Set RESEND_API_KEY to deliver mail for real.
 ```
 
-This is the case the blueprint creates by default — `render.yaml` pins `MAIL_PROVIDER=resend` while
-`RESEND_API_KEY` is `sync: false`, so it is unset until you fill it in. Pinning a provider used to
-skip inference and make *every* send throw, so the deployment mailed nothing at all until someone
-went looking. It now degrades to capture-and-log instead of failing.
+`render.yaml` therefore leaves `MAIL_PROVIDER` unset (`sync: false`) and lets inference pick: it used
+to pin `resend`, which made the whole `MAIL_*` SMTP set silently inert no matter what you put in the
+dashboard. Pinning a provider also used to skip inference and make *every* send throw, so the
+deployment mailed nothing at all until someone went looking; it now degrades to capture-and-log.
 
-For SMTP, `MAIL_FROM` must equal `MAIL_USERNAME` — providers reject a `From:` that differs from the
-authenticated mailbox ("sender denied"). Port 587 uses `MAIL_SMTP_STARTTLS=true`; port 465 uses
-`MAIL_SMTP_SSL=true` with STARTTLS off.
+Set `MAIL_PROVIDER` explicitly only to force a transport when both sets of credentials are present.
 
 **Try it locally before deploying.** Put the credentials in `backend/.env.local` (gitignored) and run
 against the embedded database — no Docker, no Postgres install:

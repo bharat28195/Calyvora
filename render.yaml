@@ -68,27 +68,54 @@ services:
         sync: false
       - key: JWT_PUBLIC_KEY
         sync: false
-      # Outgoing email over Resend's HTTPS API.
+      # Outgoing email. Two supported transports; the choice is made in the dashboard, not here,
+      # because it depends on credentials that must never live in this file.
       #
-      # NOT SMTP: Render blocks outbound SMTP on every port (25/587/465) — connections simply time
-      # out, and because a send failure is swallowed on purpose (a mail outage must not roll back a
-      # completed signup) the symptom is silent: signup succeeds and no verification mail ever
-      # arrives, so the account can never be activated. Port 443 is never blocked.
+      # MAIL_PROVIDER is deliberately left unset (sync: false) so the app INFERS the transport from
+      # whichever credential you filled in: a RESEND_API_KEY means Resend, otherwise a MAIL_USERNAME
+      # means SMTP, otherwise console. Pinning it here forced one answer and made the other set of
+      # variables silently inert.
       #
-      # Both are sync: false — an API key must never live in this file. Set them in the dashboard.
-      # MAIL_FROM must be at a domain verified in Resend, or it rejects the send with a 403.
-      # Unset ⇒ the app falls back to the console transport and says so loudly at startup.
+      # Resend (recommended on Render) sends over HTTPS on 443, which no host blocks. MAIL_FROM must
+      # be at a domain verified in Resend or it rejects the send with a 403.
+      #
+      # SMTP — e.g. a Hostinger mailbox — is wired and works, but EXPECT RENDER TO BLOCK IT: hosts
+      # commonly refuse outbound 25/587/465 to stop spam, and the connection just times out. Prove it
+      # either way with POST /api/v1/dev/test-email before trusting it, because a send failure is
+      # swallowed on purpose (a mail outage must not roll back a completed signup) and the symptom is
+      # otherwise silent: signup succeeds, no verification mail arrives, the account never activates.
+      # For SMTP, MAIL_FROM must EQUAL MAIL_USERNAME — providers reject a From: that differs from the
+      # authenticated mailbox. Port 465 ⇒ MAIL_SMTP_SSL=true; port 587 ⇒ MAIL_SMTP_STARTTLS=true.
+      #
+      # With none of them set the app falls back to the console transport and says so loudly at boot.
       - key: MAIL_PROVIDER
-        value: resend
-      - key: RESEND_API_KEY
         sync: false
       - key: MAIL_FROM
+        sync: false
+      # Resend
+      - key: RESEND_API_KEY
+        sync: false
+      # SMTP (Hostinger: MAIL_HOST=smtp.hostinger.com, MAIL_PORT=465, MAIL_SMTP_AUTH=true,
+      # MAIL_SMTP_SSL=true). Left unset these are ignored entirely.
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_SMTP_AUTH
+        sync: false
+      - key: MAIL_SMTP_STARTTLS
+        sync: false
+      - key: MAIL_SMTP_SSL
         sync: false
 
       # Where "someone wants a free trial" lands (PD-21). sync: false because it's a real inbox that
       # may change; unset, the app falls back to the platform owner's login address, so an enquiry is
-      # never silently dropped. Note that until RESEND_API_KEY above is set, the notification is only
-      # written to the log — a trial request nobody hears about is exactly the failure this guards.
+      # never silently dropped. Note that until a transport above is credentialed, the notification is
+      # only written to the log — a trial request nobody hears about is exactly the failure this guards.
       - key: TRIAL_NOTIFY_EMAIL
         sync: false
 
