@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Plus, Building2, XCircle, MoreHorizontal, Search, Tags, Network, Inbox } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, Plus, XCircle, MoreHorizontal, Search } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { AgencySummary, CompanySummary, SeatRequest } from "@/lib/types";
+import type { CompanySummary } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +13,6 @@ import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
-import { PricingEditor } from "@/components/platform/pricing-editor";
-import { TrialRequestsSection } from "@/components/platform/trial-requests";
 
 const STATUS_DOT: Record<string, string> = {
   ACTIVE: "bg-emerald-400",
@@ -32,54 +31,33 @@ function sentence(status: string): string {
 }
 
 /**
- * The console's four jobs, split by what you are doing rather than by what the data is: the customer
- * list you look at daily, the queue of things waiting on a decision, the groups that resell, and the
- * price list you change a few times a year.
+ * The customer list — the platform console's home.
  *
- * <p>They used to be one long scroll, which put the price-list editor — the rarest and most
- * consequential control here — directly above the table used every day, and buried both approval
- * queues in the middle where a request could sit unnoticed. A section also carries its pending count,
- * so nothing waiting on you depends on scrolling to find it.
+ * <p>Requests, agencies and pricing are their own pages under Platform in the sidebar rather than
+ * sections of this one, so the widest table in the app gets the full width instead of sharing its
+ * row with a second navigation.
  */
-const SECTIONS = [
-  { id: "companies", label: "Companies", icon: Building2 },
-  { id: "requests", label: "Requests", icon: Inbox },
-  { id: "agencies", label: "Agencies", icon: Network },
-  { id: "pricing", label: "Pricing", icon: Tags },
-] as const;
-
-type Section = (typeof SECTIONS)[number]["id"];
-
-function isSection(v: string): v is Section {
-  return SECTIONS.some((s) => s.id === v);
-}
-
-/** Platform-owner (vendor) console — manage every customer company and its subscription. OWNER only. */
-export default function PlatformPage() {
+export default function PlatformCompaniesPage() {
+  const router = useRouter();
   const [companies, setCompanies] = useState<CompanySummary[] | null>(null);
-  const [requests, setRequests] = useState<SeatRequest[]>([]);
+  const [waiting, setWaiting] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [section, setSection] = useState<Section>("companies");
-  const [trialsWaiting, setTrialsWaiting] = useState(0);
-
-  // The section lives in the URL fragment so a reload, a bookmark or a shared link lands where you
-  // were. A fragment rather than a query parameter because it needs no router involvement and so no
-  // Suspense boundary — this page is prerendered.
-  useEffect(() => {
-    const fromHash = window.location.hash.replace("#", "");
-    if (isSection(fromHash)) setSection(fromHash);
-  }, []);
-
-  function go(next: Section) {
-    setSection(next);
-    history.replaceState(null, "", next === "companies" ? window.location.pathname : `#${next}`);
-  }
 
   function load() {
-    api.platformCompanies().then(setCompanies).catch((e) => { setCompanies([]); setError(e instanceof ApiError ? e.message : "Failed to load companies"); });
-    api.platformSeatRequests().then(setRequests).catch(() => setRequests([]));
+    api.platformCompanies().then(setCompanies).catch((e) => {
+      setCompanies([]);
+      setError(e instanceof ApiError ? e.message : "Failed to load companies");
+    });
+    // Both queues, as one number. This page does not show them, but something has to say they are
+    // there — a request nobody is told about is the failure the queue exists to prevent.
+    Promise.all([
+      api.platformSeatRequests().catch(() => []),
+      api.platformTrialRequests().catch(() => []),
+    ]).then(([seats, trials]) => {
+      setWaiting(seats.length + trials.filter((t) => t.status === "NEW").length);
+    });
   }
   useEffect(() => { load(); }, []);
 
@@ -93,19 +71,15 @@ export default function PlatformPage() {
   const totalEmployees = companies?.reduce((s, c) => s + c.headcount, 0) ?? 0;
   const active = companies?.filter((c) => !c.locked).length ?? 0;
   const mrr = companies?.reduce((s, c) => s + (c.monthlyRevenue ?? 0), 0) ?? 0;
-  const waiting = requests.length + trialsWaiting;
 
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Platform</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Companies</h1>
           <p className="mt-1 text-fg/50">Every company on Orbit, and its subscription.</p>
         </div>
-        {/* Only offered where it makes sense — creating a company from the pricing list is a non-sequitur. */}
-        {section === "companies" && (
-          <Button onClick={() => setCreating((v) => !v)}><Plus className="h-4 w-4" /> New company</Button>
-        )}
+        <Button onClick={() => setCreating((v) => !v)}><Plus className="h-4 w-4" /> New company</Button>
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
@@ -123,111 +97,22 @@ export default function PlatformPage() {
               <Stat label="Employees" value={String(totalEmployees)} />
               <Stat label="Active" value={String(active)} />
               <Stat label="Monthly revenue" value={money(mrr)} />
-              {/* One number for everything awaiting a decision, and a way straight to it. Two separate
-                  counts made you work out which queue a thing was in before you could act on it. */}
               <Stat label="Waiting on you" value={String(waiting)} tone={waiting > 0 ? "attention" : undefined}
-                onClick={() => go("requests")} />
+                onClick={() => router.push("/platform/requests")} />
             </dl>
           </Card>
 
-          <div className="mt-6 flex flex-col gap-6 lg:flex-row">
-            <SectionNav current={section} onSelect={go} waiting={waiting} />
+          {creating && <CreateCompanyForm onCreated={() => { setCreating(false); load(); }} onCancel={() => setCreating(false)} />}
 
-            {/* min-w-0 so the wide companies table scrolls inside its own card rather than stretching
-                this column and pushing the whole page sideways. */}
-            <div className="min-w-0 flex-1">
-              {section === "companies" && (
-                <>
-                  {creating && <CreateCompanyForm onCreated={() => { setCreating(false); load(); }} onCancel={() => setCreating(false)} />}
-                  <CompaniesTable companies={companies} busyId={busyId} act={act} />
-                </>
-              )}
-
-              {/* Kept mounted rather than unmounted so its "waiting on you" count is known before the
-                  section is ever opened — a badge you must click to populate defeats its purpose. */}
-              <div className={cn(section === "requests" ? "" : "hidden")}>
-                <SeatRequestsCard requests={requests} busyId={busyId} act={act} />
-                <TrialRequestsSection onChanged={load} onWaitingCount={setTrialsWaiting} />
-              </div>
-
-              {section === "agencies" && <AgenciesSection onChanged={load} />}
-
-              {section === "pricing" && <PricingEditor />}
-            </div>
-          </div>
+          <CompaniesTable companies={companies} busyId={busyId} act={act} />
         </>
       )}
     </div>
   );
 }
 
-/**
- * The console's own navigation. A second nav rather than four entries in the app sidebar, because
- * these sections exist only for the vendor — putting them in the main nav would enlarge, for every
- * company admin, a menu none of them can use.
- *
- * <p>Horizontal and scrollable on a narrow screen, vertical from `lg` up.
- */
-function SectionNav({ current, onSelect, waiting }: {
-  current: Section; onSelect: (s: Section) => void; waiting: number;
-}) {
-  return (
-    <nav aria-label="Platform sections"
-      className="flex gap-1 overflow-x-auto border-b border-fg/10 pb-2 lg:w-48 lg:shrink-0 lg:flex-col lg:overflow-visible lg:border-b-0 lg:pb-0">
-      {SECTIONS.map(({ id, label, icon: Icon }) => {
-        const selected = current === id;
-        return (
-          <button key={id} type="button" onClick={() => onSelect(id)} aria-current={selected ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet",
-              selected ? "bg-violet/15 font-medium text-violet" : "text-fg/60 hover:bg-fg/5 hover:text-fg",
-            )}>
-            <Icon className="h-4 w-4 shrink-0" />
-            {label}
-            {id === "requests" && waiting > 0 && (
-              <span className="ml-auto rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium tabular-nums text-amber-300">
-                {waiting}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function SeatRequestsCard({ requests, busyId, act }: {
-  requests: SeatRequest[]; busyId: string | null; act: (id: string, fn: () => Promise<unknown>) => void;
-}) {
-  return (
-    <Card>
-      <CardTitle>Seat requests</CardTitle>
-      <p className="mt-1 text-xs text-fg/40">Companies that have outgrown the seats they pay for.</p>
-      {requests.length === 0 ? (
-        <p className="mt-3 text-sm text-fg/50">Nothing waiting.</p>
-      ) : (
-        <div className="mt-3 flex flex-col divide-y divide-fg/5">
-          {requests.map((r) => (
-            <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{r.companyName} · {r.currentSeats} → {r.requestedSeats} seats</p>
-                {r.note && <p className="truncate text-xs text-fg/40">{r.note}</p>}
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" disabled={busyId === r.id} onClick={() => act(r.id, () => api.approveSeatRequest(r.id))}>Approve</Button>
-                <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => act(r.id, () => api.declineSeatRequest(r.id))}>Decline</Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-}
-
 const STATUS_FILTERS = [
-  { id: "all", label: "All" },
+  { id: "all", label: "All companies" },
   { id: "active", label: "Active" },
   { id: "pending", label: "Awaiting activation" },
   { id: "ended", label: "Ended" },
@@ -237,11 +122,9 @@ const STATUS_FILTERS = [
 type StatusFilter = (typeof STATUS_FILTERS)[number]["id"];
 
 /**
- * The customer list.
- *
  * <p>Filtering exists because the list is not all customers: signup probes and abandoned trials land
  * here too, and once a few accumulate the real accounts are hard to pick out. Filtering rather than
- * deleting, deliberately — the counts above are of everything on the platform, and hiding a row must
+ * deleting, deliberately — the strip above counts everything on the platform, and hiding a row must
  * not quietly change what the platform is reported to contain.
  */
 function CompaniesTable({ companies, busyId, act }: {
@@ -273,7 +156,7 @@ function CompaniesTable({ companies, busyId, act }: {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9"
@@ -336,9 +219,14 @@ function CompaniesTable({ companies, busyId, act }: {
                   <span className={cn(c.headcount > c.seats ? "text-red-400" : "text-fg/80")}>{c.headcount}</span>
                   <span className="text-fg/40"> / {c.seats}</span>
                 </td>
+                {/* Where the rate came from matters as much as the rate: a company on an agreed price
+                    is one that publishing a new price list will NOT move. */}
                 <td className="px-3 py-3">
                   <p className="tabular-nums text-fg/80">{c.monthlyRevenue != null ? money(c.monthlyRevenue) : "—"}<span className="text-xs text-fg/40">/mo</span></p>
-                  <p className="text-xs text-fg/40">{c.pricePerEmployee != null ? `${money(c.pricePerEmployee)}/seat` : ""}</p>
+                  <p className="text-xs text-fg/40">
+                    {c.pricePerEmployee != null ? `${money(c.pricePerEmployee)}/seat` : ""}
+                    {c.customPrice && <span className="text-fg/50"> · agreed</span>}
+                  </p>
                 </td>
                 {/* Status and expiry read as one fact — "active until March" — so they share a cell.
                     A dot rather than a filled pill: seventeen coloured pills down a page is the noise
@@ -388,7 +276,7 @@ function RowActions({ company: c, busy, act }: {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const MENU_WIDTH = 208; // w-52
+  const MENU_WIDTH = 224; // w-56
 
   function openMenu() {
     const r = triggerRef.current?.getBoundingClientRect();
@@ -440,8 +328,14 @@ function RowActions({ company: c, busy, act }: {
     { label: "Extend by 12 months", run: () => act(c.companyId, () => api.renewCompanySubscription(c.companyId, 12)) },
     { label: "Change end date", run: () => setEditing("date") },
     { label: "Change seats", run: () => setEditing("seats") },
-    { label: "Change price", run: () => setEditing("price") },
+    { label: c.customPrice ? "Change agreed price" : "Agree a custom price", run: () => setEditing("price") },
   ];
+  // Only offered once there is something to undo. The backend has always accepted a null price to
+  // put a company back on the published list; nothing in the console could send one, so agreeing a
+  // custom price was a one-way door.
+  if (c.customPrice) {
+    items.push({ label: "Back to standard price list", run: () => act(c.companyId, () => api.setCompanyPrice(c.companyId, null)) });
+  }
   if (!c.locked) {
     items.push({ label: "End subscription", run: () => act(c.companyId, () => api.endCompanySubscription(c.companyId)), danger: true });
   }
@@ -485,124 +379,6 @@ function RowActions({ company: c, busy, act }: {
         document.body,
       )}
     </div>
-  );
-}
-
-/**
- * Agencies — customers who run several companies (PD-18). Optional: a company sold direct has no
- * agency and simply appears in the companies table as "Direct".
- */
-function AgenciesSection({ onChanged }: { onChanged: () => void }) {
-  const [agencies, setAgencies] = useState<AgencySummary[] | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  const load = () => void api.platformAgencies().then(setAgencies).catch(() => setAgencies([]));
-  useEffect(() => { load(); }, []);
-
-  return (
-    <Card>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <CardTitle>Agencies</CardTitle>
-          <p className="mt-1 text-xs text-fg/40">
-            Groups that run several companies. They provision their own companies; you decide when
-            billing starts.
-          </p>
-        </div>
-        <Button size="sm" variant="secondary" onClick={() => setCreating((v) => !v)}>
-          <Plus className="h-4 w-4" /> New agency
-        </Button>
-      </div>
-
-      {creating && (
-        <CreateAgencyForm
-          onCreated={() => { setCreating(false); load(); onChanged(); }}
-          onCancel={() => setCreating(false)}
-        />
-      )}
-
-      {agencies && agencies.length > 0 && (
-        <div className="mt-3 flex flex-col divide-y divide-fg/5">
-          {agencies.map((a) => (
-            <div key={a.agencyId} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{a.name}</p>
-                <p className="truncate text-xs text-fg/40">{a.ownerName} · {a.ownerEmail}</p>
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-fg/60">{a.companyCount} companies</span>
-                <span className="text-fg/60">{a.headcount} employees</span>
-                <span className="tabular-nums text-emerald-400">{money(a.monthlyRevenue ?? 0)}/mo</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {agencies && agencies.length === 0 && !creating && (
-        <p className="mt-3 text-sm text-fg/50">
-          No agencies yet — every company is sold direct.
-        </p>
-      )}
-    </Card>
-  );
-}
-
-function CreateAgencyForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
-  const [v, setV] = useState({ agencyName: "", ownerFirstName: "", ownerLastName: "", ownerEmail: "", password: "" });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setV((prev) => ({ ...prev, [k]: e.target.value }));
-    setFieldErrors((f) => (f[k] ? { ...f, [k]: "" } : f));
-  };
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true); setError(null); setFieldErrors({});
-    try {
-      await api.createAgency(v);
-      onCreated();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setFieldErrors(err.fieldErrors);
-        setError(Object.keys(err.fieldErrors).length === 0 ? err.message : "Please correct the highlighted fields.");
-      } else {
-        setError("Couldn't create the agency");
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="mt-4 flex flex-col gap-4 rounded-xl border border-fg/10 p-4">
-      {error && <Alert tone="error">{error}</Alert>}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Agency name" htmlFor="agencyName" error={fieldErrors.agencyName}>
-          <Input id="agencyName" value={v.agencyName} onChange={set("agencyName")} />
-        </Field>
-        <Field label="Owner email" htmlFor="ownerEmail" error={fieldErrors.ownerEmail}>
-          <Input id="ownerEmail" type="email" value={v.ownerEmail} onChange={set("ownerEmail")} />
-        </Field>
-        <Field label="Owner first name" htmlFor="ownerFirstName" error={fieldErrors.ownerFirstName}>
-          <Input id="ownerFirstName" value={v.ownerFirstName} onChange={set("ownerFirstName")} />
-        </Field>
-        <Field label="Owner last name" htmlFor="ownerLastName" error={fieldErrors.ownerLastName}>
-          <Input id="ownerLastName" value={v.ownerLastName} onChange={set("ownerLastName")} />
-        </Field>
-        <Field label="Temporary password" htmlFor="agencyPassword" error={fieldErrors.password}>
-          <Input id="agencyPassword" value={v.password} onChange={set("password")} />
-        </Field>
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={saving}>
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Create agency
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
-      </div>
-    </form>
   );
 }
 
@@ -650,7 +426,7 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
   }
 
   return (
-    <Card className="mb-4">
+    <Card className="mt-6">
       <CardTitle>New company</CardTitle>
       <p className="mt-1 text-sm text-fg/50">Provisions the company and its first admin. Share the login with them.</p>
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}

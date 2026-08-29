@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Tag, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { PriceListVersion } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,8 @@ export function PricingEditor() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Read first, change second: the editor opens only when asked for.
+  const [editing, setEditing] = useState(false);
 
   function load() {
     api.platformPricing()
@@ -83,15 +85,12 @@ export function PricingEditor() {
 
   return (
     <Card>
+      {/* No title of its own — the page it sits on already says "Pricing", and saying it twice on the
+          same screen is the kind of duplication that appears the moment a section becomes a page. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <CardTitle>Pricing</CardTitle>
-          <p className="mt-0.5 text-sm text-fg/50">
-            What every company on the standard list pays. Takes effect on its start date — no deploy.
-          </p>
-        </div>
+        <CardTitle>{editing ? "Edit the price list" : "Current price list"}</CardTitle>
         {current && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-fg/10 px-2.5 py-1 text-xs text-fg/60">
+          <span className="inline-flex items-center gap-1.5 text-xs text-fg/50">
             <Tag className="h-3 w-3" /> in force since {current.effectiveFrom}
           </span>
         )}
@@ -102,6 +101,11 @@ export function PricingEditor() {
 
       {versions === null ? (
         <div className="mt-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-violet" /></div>
+      ) : !editing ? (
+        <>
+          <CurrentPriceList current={current} onEdit={() => { setEditing(true); setSaved(false); }} />
+          <History versions={versions} />
+        </>
       ) : (
         <>
           <div className="mt-5 flex flex-col gap-3">
@@ -216,38 +220,109 @@ export function PricingEditor() {
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {saving ? "Publishing…" : "Publish price list"}
             </Button>
+            {/* Reloads rather than just hiding the form: leaving edits in memory would mean reopening
+                the editor showed changes that were never published, and the table would disagree. */}
+            <Button type="button" variant="ghost" className="mb-1" disabled={saving}
+              onClick={() => { setEditing(false); setError(null); load(); }}>
+              Cancel
+            </Button>
           </div>
 
-          {versions.length > 0 && (
-            <div className="mt-6 border-t border-fg/10 pt-4">
-              <p className="text-xs uppercase tracking-wide text-fg/40">History</p>
-              <div className="mt-2 flex flex-col divide-y divide-fg/5">
-                {versions.map((v) => (
-                  <div key={v.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
-                    <span className="text-sm">
-                      <span className="tabular-nums text-fg/80">{v.effectiveFrom}</span>
-                      {v.current && (
-                        <span className="ml-2 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-400">
-                          current
-                        </span>
-                      )}
-                      {v.note && <span className="ml-2 text-fg/40">{v.note}</span>}
-                    </span>
-                    <span className="text-xs text-fg/50">
-                      {v.tiers.map((t) =>
-                        t.toEmployee ? `≤${t.toEmployee}: ${money(t.rate)}` : `then ${money(t.rate)}`,
-                      ).join(" · ")}
-                      {v.monthlyMinimum > 0 && ` · min ${money(v.monthlyMinimum)}`}
-                      {v.annualMonthsCharged < 12 && ` · yearly ×${v.annualMonthsCharged}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <History versions={versions} />
         </>
       )}
     </Card>
+  );
+}
+
+/**
+ * What the price list says, as a table you can read at a glance.
+ *
+ * <p>The editor used to be the only view, so eight always-live inputs stood permanently on screen
+ * for something changed a few times a year — and a form is harder to read than a table, because every
+ * value sits in a box that invites typing into it. Reading and changing are different jobs.
+ */
+function CurrentPriceList({ current, onEdit }: { current: PriceListVersion | undefined; onEdit: () => void }) {
+  if (!current) {
+    return (
+      <div className="mt-5">
+        <p className="text-sm text-fg/50">No price list published yet.</p>
+        <Button type="button" size="sm" className="mt-3" onClick={onEdit}>Set the first price list</Button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-5">
+      <div className="overflow-x-auto rounded-lg border border-fg/10">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-fg/10 text-left text-xs text-fg/40">
+              <th className="px-4 py-2.5 font-medium">Employees</th>
+              <th className="px-4 py-2.5 text-right font-medium">Rate / employee / month</th>
+            </tr>
+          </thead>
+          <tbody>
+            {current.tiers.map((t, i) => {
+              const from = i === 0 ? 1 : (current.tiers[i - 1].toEmployee ?? 0) + 1;
+              return (
+                <tr key={i} className="border-b border-fg/5 last:border-0">
+                  <td className="px-4 py-2.5 tabular-nums text-fg/80">
+                    {t.toEmployee == null ? `${from} and above` : `${from} – ${t.toEmployee}`}
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-fg/80">{money(t.rate)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+        <div className="flex gap-2">
+          <dt className="text-fg/50">Monthly minimum</dt>
+          <dd className="tabular-nums text-fg/80">{current.monthlyMinimum > 0 ? money(current.monthlyMinimum) : "none"}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-fg/50">Paying yearly</dt>
+          <dd className="text-fg/80">
+            {current.annualMonthsCharged < 12
+              ? `${12 - current.annualMonthsCharged} month${12 - current.annualMonthsCharged === 1 ? "" : "s"} free`
+              : "no discount"}
+          </dd>
+        </div>
+      </dl>
+
+      <Button type="button" size="sm" variant="secondary" className="mt-4" onClick={onEdit}>
+        <Pencil className="h-4 w-4" /> Edit price list
+      </Button>
+    </div>
+  );
+}
+
+function History({ versions }: { versions: PriceListVersion[] }) {
+  if (versions.length === 0) return null;
+  return (
+    <div className="mt-6 border-t border-fg/10 pt-4">
+      <p className="text-xs uppercase tracking-wide text-fg/40">History</p>
+      <div className="mt-2 flex flex-col divide-y divide-fg/5">
+        {versions.map((v) => (
+          <div key={v.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+            <span className="text-sm">
+              <span className="tabular-nums text-fg/80">{v.effectiveFrom}</span>
+              {v.current && <span className="ml-2 text-xs text-fg/50">current</span>}
+              {v.note && <span className="ml-2 text-fg/40">{v.note}</span>}
+            </span>
+            <span className="text-xs text-fg/50">
+              {v.tiers.map((t) =>
+                t.toEmployee ? `≤${t.toEmployee}: ${money(t.rate)}` : `then ${money(t.rate)}`,
+              ).join(" · ")}
+              {v.monthlyMinimum > 0 && ` · min ${money(v.monthlyMinimum)}`}
+              {v.annualMonthsCharged < 12 && ` · yearly ×${v.annualMonthsCharged}`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -392,7 +392,8 @@ export const api = {
   setCompanyEndDate(companyId: string, endsAt: string): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/end-date`, { method: "POST", body: JSON.stringify({ endsAt }) }) : Promise.reject(new Error("live only"));
   },
-  setCompanyPrice(companyId: string, price: number): Promise<CompanySummary> {
+  /** A number agrees a rate with this customer; `null` puts them back on the published price list. */
+  setCompanyPrice(companyId: string, price: number | null): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/price`, { method: "POST", body: JSON.stringify({ price }) }) : Promise.reject(new Error("live only"));
   },
   platformAgencies(): Promise<AgencySummary[]> {

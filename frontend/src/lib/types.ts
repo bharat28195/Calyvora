@@ -597,6 +597,8 @@ export interface CompanySummary {
   daysLeft: number | null;
   locked: boolean;
   pricePerEmployee: number | null;
+  /** True when this rate was agreed with the customer, so publishing a new price list won't move it. */
+  customPrice: boolean;
   monthlyRevenue: number | null;
   currency: string;
   createdAt: string | null;

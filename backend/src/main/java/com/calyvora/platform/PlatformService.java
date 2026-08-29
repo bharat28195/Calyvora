@@ -400,7 +400,7 @@ public class PlatformService {
                 sub == null ? "NONE" : sub.getStatus().name(),
                 endsAt, daysLeft,
                 sub != null && sub.isLocked(),
-                price, revenue, sub == null ? "INR" : sub.getCurrency(),
+                price, sub != null && sub.isCustomPrice(), revenue, sub == null ? "INR" : sub.getCurrency(),
                 company.getCreatedAt() == null ? null : company.getCreatedAt().toString(),
                 agency == null ? null : agency.getId().toString(),
                 agency == null ? null : agency.getName());

@@ -38,7 +38,17 @@ const HR_PLUS: Role[] = ["ADMIN", "HR"];
 const MANAGES: Role[] = ["ADMIN", "HR", "MANAGER"]; // people who approve their team's requests
 const COMPANY: Role[] = ["ADMIN", "HR", "MANAGER", "MEMBER"]; // any company user (not the platform OWNER)
 const NAV: NavItem[] = [
-  { href: "/platform", label: "Platform", icon: Building2, roles: ["OWNER"] },
+  // Four pages rather than four sections of one, so each gets the whole width — the companies table
+  // is the widest thing in the app and was sharing its row with a second nav.
+  {
+    href: "/platform", label: "Platform", icon: Building2, roles: ["OWNER"],
+    children: [
+      { href: "/platform", label: "Companies" },
+      { href: "/platform/requests", label: "Requests" },
+      { href: "/platform/agencies", label: "Agencies" },
+      { href: "/platform/pricing", label: "Pricing" },
+    ],
+  },
   // An agency sees only this — no company surface at all, because it holds no employees of its own.
   { href: "/agency", label: "My companies", icon: Building2, roles: ["AGENCY_OWNER"] },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
