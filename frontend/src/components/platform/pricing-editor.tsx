@@ -82,7 +82,7 @@ export function PricingEditor() {
   const current = versions?.find((v) => v.current);
 
   return (
-    <Card className="mt-6">
+    <Card>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <CardTitle>Pricing</CardTitle>

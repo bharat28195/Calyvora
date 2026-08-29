@@ -18,7 +18,11 @@ import { Alert } from "@/components/ui/alert";
  * for the same three terms as "New company" — starting password, seats, months — because that is
  * exactly what it does underneath.
  */
-export function TrialRequestsSection({ onChanged }: { onChanged: () => void }) {
+export function TrialRequestsSection({ onChanged, onWaitingCount }: {
+  onChanged: () => void;
+  /** Lifts the "waiting on you" count so the tab it lives behind can show it without being opened. */
+  onWaitingCount?: (n: number) => void;
+}) {
   const [requests, setRequests] = useState<TrialRequest[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -32,6 +36,8 @@ export function TrialRequestsSection({ onChanged }: { onChanged: () => void }) {
 
   const waiting = requests?.filter((r) => r.status === "NEW") ?? [];
   const decided = requests?.filter((r) => r.status !== "NEW") ?? [];
+
+  useEffect(() => { onWaitingCount?.(waiting.length); }, [waiting.length, onWaitingCount]);
 
   async function approve(r: TrialRequest) {
     setBusyId(r.id);
@@ -69,7 +75,7 @@ export function TrialRequestsSection({ onChanged }: { onChanged: () => void }) {
 
   if (requests === null) {
     return (
-      <Card className="mt-6">
+      <Card className="mt-4">
         <CardTitle>Trial requests</CardTitle>
         <div className="mt-3 flex items-center gap-2 text-sm text-fg/50">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -79,7 +85,7 @@ export function TrialRequestsSection({ onChanged }: { onChanged: () => void }) {
   }
 
   return (
-    <Card className="mt-6">
+    <Card className="mt-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <CardTitle>Trial requests</CardTitle>
         {waiting.length > 0 && (
