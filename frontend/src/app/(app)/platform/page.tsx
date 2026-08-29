@@ -2,10 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  Loader2, Plus, Building2, Users, CheckCircle2, XCircle, Clock, Wallet,
-  MoreHorizontal, Search, Tags, Network, Inbox,
-} from "lucide-react";
+import { Loader2, Plus, Building2, XCircle, MoreHorizontal, Search, Tags, Network, Inbox } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { AgencySummary, CompanySummary, SeatRequest } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -18,15 +15,21 @@ import { money } from "@/lib/format";
 import { PricingEditor } from "@/components/platform/pricing-editor";
 import { TrialRequestsSection } from "@/components/platform/trial-requests";
 
-const STATUS_TONE: Record<string, string> = {
-  ACTIVE: "bg-emerald-500/15 text-emerald-400",
-  TRIALING: "bg-sky-500/15 text-sky-400",
+const STATUS_DOT: Record<string, string> = {
+  ACTIVE: "bg-emerald-400",
+  TRIALING: "bg-sky-400",
   // Created by an agency and waiting on you to switch billing on.
-  PENDING: "bg-amber-500/15 text-amber-300",
-  PAST_DUE: "bg-amber-500/15 text-amber-300",
-  CANCELLED: "bg-red-500/15 text-red-400",
-  NONE: "bg-fg/10 text-fg/50",
+  PENDING: "bg-amber-400",
+  PAST_DUE: "bg-amber-400",
+  CANCELLED: "bg-red-400",
+  NONE: "bg-fg/25",
 };
+
+/** "PAST_DUE" → "Past due". */
+function sentence(status: string): string {
+  const s = status.replace(/_/g, " ").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 /**
  * The console's four jobs, split by what you are doing rather than by what the data is: the customer
@@ -111,16 +114,21 @@ export default function PlatformPage() {
         <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <Kpi label="Companies" value={String(companies.length)} icon={<Building2 className="h-4 w-4 text-violet" />} />
-            <Kpi label="Employees" value={String(totalEmployees)} icon={<Users className="h-4 w-4 text-aqua" />} />
-            <Kpi label="Active" value={String(active)} icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />} />
-            <Kpi label="Monthly revenue" value={money(mrr)} icon={<Wallet className="h-4 w-4 text-emerald-400" />} />
-            {/* One number for everything awaiting a decision, and a way straight to it. Two separate
-                counts made you work out which queue a thing was in before you could act on it. */}
-            <Kpi label="Waiting on you" value={String(waiting)} onClick={() => go("requests")}
-              icon={<Clock className={cn("h-4 w-4", waiting > 0 ? "text-amber-400" : "text-fg/30")} />} />
-          </div>
+          {/* One quiet strip rather than five separate boxes, each with its own border, shadow and
+              coloured icon. Five tiles competed with each other and with the table below; the numbers
+              are context you glance at, so they should read as one line, not five objects. */}
+          <Card className="mt-6 p-0">
+            <dl className="grid grid-cols-2 divide-fg/10 sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
+              <Stat label="Companies" value={String(companies.length)} />
+              <Stat label="Employees" value={String(totalEmployees)} />
+              <Stat label="Active" value={String(active)} />
+              <Stat label="Monthly revenue" value={money(mrr)} />
+              {/* One number for everything awaiting a decision, and a way straight to it. Two separate
+                  counts made you work out which queue a thing was in before you could act on it. */}
+              <Stat label="Waiting on you" value={String(waiting)} tone={waiting > 0 ? "attention" : undefined}
+                onClick={() => go("requests")} />
+            </dl>
+          </Card>
 
           <div className="mt-6 flex flex-col gap-6 lg:flex-row">
             <SectionNav current={section} onSelect={go} waiting={waiting} />
@@ -271,17 +279,15 @@ function CompaniesTable({ companies, busyId, act }: {
           <Input value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9"
             placeholder="Search company, admin email or agency" aria-label="Search companies" />
         </div>
-        <div className="flex gap-1 overflow-x-auto rounded-lg border border-fg/10 bg-fg/5 p-0.5">
+        {/* A select rather than a row of pills: five always-visible buttons, one of them filled
+            violet, drew more attention than the table they filter. */}
+        <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}
+          aria-label="Filter by subscription status"
+          className="h-11 rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
           {STATUS_FILTERS.map((f) => (
-            <button key={f.id} type="button" onClick={() => setStatus(f.id)}
-              className={cn(
-                "whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors",
-                status === f.id ? "bg-violet text-white" : "text-fg/60 hover:text-fg",
-              )}>
-              {f.label}
-            </button>
+            <option key={f.id} value={f.id}>{f.label}</option>
           ))}
-        </div>
+        </select>
       </div>
 
       {filtering && (
@@ -293,37 +299,34 @@ function CompaniesTable({ companies, busyId, act }: {
       )}
 
       <Card className="mt-4 overflow-x-auto p-0">
-        <table className="w-full min-w-[860px] border-collapse text-sm">
+        <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-fg/10 text-left text-xs uppercase tracking-wide text-fg/40">
+            <tr className="border-b border-fg/10 text-left text-xs text-fg/40">
               <th className="px-5 py-3 font-medium">Company</th>
-              <th className="px-3 py-3 font-medium">Sold via</th>
               <th className="px-3 py-3 font-medium">Admin</th>
               <th className="px-3 py-3 font-medium">Seats</th>
               <th className="px-3 py-3 font-medium">Billing</th>
               <th className="px-3 py-3 font-medium">Subscription</th>
-              <th className="px-3 py-3 font-medium">Ends</th>
-              <th className="px-5 py-3 text-right font-medium">Actions</th>
+              <th className="px-5 py-3 text-right font-medium">{/* actions */}</th>
             </tr>
           </thead>
           <tbody>
             {shown.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-fg/50">
+                <td colSpan={6} className="px-5 py-8 text-center text-fg/50">
                   {companies.length === 0 ? "No companies yet. Create your first customer." : "No company matches these filters."}
                 </td>
               </tr>
             ) : shown.map((c) => (
               <tr key={c.companyId} className="border-b border-fg/5 last:border-0 hover:bg-fg/[0.02]">
+                {/* Headcount and who sold it belong to the company, not to columns of their own —
+                    two of the eight columns existed to hold one short phrase each. */}
                 <td className="px-5 py-3">
                   <p className="font-medium">{c.name}</p>
-                  <p className="text-xs text-fg/40">{c.headcount} employee{c.headcount === 1 ? "" : "s"}</p>
-                </td>
-                {/* Direct sale or through a group — the two ways a company gets here. */}
-                <td className="px-3 py-3">
-                  {c.agencyName
-                    ? <span className="rounded-full bg-violet/15 px-2 py-0.5 text-xs font-medium text-violet">{c.agencyName}</span>
-                    : <span className="text-xs text-fg/40">Direct</span>}
+                  <p className="text-xs text-fg/40">
+                    {c.headcount} employee{c.headcount === 1 ? "" : "s"}
+                    {c.agencyName ? ` · via ${c.agencyName}` : ""}
+                  </p>
                 </td>
                 <td className="px-3 py-3">
                   <p className="text-fg/80">{c.adminName}</p>
@@ -337,19 +340,23 @@ function CompaniesTable({ companies, busyId, act }: {
                   <p className="tabular-nums text-fg/80">{c.monthlyRevenue != null ? money(c.monthlyRevenue) : "—"}<span className="text-xs text-fg/40">/mo</span></p>
                   <p className="text-xs text-fg/40">{c.pricePerEmployee != null ? `${money(c.pricePerEmployee)}/seat` : ""}</p>
                 </td>
+                {/* Status and expiry read as one fact — "active until March" — so they share a cell.
+                    A dot rather than a filled pill: seventeen coloured pills down a page is the noise
+                    itself, while a dot still carries the state at a glance. */}
                 <td className="px-3 py-3">
-                  <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_TONE[c.subscriptionStatus] ?? STATUS_TONE.NONE)}>
+                  <p className="flex items-center gap-1.5 text-fg/80">
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[c.subscriptionStatus] ?? STATUS_DOT.NONE)} />
                     {/* PENDING is locked too, but "Ended" would be wrong — it never started. */}
-                    {c.subscriptionStatus === "PENDING" ? "awaiting activation"
-                      : c.locked ? "Ended" : c.subscriptionStatus.toLowerCase()}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-fg/70">
-                  {c.endsAt ?? "—"}
-                  {c.daysLeft != null && !c.locked && (
-                    <span className={cn("ml-1 text-xs", c.daysLeft <= 14 ? "text-amber-400" : "text-fg/40")}>
-                      ({c.daysLeft}d)
-                    </span>
+                    {c.subscriptionStatus === "PENDING" ? "Awaiting activation"
+                      : c.locked ? "Ended" : sentence(c.subscriptionStatus)}
+                  </p>
+                  {c.endsAt && !c.locked && (
+                    <p className="mt-0.5 text-xs text-fg/40">
+                      until {c.endsAt}
+                      {c.daysLeft != null && (
+                        <span className={cn(c.daysLeft <= 14 ? "text-amber-400" : "")}> · {c.daysLeft}d</span>
+                      )}
+                    </p>
                   )}
                 </td>
                 <td className="px-5 py-3">
@@ -666,26 +673,34 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
   );
 }
 
-function Kpi({ label, value, icon, onClick }: {
-  label: string; value: string; icon: React.ReactNode; onClick?: () => void;
+/**
+ * One number in the summary strip.
+ *
+ * <p>No icon and no colour unless something is actually waiting on you. Decoration on every tile
+ * spends attention evenly, which leaves nothing to spend on the one tile that has news.
+ */
+function Stat({ label, value, tone, onClick }: {
+  label: string; value: string; tone?: "attention"; onClick?: () => void;
 }) {
   const body = (
     <>
-      <div className="flex items-center gap-2 text-xs text-fg/50">{icon} {label}</div>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      <dt className="text-xs text-fg/50">{label}</dt>
+      <dd className={cn("mt-1 text-2xl font-semibold tabular-nums", tone === "attention" ? "text-amber-400" : "text-fg")}>
+        {value}
+      </dd>
     </>
   );
-  // A number you can act on should be reachable from the number itself. Rendered as a real button so
-  // it is keyboard-reachable, rather than a card with a click handler bolted on.
+  // A number you can act on should be reachable from the number itself, and as a real button so it
+  // is keyboard-reachable rather than a div with a click handler bolted on.
   if (onClick) {
     return (
-      <Card className="p-0">
+      <div>
         <button type="button" onClick={onClick}
-          className="w-full rounded-[inherit] px-5 py-4 text-left transition-colors hover:bg-fg/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
+          className="w-full px-5 py-4 text-left transition-colors hover:bg-fg/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet">
           {body}
         </button>
-      </Card>
+      </div>
     );
   }
-  return <Card className="py-4">{body}</Card>;
+  return <div className="px-5 py-4">{body}</div>;
 }

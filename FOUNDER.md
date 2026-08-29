@@ -456,6 +456,14 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   the Calyvora group" and "operates as part of" rather than naming a shareholding, so nothing on the
   site has to be retracted if the paperwork lands differently. **Confirm with an accountant before
   claiming a parent/subsidiary relationship in a contract or an invoice.**
+- **Amended 2026-08-30:** there is now **one director, Renu Rao**. Khushboo is no longer part of the
+  group, so the two-director split above no longer holds — the Calyvora/platform remit sits with the
+  founder. Recorded as an amendment rather than an edit because the original reasoning is still why
+  the group is shaped this way, and a journal that quietly rewrites itself cannot be trusted later.
+  **No site change was needed:** `about.html` names only Renu Rao and describes the role as
+  "Director", full stop, without attaching it to one of the two arms — so the page was already
+  correct on the day the split ended. Worth noting as a design lesson: copy that avoids stating more
+  structure than it needs does not have to be retracted when the structure changes.
 - **Final outcome:** _Shipped — `website/orbit/about.html`, linked from the nav and footer of every
   page._
 
