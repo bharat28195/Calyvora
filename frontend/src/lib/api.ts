@@ -129,22 +129,80 @@ export const auth = {
   },
 };
 
+/**
+ * How long to keep trying while the backend is waking up. The hosted backend sleeps when idle and
+ * takes the better part of a minute to come back, during which the proxy cannot reach it at all.
+ */
+const WAKE_BACKOFF_MS = [1_000, 3_000, 6_000, 12_000, 20_000, 25_000];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Can this failure be retried safely, and is it worth retrying?
+ *
+ * <p>The signal is `unreachable` — a non-JSON error body. Every error the backend itself raises is
+ * JSON, so a body the browser cannot parse did not come from the application: it is the Next proxy
+ * reporting that it could not reach the backend at all. That distinction is what makes a retry safe
+ * even for a POST, because a request that never arrived cannot have been half-applied.
+ *
+ * <p>A JSON 500 is a genuine application error and is never retried — repeating it just fails again.
+ * Neither is 429: retrying a rate limit is what extends it.
+ */
+function shouldRetry(status: number, unreachable: boolean, attempt: number): boolean {
+  if (attempt >= WAKE_BACKOFF_MS.length) return false;
+  return unreachable && (status === 500 || status === 502 || status === 503 || status === 504);
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (res.status === 204) return undefined as T;
-  const body = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new ApiError((body as ApiErrorBody) ?? { timestamp: "", status: res.status, code: "INTERNAL_ERROR", message: "Request failed" });
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE}${path}`, {
+        ...init,
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(init?.headers ?? {}),
+        },
+      });
+    } catch {
+      // The request never left, so nothing can have been applied — same reasoning as `unreachable`.
+      if (!shouldRetry(503, true, attempt)) throw new ApiError(infrastructureError(0));
+      await sleep(WAKE_BACKOFF_MS[attempt]);
+      continue;
+    }
+
+    if (res.status === 204) return undefined as T;
+    const body = await res.json().catch(() => null);
+    if (res.ok) return body as T;
+
+    if (shouldRetry(res.status, body === null, attempt)) {
+      await sleep(WAKE_BACKOFF_MS[attempt]);
+      continue;
+    }
+    throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
   }
-  return body as T;
+}
+
+/**
+ * What to say when the failure did not come from the app at all.
+ *
+ * <p>Every error the backend raises is JSON carrying its own message. A response the browser cannot
+ * parse as JSON therefore came from something in front of it — the platform's rate limiter, a
+ * gateway, or an instance that is still waking up — and those answer in plain text or HTML.
+ *
+ * <p>This used to collapse all of them into "Request failed", which is the least useful thing the
+ * screen could say: the three causes need three different responses from the person reading it, and
+ * two of them just mean "wait". Naming the cause is the difference between waiting a minute and
+ * concluding the account is broken.
+ */
+function infrastructureError(status: number): ApiErrorBody {
+  const message =
+    status === 429
+      ? "Too many attempts from this network. Wait a minute, then try again."
+      : "The server could not be reached — it may still be starting up. Try again in a moment.";
+  return { timestamp: "", status, code: "INFRASTRUCTURE", message };
 }
 
 export const api = {
