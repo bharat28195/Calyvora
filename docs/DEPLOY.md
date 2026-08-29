@@ -104,25 +104,36 @@ Tokens signed by the old key keep verifying; drop the `_PREV` trio once they've 
 
 ### Turn on real email — otherwise nobody can finish signing up
 
-Two transports are supported and both are fully wired: **Resend** (HTTPS) and **SMTP** (your own
-mailbox, e.g. Hostinger). Read the next paragraph before choosing.
+**On Render there is exactly one variable to set: `RESEND_API_KEY`.** The sending address
+(`connect@calyvora.in`), the trial-notification inbox and the transport choice are defaults in
+`application.yml` — they are not secrets and do not vary by deployment, so they are not dashboard
+fields anyone has to remember. The API key is the only real secret, and secrets are never committed.
 
-**The deciding factor is the host, not the mailbox.** Hosting platforms commonly block outbound SMTP
-on 25, 587 and 465 to stop spam, and Render's free instances are expected to be among them — the
-connection simply times out, which is *not* a credential problem and no amount of fiddling with
-STARTTLS fixes. That failure is dangerous here because a mail failure is deliberately swallowed (an
-outage must never roll back a completed signup), so the symptom is silent: registration returns
-success, the verification email goes nowhere, the account can never be activated. **So never assume
-SMTP works — prove it with `/dev/test-email` below, which reports the connection error instead of
-hiding it.**
+**SMTP does not work on Render — this is measured, not assumed.** We configured a real Hostinger
+mailbox and tested it:
 
-Resend sends over HTTPS on port 443, which no host blocks, so it is the recommended choice on Render.
+```
+MailConnectException: Couldn't connect to host, port: smtp.hostinger.com, 465
+SocketTimeoutException: Connect timed out
+```
 
-**Owning a mailbox does not commit you to SMTP.** The mailbox provider and the sending transport are
-separate: with Resend you still send *from* `no-reply@calyvora.in`, and replies still land in your
-own Hostinger inbox. Resend only carries the outbound message.
+`smtp.hostinger.com` answers on 465 and 587 from a laptop and times out from Render, so the block is
+outbound from the host. The TCP connection never opens, which means **no credential, port or TLS flag
+can change the outcome** — the failure happens before a username is ever sent. The SMTP transport
+remains supported in the code for a host that permits it; it is simply unusable here.
 
-#### Option A — Resend (recommended on Render)
+That failure mode is dangerous because a mail failure is deliberately swallowed (an outage must never
+roll back a completed signup), so the symptom is silent: registration returns success, the
+verification email goes nowhere, the account can never be activated. **Never assume a transport
+works — prove it with `/dev/test-email` below, which reports the connection error instead of hiding
+it.** `/dev/mail-status` reporting `delivers: true` only means a transport is *configured*, not that
+a message has ever left the building.
+
+**Owning a mailbox does not commit you to SMTP.** The mailbox and the transport are separate things:
+with Resend the mail still goes out *from* `connect@calyvora.in` and replies still land in that
+Hostinger inbox. Resend only carries the outbound message.
+
+#### Option A — Resend (what Render needs)
 
 1. Sign up at **https://resend.com** (free tier: 3,000 emails/month).
 2. **Add your domain** and paste the SPF/DKIM records it gives you into your DNS. Until the domain is
@@ -133,19 +144,22 @@ own Hostinger inbox. Resend only carries the outbound message.
 | Key | Value |
 |-----|-------|
 | `RESEND_API_KEY` | the key from step 3 (starts `re_…`) |
-| `MAIL_FROM` | an address at your verified domain, e.g. `no-reply@calyvora.in` |
 
-That's it — no host, port or TLS flags. The startup log confirms the choice:
+That is the whole list — no `MAIL_FROM`, no host, port or TLS flags, and no `MAIL_PROVIDER`: a
+configured Resend key is itself how the app infers the transport. The startup log confirms it:
 
 ```
-Outgoing email: provider=RESEND, from=no-reply@calyvora.in, endpoint=https://api.resend.com/emails
+Outgoing email: provider=RESEND, from=connect@calyvora.in, endpoint=https://api.resend.com/emails
 ```
 
-#### Option B — a Hostinger mailbox over SMTP
+Set `MAIL_FROM` only to send as a *different* address than `connect@calyvora.in`, and only one at a
+domain verified in Resend — it rejects anything else with a 403.
 
-Use this if you'd rather send through the mailbox you already pay for, or once the app runs somewhere
-that permits outbound SMTP. Create the mailbox in **hPanel → Emails** first, then in Render →
-`calyvora-backend` → **Environment**:
+#### Option B — a Hostinger mailbox over SMTP (**does not work on Render**)
+
+Kept for the day the backend runs somewhere that permits outbound SMTP. Do not spend time on it here:
+the section above records the measured timeout. Create the mailbox in **hPanel → Emails** first, then
+set, on a host that allows SMTP:
 
 | Key | Value |
 |-----|-------|

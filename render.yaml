@@ -68,55 +68,29 @@ services:
         sync: false
       - key: JWT_PUBLIC_KEY
         sync: false
-      # Outgoing email. Two supported transports; the choice is made in the dashboard, not here,
-      # because it depends on credentials that must never live in this file.
+      # Outgoing email — ONE variable, because everything else now lives in application.yml.
       #
-      # MAIL_PROVIDER is deliberately left unset (sync: false) so the app INFERS the transport from
-      # whichever credential you filled in: a RESEND_API_KEY means Resend, otherwise a MAIL_USERNAME
-      # means SMTP, otherwise console. Pinning it here forced one answer and made the other set of
-      # variables silently inert.
+      # The sending address, the trial-notification inbox and the transport choice are not secrets and
+      # do not vary by deployment, so they are defaults in the app rather than dashboard fields
+      # somebody has to remember. The API key is the only genuine secret, and a secret must never be
+      # committed — hence sync: false, set it by hand.
       #
-      # Resend (recommended on Render) sends over HTTPS on 443, which no host blocks. MAIL_FROM must
-      # be at a domain verified in Resend or it rejects the send with a 403.
+      # WHY NOT SMTP, given we own a Hostinger mailbox: RENDER BLOCKS OUTBOUND SMTP. Measured, not
+      # assumed — smtp.hostinger.com:465 answers from a laptop and times out from here:
+      #   MailConnectException: Couldn't connect to host, port: smtp.hostinger.com, 465
+      #   SocketTimeoutException: Connect timed out
+      # The connection never opens, so no credential, port or TLS flag can change the outcome. The
+      # SMTP transport stays supported in code for a host that permits it; it is simply unusable here,
+      # and the variables are gone from this file rather than left as an invitation to retry it.
       #
-      # SMTP — e.g. a Hostinger mailbox — is wired and works, but EXPECT RENDER TO BLOCK IT: hosts
-      # commonly refuse outbound 25/587/465 to stop spam, and the connection just times out. Prove it
-      # either way with POST /api/v1/dev/test-email before trusting it, because a send failure is
-      # swallowed on purpose (a mail outage must not roll back a completed signup) and the symptom is
-      # otherwise silent: signup succeeds, no verification mail arrives, the account never activates.
-      # For SMTP, MAIL_FROM must EQUAL MAIL_USERNAME — providers reject a From: that differs from the
-      # authenticated mailbox. Port 465 ⇒ MAIL_SMTP_SSL=true; port 587 ⇒ MAIL_SMTP_STARTTLS=true.
+      # Resend sends over HTTPS on 443, which is not blocked. It carries the message; the mail still
+      # goes out FROM connect@calyvora.in and replies still land in that Hostinger inbox.
       #
-      # With none of them set the app falls back to the console transport and says so loudly at boot.
-      - key: MAIL_PROVIDER
-        sync: false
-      - key: MAIL_FROM
-        sync: false
-      # Resend
+      # Unset ⇒ the app falls back to the console transport and says so loudly at boot. Always prove a
+      # real send with POST /api/v1/dev/test-email: a send failure is swallowed on purpose (a mail
+      # outage must not roll back a completed signup), so an unproven transport fails silently —
+      # signup succeeds, no verification mail arrives, and the account can never be activated.
       - key: RESEND_API_KEY
-        sync: false
-      # SMTP (Hostinger: MAIL_HOST=smtp.hostinger.com, MAIL_PORT=465, MAIL_SMTP_AUTH=true,
-      # MAIL_SMTP_SSL=true). Left unset these are ignored entirely.
-      - key: MAIL_HOST
-        sync: false
-      - key: MAIL_PORT
-        sync: false
-      - key: MAIL_USERNAME
-        sync: false
-      - key: MAIL_PASSWORD
-        sync: false
-      - key: MAIL_SMTP_AUTH
-        sync: false
-      - key: MAIL_SMTP_STARTTLS
-        sync: false
-      - key: MAIL_SMTP_SSL
-        sync: false
-
-      # Where "someone wants a free trial" lands (PD-21). sync: false because it's a real inbox that
-      # may change; unset, the app falls back to the platform owner's login address, so an enquiry is
-      # never silently dropped. Note that until a transport above is credentialed, the notification is
-      # only written to the log — a trial request nobody hears about is exactly the failure this guards.
-      - key: TRIAL_NOTIFY_EMAIL
         sync: false
 
   # ---- Frontend: Next.js (native Node) ----

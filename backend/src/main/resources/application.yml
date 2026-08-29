@@ -65,7 +65,11 @@ calyvora:
     # Prefer Resend on a hosted deployment — it sends over HTTPS on 443, whereas outbound SMTP
     # (25/587/465) is blocked entirely by many hosts, Render's free tier included.
     provider: ${MAIL_PROVIDER:}
-    from: ${MAIL_FROM:no-reply@calyvora.local}
+    # The mailbox Orbit sends as, and the one replies come back to. Not a secret and not
+    # deployment-specific, so it belongs here rather than in a dashboard field somebody has to
+    # remember to fill in — an unset MAIL_FROM used to mean mail went out as @calyvora.local, an
+    # address that does not exist.
+    from: ${MAIL_FROM:connect@calyvora.in}
     resend:
       api-key: ${RESEND_API_KEY:}
       api-url: ${RESEND_API_URL:https://api.resend.com/emails}
@@ -112,8 +116,10 @@ calyvora:
       # workspace with no human in the loop.
       open: ${OPEN_REGISTRATION:false}
   trial:
-    # Who gets told when someone asks for a trial. Blank means the platform owner's own login address.
-    notify-email: ${TRIAL_NOTIFY_EMAIL:}
+    # Who gets told when someone asks for a trial. Defaults to the shared mailbox rather than the
+    # founder's personal login, so an enquiry reaches an address more than one person can open.
+    # Blank falls back to the platform owner's own login address.
+    notify-email: ${TRIAL_NOTIFY_EMAIL:connect@calyvora.in}
 
 springdoc:
   swagger-ui:
