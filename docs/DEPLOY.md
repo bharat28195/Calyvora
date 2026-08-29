@@ -447,7 +447,7 @@ Everything in `website/orbit/` goes into `public_html`, keeping the same filenam
 | `hr-services.html` | Priority HR Services |
 | `about.html` | the group, the story and the straight answers (PD-19) |
 | `orbit.css` | shared stylesheet for all three |
-| `renu-rao.jpg` | the director's photo — a **placeholder**, replace with the real one |
+| `renu-rao.jpg` | the director's photo |
 | `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | the tab icon |
 
 Upload via Hostinger's **File Manager** (hPanel → Files → File Manager → `public_html` → Upload) or
