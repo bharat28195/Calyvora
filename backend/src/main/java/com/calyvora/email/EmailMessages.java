@@ -46,13 +46,22 @@ final class EmailMessages {
     }
 
     /**
-     * The code goes in the subject line as well as the body. Most people read it off a notification
-     * without opening anything, and a subject that says only "Password reset" makes them open the
-     * mail to learn six digits.
+     * The code is deliberately NOT in the subject line.
+     *
+     * <p>It used to be, on the reasoning that people read a code off a notification without opening
+     * anything. That convenience is real, but it is bought by printing the credential somewhere it
+     * cannot be taken back: a subject line shows on a locked phone, on a smartwatch, and in the
+     * preview pane of a screen someone else can see. Anyone within sight of the device could then
+     * reset the account without ever unlocking it — which defeats the point of mailing a code at all,
+     * since the whole mechanism assumes only the mailbox owner can read it.
+     *
+     * <p>So the subject says what the mail is for and the code lives one tap further in, alone on its
+     * own line so it is still the first thing read on opening.
      */
     static Message passwordReset(String code, long minutes) {
-        return new Message("Your Calyvora reset code is " + code,
-                "Use this code to set a new password:\n\n    " + code + "\n\n"
+        return new Message("Password reset assistance for your Calyvora account",
+                "Someone asked to reset the password for this account.\n\n"
+                        + "Use this code to set a new password:\n\n    " + code + "\n\n"
                         + "It expires in " + minutes + " minutes and can be used once.\n\n"
                         + "If you didn't ask to reset your password, you can ignore this — nothing has "
                         + "changed, and whoever asked cannot get in without this code.");
