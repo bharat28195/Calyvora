@@ -12,6 +12,8 @@ public record EmailSettings(
         String from,
         /** Where a reply goes. The From address may be an unattended no-reply; this must not be. */
         String replyTo,
+        /** The From used for one-time codes only — see {@link #forOneTimeCode()}. */
+        String otpFrom,
         // --- HTTPS API providers (Resend) ---
         String apiKey,
         String apiUrl,
@@ -44,20 +46,33 @@ public record EmailSettings(
     }
 
     public static EmailSettings console(String from) {
-        return console(from, null);
+        return console(from, null, from);
     }
 
-    public static EmailSettings console(String from, String replyTo) {
-        return new EmailSettings(Provider.CONSOLE, from, replyTo, null, null, null, 0, null, null, false, false, false);
+    public static EmailSettings console(String from, String replyTo, String otpFrom) {
+        return new EmailSettings(Provider.CONSOLE, from, replyTo, otpFrom, null, null, null, 0, null, null, false, false, false);
     }
 
-    public static EmailSettings resend(String from, String replyTo, String apiKey, String apiUrl) {
-        return new EmailSettings(Provider.RESEND, from, replyTo, apiKey, apiUrl, null, 0, null, null, false, false, false);
+    public static EmailSettings resend(String from, String replyTo, String otpFrom, String apiKey, String apiUrl) {
+        return new EmailSettings(Provider.RESEND, from, replyTo, otpFrom, apiKey, apiUrl, null, 0, null, null, false, false, false);
     }
 
-    public static EmailSettings smtp(String from, String replyTo, String host, int port, String username,
-                                     String password, boolean auth, boolean starttls, boolean ssl) {
-        return new EmailSettings(Provider.SMTP, from, replyTo, null, null, host, port, username, password,
-                auth, starttls, ssl);
+    public static EmailSettings smtp(String from, String replyTo, String otpFrom, String host, int port,
+                                     String username, String password, boolean auth, boolean starttls,
+                                     boolean ssl) {
+        return new EmailSettings(Provider.SMTP, from, replyTo, otpFrom, null, null, host, port, username,
+                password, auth, starttls, ssl);
+    }
+
+    /**
+     * The same transport and credentials, sending as the one-time-code address.
+     *
+     * <p>A copy rather than a field the senders consult, so a transport cannot accidentally apply the
+     * code sender to an invitation: only the call that builds a code asks for it.
+     */
+    public EmailSettings forOneTimeCode() {
+        String sender = otpFrom == null || otpFrom.isBlank() ? from : otpFrom;
+        return new EmailSettings(provider, sender, replyTo, otpFrom, apiKey, apiUrl, host, port,
+                username, password, auth, starttls, ssl);
     }
 }

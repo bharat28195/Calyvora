@@ -72,10 +72,15 @@ calyvora:
     # no-reply is the sending identity because these are machine-generated: a reset code and an
     # invitation are not the start of a conversation. It does not need to be a real mailbox — Resend
     # will send as any address at a verified domain.
-    from: ${MAIL_FROM:no-reply@calyvora.in}
-    # ...but a reply must still reach a person. Without this, replying to a no-reply address bounces,
-    # and the people most likely to reply are the ones already having trouble.
+    from: ${MAIL_FROM:connect@calyvora.in}
+    # A reply must reach a person. Without this, replying to an unattended address bounces, and the
+    # people most likely to reply are the ones already having trouble.
     reply-to: ${MAIL_REPLY_TO:connect@calyvora.in}
+    # One-time codes only. A code is the message an attacker most wants to imitate, so it is worth a
+    # sender the reader can learn: if reset codes always arrive from noreply@, one that doesn't is
+    # visibly wrong. Needs no mailbox of its own — a verified domain may send as any address at it,
+    # and Reply-To above still carries a reply to somewhere staffed.
+    otp-from: ${MAIL_OTP_FROM:noreply@calyvora.in}
     resend:
       api-key: ${RESEND_API_KEY:}
       api-url: ${RESEND_API_URL:https://api.resend.com/emails}

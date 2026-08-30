@@ -38,6 +38,7 @@ public class PlatformEmailSettingsResolver implements EmailSettingsResolver {
 
         String from = props.mail().from();
         String replyTo = props.mail().replyTo();
+        String otpFrom = props.mail().otpFrom();
         String apiKey = props.mail().resend().apiKey();
         String apiUrl = props.mail().resend().apiUrl();
 
@@ -55,9 +56,9 @@ public class PlatformEmailSettingsResolver implements EmailSettingsResolver {
         }
 
         this.settings = switch (provider) {
-            case RESEND -> EmailSettings.resend(from, replyTo, apiKey, apiUrl);
-            case SMTP -> EmailSettings.smtp(from, replyTo, host, port, username, password, auth, starttls, ssl);
-            case CONSOLE -> EmailSettings.console(from, replyTo);
+            case RESEND -> EmailSettings.resend(from, replyTo, otpFrom, apiKey, apiUrl);
+            case SMTP -> EmailSettings.smtp(from, replyTo, otpFrom, host, port, username, password, auth, starttls, ssl);
+            case CONSOLE -> EmailSettings.console(from, replyTo, otpFrom);
         };
 
         log.info("Outgoing email: provider={}, from={}, endpoint={}",

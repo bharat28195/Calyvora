@@ -61,7 +61,10 @@ public class DispatchingEmailService implements EmailService {
         // The dev mailbox holds the code itself rather than a link, which is the whole payload here —
         // it is what makes the flow testable on a deployment with no mail provider configured.
         record(to, message.subject(), code);
-        return send(to, message.subject(), message.body(), message.html());
+        // The only message sent from the one-time-code address. A code is the mail an attacker most
+        // wants to imitate, so it is worth a sender a reader can learn: if codes always arrive from
+        // noreply@, one arriving from anywhere else is visibly wrong.
+        return send(to, message.subject(), message.body(), message.html(), EmailSettings::forOneTimeCode);
     }
 
     @Override
@@ -101,7 +104,18 @@ public class DispatchingEmailService implements EmailService {
     }
 
     private EmailResult send(String to, String subject, String body, String html) {
-        EmailSettings settings = resolver.resolve(TenantContext.getCompanyIdOrNull());
+        return send(to, subject, body, html, java.util.function.UnaryOperator.identity());
+    }
+
+    /**
+     * @param senderIdentity adjusts the resolved settings for this one message — used only to swap the
+     *                       From for a one-time code. A function rather than a field so the choice is
+     *                       made at the call that knows what kind of message this is, and cannot leak
+     *                       to the others.
+     */
+    private EmailResult send(String to, String subject, String body, String html,
+                             java.util.function.UnaryOperator<EmailSettings> senderIdentity) {
+        EmailSettings settings = senderIdentity.apply(resolver.resolve(TenantContext.getCompanyIdOrNull()));
         String provider = settings.provider().name();
         try {
             EmailSender sender = senderFor(settings);

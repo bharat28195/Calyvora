@@ -30,7 +30,13 @@ public record AppProperties(
      * Outgoing mail. {@code provider} pins the transport ({@code resend} / {@code smtp} /
      * {@code console}); left blank it is inferred from whichever credentials are present.
      */
-    public record Mail(String provider, String from, String replyTo, Resend resend) {}
+    /**
+     * @param otpFrom the address a one-time code is sent from. Separate from {@code from} because a
+     *                code is the one message where the sender should visibly be a machine: it is the
+     *                mail an attacker most wants to imitate, so a reader who learns codes always come
+     *                from noreply has something to check a forgery against.
+     */
+    public record Mail(String provider, String from, String replyTo, String otpFrom, Resend resend) {}
 
     /** Resend's HTTPS API — the transport that survives hosts which block outbound SMTP. */
     public record Resend(String apiKey, String apiUrl) {}
