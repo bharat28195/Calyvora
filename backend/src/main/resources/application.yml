@@ -65,11 +65,17 @@ calyvora:
     # Prefer Resend on a hosted deployment — it sends over HTTPS on 443, whereas outbound SMTP
     # (25/587/465) is blocked entirely by many hosts, Render's free tier included.
     provider: ${MAIL_PROVIDER:}
-    # The mailbox Orbit sends as, and the one replies come back to. Not a secret and not
-    # deployment-specific, so it belongs here rather than in a dashboard field somebody has to
-    # remember to fill in — an unset MAIL_FROM used to mean mail went out as @calyvora.local, an
-    # address that does not exist.
-    from: ${MAIL_FROM:connect@calyvora.in}
+    # The address Orbit sends as. Not a secret and not deployment-specific, so it belongs here rather
+    # than in a dashboard field somebody has to remember — an unset MAIL_FROM used to mean mail went
+    # out as @calyvora.local, an address that does not exist.
+    #
+    # no-reply is the sending identity because these are machine-generated: a reset code and an
+    # invitation are not the start of a conversation. It does not need to be a real mailbox — Resend
+    # will send as any address at a verified domain.
+    from: ${MAIL_FROM:no-reply@calyvora.in}
+    # ...but a reply must still reach a person. Without this, replying to a no-reply address bounces,
+    # and the people most likely to reply are the ones already having trouble.
+    reply-to: ${MAIL_REPLY_TO:connect@calyvora.in}
     resend:
       api-key: ${RESEND_API_KEY:}
       api-url: ${RESEND_API_URL:https://api.resend.com/emails}

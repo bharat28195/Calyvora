@@ -1,7 +1,9 @@
 package com.calyvora.email;
 
-import org.springframework.mail.SimpleMailMessage;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 import java.util.Properties;
@@ -25,7 +27,7 @@ public class SmtpSender implements EmailSender {
     }
 
     @Override
-    public void send(EmailSettings settings, String to, String subject, String body) throws Exception {
+    public void send(EmailSettings settings, String to, String subject, String body, String html) throws Exception {
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
         sender.setHost(settings.host());
         sender.setPort(settings.port());
@@ -42,11 +44,21 @@ public class SmtpSender implements EmailSender {
         props.put("mail.smtp.timeout", TIMEOUT_MS);
         props.put("mail.smtp.writetimeout", TIMEOUT_MS);
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(settings.from());
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body);
+        // multipart/alternative: the same message as text and HTML, the client choosing. Sending only
+        // HTML costs deliverability — filters read the text part, and its absence counts against you.
+        MimeMessage message = sender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setFrom(new InternetAddress(settings.from(), EmailIdentity.DISPLAY_NAME, "UTF-8"));
+        helper.setTo(to);
+        helper.setSubject(subject);
+        if (html == null || html.isBlank()) {
+            helper.setText(body, false);
+        } else {
+            helper.setText(body, html);
+        }
+        if (settings.replyTo() != null && !settings.replyTo().isBlank()) {
+            helper.setReplyTo(settings.replyTo());
+        }
         sender.send(message);
     }
 }

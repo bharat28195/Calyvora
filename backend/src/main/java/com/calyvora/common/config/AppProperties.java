@@ -30,7 +30,7 @@ public record AppProperties(
      * Outgoing mail. {@code provider} pins the transport ({@code resend} / {@code smtp} /
      * {@code console}); left blank it is inferred from whichever credentials are present.
      */
-    public record Mail(String provider, String from, Resend resend) {}
+    public record Mail(String provider, String from, String replyTo, Resend resend) {}
 
     /** Resend's HTTPS API — the transport that survives hosts which block outbound SMTP. */
     public record Resend(String apiKey, String apiUrl) {}

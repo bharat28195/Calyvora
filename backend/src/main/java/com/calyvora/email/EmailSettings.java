@@ -10,6 +10,8 @@ package com.calyvora.email;
 public record EmailSettings(
         Provider provider,
         String from,
+        /** Where a reply goes. The From address may be an unattended no-reply; this must not be. */
+        String replyTo,
         // --- HTTPS API providers (Resend) ---
         String apiKey,
         String apiUrl,
@@ -42,16 +44,20 @@ public record EmailSettings(
     }
 
     public static EmailSettings console(String from) {
-        return new EmailSettings(Provider.CONSOLE, from, null, null, null, 0, null, null, false, false, false);
+        return console(from, null);
     }
 
-    public static EmailSettings resend(String from, String apiKey, String apiUrl) {
-        return new EmailSettings(Provider.RESEND, from, apiKey, apiUrl, null, 0, null, null, false, false, false);
+    public static EmailSettings console(String from, String replyTo) {
+        return new EmailSettings(Provider.CONSOLE, from, replyTo, null, null, null, 0, null, null, false, false, false);
     }
 
-    public static EmailSettings smtp(String from, String host, int port, String username, String password,
-                                     boolean auth, boolean starttls, boolean ssl) {
-        return new EmailSettings(Provider.SMTP, from, null, null, host, port, username, password,
+    public static EmailSettings resend(String from, String replyTo, String apiKey, String apiUrl) {
+        return new EmailSettings(Provider.RESEND, from, replyTo, apiKey, apiUrl, null, 0, null, null, false, false, false);
+    }
+
+    public static EmailSettings smtp(String from, String replyTo, String host, int port, String username,
+                                     String password, boolean auth, boolean starttls, boolean ssl) {
+        return new EmailSettings(Provider.SMTP, from, replyTo, null, null, host, port, username, password,
                 auth, starttls, ssl);
     }
 }

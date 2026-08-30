@@ -37,6 +37,7 @@ public class PlatformEmailSettingsResolver implements EmailSettingsResolver {
             @Value("${spring.mail.properties.mail.smtp.ssl.enable:false}") boolean ssl) {
 
         String from = props.mail().from();
+        String replyTo = props.mail().replyTo();
         String apiKey = props.mail().resend().apiKey();
         String apiUrl = props.mail().resend().apiUrl();
 
@@ -54,9 +55,9 @@ public class PlatformEmailSettingsResolver implements EmailSettingsResolver {
         }
 
         this.settings = switch (provider) {
-            case RESEND -> EmailSettings.resend(from, apiKey, apiUrl);
-            case SMTP -> EmailSettings.smtp(from, host, port, username, password, auth, starttls, ssl);
-            case CONSOLE -> EmailSettings.console(from);
+            case RESEND -> EmailSettings.resend(from, replyTo, apiKey, apiUrl);
+            case SMTP -> EmailSettings.smtp(from, replyTo, host, port, username, password, auth, starttls, ssl);
+            case CONSOLE -> EmailSettings.console(from, replyTo);
         };
 
         log.info("Outgoing email: provider={}, from={}, endpoint={}",

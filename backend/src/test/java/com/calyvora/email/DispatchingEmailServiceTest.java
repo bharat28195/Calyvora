@@ -118,7 +118,7 @@ class DispatchingEmailServiceTest {
         }
 
         @Override
-        public void send(EmailSettings settings, String to, String subject, String body) {
+        public void send(EmailSettings settings, String to, String subject, String body, String html) {
             // delivered
         }
     }
@@ -130,7 +130,7 @@ class DispatchingEmailServiceTest {
         }
 
         @Override
-        public void send(EmailSettings settings, String to, String subject, String body) {
+        public void send(EmailSettings settings, String to, String subject, String body, String html) {
             throw new IllegalStateException("mail host unreachable");
         }
     }

@@ -20,7 +20,7 @@ public class ConsoleSender implements EmailSender {
     }
 
     @Override
-    public void send(EmailSettings settings, String to, String subject, String body) {
+    public void send(EmailSettings settings, String to, String subject, String body, String html) {
         log.info("""
 
                 ┌───────────────────────────────────────────────────────────────

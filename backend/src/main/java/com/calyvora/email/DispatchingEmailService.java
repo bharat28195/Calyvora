@@ -45,14 +45,14 @@ public class DispatchingEmailService implements EmailService {
     public EmailResult sendVerificationEmail(String to, String verificationUrl) {
         EmailMessages.Message message = EmailMessages.verification(verificationUrl);
         record(to, message.subject(), verificationUrl);
-        return send(to, message.subject(), message.body());
+        return send(to, message.subject(), message.body(), message.html());
     }
 
     @Override
     public EmailResult sendInvitationEmail(String to, String companyName, String acceptUrl) {
         EmailMessages.Message message = EmailMessages.invitation(companyName, acceptUrl);
         record(to, message.subject(), acceptUrl);
-        return send(to, message.subject(), message.body());
+        return send(to, message.subject(), message.body(), message.html());
     }
 
     @Override
@@ -61,28 +61,28 @@ public class DispatchingEmailService implements EmailService {
         // The dev mailbox holds the code itself rather than a link, which is the whole payload here —
         // it is what makes the flow testable on a deployment with no mail provider configured.
         record(to, message.subject(), code);
-        return send(to, message.subject(), message.body());
+        return send(to, message.subject(), message.body(), message.html());
     }
 
     @Override
     public EmailResult sendTrialRequestNotification(String to, TrialEnquiry enquiry) {
         EmailMessages.Message message = EmailMessages.trialEnquiry(enquiry);
         record(to, message.subject(), enquiry.consoleUrl());
-        return send(to, message.subject(), message.body());
+        return send(to, message.subject(), message.body(), message.html());
     }
 
     @Override
     public EmailResult sendTrialRequestAcknowledgement(String to, String contactName) {
         EmailMessages.Message message = EmailMessages.trialAcknowledgement(contactName);
         record(to, message.subject(), null);
-        return send(to, message.subject(), message.body());
+        return send(to, message.subject(), message.body(), message.html());
     }
 
     @Override
     public EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl) {
         EmailMessages.Message message = EmailMessages.trialApproved(companyName, loginUrl);
         record(to, message.subject(), loginUrl);
-        return send(to, message.subject(), message.body());
+        return send(to, message.subject(), message.body(), message.html());
     }
 
     /** The settings a send from the current tenant would use — for the diagnostic endpoint. */
@@ -97,15 +97,15 @@ public class DispatchingEmailService implements EmailService {
      */
     public void sendOrThrow(String to, String subject, String body) throws Exception {
         EmailSettings settings = currentSettings();
-        senderFor(settings).send(settings, to, subject, body);
+        senderFor(settings).send(settings, to, subject, body, null);
     }
 
-    private EmailResult send(String to, String subject, String body) {
+    private EmailResult send(String to, String subject, String body, String html) {
         EmailSettings settings = resolver.resolve(TenantContext.getCompanyIdOrNull());
         String provider = settings.provider().name();
         try {
             EmailSender sender = senderFor(settings);
-            sender.send(settings, to, subject, body);
+            sender.send(settings, to, subject, body, html);
             if (sender instanceof ConsoleSender) {
                 // The console transport cannot fail, because it only writes to the log — so reporting
                 // it as delivered would tell someone to check an inbox nothing is coming to. The link

@@ -17,5 +17,5 @@ public interface EmailSender {
      * @throws Exception with the provider's own wording — the diagnostic endpoint reports it verbatim,
      *                   so don't wrap it in something friendlier.
      */
-    void send(EmailSettings settings, String to, String subject, String body) throws Exception;
+    void send(EmailSettings settings, String to, String subject, String body, String html) throws Exception;
 }

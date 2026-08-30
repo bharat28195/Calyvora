@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,15 +39,24 @@ public class ResendSender implements EmailSender {
     }
 
     @Override
-    public void send(EmailSettings settings, String to, String subject, String body) throws Exception {
+    public void send(EmailSettings settings, String to, String subject, String body, String html) throws Exception {
         if (settings.apiKey() == null || settings.apiKey().isBlank()) {
             throw new IllegalStateException("No Resend API key configured (set RESEND_API_KEY)");
         }
-        byte[] payload = json.writeValueAsBytes(Map.of(
-                "from", settings.from(),
+        // Both parts, always. The client picks; filters read the text one, and a message with no text
+        // alternative is scored as more likely to be spam for exactly that reason.
+        Map<String, Object> payloadMap = new LinkedHashMap<>(Map.of(
+                "from", EmailIdentity.from(settings),
                 "to", List.of(to),
                 "subject", subject,
                 "text", body));
+        if (html != null && !html.isBlank()) {
+            payloadMap.put("html", html);
+        }
+        if (settings.replyTo() != null && !settings.replyTo().isBlank()) {
+            payloadMap.put("reply_to", settings.replyTo());
+        }
+        byte[] payload = json.writeValueAsBytes(payloadMap);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(settings.apiUrl()))
                 .timeout(REQUEST_TIMEOUT)

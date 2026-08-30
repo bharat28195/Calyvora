@@ -41,7 +41,7 @@ class PlatformEmailSettingsResolverTest {
         // Only the mail block matters here; the rest of AppProperties is inert for this resolver.
         AppProperties props = new AppProperties(
                 "http://localhost:3000", java.util.List.of(),
-                new AppProperties.Mail(configuredProvider, "no-reply@calyvora.test",
+                new AppProperties.Mail(configuredProvider, "no-reply@calyvora.test", "hello@calyvora.test",
                         new AppProperties.Resend(apiKey, "https://api.resend.com/emails")),
                 null, null);
         return new PlatformEmailSettingsResolver(props, configuredProvider, "localhost", 1025,
