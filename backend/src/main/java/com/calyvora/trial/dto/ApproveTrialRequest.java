@@ -15,6 +15,13 @@ import jakarta.validation.constraints.Size;
 public record ApproveTrialRequest(
         @NotBlank @Size(min = 8, max = 100) String password,
         @Positive int seats,
-        @Positive int months
+        @Positive int months,
+        /**
+         * What this customer will be billed in — it decides which published price list applies. Set at
+         * approval rather than taken from the enquiry, because the form on the website is filled in by
+         * someone who has no idea what we bill in, and a currency is a commercial term, not a
+         * preference. Null means rupees.
+         */
+        @Size(min = 3, max = 3) String currency
 ) {
 }

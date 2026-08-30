@@ -154,7 +154,7 @@ class PriceListIntegrationTest extends IntegrationTestBase {
         YearMonth month = YearMonth.now();
         pricingService.publish(month.atDay(1), "with a floor",
                 List.of(new PricingService.TierInput(null, new BigDecimal("149"))),
-                new BigDecimal("1299"), 10);
+                new BigDecimal("1299"), 10, "INR");
 
         assertThat(pricingService.monthlyFor(null, 4, month)).isEqualByComparingTo("1299");
         assertThat(pricingService.minimumApplies(null, 4, month)).isTrue();
@@ -165,7 +165,7 @@ class PriceListIntegrationTest extends IntegrationTestBase {
         YearMonth month = YearMonth.now();
         pricingService.publish(month.atDay(1), "with a floor",
                 List.of(new PricingService.TierInput(null, new BigDecimal("149"))),
-                new BigDecimal("1299"), 10);
+                new BigDecimal("1299"), 10, "INR");
 
         // 10 × 149 = 1,490, comfortably over the floor.
         assertThat(pricingService.monthlyFor(null, 10, month)).isEqualByComparingTo("1490");
@@ -178,7 +178,7 @@ class PriceListIntegrationTest extends IntegrationTestBase {
         YearMonth month = YearMonth.now();
         pricingService.publish(month.atDay(1), "with a floor",
                 List.of(new PricingService.TierInput(null, new BigDecimal("149"))),
-                new BigDecimal("1299"), 10);
+                new BigDecimal("1299"), 10, "INR");
 
         assertThat(pricingService.monthlyFor(null, 0, month)).isEqualByComparingTo("0");
     }
@@ -188,7 +188,7 @@ class PriceListIntegrationTest extends IntegrationTestBase {
         YearMonth month = YearMonth.now();
         pricingService.publish(month.atDay(1), "two months free",
                 List.of(new PricingService.TierInput(null, new BigDecimal("100"))),
-                BigDecimal.ZERO, 10);
+                BigDecimal.ZERO, 10, "INR");
 
         // 10 people × ₹100 = ₹1,000/month → ₹10,000 a year instead of ₹12,000.
         assertThat(pricingService.annualPrepaidFor(null, 10, month)).isEqualByComparingTo("10000");
@@ -201,7 +201,7 @@ class PriceListIntegrationTest extends IntegrationTestBase {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                         pricingService.publish(month.atDay(1), "bad",
                                 List.of(new PricingService.TierInput(null, new BigDecimal("100"))),
-                                BigDecimal.ZERO, 13))
+                                BigDecimal.ZERO, 13, "INR"))
                 .hasMessageContaining("between 1 and 12");
     }
 

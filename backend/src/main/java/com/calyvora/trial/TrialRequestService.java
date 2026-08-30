@@ -123,7 +123,8 @@ public class TrialRequestService {
                 terms.password(),
                 terms.seats(),
                 terms.months(),
-                null), null, true);
+                null,
+                terms.currency()), null, true);
 
         request.decide(TrialRequestStatus.APPROVED, company.getId());
         emailService.sendTrialApprovedEmail(request.getEmail(), company.getName(),

@@ -365,11 +365,11 @@ export const api = {
 
   // --- platform owner (vendor) console — live backend only ---
   /** Every version of the price list, newest first. Owner only. */
-  platformPricing(): Promise<PriceListVersion[]> {
-    return LIVE ? http<PriceListVersion[]>("/platform/pricing") : Promise.reject(new Error("live only"));
+  platformPricing(currency = "INR"): Promise<PriceListVersion[]> {
+    return LIVE ? http<PriceListVersion[]>(`/platform/pricing?currency=${encodeURIComponent(currency)}`) : Promise.reject(new Error("live only"));
   },
   /** Publish a new price list — live immediately, no deploy. Owner only. */
-  publishPricing(input: { effectiveFrom: string; note?: string; tiers: { toEmployee: number | null; rate: number }[]; monthlyMinimum: number; annualMonthsCharged: number }): Promise<PriceListVersion> {
+  publishPricing(input: { effectiveFrom: string; note?: string; tiers: { toEmployee: number | null; rate: number }[]; monthlyMinimum: number; annualMonthsCharged: number; currency: string }): Promise<PriceListVersion> {
     return LIVE
       ? http<PriceListVersion>("/platform/pricing", { method: "POST", body: JSON.stringify(input) })
       : Promise.reject(new Error("live only"));
@@ -434,7 +434,7 @@ export const api = {
     return LIVE ? http<TrialRequest[]>("/platform/trial-requests") : liveOnly("The trial queue");
   },
   /** Approving provisions the company on these terms — this is the moment a login starts existing. */
-  approveTrialRequest(id: string, terms: { password: string; seats: number; months: number }): Promise<CompanySummary> {
+  approveTrialRequest(id: string, terms: { password: string; seats: number; months: number; currency?: string }): Promise<CompanySummary> {
     return LIVE
       ? http<CompanySummary>(`/platform/trial-requests/${id}/approve`, { method: "POST", body: JSON.stringify(terms) })
       : liveOnly("Approving a trial");

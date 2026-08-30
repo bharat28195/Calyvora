@@ -118,9 +118,15 @@ public class PlatformService {
         company.setAgencyId(agencyId);
         companyRepository.save(company);
 
+        String currency = req.currency() == null || req.currency().isBlank()
+                ? com.calyvora.billing.PricingService.DEFAULT_CURRENCY
+                : req.currency().trim().toUpperCase(java.util.Locale.ROOT);
+
         CompanySettings settings = new CompanySettings(company.getId());
-        settings.setTimezone("Asia/Kolkata");
-        settings.setCurrency("INR");
+        // A USD customer is not in India; guessing its timezone from ours would put every attendance
+        // record five and a half hours out on day one.
+        settings.setTimezone("USD".equals(currency) ? "America/New_York" : "Asia/Kolkata");
+        settings.setCurrency(currency);
         settingsRepository.save(settings);
 
         User admin = new User(UUID.randomUUID(), company.getId(), email,
@@ -129,7 +135,7 @@ public class PlatformService {
         admin.setEmailVerifiedAt(Instant.now());
         userRepository.save(admin);
 
-        Subscription sub = new Subscription(UUID.randomUUID(), company.getId(), DEFAULT_PRICE, "INR", null);
+        Subscription sub = new Subscription(UUID.randomUUID(), company.getId(), DEFAULT_PRICE, currency, null);
         sub.setSeats(Math.max(1, req.seats()));
         if (activate) {
             sub.setStatus(SubscriptionStatus.ACTIVE);
@@ -296,9 +302,12 @@ public class PlatformService {
 
     /** Every version of the price list, newest first, with the one currently in force flagged. */
     @Transactional(readOnly = true)
-    public List<com.calyvora.platform.dto.PriceListResponse> priceLists() {
-        UUID currentId = pricingService.current().getId();
-        return pricingService.history().stream()
+    public List<com.calyvora.platform.dto.PriceListResponse> priceLists(String currency) {
+        String cur = currency == null || currency.isBlank()
+                ? com.calyvora.billing.PricingService.DEFAULT_CURRENCY
+                : currency.trim().toUpperCase(java.util.Locale.ROOT);
+        UUID currentId = pricingService.current(cur).getId();
+        return pricingService.history(cur).stream()
                 .map(l -> com.calyvora.platform.dto.PriceListResponse.of(l, l.getId().equals(currentId)))
                 .toList();
     }
@@ -317,10 +326,13 @@ public class PlatformService {
         List<com.calyvora.billing.PricingService.TierInput> tiers = request.tiers().stream()
                 .map(t -> new com.calyvora.billing.PricingService.TierInput(t.toEmployee(), t.rate()))
                 .toList();
+        String cur = request.currency() == null || request.currency().isBlank()
+                ? com.calyvora.billing.PricingService.DEFAULT_CURRENCY
+                : request.currency().trim().toUpperCase(java.util.Locale.ROOT);
         var saved = pricingService.publish(effectiveFrom, request.note(), tiers,
-                request.monthlyMinimum(), request.annualMonthsCharged());
+                request.monthlyMinimum(), request.annualMonthsCharged(), cur);
         return com.calyvora.platform.dto.PriceListResponse.of(
-                saved, saved.getId().equals(pricingService.current().getId()));
+                saved, saved.getId().equals(pricingService.current(cur).getId()));
     }
 
     // ---- seat requests ----

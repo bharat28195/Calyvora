@@ -649,6 +649,8 @@ export interface CreateCompanyInput {
   months: number;
   /** Owner console only: file the company under an agency. Omit to sell direct. */
   agencyId?: string | null;
+  /** What this customer is billed in; decides which price list applies. Omit for INR. */
+  currency?: string | null;
 }
 /**
  * Someone who asked for a free trial (PD-21). Not a customer yet — until the vendor approves it there
@@ -794,6 +796,8 @@ export interface PriceListVersion {
   monthlyMinimum: number;
   /** Months charged for an annual prepayment — 10 means two months free. */
   annualMonthsCharged: number;
+  /** Which currency this list prices in. One published list per currency. */
+  currency: string;
 }
 
 /** Configurable payslip template (feedback: "add template for creating payslip"). */

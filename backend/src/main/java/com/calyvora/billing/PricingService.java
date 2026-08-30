@@ -27,38 +27,49 @@ import java.util.UUID;
 @Service
 public class PricingService {
 
+    /** The currency that existed before there were several, and the fallback wherever none is given. */
+    public static final String DEFAULT_CURRENCY = "INR";
+
     private final PriceListRepository priceListRepository;
 
     public PricingService(PriceListRepository priceListRepository) {
         this.priceListRepository = priceListRepository;
     }
 
-    /** The list governing a given month — the last day is what decides which one applies. */
+    /** The currency a subscription is billed in. Absent one, rupees — the list that existed first. */
+    public static String currencyOf(Subscription sub) {
+        return sub == null || sub.getCurrency() == null || sub.getCurrency().isBlank()
+                ? DEFAULT_CURRENCY : sub.getCurrency();
+    }
+
+    /** The list governing a given month in a given currency — the last day decides which applies. */
     @Transactional(readOnly = true)
-    public PriceList listFor(YearMonth month) {
+    public PriceList listFor(YearMonth month, String currency) {
         return priceListRepository
-                .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(month.atEndOfMonth())
+                .findFirstByCurrencyAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
+                        currency, month.atEndOfMonth())
                 .orElseThrow(() -> new IllegalStateException(
-                        "No price list is effective for " + month + " — V37 seeds one from 2020-01-01"));
+                        "No " + currency + " price list is effective for " + month));
     }
 
     /** The tiers governing a given month. */
     @Transactional(readOnly = true)
-    public List<PriceListTier> tiersFor(YearMonth month) {
-        return listFor(month).getTiers();
+    public List<PriceListTier> tiersFor(YearMonth month, String currency) {
+        return listFor(month, currency).getTiers();
     }
 
-    /** Today's list, for the console and for pricing the current month. */
+    /** Today.s list, for the console and for pricing the current month. */
     @Transactional(readOnly = true)
-    public PriceList current() {
+    public PriceList current(String currency) {
         return priceListRepository
-                .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(LocalDate.now())
-                .orElseThrow(() -> new IllegalStateException("No price list is in force"));
+                .findFirstByCurrencyAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
+                        currency, LocalDate.now())
+                .orElseThrow(() -> new IllegalStateException("No " + currency + " price list is in force"));
     }
 
     @Transactional(readOnly = true)
-    public List<PriceList> history() {
-        return priceListRepository.findAllByOrderByEffectiveFromDesc();
+    public List<PriceList> history(String currency) {
+        return priceListRepository.findAllByCurrencyOrderByEffectiveFromDesc(currency);
     }
 
     /**
@@ -72,7 +83,7 @@ public class PricingService {
         if (sub != null && sub.isCustomPrice()) {
             return sub.getPricePerEmployee().multiply(BigDecimal.valueOf(headcount));
         }
-        PriceList list = listFor(month);
+        PriceList list = listFor(month, currencyOf(sub));
         BigDecimal metered = applyTiers(list.getTiers(), headcount);
         // A company with nobody in it owes nothing; the floor is for real, small customers.
         return headcount == 0 ? metered : metered.max(list.getMonthlyMinimum());
@@ -84,7 +95,7 @@ public class PricingService {
         if (sub != null && sub.isCustomPrice() || headcount == 0) {
             return false;
         }
-        PriceList list = listFor(month);
+        PriceList list = listFor(month, currencyOf(sub));
         return applyTiers(list.getTiers(), headcount).compareTo(list.getMonthlyMinimum()) < 0;
     }
 
@@ -96,7 +107,7 @@ public class PricingService {
     @Transactional(readOnly = true)
     public BigDecimal annualPrepaidFor(Subscription sub, long headcount, YearMonth month) {
         BigDecimal monthly = monthlyFor(sub, headcount, month);
-        int months = sub != null && sub.isCustomPrice() ? 12 : listFor(month).getAnnualMonthsCharged();
+        int months = sub != null && sub.isCustomPrice() ? 12 : listFor(month, currencyOf(sub)).getAnnualMonthsCharged();
         return monthly.multiply(BigDecimal.valueOf(months));
     }
 
@@ -109,7 +120,7 @@ public class PricingService {
         if (sub != null && sub.isCustomPrice()) {
             return sub.getPricePerEmployee();
         }
-        List<PriceListTier> tiers = tiersFor(month);
+        List<PriceListTier> tiers = tiersFor(month, currencyOf(sub));
         for (PriceListTier tier : tiers) {
             if (tier.getUpTo() == null || headcount < tier.getUpTo()) {
                 return tier.getRate();
@@ -151,10 +162,11 @@ public class PricingService {
      */
     @Transactional
     public PriceList publish(LocalDate effectiveFrom, String note, List<TierInput> tiers,
-                             BigDecimal monthlyMinimum, Integer annualMonthsCharged) {
+                             BigDecimal monthlyMinimum, Integer annualMonthsCharged, String currency) {
         validate(effectiveFrom, tiers, monthlyMinimum, annualMonthsCharged);
-        PriceList list = priceListRepository.findByEffectiveFrom(effectiveFrom)
-                .orElseGet(() -> new PriceList(UUID.randomUUID(), effectiveFrom, note));
+        String cur = currency == null || currency.isBlank() ? DEFAULT_CURRENCY : currency;
+        PriceList list = priceListRepository.findByCurrencyAndEffectiveFrom(cur, effectiveFrom)
+                .orElseGet(() -> new PriceList(UUID.randomUUID(), effectiveFrom, note, cur));
         // Re-publishing the same start date replaces that version rather than creating a duplicate
         // no query could choose between.
         list.getTiers().clear();
@@ -169,7 +181,7 @@ public class PricingService {
     /** Convenience for callers with no commercial terms to set — keeps the floor off. */
     @Transactional
     public PriceList publish(LocalDate effectiveFrom, String note, List<TierInput> tiers) {
-        return publish(effectiveFrom, note, tiers, BigDecimal.ZERO, 12);
+        return publish(effectiveFrom, note, tiers, BigDecimal.ZERO, 12, DEFAULT_CURRENCY);
     }
 
     private void validate(LocalDate effectiveFrom, List<TierInput> tiers,

@@ -526,3 +526,21 @@ any deploy for `ephemeral=false` and no `[TENANT ISOLATION]` error.
   swallowed on purpose (see the email section above). Run
   `curl -X POST "<backend>/api/v1/dev/test-email?to=you@example.com"` — it returns the real provider
   error. Also check the backend log for `Failed to send email`.
+
+---
+
+## The USD site (`calyvora.net`)
+
+`calyvora.in` sells in rupees; `calyvora.net` sells the same product in dollars. Two static sites, not
+one site that detects your region — see [PD-24](../FOUNDER.md) for why.
+
+The short version: we cannot collect USD yet, so a detected price is one we cannot invoice;
+geo-detection fails visibly on VPNs, bad IP data and CDN caching; and every currency advertised
+implies a tax jurisdiction. Two sites is a day's work, geo-pricing is a system.
+
+Both sites link to the same app at `orbit.calyvora.in` — there is one product and one deployment. Only
+the price shown, and the currency a company is created in, differ.
+
+**DNS for calyvora.net**, once the site exists: the same shape as `calyvora.in` — an ALIAS/A record at
+the root pointing at the host, and nothing else. Do **not** add mail records for it; mail keeps going
+out from `calyvora.in`, which is the domain verified in Resend.

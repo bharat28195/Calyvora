@@ -387,6 +387,47 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   can populate demo data there. Acceptable for a demo deployment, unacceptable the day staging holds
   anything real — at which point the profile must change to `prod` and the endpoint disappears.
 
+### PD-24 · 2026-08-31 · A price list per currency, priced to its market and not converted
+- **Context:** we own `calyvora.net` and want a USD site for customers outside India. The obvious
+  move — show the same product with the rupee price converted — is the wrong one, and the reason is
+  worth writing down. ₹149 is about **$1.70**. Against BambooHR at ~$10/employee, Gusto at $6 plus a
+  $49 base and Rippling at $15+, listing $1.70 puts us roughly six times under the cheapest credible
+  competitor. In B2B software that does not read as a bargain; it reads as *not serious*, invites
+  "what is missing", and attracts the customers who churn hardest. (Researched 2026-08-31; the figures
+  and sources are in [docs/PRICING.md](docs/PRICING.md).)
+- **Decision:** one published price list **per currency**, each priced against its own market. USD is
+  **$6/employee, $5 above 100, a $49 monthly minimum**, same two-months-free annual term. A 20-person
+  US company pays $120/month where BambooHR would charge $200 — clearly cheaper, still credible, and
+  about 3.5× what the same company would pay here, which is ordinary purchasing-power pricing rather
+  than opportunism.
+- **India left at ₹149.** It sits between Zoho Professional (₹120) and Premium (₹180) — the premium end
+  for a brand nobody knows yet, but defensible on breadth, since payroll, recruitment, performance and
+  helpdesk are not in Zoho's ₹60 tier. Early customers get discounted **individually** with an agreed
+  price instead. A published price is far easier to discount from than to raise.
+- **The blocker this exposed, which was the real find:** `PlatformService` hardcoded
+  `settings.setCurrency("INR")` on every company it provisioned, and `Subscription.currency` defaulted
+  to INR with no way to set it. So the console **could not onboard a customer billed in dollars at
+  all**. A .net site that converted would have handed us a customer we could not invoice properly —
+  the website was never the blocker, the billing model was. Currency is now chosen at company creation
+  and in the trial-approval terms, the two moments the answer is actually known; it cannot be inferred
+  later from an address.
+- **Alternatives considered:** region-detected pricing on one site (**rejected** — we cannot collect
+  USD yet, so it would advertise a price we cannot invoice; geo-detection fails visibly on VPNs, bad
+  IP data and CDN caching; and every currency advertised implies a tax jurisdiction, UK VAT and EU OSS
+  included, that we have not decided on). Converting rupees to dollars (**rejected**, above). A single
+  global USD price (**rejected** — it would roughly triple the Indian price overnight).
+- **Trade-offs / debt:** nothing collects payment in either currency; subscriptions are still switched
+  on by hand. A company's currency cannot be changed after creation, deliberately — changing it
+  mid-life would re-price historic months against a list that never applied to them. And a USD company
+  is given `America/New_York` rather than our default, because guessing an Indian timezone for an
+  American customer puts every attendance record five and a half hours out on day one.
+- **A concern recorded rather than resolved:** we have no paying customer yet. The US market is more
+  competitive, expects US-hours support, and mid-market buyers there ask for SOC 2, which we do not
+  have. The recommendation was to aim `.net` at international remote-first SMBs rather than head-on at
+  BambooHR, and not to let it delay landing the first Indian customer.
+- **Final outcome:** _V44 ships both lists; 9 tests in `CurrencyPricingIntegrationTest` hold the
+  independence of the two — publishing a USD change must not move what an Indian customer pays._
+
 ### PD-23 · 2026-08-15 · A way back in, and the app moves to `orbit.calyvora.in`
 - **Context:** there was no password reset at all. A forgotten password meant asking an administrator
   to set a new one, and the platform owner had nobody to ask. Every earlier change that touched

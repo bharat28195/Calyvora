@@ -37,6 +37,10 @@ public class PriceList {
     @Column(length = 200)
     private String note;
 
+    /** Which currency this list prices in. One published list per currency (V44). */
+    @Column(nullable = false, length = 3)
+    private String currency = "INR";
+
     /**
      * The floor a company pays regardless of headcount. Protects against the smallest accounts
      * costing more in support than they pay; zero disables it.
@@ -60,9 +64,18 @@ public class PriceList {
     }
 
     public PriceList(UUID id, LocalDate effectiveFrom, String note) {
+        this(id, effectiveFrom, note, "INR");
+    }
+
+    public PriceList(UUID id, LocalDate effectiveFrom, String note, String currency) {
         this.id = id;
         this.effectiveFrom = effectiveFrom;
         this.note = note;
+        this.currency = currency;
+    }
+
+    public String getCurrency() {
+        return currency;
     }
 
     public void addTier(PriceListTier tier) {

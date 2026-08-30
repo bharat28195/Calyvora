@@ -9,11 +9,12 @@ import java.util.UUID;
 
 public interface PriceListRepository extends JpaRepository<PriceList, UUID> {
 
-    /** The list in force on a date — the newest one that had already started. */
-    Optional<PriceList> findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(LocalDate on);
+    /** The list in force on a date for one currency — the newest one that had already started. */
+    Optional<PriceList> findFirstByCurrencyAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
+            String currency, LocalDate on);
 
     /** Newest first, for the history view. */
-    List<PriceList> findAllByOrderByEffectiveFromDesc();
+    List<PriceList> findAllByCurrencyOrderByEffectiveFromDesc(String currency);
 
-    Optional<PriceList> findByEffectiveFrom(LocalDate effectiveFrom);
+    Optional<PriceList> findByCurrencyAndEffectiveFrom(String currency, LocalDate effectiveFrom);
 }

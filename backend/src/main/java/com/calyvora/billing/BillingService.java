@@ -68,8 +68,8 @@ public class BillingService {
                 sub.getStatus() == SubscriptionStatus.TRIALING,
                 billable, monthly, annual,
                 now.toString(), sub.getPaidThrough(),
-                sub.isCustomPrice() ? null : tierBreakdown(now),
-                sub.isCustomPrice() ? null : pricingService.listFor(now).getMonthlyMinimum(),
+                sub.isCustomPrice() ? null : tierBreakdown(now, PricingService.currencyOf(sub)),
+                sub.isCustomPrice() ? null : pricingService.listFor(now, PricingService.currencyOf(sub)).getMonthlyMinimum(),
                 pricingService.minimumApplies(sub, billable, now),
                 prepaid, annual.subtract(prepaid),
                 invoices(companyId, sub, now));
@@ -116,10 +116,10 @@ public class BillingService {
     }
 
     /** The price list in force this month, so the UI can explain a bill that isn't headcount × one rate. */
-    private List<BillingOverviewResponse.PriceTier> tierBreakdown(YearMonth month) {
+    private List<BillingOverviewResponse.PriceTier> tierBreakdown(YearMonth month, String currency) {
         List<BillingOverviewResponse.PriceTier> out = new ArrayList<>();
         long from = 1;
-        for (PriceListTier tier : pricingService.tiersFor(month)) {
+        for (PriceListTier tier : pricingService.tiersFor(month, currency)) {
             Long upTo = tier.getUpTo() == null ? null : tier.getUpTo().longValue();
             out.add(new BillingOverviewResponse.PriceTier(from, upTo, tier.getRate()));
             if (upTo == null) {

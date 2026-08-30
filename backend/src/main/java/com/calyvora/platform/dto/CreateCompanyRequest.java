@@ -20,6 +20,12 @@ public record CreateCompanyRequest(
         @NotBlank @Size(min = 8, max = 100) String password,
         @Positive int seats,
         @Positive int months,
-        String agencyId
+        String agencyId,
+        /**
+         * What this customer is billed in. Null means rupees, which is what every company created
+         * before there was a choice is. It decides which published price list applies, so it cannot
+         * be inferred later from an address.
+         */
+        @Size(min = 3, max = 3) String currency
 ) {
 }

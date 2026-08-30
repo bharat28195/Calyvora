@@ -271,7 +271,7 @@ public class DemoSeedService {
                 new Member("Meridian Care", "admin@meridian.demo", "Tara", "Menon", 6))) {
             var company = platformService.createCompany(new com.calyvora.platform.dto.CreateCompanyRequest(
                     m.name(), m.first(), m.last(), m.email(), DEMO_PASSWORD, m.seats(), 6,
-                    agencyId.toString()));
+                    agencyId.toString(), null));
             UUID cid = UUID.fromString(company.companyId());
             for (int i = 1; i <= Math.max(1, m.seats() - 4); i++) {
                 createUser(cid, "emp" + i + "@" + company.slug() + ".demo", "Employee",
@@ -324,7 +324,7 @@ public class DemoSeedService {
             // console shows both kinds side by side, which is how it will really look.
             var summary = platformService.createCompany(new com.calyvora.platform.dto.CreateCompanyRequest(
                     s.name(), s.first(), s.last(), s.email(), DEMO_PASSWORD, s.seats(),
-                    Math.max(1, s.months()), null));
+                    Math.max(1, s.months()), null, null));
             UUID cid = UUID.fromString(summary.companyId());
             String slug = summary.slug();
             platformService.setPrice(cid, java.math.BigDecimal.valueOf(s.price()));

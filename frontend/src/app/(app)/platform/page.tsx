@@ -70,7 +70,20 @@ export default function PlatformCompaniesPage() {
 
   const totalEmployees = companies?.reduce((s, c) => s + c.headcount, 0) ?? 0;
   const active = companies?.filter((c) => !c.locked).length ?? 0;
-  const mrr = companies?.reduce((s, c) => s + (c.monthlyRevenue ?? 0), 0) ?? 0;
+  // Per currency, never summed into one figure. Adding rupees to dollars produces a number that is
+  // not revenue in any currency, and it would be the headline number on the page.
+  const mrr = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const c of companies ?? []) {
+      const cur = c.currency || "INR";
+      totals.set(cur, (totals.get(cur) ?? 0) + (c.monthlyRevenue ?? 0));
+    }
+    if (totals.size === 0) return money(0);
+    return [...totals.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([cur, total]) => money(total, cur))
+      .join(" · ");
+  }, [companies]);
 
   return (
     <div>
@@ -96,7 +109,7 @@ export default function PlatformCompaniesPage() {
               <Stat label="Companies" value={String(companies.length)} />
               <Stat label="Employees" value={String(totalEmployees)} />
               <Stat label="Active" value={String(active)} />
-              <Stat label="Monthly revenue" value={money(mrr)} />
+              <Stat label="Monthly revenue" value={mrr} />
               <Stat label="Waiting on you" value={String(waiting)} tone={waiting > 0 ? "attention" : undefined}
                 onClick={() => router.push("/platform/requests")} />
             </dl>
@@ -222,9 +235,9 @@ function CompaniesTable({ companies, busyId, act }: {
                 {/* Where the rate came from matters as much as the rate: a company on an agreed price
                     is one that publishing a new price list will NOT move. */}
                 <td className="px-3 py-3">
-                  <p className="tabular-nums text-fg/80">{c.monthlyRevenue != null ? money(c.monthlyRevenue) : "—"}<span className="text-xs text-fg/40">/mo</span></p>
+                  <p className="tabular-nums text-fg/80">{c.monthlyRevenue != null ? money(c.monthlyRevenue, c.currency) : "—"}<span className="text-xs text-fg/40">/mo</span></p>
                   <p className="text-xs text-fg/40">
-                    {c.pricePerEmployee != null ? `${money(c.pricePerEmployee)}/seat` : ""}
+                    {c.pricePerEmployee != null ? `${money(c.pricePerEmployee, c.currency)}/seat` : ""}
                     {c.customPrice && <span className="text-fg/50"> · agreed</span>}
                   </p>
                 </td>
@@ -406,7 +419,7 @@ function InlineEditor({ label, type, initial, busy, onSet, onCancel }: {
 }
 
 function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
-  const [f, setF] = useState({ companyName: "", adminFirstName: "", adminLastName: "", adminEmail: "", password: "demopass123", seats: "10", months: "12" });
+  const [f, setF] = useState({ companyName: "", adminFirstName: "", adminLastName: "", adminEmail: "", password: "demopass123", seats: "10", months: "12", currency: "INR" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
@@ -420,6 +433,7 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
         companyName: f.companyName.trim(), adminFirstName: f.adminFirstName.trim() || "Admin",
         adminLastName: f.adminLastName.trim() || "User", adminEmail: f.adminEmail.trim(),
         password: f.password, seats: Number(f.seats) || 5, months: Number(f.months) || 12,
+        currency: f.currency,
       });
       onCreated();
     } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't create the company"); setBusy(false); }
@@ -436,9 +450,20 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
         <Field label="Admin last name" htmlFor="c-last"><Input id="c-last" value={f.adminLastName} onChange={set("adminLastName")} /></Field>
         <div className="sm:col-span-2"><Field label="Admin email" htmlFor="c-email"><Input id="c-email" type="email" value={f.adminEmail} onChange={set("adminEmail")} placeholder="admin@company.com" /></Field></div>
         <Field label="Temp password" htmlFor="c-pw"><Input id="c-pw" value={f.password} onChange={set("password")} /></Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Field label="Seats" htmlFor="c-seats"><Input id="c-seats" type="number" min={1} value={f.seats} onChange={set("seats")} /></Field>
           <Field label="Months" htmlFor="c-months"><Input id="c-months" type="number" min={1} value={f.months} onChange={set("months")} /></Field>
+          {/* Decides which published price list this customer is billed against, and cannot be
+              inferred later from an address — so it is asked once, here, at the only moment the
+              answer is actually known. */}
+          <Field label="Currency" htmlFor="c-currency">
+            <select id="c-currency" value={f.currency}
+              onChange={(e) => setF({ ...f, currency: e.target.value })}
+              className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
+              <option value="INR">INR</option>
+              <option value="USD">USD</option>
+            </select>
+          </Field>
         </div>
         <div className="flex gap-2 sm:col-span-2">
           <Button type="submit" disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Create company</Button>

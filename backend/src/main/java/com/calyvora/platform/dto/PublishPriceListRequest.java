@@ -22,7 +22,9 @@ public record PublishPriceListRequest(
         /** Floor a company pays regardless of headcount. Zero or null disables it. */
         BigDecimal monthlyMinimum,
         /** Months charged for an annual prepayment — 10 means two months free, 12 means no discount. */
-        Integer annualMonthsCharged
+        Integer annualMonthsCharged,
+        /** Which currency this list prices in. Null means rupees, the list that existed first. */
+        @Size(min = 3, max = 3) String currency
 ) {
     public record Tier(Integer toEmployee, @NotNull BigDecimal rate) {}
 }

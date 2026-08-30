@@ -32,9 +32,12 @@ export function PricingEditor() {
   const [saving, setSaving] = useState(false);
   // Read first, change second: the editor opens only when asked for.
   const [editing, setEditing] = useState(false);
+  // One published list per currency (V44). The USD list is priced against its own market rather than
+  // converted from rupees, so switching here changes what is being edited, not a display format.
+  const [currency, setCurrency] = useState("INR");
 
   function load() {
-    api.platformPricing()
+    api.platformPricing(currency)
       .then((v) => {
         setVersions(v);
         const current = v.find((x) => x.current) ?? v[0];
@@ -49,7 +52,7 @@ export function PricingEditor() {
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load pricing"));
   }
-  useEffect(load, []);
+  useEffect(load, [currency]);
 
   function setTier(i: number, patch: Partial<DraftTier>) {
     setTiers((ts) => ts.map((t, k) => (k === i ? { ...t, ...patch } : t)));
@@ -70,6 +73,7 @@ export function PricingEditor() {
         })),
         monthlyMinimum: Number(minimum || 0),
         annualMonthsCharged: Number(annualMonths || 12),
+        currency,
       });
       setSaved(true);
       setNote("");
@@ -89,11 +93,20 @@ export function PricingEditor() {
           same screen is the kind of duplication that appears the moment a section becomes a page. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <CardTitle>{editing ? "Edit the price list" : "Current price list"}</CardTitle>
-        {current && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-fg/50">
-            <Tag className="h-3 w-3" /> in force since {current.effectiveFrom}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {current && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-fg/50">
+              <Tag className="h-3 w-3" /> in force since {current.effectiveFrom}
+            </span>
+          )}
+          {/* A separate list, not a converted one - see V44. */}
+          <select value={currency} onChange={(e) => { setCurrency(e.target.value); setEditing(false); setSaved(false); }}
+            aria-label="Price list currency" disabled={editing}
+            className="h-9 rounded-lg border border-fg/15 bg-fg/5 px-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet disabled:opacity-50">
+            <option value="INR">INR &middot; India</option>
+            <option value="USD">USD &middot; International</option>
+          </select>
+        </div>
       </div>
 
       {error && <Alert tone="error" className="mt-4">{error}</Alert>}
@@ -103,8 +116,8 @@ export function PricingEditor() {
         <div className="mt-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-violet" /></div>
       ) : !editing ? (
         <>
-          <CurrentPriceList current={current} onEdit={() => { setEditing(true); setSaved(false); }} />
-          <History versions={versions} />
+          <CurrentPriceList current={current} currency={currency} onEdit={() => { setEditing(true); setSaved(false); }} />
+          <History versions={versions} currency={currency} />
         </>
       ) : (
         <>
@@ -228,7 +241,7 @@ export function PricingEditor() {
             </Button>
           </div>
 
-          <History versions={versions} />
+          <History versions={versions} currency={currency} />
         </>
       )}
     </Card>
@@ -242,7 +255,9 @@ export function PricingEditor() {
  * for something changed a few times a year — and a form is harder to read than a table, because every
  * value sits in a box that invites typing into it. Reading and changing are different jobs.
  */
-function CurrentPriceList({ current, onEdit }: { current: PriceListVersion | undefined; onEdit: () => void }) {
+function CurrentPriceList({ current, currency, onEdit }: {
+  current: PriceListVersion | undefined; currency: string; onEdit: () => void;
+}) {
   if (!current) {
     return (
       <div className="mt-5">
@@ -269,7 +284,7 @@ function CurrentPriceList({ current, onEdit }: { current: PriceListVersion | und
                   <td className="px-4 py-2.5 tabular-nums text-fg/80">
                     {t.toEmployee == null ? `${from} and above` : `${from} – ${t.toEmployee}`}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-fg/80">{money(t.rate)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-fg/80">{money(t.rate, currency)}</td>
                 </tr>
               );
             })}
@@ -280,7 +295,7 @@ function CurrentPriceList({ current, onEdit }: { current: PriceListVersion | und
       <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-sm">
         <div className="flex gap-2">
           <dt className="text-fg/50">Monthly minimum</dt>
-          <dd className="tabular-nums text-fg/80">{current.monthlyMinimum > 0 ? money(current.monthlyMinimum) : "none"}</dd>
+          <dd className="tabular-nums text-fg/80">{current.monthlyMinimum > 0 ? money(current.monthlyMinimum, currency) : "none"}</dd>
         </div>
         <div className="flex gap-2">
           <dt className="text-fg/50">Paying yearly</dt>
@@ -299,7 +314,7 @@ function CurrentPriceList({ current, onEdit }: { current: PriceListVersion | und
   );
 }
 
-function History({ versions }: { versions: PriceListVersion[] }) {
+function History({ versions, currency }: { versions: PriceListVersion[]; currency: string }) {
   if (versions.length === 0) return null;
   return (
     <div className="mt-6 border-t border-fg/10 pt-4">
@@ -314,9 +329,9 @@ function History({ versions }: { versions: PriceListVersion[] }) {
             </span>
             <span className="text-xs text-fg/50">
               {v.tiers.map((t) =>
-                t.toEmployee ? `≤${t.toEmployee}: ${money(t.rate)}` : `then ${money(t.rate)}`,
+                t.toEmployee ? `≤${t.toEmployee}: ${money(t.rate, currency)}` : `then ${money(t.rate, currency)}`,
               ).join(" · ")}
-              {v.monthlyMinimum > 0 && ` · min ${money(v.monthlyMinimum)}`}
+              {v.monthlyMinimum > 0 && ` · min ${money(v.monthlyMinimum, currency)}`}
               {v.annualMonthsCharged < 12 && ` · yearly ×${v.annualMonthsCharged}`}
             </span>
           </div>

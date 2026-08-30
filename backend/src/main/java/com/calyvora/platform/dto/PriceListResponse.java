@@ -13,7 +13,8 @@ public record PriceListResponse(
         boolean current,
         List<Tier> tiers,
         BigDecimal monthlyMinimum,
-        int annualMonthsCharged
+        int annualMonthsCharged,
+        String currency
 ) {
     /** {@code toEmployee} is null on the final, open-ended tier. */
     public record Tier(long fromEmployee, Integer toEmployee, BigDecimal rate) {}
@@ -29,6 +30,7 @@ public record PriceListResponse(
             from = t.getUpTo() + 1L;
         }
         return new PriceListResponse(list.getId().toString(), list.getEffectiveFrom().toString(),
-                list.getNote(), current, tiers, list.getMonthlyMinimum(), list.getAnnualMonthsCharged());
+                list.getNote(), current, tiers, list.getMonthlyMinimum(), list.getAnnualMonthsCharged(),
+                list.getCurrency());
     }
 }
