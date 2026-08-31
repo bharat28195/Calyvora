@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orbit by Calyvora — HR software from $6 per employee</title>
+<meta name="description" content="Orbit is the modern HR platform — attendance, leave, payroll, helpdesk and people ops in one place. From $6 per employee per month, with a $49 monthly minimum." />
+<!-- Tab icon. SVG is preferred by every current browser; the .ico is the fallback
+     for older Safari and for the bare /favicon.ico that browsers request anyway. -->
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="favicon.ico" sizes="48x48" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#0b0b12" />
+<!-- ?v= is a cache-buster. This site is uploaded by hand to shared hosting, which serves
+     orbit.css with a long cache life; without it a returning visitor gets new HTML against the
+     stylesheet they already have, and the page renders half-styled. Bump the number on any CSS
+     change. -->
+<!-- Two near-identical sites at different prices. Without these a search engine treats one as a
+     duplicate of the other and chooses between them itself, which can be the wrong currency for the
+     reader. These say: same page, different region. -->
+<link rel="canonical" href="https://calyvora.net/" />
+<link rel="alternate" hreflang="en-IN" href="https://calyvora.in/" />
+<link rel="alternate" hreflang="en" href="https://calyvora.net/" />
+<link rel="alternate" hreflang="x-default" href="https://calyvora.net/" />
+<link rel="stylesheet" href="orbit.css?v=2" />
+</head>
+<body>
+<div class="glow a"></div><div class="glow b"></div>
+
+<header id="hdr">
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="#top">
+        <span class="logo"></span>
+        <span>Orbit<small>by Calyvora</small></span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Product</a>
+        <a href="#flow">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://calyvora.in/about.html">About</a>
+      </div>
+      <div class="nav-cta">
+        <a href="https://orbit.calyvora.in/login" class="btn btn-ghost">Sign in</a>
+        <a href="https://orbit.calyvora.in/request-trial?from=net-nav" class="btn btn-primary">Request a trial →</a>
+      </div>
+      <button class="menu-btn" aria-label="menu">☰</button>
+    </nav>
+  </div>
+</header>
+
+<span id="top"></span>
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow reveal"><span class="dot"></span>The modern HR platform</span>
+    <h1 class="reveal">All of HR, in one calm <span class="grad-text">orbit</span>.</h1>
+    <p class="sub reveal">Attendance, leave, payroll, helpdesk and every people-ops workflow — in a single, beautifully simple place your whole team actually enjoys using.</p>
+    <div class="hero-cta reveal">
+      <a href="https://orbit.calyvora.in/request-trial?from=net-hero" class="btn btn-primary">Request a free trial →</a>
+      <a href="#flow" class="btn btn-ghost">See how it works</a>
+    </div>
+    <!-- The button used to open a signup form that created a live workspace on the spot. It now
+         raises a request we answer by hand, so the note under it says so.
+
+         "No card needed" was here until it was checked: there is no card processing anywhere in the
+         product — billing computes an amount from headcount and is invoiced by a person. So the line
+         was true the way "no fax needed" is true, and worse, it implied a card would be wanted later.
+         Describe the process instead; it is more reassuring than the claim was. -->
+    <p class="hero-note reveal">Tell us about your team and we'll set the workspace up · Sign-in details come by email</p>
+
+    <!-- A row of five company names used to sit here, styled as a customer logo wall. Three of them
+         (Northwind, Vertex Labs, Meridian) were the DEMO SEED TENANTS out of DemoSeedService.java;
+         the other two were invented. Removed 2026-08-12: a prospect who asks "can I speak to someone
+         at Meridian?" gets an answer we cannot give, and one unearned proof point costs more than it
+         earns on a site whose argument is that we tell the truth.
+         Put real names back only when that client has agreed in writing to be named. -->
+  </div>
+
+  <!-- PRODUCT MOCK -->
+  <div class="wrap">
+    <div class="mock reveal">
+      <div class="mock-glow"></div>
+      <!-- ====================================================================================
+           This is drawn to match the REAL dashboard, screen for screen. It used to show a
+           "Good morning, Ava 👋" greeting, three KPIs and an approvals feed — none of which
+           exist in the product — on a domain (app.orbit.calyvora.com) we do not own.
+
+           If you change the dashboard, change this. The check is simple: open
+           frontend/src/app/(app)/dashboard/page.tsx and confirm each element below is there.
+             · heading           "Welcome, {firstName}."
+             · sub               "{Company} — your people, one place."
+             · four stat cards   People / Departments / Performance / Payroll
+             · quick access      six tiles, in this order
+           Sidebar labels and their order come from components/layout/app-shell.tsx.
+           ==================================================================================== -->
+      <div class="window">
+        <div class="win-bar"><i></i><i></i><i></i><span class="url">orbit.calyvora.in/dashboard</span></div>
+        <div class="win-body">
+          <aside class="side">
+            <div class="s-item active"><span class="ic"></span>Dashboard</div>
+            <div class="s-item"><span class="ic"></span>Insights</div>
+            <div class="s-item"><span class="ic"></span>Me</div>
+            <div class="s-item"><span class="ic"></span>Inbox</div>
+            <div class="s-item"><span class="ic"></span>Helpdesk</div>
+            <div class="s-item"><span class="ic"></span>People</div>
+            <div class="s-item"><span class="ic"></span>Recruitment</div>
+            <div class="s-item"><span class="ic"></span>Payroll</div>
+          </aside>
+          <div class="content">
+            <h4>Welcome, Ava.</h4>
+            <!-- Northwind Robotics is our own demo tenant, which is exactly what it is here:
+                 sample data inside a product shot, not a customer being named. -->
+            <div class="muted">Northwind Robotics — your people, one place.</div>
+            <!-- Card order and shape follow the real Stat component: labelled icon on top, then
+                 the value, then the sub-line. The two without a number show "Open →" because that
+                 is exactly what Performance and Payroll do in the product. -->
+            <div class="kpis four">
+              <div class="kpi"><div class="kl"><span class="ki v"></span>People</div><div class="n">142</div><div class="l">8 departments</div></div>
+              <div class="kpi"><div class="kl"><span class="ki a"></span>Departments</div><div class="n">8</div><div class="l">org structure</div></div>
+              <div class="kpi"><div class="kl"><span class="ki m"></span>Performance</div><div class="go">Open →</div><div class="l">review cycles</div></div>
+              <div class="kpi"><div class="kl"><span class="ki e"></span>Payroll</div><div class="go">Open →</div><div class="l">salaries &amp; payslips</div></div>
+            </div>
+            <div class="sec-label">Quick access</div>
+            <div class="tiles">
+              <div class="tile"><span class="ti"></span>Attendance</div>
+              <div class="tile"><span class="ti"></span>Time off<small>12 days left</small></div>
+              <div class="tile"><span class="ti"></span>My pay</div>
+              <div class="tile"><span class="ti"></span>My review</div>
+              <div class="tile"><span class="ti"></span>Expenses</div>
+              <div class="tile"><span class="ti"></span>Inbox</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="pad" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>One platform, every module</span>
+      <h2>Everything your people team touches — under one roof.</h2>
+      <p>Stop stitching together five tools and a dozen spreadsheets. Orbit brings the entire employee lifecycle into one connected system.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg></div><h3>Attendance &amp; shifts</h3><p>Live check-in/out, a day-wise log for every employee, shift schedules and a clean team sheet — the way Keka and Zoho do it, minus the clutter.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><h3>Leave &amp; time off</h3><p>Balances, policies and holidays that just work. Employees request in a tap; managers approve from their inbox or phone.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><h3>Payroll that reads attendance</h3><p>Salaries, loss-of-pay auto-calculated from real attendance, and branded payslips. HR runs the whole month in one click.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></div><h3>Regularizations</h3><p>Forgot to punch in? Employees raise a fix-up request; the right manager approves and the day is marked present automatically.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg></div><h3>Employee helpdesk</h3><p>People raise HR tickets and track them to resolution. HR gets a tidy queue with threads, priorities and status — nothing slips.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM19 8v6M22 11h-6"/></svg></div><h3>Recruitment &amp; onboarding</h3><p>Track candidates through your pipeline and turn a hire into a fully onboarded employee with tasks, documents and a warm first day.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/></svg></div><h3>Performance</h3><p>Goals, reviews and check-ins that keep growth on the calendar instead of in someone's forgotten to-do list.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div><h3>Documents &amp; letters</h3><p>Generate offer letters, payslips and certificates from your own templates — with your company's name and branding on top.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8"/></svg></div><h3>Roles &amp; permissions</h3><p>Owner, Admin, HR, Manager, Employee — each sees exactly what they should. Set up your org's personas in minutes.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div><h3>Currency, timezone &amp; language</h3><p>Run India in ₹ and the US in $, each in the right timezone — one workspace, applied everywhere automatically.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M3 10h18M7 15h.01M11 15h2M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg></div><h3>My Finances</h3><p>Every employee sees how they&apos;re paid — bank details, PF, ESI and professional tax in one place. Salary and PAN stay private: their own only, never a colleague&apos;s.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z"/></svg></div><h3>Expenses &amp; reimbursements</h3><p>Staff claim what they spent, managers approve, finance sees what&apos;s pending and what&apos;s been paid — without a single email thread.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div><h3>Ask it anything</h3><p>&quot;How many people are on leave next week?&quot; The built-in assistant answers from your own data and cites where it looked.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></div><h3>Knowledge base &amp; projects</h3><p>Policies and handbooks people can actually find, plus projects, sprints and tasks — so work and the people doing it live in one system.</p></div>
+      <div class="card reveal"><div class="ci"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 16l4-6 4 3 5-8"/></svg></div><h3>Analytics</h3><p>Headcount, tenure, joiners, attrition risk and goal attainment — the numbers you get asked for in a board meeting, already worked out.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FLOW / STORY -->
+<section class="pad" id="flow">
+  <div class="wrap">
+    <div class="split">
+      <div class="reveal">
+        <span class="eyebrow"><span class="dot"></span>Connected by design</span>
+        <h2>Attendance flows straight into pay. Automatically.</h2>
+        <p>In most companies, attendance lives in one tool and payroll in another — so someone spends the last week of every month reconciling spreadsheets. In Orbit, it's one thread.</p>
+        <div class="steps">
+          <div class="step"><span class="num">1</span><div><b>Employees clock in</b><span>Check-in/out and a full day-wise log, on web or mobile.</span></div></div>
+          <div class="step"><span class="num">2</span><div><b>Exceptions get fixed</b><span>Forgot to punch? A regularization goes to the manager and, once approved, updates the day.</span></div></div>
+          <div class="step"><span class="num">3</span><div><b>Payroll reads it</b><span>Loss-of-pay is calculated from real attendance — no manual deductions.</span></div></div>
+          <div class="step"><span class="num">4</span><div><b>Payslips go out</b><span>HR runs the month in one click; branded payslips land with each employee.</span></div></div>
+        </div>
+      </div>
+      <div class="flow reveal">
+        <div class="frow"><span>Attendance · July</span><span class="r">21 / 22 days</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Loss of pay</span><span class="r" style="color:#fbbf24">1 day</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Gross salary</span><span class="r">$ 6,600</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow" style="border-color:rgba(124,92,255,.5)"><span>Net payable</span><span class="r grad-text" style="font-size:17px">$ 6,300</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORM / AGENCY -->
+<section class="pad" id="platform">
+  <div class="wrap">
+    <div class="platform reveal">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>For agencies &amp; groups</span>
+        <h2>Manage every company from one console.</h2>
+        <p>Run HR for several companies? Your agency console lists every one you look after, with its headcount, seats and what it costs — and lets you set the next one up yourself.</p>
+        <div class="plist">
+          <div><span class="check">✓</span>Every company you run, its headcount and its cost, at a glance</div>
+          <div><span class="check">✓</span>Spin up a new company and its admin in seconds</div>
+          <div><span class="check">✓</span>Metered, Netflix-style seats — ask for more as they grow</div>
+          <div><span class="check">✓</span>Airtight data isolation — between your companies, and from everyone else's</div>
+        </div>
+      </div>
+      <div class="flow" style="background:rgba(0,0,0,.25)">
+        <div class="frow"><span class="who" style="display:flex;gap:9px;align-items:center"><span class="av">NW</span>Northwind</span><span class="pill ok">Active · 142</span></div>
+        <div class="frow"><span class="who" style="display:flex;gap:9px;align-items:center"><span class="av">VL</span>Vertex Labs</span><span class="pill ok">Active · 38</span></div>
+        <div class="frow"><span class="who" style="display:flex;gap:9px;align-items:center"><span class="av">MD</span>Meridian</span><span class="pill warn">Expires 9d</span></div>
+        <div class="frow" style="border-color:rgba(124,92,255,.5)"><span>Monthly spend</span><span class="r grad-text" style="font-size:17px">$ 1,242</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pad" id="pricing">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Simple, per-employee pricing</span>
+      <h2>One platform. One price. It just gets cheaper as you grow.</h2>
+      <p>There are no feature tiers to compare — everyone gets all of Orbit. The only thing that
+        changes is the rate per employee, and it drops the moment you pass 100. Billed monthly from
+        $49, or pay for a year and get two months free.</p>
+    </div>
+    <div class="prices">
+      <div class="price feat reveal">
+        <span class="tag">Most companies</span>
+        <h3>Standard</h3>
+        <div class="amt">$6<small> / employee / mo</small></div>
+        <div class="desc">For teams up to 100 people. The complete platform, nothing held back.</div>
+        <ul><li>Attendance, leave &amp; holidays</li><li>Payroll with loss-of-pay from attendance</li><li>Employee helpdesk &amp; documents</li><li>Performance, recruitment &amp; shifts</li><li>Roles, currency &amp; timezone</li></ul>
+        <a href="https://orbit.calyvora.in/request-trial?from=net-pricing" class="btn btn-primary">Request a free trial →</a>
+      </div>
+      <div class="price reveal">
+        <h3>Scale</h3>
+        <div class="amt">$5<small> / employee / mo</small></div>
+        <div class="desc">From your 101st employee. Same platform, better rate — applied automatically.</div>
+        <ul><li>Everything in Standard</li><li>Automatic volume rate past 100 people</li><li>Priority support &amp; onboarding</li><li>Dedicated success contact</li></ul>
+        <a href="https://orbit.calyvora.in/request-trial?from=net-pricing-scale" class="btn btn-ghost">Request a free trial</a>
+      </div>
+      <div class="price reveal">
+        <h3>Agency</h3>
+        <div class="amt">Custom</div>
+        <div class="desc">For agencies &amp; groups running HR across many companies.</div>
+        <ul><li>Everything in Scale</li><li>Multi-company platform console</li><li>Metered seats &amp; billing per client</li><li>Named onboarding partner</li></ul>
+        <a href="mailto:connect@calyvora.in?subject=Agency%20plan" class="btn btn-ghost">Talk to us</a>
+      </div>
+    </div>
+    <!-- No GST line here: that is an Indian tax and this page is not sold in India. Sales tax and VAT
+         vary by where the customer is, so the honest thing is to say it is excluded without naming a
+         tax we may not be charging. -->
+    <p class="reveal" style="text-align:center;margin-top:28px;color:var(--fg-2);font-size:14.5px">
+      Prices in USD and exclude any sales tax or VAT that applies where you are.
+      Minimum $49 per month · two months free on annual billing · no setup fee.
+      Prices are indicative and confirmed on your order.
+    </p>
+    <p class="reveal" style="text-align:center;margin-top:10px;color:var(--fg-2);font-size:14.5px">
+      Based in India? <a href="https://calyvora.in/#pricing" style="color:var(--aqua);font-weight:600">See pricing in rupees</a>
+      — same product, priced for that market.
+    </p>
+  </div>
+</section>
+
+<!-- QUOTE -->
+<section class="pad">
+  <div class="wrap">
+    <div class="quote reveal">
+      <p>“We replaced three tools and a mountain of spreadsheets with Orbit. Month-end payroll went from three days to <span class="grad-text">twenty minutes</span>.”</p>
+      <div class="by">Ava Chen · Head of People, Northwind</div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="wrap">
+  <div class="final reveal">
+    <h2>Bring your whole team into orbit.</h2>
+    <p>Set up your company, invite your people, and run your first payroll this week. It's genuinely that fast.</p>
+    <div class="hero-cta">
+      <a href="https://orbit.calyvora.in/request-trial?from=net-final" class="btn btn-primary">Request a free trial →</a>
+      <a href="mailto:connect@calyvora.in?subject=Book%20a%20demo" class="btn btn-ghost">Book a demo</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="brand" href="#top"><span class="logo"></span><span>Orbit<small>by Calyvora</small></span></a>
+        <p class="tagline">The modern HR platform for growing teams. Built with care by Calyvora.</p>
+      </div>
+      <div><h5>Product</h5><a href="#features">Attendance</a><a href="#features">Payroll</a><a href="#features">Helpdesk</a><a href="#pricing">Pricing</a></div>
+      <div><h5>Company</h5><a href="https://calyvora.in/about.html">About us</a><a href="https://calyvora.in/about.html#leadership">Leadership</a><a href="https://calyvora.in/about.html#careers">Careers</a><a href="mailto:connect@calyvora.in">connect@calyvora.in</a><a href="#">Privacy</a><a href="#">Terms</a></div>
+    </div>
+    <p class="foot-note">Everything on this site is general information about what we do. It is not an
+      offer, a quotation or a commitment, and it does not form part of any contract. Services, fees,
+      timelines and any guarantees are only those set out in the signed agreement for that engagement.
+      Product features and pricing may change.</p>
+    <div class="foot-bottom">
+      <span>© 2026 Calyvora. All rights reserved.</span>
+      <span>Orbit™ is a product of Calyvora.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // sticky nav shadow
+  const hdr=document.getElementById('hdr');
+  addEventListener('scroll',()=>hdr.classList.toggle('scrolled',scrollY>12));
+  // scroll reveal
+  const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(i%3*70)+'ms';io.observe(el)});
+</script>
+</body>
+</html>

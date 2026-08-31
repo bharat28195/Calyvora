@@ -145,3 +145,24 @@ Unset means INR, which is what every company created before there was a choice i
   advertising a currency implies a tax jurisdiction (UK VAT, EU OSS), so decide that first.
 - **The monthly-revenue figure on the console** is shown per currency, never summed. Adding rupees to
   dollars produces a number that is not revenue in anything.
+
+---
+
+## The two websites
+
+| | Domain | Price shown | Files |
+|---|---|---|---|
+| India | `calyvora.in` | INR | `website/orbit/` |
+| International | `calyvora.net` | USD | `website/calyvora-net/` |
+
+Both link to the same app at `orbit.calyvora.in`. One product, one deployment; only the price differs.
+
+**When you change a price, two places must agree:** the website card *and* `/platform/pricing` in the
+console. The console is what customers are actually billed from — the website is a claim about it. A
+site advertising a rate the console does not hold is the kind of mismatch that surfaces on an invoice.
+
+Trial links on the USD site carry `?from=net-*`, so a request in the console shows which site it came
+from and therefore which currency to approve it in.
+
+**Do not add mail DNS records to `calyvora.net`.** Mail goes out from `calyvora.in`, the domain
+verified in Resend.

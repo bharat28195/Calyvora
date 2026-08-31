@@ -1,0 +1,20 @@
+<!-- The Orbit mark, in the same geometry as the .logo element in orbit.css: a
+     gradient-filled rounded square, an inset ring, and a satellite dot haloed in
+     aqua. Kept as SVG so it stays crisp at any size and needs no regeneration
+     when the brand colours change — edit the two stops and it follows. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" width="34" height="34">
+  <defs>
+    <!-- linear-gradient(120deg, violet, aqua): direction vector (sin120, -cos120)
+         normalised across the 34×34 box. -->
+    <linearGradient id="g" x1="2.7" y1="25.7" x2="31.3" y2="8.3" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="34" height="34" rx="10" fill="url(#g)"/>
+  <!-- the orbit itself: inset 8, 2px stroke -->
+  <circle cx="17" cy="17" r="8" fill="none" stroke="#0b0b12" stroke-opacity=".9" stroke-width="2"/>
+  <!-- the satellite: 7px dark dot with a 3px aqua halo, top-right -->
+  <circle cx="24.5" cy="9.5" r="5" fill="none" stroke="#22d3ee" stroke-width="3"/>
+  <circle cx="24.5" cy="9.5" r="3.5" fill="#0b0b12"/>
+</svg>
