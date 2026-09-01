@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
 
 /**
- * Light/dark toggle. The theme is a `.light` class on <html> (dark is the default, set before paint
- * by the no-flash script in the root layout); the choice persists in localStorage.
+ * Light/dark toggle. The theme is a class on <html>, set before paint by the no-flash script in the
+ * root layout; the choice persists in localStorage and is read back on mount.
+ *
+ * <p>Light is the default and the initial state here matches it, so the icon does not flip on hydration
+ * for the majority of visitors who have never chosen.
  */
 export function ThemeToggle() {
-  const [light, setLight] = useState(false);
+  const [light, setLight] = useState(true);
 
   useEffect(() => {
     setLight(document.documentElement.classList.contains("light"));

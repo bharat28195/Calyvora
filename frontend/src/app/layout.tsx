@@ -17,12 +17,20 @@ export const metadata: Metadata = {
   },
 };
 
-// Runs before first paint so a light-theme preference doesn't flash dark.
-const noFlashTheme = `(function(){try{var t=localStorage.getItem('calyvora-theme');var d=document.documentElement;if(t==='light'){d.classList.add('light');d.classList.remove('dark');}else{d.classList.add('dark');d.classList.remove('light');}}catch(e){}})();`;
+/*
+ * Runs before first paint so a stored dark preference doesn't flash light.
+ *
+ * Light unless dark was explicitly chosen — the OS preference is deliberately not consulted. Orbit
+ * opens the same way for everyone the first time; dark is a decision, and once made it is remembered
+ * and applies on every device.
+ */
+const noFlashTheme = `(function(){try{var d=document.documentElement;if(localStorage.getItem('calyvora-theme')==='dark'){d.classList.add('dark');d.classList.remove('light');}else{d.classList.add('light');d.classList.remove('dark');}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    // `light` here, not on the script alone: if JavaScript never runs the page must still be
+    // readable, and an unclassed root would take the bare :root palette anyway.
+    <html lang="en" className="light">
       <head>
         <script dangerouslySetInnerHTML={{ __html: noFlashTheme }} />
       </head>

@@ -5,21 +5,33 @@
 :root {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Dark theme (default). Values are space-separated RGB for Tailwind's <alpha-value>. */
-  --app: 11 11 18; /* #0b0b12 page background */
-  --surface: 20 20 31; /* #14141f elevated solid */
-  --fg: 255 255 255; /* white foreground tint */
-  --glow-violet: 0.18;
-  --glow-aqua: 0.1;
-}
-
-/* Light theme — a soft off-white canvas with crisp white surfaces. */
-:root.light {
-  --app: 244 246 250; /* #f4f6fa */
-  --surface: 255 255 255; /* #ffffff */
+  /*
+   * Light is the default, and deliberately not the OS preference.
+   *
+   * A great many people run their laptop dark for personal use and still expect a work tool to look
+   * like a document — and this one prints payslips and letters. Following prefers-color-scheme meant
+   * someone opening Orbit for the first time saw whichever theme their phone happened to be in, so
+   * the product had no settled first impression. Now it always opens light, and dark is something you
+   * choose. Once chosen it is remembered, and it wins on every device.
+   *
+   * These live on bare :root rather than :root.light so the palette is complete before any class is
+   * applied — with JavaScript off, no class is ever added, and the page must still be readable.
+   * Values are space-separated RGB for Tailwind's <alpha-value>.
+   */
+  --app: 244 246 250; /* #f4f6fa soft off-white canvas */
+  --surface: 255 255 255; /* #ffffff crisp elevated surfaces */
   --fg: 23 26 38; /* #171a26 near-black slate */
   --glow-violet: 0.1;
   --glow-aqua: 0.07;
+}
+
+/* Dark theme — chosen, then remembered. */
+:root.dark {
+  --app: 11 11 18; /* #0b0b12 */
+  --surface: 20 20 31; /* #14141f */
+  --fg: 255 255 255;
+  --glow-violet: 0.18;
+  --glow-aqua: 0.1;
 }
 
 html {
@@ -89,4 +101,78 @@ body {
 .text-gradient {
   @apply bg-clip-text text-transparent;
   background-image: linear-gradient(90deg, theme(colors.violet), theme(colors.aqua));
+}
+
+/*
+ * ---------------------------------------------------------------------------------------------
+ * Signed-out backdrop
+ *
+ * The login, register and reset screens were a card floating on an empty page. This gives them a
+ * ground to sit on, built from the product's own idea rather than a generic dot grid: faint
+ * concentric rings, like orbits, centred behind the card, with a fine dot field and a little grain
+ * over the top so large flat areas do not band on cheap panels.
+ *
+ * Everything is drawn in CSS from the theme tokens, so it costs no image request and follows light
+ * and dark automatically. Deliberately faint — this is a surface for the form, and if you notice it
+ * before you notice the password field it is too strong.
+ * ---------------------------------------------------------------------------------------------
+ */
+:root {
+  --auth-ring: 23 26 38;
+  --auth-ring-alpha: 0.055;
+  --auth-dot-alpha: 0.05;
+  --auth-grain-alpha: 0.035;
+}
+:root.dark {
+  --auth-ring: 255 255 255;
+  --auth-ring-alpha: 0.045;
+  --auth-dot-alpha: 0.04;
+  --auth-grain-alpha: 0.05;
+}
+
+.auth-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The orbits, plus two soft colour washes so the rings are not the only thing happening. */
+.auth-bg::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background-image:
+    repeating-radial-gradient(
+      circle at 50% 42%,
+      transparent 0 92px,
+      rgba(var(--auth-ring), var(--auth-ring-alpha)) 92px 93px
+    ),
+    radial-gradient(38rem 26rem at 82% 8%, rgba(124, 92, 255, var(--glow-violet)), transparent 62%),
+    radial-gradient(32rem 24rem at 12% 88%, rgba(34, 211, 238, var(--glow-aqua)), transparent 60%);
+  /* Fades the rings out at the edges so they end by dissolving rather than by being clipped. */
+  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 30%, transparent 72%);
+  mask-image: radial-gradient(circle at 50% 42%, #000 30%, transparent 72%);
+}
+
+/* The dot field, sitting over the rings. */
+.auth-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, rgba(var(--auth-ring), var(--auth-dot-alpha)) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+}
+
+/* Grain, as its own element because its strength is toned per theme and a pseudo-element is already
+   spoken for. Inline SVG, so no second network request. */
+.auth-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--auth-grain-alpha);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
 }
