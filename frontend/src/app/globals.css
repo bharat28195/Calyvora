@@ -123,16 +123,17 @@ body {
  */
 :root {
   --auth-ring: 23 26 38;
-  --auth-ring-alpha: 0.1;
-  --auth-dot-alpha: 0.075;
+  /* The wallpaper tint. Two earlier passes at 4.5% and 10% were invisible on this canvas; line art
+     needs more than a gradient does, and this is the number to change if it reads too strong. */
+  --auth-pattern-alpha: 0.16;
   --auth-grain-alpha: 0.045;
   --auth-violet: 0.22;
   --auth-aqua: 0.16;
 }
 :root.dark {
   --auth-ring: 255 255 255;
-  --auth-ring-alpha: 0.07;
-  --auth-dot-alpha: 0.05;
+  /* Lower on dark: white line art on near-black carries much further than dark-on-white. */
+  --auth-pattern-alpha: 0.1;
   --auth-grain-alpha: 0.06;
   --auth-violet: 0.26;
   --auth-aqua: 0.16;
@@ -158,22 +159,27 @@ body {
     radial-gradient(34rem 26rem at 96% 88%, rgba(124, 92, 255, calc(var(--auth-violet) * 0.55)), transparent 60%);
 }
 
-/* 2 — the orbits and the dot grid. The mask opens a hole in the middle: rings drawn under the card
-   are wasted, and the ones that actually read are the arcs escaping past its edges. */
+/* 2 — the wallpaper: small HR objects tiled the way a messaging app tiles doodles.
+ *
+ * This replaced concentric rings and a dot grid, twice, because neither could be seen. A gradient at
+ * a few percent on a near-white page is nothing; line art at the same tint is legible, because the
+ * eye finds an edge where it cannot find a wash.
+ *
+ * The SVG is used as a MASK rather than an image, so the colour comes from the token below and one
+ * file serves both themes. It lives in /public rather than inline: twelve drawn objects as a data URI
+ * would be an unreadable wall of percent-encoding, and this way it is a file you can open and edit.
+ */
 .auth-bg::after {
   content: "";
   position: absolute;
-  inset: -10%;
-  background-image:
-    repeating-radial-gradient(
-      circle at 50% 46%,
-      transparent 0 63px,
-      rgba(var(--auth-ring), var(--auth-ring-alpha)) 63px 64px
-    ),
-    radial-gradient(circle, rgba(var(--auth-ring), var(--auth-dot-alpha)) 1px, transparent 1.5px);
-  background-size: auto, 24px 24px;
-  -webkit-mask-image: radial-gradient(circle at 50% 46%, transparent 12%, #000 30%, #000 58%, transparent 82%);
-  mask-image: radial-gradient(circle at 50% 46%, transparent 12%, #000 30%, #000 58%, transparent 82%);
+  inset: 0;
+  background-color: rgb(var(--auth-ring) / var(--auth-pattern-alpha));
+  -webkit-mask-image: url("/hr-pattern.svg");
+  mask-image: url("/hr-pattern.svg");
+  -webkit-mask-size: 240px 240px;
+  mask-size: 240px 240px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
 }
 
 /* The card is white on a near-white canvas. With a backdrop behind it, it needs its own lift or it
