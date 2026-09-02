@@ -105,29 +105,37 @@ body {
 
 /*
  * ---------------------------------------------------------------------------------------------
- * Signed-out backdrop
+ * Signed-out backdrop — login, register, invite, verify, reset.
  *
- * The login, register and reset screens were a card floating on an empty page. This gives them a
- * ground to sit on, built from the product's own idea rather than a generic dot grid: faint
- * concentric rings, like orbits, centred behind the card, with a fine dot field and a little grain
- * over the top so large flat areas do not band on cheap panels.
+ * These screens were a card floating on an empty page. The first attempt at this was too faint to
+ * see at all, which is worth recording: on a near-white canvas anything under roughly 8% alpha is
+ * simply not there. These values were set from a screenshot of the real page rather than from taste,
+ * and they err towards being visible.
  *
- * Everything is drawn in CSS from the theme tokens, so it costs no image request and follows light
- * and dark automatically. Deliberately faint — this is a surface for the form, and if you notice it
- * before you notice the password field it is too strong.
+ * Three layers, each with a different job:
+ *   1. colour washes    — stop the canvas being one flat tone
+ *   2. orbit rings      — the product's own motif, as a halo AROUND the card rather than behind it,
+ *                         because anything under the card is never seen
+ *   3. dot grid + grain — texture close up, and a guard against banding on cheap panels
+ *
+ * All CSS, from the theme tokens: no image request, no JavaScript, follows light and dark on its own.
  * ---------------------------------------------------------------------------------------------
  */
 :root {
   --auth-ring: 23 26 38;
-  --auth-ring-alpha: 0.055;
-  --auth-dot-alpha: 0.05;
-  --auth-grain-alpha: 0.035;
+  --auth-ring-alpha: 0.1;
+  --auth-dot-alpha: 0.075;
+  --auth-grain-alpha: 0.045;
+  --auth-violet: 0.22;
+  --auth-aqua: 0.16;
 }
 :root.dark {
   --auth-ring: 255 255 255;
-  --auth-ring-alpha: 0.045;
-  --auth-dot-alpha: 0.04;
-  --auth-grain-alpha: 0.05;
+  --auth-ring-alpha: 0.07;
+  --auth-dot-alpha: 0.05;
+  --auth-grain-alpha: 0.06;
+  --auth-violet: 0.26;
+  --auth-aqua: 0.16;
 }
 
 .auth-bg {
@@ -137,36 +145,53 @@ body {
   pointer-events: none;
 }
 
-/* The orbits, plus two soft colour washes so the rings are not the only thing happening. */
+/* 1 — the washes. Large, soft and off-centre, so the page has a light source instead of one flat
+   tone. Their own variables rather than the app-wide --glow-*, which are tuned for a page full of
+   content and are far too quiet behind a single card. */
 .auth-bg::before {
-  content: "";
-  position: absolute;
-  inset: -20%;
-  background-image:
-    repeating-radial-gradient(
-      circle at 50% 42%,
-      transparent 0 92px,
-      rgba(var(--auth-ring), var(--auth-ring-alpha)) 92px 93px
-    ),
-    radial-gradient(38rem 26rem at 82% 8%, rgba(124, 92, 255, var(--glow-violet)), transparent 62%),
-    radial-gradient(32rem 24rem at 12% 88%, rgba(34, 211, 238, var(--glow-aqua)), transparent 60%);
-  /* Fades the rings out at the edges so they end by dissolving rather than by being clipped. */
-  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 30%, transparent 72%);
-  mask-image: radial-gradient(circle at 50% 42%, #000 30%, transparent 72%);
-}
-
-/* The dot field, sitting over the rings. */
-.auth-bg::after {
   content: "";
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle, rgba(var(--auth-ring), var(--auth-dot-alpha)) 1px, transparent 1.4px);
-  background-size: 26px 26px;
+    radial-gradient(46rem 34rem at 84% -6%, rgba(124, 92, 255, var(--auth-violet)), transparent 64%),
+    radial-gradient(40rem 30rem at 8% 96%, rgba(34, 211, 238, var(--auth-aqua)), transparent 62%),
+    radial-gradient(34rem 26rem at 96% 88%, rgba(124, 92, 255, calc(var(--auth-violet) * 0.55)), transparent 60%);
 }
 
-/* Grain, as its own element because its strength is toned per theme and a pseudo-element is already
-   spoken for. Inline SVG, so no second network request. */
+/* 2 — the orbits and the dot grid. The mask opens a hole in the middle: rings drawn under the card
+   are wasted, and the ones that actually read are the arcs escaping past its edges. */
+.auth-bg::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background-image:
+    repeating-radial-gradient(
+      circle at 50% 46%,
+      transparent 0 63px,
+      rgba(var(--auth-ring), var(--auth-ring-alpha)) 63px 64px
+    ),
+    radial-gradient(circle, rgba(var(--auth-ring), var(--auth-dot-alpha)) 1px, transparent 1.5px);
+  background-size: auto, 24px 24px;
+  -webkit-mask-image: radial-gradient(circle at 50% 46%, transparent 12%, #000 30%, #000 58%, transparent 82%);
+  mask-image: radial-gradient(circle at 50% 46%, transparent 12%, #000 30%, #000 58%, transparent 82%);
+}
+
+/* The card is white on a near-white canvas. With a backdrop behind it, it needs its own lift or it
+   dissolves into the texture — the shadow is what says "this is the thing to use". */
+.auth-panel > * {
+  box-shadow:
+    0 1px 2px rgba(15, 18, 30, 0.04),
+    0 12px 32px -8px rgba(15, 18, 30, 0.1),
+    0 32px 64px -24px rgba(15, 18, 30, 0.14);
+}
+:root.dark .auth-panel > * {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 16px 40px -12px rgba(0, 0, 0, 0.45);
+}
+
+/* 3 — grain, as its own element because its strength is toned per theme and a pseudo-element is
+   already spoken for. Inline SVG, so no second network request. */
 .auth-grain {
   position: absolute;
   inset: 0;

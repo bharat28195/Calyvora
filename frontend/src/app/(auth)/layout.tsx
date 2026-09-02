@@ -26,7 +26,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <Link href="/" className="relative z-10 mb-8">
         <Wordmark className="scale-110" />
       </Link>
-      <div className="relative z-10 w-full max-w-md">{children}</div>
+      <div className="auth-panel relative z-10 w-full max-w-md">{children}</div>
     </div>
   );
 }
