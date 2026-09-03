@@ -107,40 +107,50 @@ body {
  * ---------------------------------------------------------------------------------------------
  * Signed-out backdrop — login, register, invite, verify, reset.
  *
- * The HR tools, in orbit around the card. The product is called Orbit; the backdrop should mean
- * something rather than be decoration that happens to sit behind a payroll product.
+ * Soft colour only. No lines, no tiles, no icons.
  *
- * The route here is worth recording, because three attempts failed for three different reasons:
- *   - gradient washes at a few percent were not subtle, they were *absent* — on a near-white canvas
- *     there is no edge for the eye to catch, so nothing appeared at all
- *   - a tiled mandala wallpaper with HR doodles was certainly visible, and looked like a wallpaper
- *     sample rather than business software
- *   - flat colour bands across the foot of the page were clean and completely anonymous — the same
- *     backdrop every SaaS login has, saying nothing about this product
+ * Four attempts got here, and the failures are the useful part:
+ *   - washes at 4-10% were not subtle, they were *absent*: on a near-white canvas there is no edge
+ *     for the eye to catch, so nothing appeared at all
+ *   - a tiled mandala with HR doodles was visible, and looked like a wallpaper sample
+ *   - flat bands across the foot were clean and anonymous
+ *   - orbit rings with HR tools riding them meant something, but drawn faint at that scale the rings
+ *     read as stray arcs and the ringed icons as stickers scattered on the page
  *
- * Three layers, each with a different job:
- *   1. wash  — a single quiet tint high on the page, so the canvas is not one flat tone
- *   2. orbit — three rings around the centre of the page with an HR tool riding each (auth-orbit.svg)
- *   3. grid  — a hairline rule grid, faded out behind the card so it never crowds the fields
+ * The pattern in all four: every fix for "too quiet" reached for *shapes*, and shapes behind a form
+ * are either too faint to justify themselves or too busy to sit behind a password box. So this stops
+ * drawing things. It is one large colour field — four wide, overlapping tints, a diffuse horizon at
+ * the foot, and a bloom of the page colour behind the card. Nothing has an outline, so nothing can
+ * look like a sticker, and nothing has a repeat, so nothing can look like graph paper.
  *
- * The orbit is a MASK over the brand gradient, not a coloured image: the SVG carries shape only, the
- * colour comes from the theme, and one file serves both themes instead of two that drift apart.
+ * The tints are strong enough to see (the first lesson) because they are the whole design now rather
+ * than a backing for line art. Every value is theme-tokened, so light and dark are tuned separately
+ * instead of one being an accident of the other.
  * ---------------------------------------------------------------------------------------------
  */
 :root {
-  /* Line art again, so this is back near the mandala's 0.13 rather than the 0.16 the solid bands
-     wanted — and higher still, because violet and aqua have less contrast on a near-white page than
-     the near-black ink did. This is the number to change if the rings read too strong. */
-  --auth-orbit-alpha: 0.34;
-  --auth-grid: 23 26 38;
-  --auth-grid-alpha: 0.05;
-  --auth-wash: 0.14;
+  /* Read together, not individually: these overlap, so the page tone is roughly their sum. Raising
+     one alone tips the whole field towards that hue. */
+  --auth-violet: 0.3;
+  --auth-aqua: 0.24;
+  --auth-indigo: 0.16;
+  --auth-rose: 0.11;
+  --auth-horizon: 0.16;
+  /* The bloom behind the card, in the page's own colour. Light needs a lot: the card is white on a
+     tinted field and the tints run right up to its edge without it. */
+  --auth-bloom: 244 246 250;
+  --auth-bloom-alpha: 0.82;
 }
 :root.dark {
-  --auth-orbit-alpha: 0.4;
-  --auth-grid: 255 255 255;
-  --auth-grid-alpha: 0.05;
-  --auth-wash: 0.18;
+  /* On near-black the same tints are glows rather than washes, and read much further, so the two
+     leading hues come down while the quieter two hold — otherwise the page goes flatly violet. */
+  --auth-violet: 0.26;
+  --auth-aqua: 0.2;
+  --auth-indigo: 0.18;
+  --auth-rose: 0.1;
+  --auth-horizon: 0.2;
+  --auth-bloom: 11 11 18;
+  --auth-bloom-alpha: 0.72;
 }
 
 .auth-bg {
@@ -150,62 +160,43 @@ body {
   pointer-events: none;
 }
 
-/* 1 — the wash. One tint, high and off to the side, so the page has a light source. Deliberately
-   milder than an earlier version's three overlapping washes, which read as a sunset behind a form. */
+/* 1 — the field. Four tints, each larger than the viewport and anchored off its edges, so the page
+   shows the middle of a big soft gradient rather than four visible blobs. Two hues would read as the
+   default purple-and-blue SaaS header; the indigo and the rose are what stop it. */
 .auth-bg::before {
   content: "";
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(52rem 34rem at 88% -12%, rgba(124, 92, 255, var(--auth-wash)), transparent 62%),
-    radial-gradient(40rem 28rem at 4% 4%, rgba(34, 211, 238, calc(var(--auth-wash) * 0.55)), transparent 58%);
+    radial-gradient(62rem 46rem at 86% -14%, rgba(124, 92, 255, var(--auth-violet)), transparent 68%),
+    radial-gradient(50rem 38rem at -6% -4%, rgba(34, 211, 238, var(--auth-aqua)), transparent 66%),
+    radial-gradient(56rem 44rem at 4% 104%, rgba(99, 102, 241, var(--auth-indigo)), transparent 66%),
+    radial-gradient(46rem 36rem at 100% 96%, rgba(236, 72, 153, var(--auth-rose)), transparent 64%);
 }
 
-/* 2 — the orbit system. Centred, not tiled: the composition is built around the card sitting at the
- * middle of it, and the node positions are checked against the card's footprint in the SVG itself.
- * Tiling or anchoring this to a corner would put a tool under the password field.
- *
- * The mask is sized in pixels rather than a percentage so the rings keep their proportions on any
- * viewport and simply run off the edges on a small one — stretching them would flatten the tilt that
- * makes them read as orbits. Below 640px it is scaled down, or the innermost ring falls outside the
- * screen entirely and the phone shows an empty page.
- */
+/* 2 — the horizon: one very wide, very shallow tint along the foot of the page, so the field has a
+   floor. Deliberately not the band shape it replaced — a band has an edge, and an edge is a line. */
 .auth-bg::after {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(112deg, rgba(124, 92, 255, var(--auth-orbit-alpha)) 0%, rgba(34, 211, 238, var(--auth-orbit-alpha)) 100%);
-  -webkit-mask-image: url("/auth-orbit.svg");
-  mask-image: url("/auth-orbit.svg");
-  -webkit-mask-size: 1700px 1200px;
-  mask-size: 1700px 1200px;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
+  background-image:
+    radial-gradient(140% 46% at 50% 118%, rgba(124, 92, 255, var(--auth-horizon)), transparent 70%);
 }
 
-@media (max-width: 640px) {
-  .auth-bg::after {
-    -webkit-mask-size: 1150px 812px;
-    mask-size: 1150px 812px;
-  }
-}
-
-/* 3 — the grid. A hairline rule every 32px, which is what makes the ground read as *drawn* rather
-   than empty, and gives the orbits something to sit on. Masked to fade out towards the middle: at full
-   strength behind the card the lines run straight through the input boxes and the form gets harder to
-   read, which is the exact failure the backdrop is supposed to avoid. */
-.auth-grid {
+/* 3 — the bloom. A pool of the page's own colour behind the card, so the form sits in calm rather
+   than on top of the strongest part of the field. This is what lets layer 1 be as strong as it is:
+   without it the tints would have to be dialled back until they vanished again, which is exactly the
+   first failure. */
+.auth-bloom {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(to right, rgb(var(--auth-grid) / var(--auth-grid-alpha)) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(var(--auth-grid) / var(--auth-grid-alpha)) 1px, transparent 1px);
-  background-size: 32px 32px;
-  -webkit-mask-image: radial-gradient(58% 46% at 50% 42%, transparent 0%, #000 100%);
-  mask-image: radial-gradient(58% 46% at 50% 42%, transparent 0%, #000 100%);
+    radial-gradient(38rem 32rem at 50% 46%,
+      rgb(var(--auth-bloom) / var(--auth-bloom-alpha)) 0%,
+      rgb(var(--auth-bloom) / calc(var(--auth-bloom-alpha) * 0.55)) 42%,
+      transparent 72%);
 }
 
 /* The card is white on a near-white canvas. With a backdrop behind it, it needs its own lift or it
