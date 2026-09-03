@@ -138,6 +138,21 @@ const WAKE_BACKOFF_MS = [1_000, 3_000, 6_000, 12_000, 20_000, 25_000];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * One request at a time waits out a cold start; the others wait on it.
+ *
+ * <p>Without this, retrying multiplies traffic exactly when the backend is least able to take it. A
+ * screen that loads three calls, each retrying up to six times, turns one cold start into twenty-one
+ * requests — enough to look like abuse to the rate limiter in front of the app, which then answers
+ * 429 to everything including the login the person is actually trying to use. The retry meant to
+ * hide a cold start would have caused a harder outage than the cold start.
+ *
+ * <p>So the first request to find the backend down does the waiting, and every other one parks on
+ * that same promise and re-tries once it resolves. Traffic during a wake-up becomes roughly one
+ * request per backoff step rather than one per step per caller.
+ */
+let wakeInProgress: Promise<void> | null = null;
+
+/**
  * Can this failure be retried safely, and is it worth retrying?
  *
  * <p>The signal is `unreachable` — a non-JSON error body. Every error the backend itself raises is
@@ -148,40 +163,74 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * <p>A JSON 500 is a genuine application error and is never retried — repeating it just fails again.
  * Neither is 429: retrying a rate limit is what extends it.
  */
-function shouldRetry(status: number, unreachable: boolean, attempt: number): boolean {
-  if (attempt >= WAKE_BACKOFF_MS.length) return false;
+function retryable(status: number, unreachable: boolean): boolean {
   return unreachable && (status === 500 || status === 502 || status === 503 || status === 504);
 }
 
+/** Whether the ladder has a step left for this attempt. */
+function shouldRetry(attempt: number): boolean {
+  return attempt < WAKE_BACKOFF_MS.length;
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    let res: Response;
-    try {
-      res = await fetch(`${BASE}${path}`, {
-        ...init,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          ...(init?.headers ?? {}),
-        },
-      });
-    } catch {
-      // The request never left, so nothing can have been applied — same reasoning as `unreachable`.
-      if (!shouldRetry(503, true, attempt)) throw new ApiError(infrastructureError(0));
-      await sleep(WAKE_BACKOFF_MS[attempt]);
-      continue;
-    }
+  // Whether this call is the one doing the waiting, and whether it is still entitled to retry.
+  let leading = false;
+  let mayRetry = true;
+  let releaseWake: () => void = () => {};
 
-    if (res.status === 204) return undefined as T;
-    const body = await res.json().catch(() => null);
-    if (res.ok) return body as T;
-
-    if (shouldRetry(res.status, body === null, attempt)) {
-      await sleep(WAKE_BACKOFF_MS[attempt]);
-      continue;
+  /** Wait before trying again, or return false if this call has run out of retries. */
+  async function backOff(attempt: number): Promise<boolean> {
+    if (!mayRetry) return false;
+    if (!leading && wakeInProgress) {
+      // Someone else is already waiting out the cold start. Sleep through THEIR whole wait rather
+      // than starting a second ladder, then spend a single attempt — by then the backend is usually
+      // up, so one request is all this call needs and all it costs.
+      await wakeInProgress;
+      mayRetry = false;
+      return true;
     }
-    throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    if (!shouldRetry(attempt)) return false;
+    if (!leading) {
+      leading = true;
+      wakeInProgress = new Promise<void>((resolve) => (releaseWake = resolve));
+    }
+    await sleep(WAKE_BACKOFF_MS[attempt]);
+    return true;
+  }
+
+  try {
+    for (let attempt = 0; ; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(`${BASE}${path}`, {
+          ...init,
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            ...(init?.headers ?? {}),
+          },
+        });
+      } catch {
+        // The request never left, so nothing can have been applied — same reasoning as `unreachable`.
+        if (!(await backOff(attempt))) throw new ApiError(infrastructureError(0));
+        continue;
+      }
+
+      if (res.status === 204) return undefined as T;
+      const body = await res.json().catch(() => null);
+      if (res.ok) return body as T;
+
+      if (retryable(res.status, body === null) && (await backOff(attempt))) continue;
+      throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    }
+  } finally {
+    // Release the followers whether this succeeded or gave up: they are waiting on the outcome of
+    // the wait, not on success. Not releasing here would park every other call until its own timeout.
+    if (leading) {
+      wakeInProgress = null;
+      releaseWake();
+    }
   }
 }
 

@@ -102,6 +102,41 @@ describe("api transport: retrying a backend that is still waking up", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not multiply traffic when several calls hit a sleeping backend at once", async () => {
+    // The failure this prevents, and the reason it matters more than the cold start itself: a screen
+    // loading three calls, each running its own six-step ladder, turns one cold start into 21
+    // requests. That reads as abuse to the rate limiter in front of the app, which then answers 429
+    // to everything — including the login the person is actually trying to use. The retry meant to
+    // hide a cold start would have caused a harder outage than the cold start.
+    const api = await loadApi();
+    fetchMock.mockResolvedValue(unreachable());
+
+    const all = Promise.allSettled([api.api.me(), api.api.me(), api.api.me()]);
+    await vi.runAllTimersAsync();
+    const results = await all;
+
+    // One caller works the ladder (7 attempts); the other two sleep through it and spend a single
+    // attempt each. Three independent ladders would be 3 x 7 = 21.
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(12);
+    expect(results.every((r) => r.status === "rejected")).toBe(true);
+  });
+
+  it("a follower still gets its answer once the backend comes up", async () => {
+    // Sleeping through someone else's wait must not mean giving up: the whole point is that by the
+    // time the leader has finished waiting, one more attempt is all anybody needs.
+    const api = await loadApi();
+    let calls = 0;
+    fetchMock.mockImplementation(() => {
+      calls += 1;
+      return Promise.resolve(calls <= 3 ? unreachable() : json(200, { ok: true }));
+    });
+
+    const all = Promise.all([api.api.me(), api.api.me(), api.api.me()]);
+    await vi.runAllTimersAsync();
+
+    await expect(all).resolves.toEqual([{ ok: true }, { ok: true }, { ok: true }]);
+  });
+
   it("passes a 401 straight through, so a real logout is still a logout", async () => {
     const api = await loadApi();
     fetchMock.mockResolvedValue(json(401, {

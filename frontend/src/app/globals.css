@@ -181,8 +181,8 @@ body {
   background-color: rgb(var(--auth-ring) / var(--auth-pattern-alpha));
   -webkit-mask-image: url("/hr-pattern.svg");
   mask-image: url("/hr-pattern.svg");
-  -webkit-mask-size: 320px 320px;
-  mask-size: 320px 320px;
+  -webkit-mask-size: 400px 400px;
+  mask-size: 400px 400px;
   -webkit-mask-repeat: repeat;
   mask-repeat: repeat;
 }
