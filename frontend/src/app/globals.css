@@ -140,6 +140,7 @@ body {
      tinted field and the tints run right up to its edge without it. */
   --auth-bloom: 244 246 250;
   --auth-bloom-alpha: 0.82;
+  --auth-texture-alpha: 0.5;
 }
 :root.dark {
   /* On near-black the same tints are glows rather than washes, and read much further, so the two
@@ -151,6 +152,8 @@ body {
   --auth-horizon: 0.2;
   --auth-bloom: 11 11 18;
   --auth-bloom-alpha: 0.72;
+  /* Higher on dark: soft-light is the gentler blend, so it needs more to show at all. */
+  --auth-texture-alpha: 0.6;
 }
 
 .auth-bg {
@@ -197,6 +200,34 @@ body {
       rgb(var(--auth-bloom) / var(--auth-bloom-alpha)) 0%,
       rgb(var(--auth-bloom) / calc(var(--auth-bloom-alpha) * 0.55)) 42%,
       transparent 72%);
+}
+
+/* 4 — texture. The field above is pure gradient, which is smooth to the point of looking like an
+ * empty div, and on a cheap panel a gradient that wide also bands into visible steps. Two grains fix
+ * both, and they are texture rather than pattern: noise has no motif to recognise and no tile edge to
+ * spot, which is the whole reason it can be used here after four attempts at drawing something failed.
+ *
+ *   - the mottle is coarse and slow, and does the real work: it breaks the gradient into cloud so the
+ *     colour looks mixed rather than computed
+ *   - the grain is fine and fast, and sits on top for tooth, the way paper stock reads up close
+ *
+ * Both are inline SVG turbulence, so they cost no network request, and both blend rather than paint:
+ * overlay on light so the texture rides the colour beneath it, soft-light on dark because overlay on
+ * near-black crushes to noise-on-black speckle instead.
+ */
+.auth-texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--auth-texture-alpha);
+  mix-blend-mode: overlay;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Cfilter id=%27g%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27180%27 height=%27180%27 filter=%27url(%23g)%27/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27700%27 height=%27700%27%3E%3Cfilter id=%27m%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.014%27 numOctaves=%273%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27700%27 height=%27700%27 filter=%27url(%23m)%27/%3E%3C/svg%3E");
+  background-size: 180px 180px, 700px 700px;
+}
+:root.dark .auth-texture {
+  mix-blend-mode: soft-light;
 }
 
 /* The card is white on a near-white canvas. With a backdrop behind it, it needs its own lift or it

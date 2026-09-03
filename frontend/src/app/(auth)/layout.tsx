@@ -21,6 +21,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-12">
       <div className="auth-bg" aria-hidden="true" />
       <div className="auth-bloom" aria-hidden="true" />
+      <div className="auth-texture" aria-hidden="true" />
 
       <div className="absolute right-5 top-5 z-10">
         <ThemeToggle />
