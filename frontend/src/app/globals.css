@@ -107,38 +107,39 @@ body {
  * ---------------------------------------------------------------------------------------------
  * Signed-out backdrop — login, register, invite, verify, reset.
  *
- * These screens were a card floating on an empty page. Two attempts at fixing it with gradients —
- * concentric rings, then rings plus a dot grid — could not be seen at all, which is worth recording:
- * on a near-white canvas a wash at a few percent is not subtle, it is absent, because there is no
- * edge for the eye to catch. Line art at the same tint reads perfectly well. Every value here was set
- * from a screenshot of the real page rather than from taste.
+ * Third attempt, and the reason for the rewrite is worth keeping. The first two were washes at a few
+ * percent, which on a near-white canvas are not subtle but *absent* — there is no edge for the eye to
+ * catch. The fix for that was line art (mandala medallions with HR objects between them, tiled like a
+ * messaging app), which was certainly visible, but it made a payroll product look like a wallpaper
+ * sample. Business software does not put a doodle field behind the password box.
+ *
+ * So this follows the convention the category actually uses — Zoho, Freshworks and the rest all do the
+ * same thing: a plain light ground, one soft colour band sweeping across the bottom, and nothing else
+ * competing with the form. Flat, geometric, no texture.
  *
  * Three layers, each with a different job:
- *   1. colour washes — stop the canvas being one flat tone
- *   2. wallpaper     — mandala medallions with HR objects between them (public/hr-pattern.svg),
- *                      tiled the way a messaging app tiles doodles
- *   3. grain         — texture close up, and a guard against banding on cheap panels
+ *   1. wash  — a single quiet tint high on the page, so the canvas is not one flat tone
+ *   2. bands — two smooth curves across the bottom, in the brand gradient rather than grey
+ *   3. grid  — a hairline rule grid, faded out behind the card so it never crowds the fields
  *
- * Theme-driven throughout: the wallpaper is a mask, so its colour comes from the token below and one
- * SVG serves both themes rather than two copies that drift apart.
+ * The bands are a MASK over a gradient, not a coloured image: the curve is shape only, the colour
+ * comes from the tokens, and one file serves both themes instead of two that drift apart.
  * ---------------------------------------------------------------------------------------------
  */
 :root {
-  --auth-ring: 23 26 38;
-  /* The wallpaper tint. Two earlier passes at 4.5% and 10% were invisible on this canvas; line art
-     needs more than a gradient does, and this is the number to change if it reads too strong. */
-  --auth-pattern-alpha: 0.13;
-  --auth-grain-alpha: 0.045;
-  --auth-violet: 0.22;
-  --auth-aqua: 0.16;
+  /* Solid bands, unlike the old line art, so this number is an order of magnitude smaller than the
+     0.13 the mandalas needed. Anything above ~0.1 stops being a backdrop and becomes a graphic. */
+  --auth-band-alpha: 0.16;
+  --auth-grid: 23 26 38;
+  --auth-grid-alpha: 0.05;
+  --auth-wash: 0.14;
 }
 :root.dark {
-  --auth-ring: 255 255 255;
-  /* Lower on dark: white line art on near-black carries much further than dark-on-white. */
-  --auth-pattern-alpha: 0.085;
-  --auth-grain-alpha: 0.06;
-  --auth-violet: 0.26;
-  --auth-aqua: 0.16;
+  /* Lifted on dark: the same band over near-black has far less contrast to work with. */
+  --auth-band-alpha: 0.26;
+  --auth-grid: 255 255 255;
+  --auth-grid-alpha: 0.05;
+  --auth-wash: 0.18;
 }
 
 .auth-bg {
@@ -148,47 +149,67 @@ body {
   pointer-events: none;
 }
 
-/* 1 — the washes. Large, soft and off-centre, so the page has a light source instead of one flat
-   tone. Their own variables rather than the app-wide --glow-*, which are tuned for a page full of
-   content and are far too quiet behind a single card. */
+/* 1 — the wash. One tint, high and off to the side, so the page has a light source. Deliberately
+   milder than the old backdrop's three overlapping washes, which read as a sunset behind a form. */
 .auth-bg::before {
   content: "";
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(46rem 34rem at 84% -6%, rgba(124, 92, 255, var(--auth-violet)), transparent 64%),
-    radial-gradient(40rem 30rem at 8% 96%, rgba(34, 211, 238, var(--auth-aqua)), transparent 62%),
-    radial-gradient(34rem 26rem at 96% 88%, rgba(124, 92, 255, calc(var(--auth-violet) * 0.55)), transparent 60%);
+    radial-gradient(52rem 34rem at 88% -12%, rgba(124, 92, 255, var(--auth-wash)), transparent 62%),
+    radial-gradient(40rem 28rem at 4% 4%, rgba(34, 211, 238, calc(var(--auth-wash) * 0.55)), transparent 58%);
 }
 
-/* 2 — the wallpaper: mandala medallions, with HR objects in the gaps between them.
+/* 2 — the bands: two curves sweeping across the foot of the page, the front one stronger.
  *
- * This replaced concentric rings and a dot grid, twice, because neither could be seen. A gradient at
- * a few percent on a near-white page is nothing; line art at the same tint is legible, because the
- * eye finds an edge where it cannot find a wash.
+ * The SVG carries the shape only; both bands are filled black and the *alpha* difference between them
+ * (1.0 and 0.5) is what makes the back one recede once it is used as a mask. The colour underneath is
+ * the brand gradient, so the bands are violet-to-aqua rather than grey.
  *
- * The SVG is used as a MASK rather than an image, so the colour comes from the token below and one
- * file serves both themes. It lives in /public rather than inline: twelve drawn objects as a data URI
- * would be an unreadable wall of percent-encoding, and this way it is a file you can open and edit.
- *
- * The tile interlocks across its own seam (a medallion sits on each corner as well as the centre), so
- * mask-size must stay square and must match the SVG viewBox, or the corner quarters stop meeting.
+ * Anchored to the bottom and never repeated, so there is no seam to get wrong. On a narrow phone
+ * `100% auto` would squash the curves into a thin strip, so below 640px the mask is given a fixed
+ * width wider than the viewport and allowed to overhang instead.
  */
 .auth-bg::after {
   content: "";
   position: absolute;
   inset: 0;
-  background-color: rgb(var(--auth-ring) / var(--auth-pattern-alpha));
-  -webkit-mask-image: url("/hr-pattern.svg");
-  mask-image: url("/hr-pattern.svg");
-  -webkit-mask-size: 400px 400px;
-  mask-size: 400px 400px;
-  -webkit-mask-repeat: repeat;
-  mask-repeat: repeat;
+  background-image: linear-gradient(104deg, rgba(124, 92, 255, var(--auth-band-alpha)) 0%, rgba(34, 211, 238, var(--auth-band-alpha)) 100%);
+  -webkit-mask-image: url("/auth-bands.svg");
+  mask-image: url("/auth-bands.svg");
+  -webkit-mask-size: 100% auto;
+  mask-size: 100% auto;
+  -webkit-mask-position: bottom center;
+  mask-position: bottom center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+@media (max-width: 640px) {
+  .auth-bg::after {
+    -webkit-mask-size: 900px auto;
+    mask-size: 900px auto;
+  }
+}
+
+/* 3 — the grid. A hairline rule every 32px, which is what makes the ground read as *drawn* rather
+   than empty. It is masked to fade out towards the middle: at full strength behind the card the lines
+   run straight through the input boxes and the form gets harder to read, which is the exact failure
+   the backdrop is supposed to avoid. */
+.auth-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(var(--auth-grid) / var(--auth-grid-alpha)) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--auth-grid) / var(--auth-grid-alpha)) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(58% 46% at 50% 42%, transparent 0%, #000 100%);
+  mask-image: radial-gradient(58% 46% at 50% 42%, transparent 0%, #000 100%);
 }
 
 /* The card is white on a near-white canvas. With a backdrop behind it, it needs its own lift or it
-   dissolves into the texture — the shadow is what says "this is the thing to use". */
+   dissolves into the ground — the shadow is what says "this is the thing to use". */
 .auth-panel > * {
   box-shadow:
     0 1px 2px rgba(15, 18, 30, 0.04),
@@ -199,16 +220,4 @@ body {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.3),
     0 16px 40px -12px rgba(0, 0, 0, 0.45);
-}
-
-/* 3 — grain, as its own element because its strength is toned per theme and a pseudo-element is
-   already spoken for. Inline SVG, so no second network request. */
-.auth-grain {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: var(--auth-grain-alpha);
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-  mix-blend-mode: overlay;
 }

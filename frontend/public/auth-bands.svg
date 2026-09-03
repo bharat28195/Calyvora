@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="420" viewBox="0 0 1440 420" preserveAspectRatio="none">
+  <!--
+    The bands across the foot of the signed-out screens.
+
+    Used as a CSS MASK, not an image (see .auth-bg::after in globals.css): the colour comes from the
+    brand gradient underneath, so one file serves light and dark. Only the ALPHA matters here, which
+    is why both bands are plain black and the back one is drawn at half opacity — that difference is
+    what makes it sit behind the front one once it is masking a gradient.
+
+    preserveAspectRatio="none" because the mask is sized `100% auto`: the curves are meant to stretch
+    with the viewport, and a wave does not look wrong when it is stretched.
+
+    Both paths close to the bottom edge (L1440 420 / L0 420) so the shape is a filled region, not a
+    stroke. Leave those out and the mask becomes an empty outline and nothing renders at all.
+  -->
+  <path d="M0 196 C 224 138 436 244 700 210 C 944 178 1212 122 1440 172 L1440 420 L0 420 Z" fill="black" fill-opacity="0.5"/>
+  <path d="M0 284 C 264 226 472 328 764 292 C 1016 262 1244 232 1440 266 L1440 420 L0 420 Z" fill="black"/>
+</svg>
