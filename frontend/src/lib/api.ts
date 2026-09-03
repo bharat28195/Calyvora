@@ -245,11 +245,23 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
  * screen could say: the three causes need three different responses from the person reading it, and
  * two of them just mean "wait". Naming the cause is the difference between waiting a minute and
  * concluding the account is broken.
+ *
+ * <p>THE 429 IS NOT THE PERSON'S FAULT, which the wording here got wrong for a while. It said "Too
+ * many attempts from this network", i.e. you have been clicking too much — and it appeared on
+ * first-time logins by people who had clicked exactly once. The real source, from the response
+ * itself:
+ *
+ * <pre>  x-render-routing: hibernate-rate-limited</pre>
+ *
+ * The host hibernates an idle free service and then limits how often it may be woken. It is per
+ * service, not per client, and it fires on the FIRST request after idleness rather than after many —
+ * so the honest message is that the server is starting up. Retrying is still the wrong response (see
+ * `retryable`, which excludes 429): the wake limiter wants quiet, not persistence.
  */
 function infrastructureError(status: number): ApiErrorBody {
   const message =
     status === 429
-      ? "Too many attempts from this network. Wait a minute, then try again."
+      ? "The server was idle and is starting up. Give it a minute, then try again."
       : "The server could not be reached — it may still be starting up. Try again in a moment.";
   return { timestamp: "", status, code: "INFRASTRUCTURE", message };
 }

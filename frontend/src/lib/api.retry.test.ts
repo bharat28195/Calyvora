@@ -73,14 +73,18 @@ describe("api transport: retrying a backend that is still waking up", () => {
     expect(fetchMock).toHaveBeenCalledTimes(7);
   });
 
-  it("does not retry a rate limit — repeating it is what extends it", async () => {
+  it("does not retry a rate limit, and blames the server rather than the person", async () => {
+    // The 429 here is the host's `hibernate-rate-limited`: an idle free service may only be woken so
+    // often. It arrives on someone's FIRST click, so wording it as "too many attempts from this
+    // network" accused a first-time visitor of hammering the login screen. The message must describe
+    // a server starting up; anything about the caller's own behaviour is factually wrong.
     const api = await loadApi();
     fetchMock.mockResolvedValue({ status: 429, ok: false, json: () => Promise.reject(new Error("not json")) });
 
     const promise = api.api.me();
     const assertion = expect(promise).rejects.toMatchObject({
       code: "INFRASTRUCTURE",
-      message: expect.stringContaining("Too many attempts"),
+      message: expect.stringContaining("starting up"),
     });
     await vi.runAllTimersAsync();
     await assertion;
