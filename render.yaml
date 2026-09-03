@@ -5,6 +5,12 @@
 # Free tier notes: web services sleep after ~15 min idle (first request after is slow), and the
 # free Postgres is removed after 30 days. Bump plans to "starter" for always-on / persistent.
 
+# SUPERSEDED by Neon — see the DB_URL block on the backend service. This is left defined only so a
+# blueprint sync does not delete the old database out from under a deployment that is still pointing
+# at it. Once the Neon move is verified, delete this block and remove the database in the dashboard.
+#
+# Why it is being retired: Render removes a free Postgres 30 days after creation. Not sleeps —
+# removes. Everything else on the free tier degrades; this one deletes.
 databases:
   - name: calyvora-db
     plan: free
@@ -14,6 +20,9 @@ databases:
     databaseName: calyvora
     user: calyvora
     # Render's Postgres role is NOSUPERUSER without BYPASSRLS -> tenant Row-Level Security works.
+    # Neon's default role is a member of neon_superuser and MAY hold BYPASSRLS, which would ignore
+    # every tenant policy silently. Verify after the move:
+    #   select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;
 
 services:
   # ---- Backend: Spring Boot (Docker) ----
@@ -28,16 +37,33 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: staging
-      - key: DB_HOST
-        fromDatabase: { name: calyvora-db, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: calyvora-db, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: calyvora-db, property: database }
+      # Database: Neon, not the Render one below.
+      #
+      # Render's free Postgres is DELETED 30 days after it is created, which makes it unusable for
+      # anything you intend to keep. Neon's free tier has no expiry and upgrades in place, so moving
+      # is a one-time cost paid now rather than an emergency later.
+      #
+      # Set all three in the dashboard (sync: false = never in this file, it is a password).
+      #
+      #   DB_URL       jdbc:postgresql://<host>/<database>?sslmode=require
+      #   DB_USERNAME  the Neon role
+      #   DB_PASSWORD  its password
+      #
+      # USE NEON'S DIRECT HOSTNAME, NOT THE ONE ENDING IN `-pooler`. The pooler is PgBouncer in
+      # transaction mode, and this app binds its tenant with a SESSION-scoped setting
+      # (TenantAwareDataSource: set_config('calyvora.company_id', ?, false)). Under transaction
+      # pooling that setting and the query relying on it can land on different server connections —
+      # best case a screen shows nothing, worst case one tenant reads another's rows. Flyway also
+      # needs a direct connection for its advisory lock.
+      #
+      # Region: pick the Neon region matching this service (Singapore, ap-southeast-1). Cross-region
+      # costs ~50ms on EVERY query, and one page makes a dozen.
+      - key: DB_URL
+        sync: false
       - key: DB_USERNAME
-        fromDatabase: { name: calyvora-db, property: user }
+        sync: false
       - key: DB_PASSWORD
-        fromDatabase: { name: calyvora-db, property: password }
+        sync: false
       # Where the app tells users to go: invitation / email-verification links, and the origin
       # allowed to call the API cross-site. Without these they default to localhost:3000 and every
       # invite email points at the recipient's own machine.
