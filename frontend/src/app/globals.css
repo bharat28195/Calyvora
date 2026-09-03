@@ -107,36 +107,37 @@ body {
  * ---------------------------------------------------------------------------------------------
  * Signed-out backdrop — login, register, invite, verify, reset.
  *
- * Third attempt, and the reason for the rewrite is worth keeping. The first two were washes at a few
- * percent, which on a near-white canvas are not subtle but *absent* — there is no edge for the eye to
- * catch. The fix for that was line art (mandala medallions with HR objects between them, tiled like a
- * messaging app), which was certainly visible, but it made a payroll product look like a wallpaper
- * sample. Business software does not put a doodle field behind the password box.
+ * The HR tools, in orbit around the card. The product is called Orbit; the backdrop should mean
+ * something rather than be decoration that happens to sit behind a payroll product.
  *
- * So this follows the convention the category actually uses — Zoho, Freshworks and the rest all do the
- * same thing: a plain light ground, one soft colour band sweeping across the bottom, and nothing else
- * competing with the form. Flat, geometric, no texture.
+ * The route here is worth recording, because three attempts failed for three different reasons:
+ *   - gradient washes at a few percent were not subtle, they were *absent* — on a near-white canvas
+ *     there is no edge for the eye to catch, so nothing appeared at all
+ *   - a tiled mandala wallpaper with HR doodles was certainly visible, and looked like a wallpaper
+ *     sample rather than business software
+ *   - flat colour bands across the foot of the page were clean and completely anonymous — the same
+ *     backdrop every SaaS login has, saying nothing about this product
  *
  * Three layers, each with a different job:
  *   1. wash  — a single quiet tint high on the page, so the canvas is not one flat tone
- *   2. bands — two smooth curves across the bottom, in the brand gradient rather than grey
+ *   2. orbit — three rings around the centre of the page with an HR tool riding each (auth-orbit.svg)
  *   3. grid  — a hairline rule grid, faded out behind the card so it never crowds the fields
  *
- * The bands are a MASK over a gradient, not a coloured image: the curve is shape only, the colour
- * comes from the tokens, and one file serves both themes instead of two that drift apart.
+ * The orbit is a MASK over the brand gradient, not a coloured image: the SVG carries shape only, the
+ * colour comes from the theme, and one file serves both themes instead of two that drift apart.
  * ---------------------------------------------------------------------------------------------
  */
 :root {
-  /* Solid bands, unlike the old line art, so this number is an order of magnitude smaller than the
-     0.13 the mandalas needed. Anything above ~0.1 stops being a backdrop and becomes a graphic. */
-  --auth-band-alpha: 0.16;
+  /* Line art again, so this is back near the mandala's 0.13 rather than the 0.16 the solid bands
+     wanted — and higher still, because violet and aqua have less contrast on a near-white page than
+     the near-black ink did. This is the number to change if the rings read too strong. */
+  --auth-orbit-alpha: 0.34;
   --auth-grid: 23 26 38;
   --auth-grid-alpha: 0.05;
   --auth-wash: 0.14;
 }
 :root.dark {
-  /* Lifted on dark: the same band over near-black has far less contrast to work with. */
-  --auth-band-alpha: 0.26;
+  --auth-orbit-alpha: 0.4;
   --auth-grid: 255 255 255;
   --auth-grid-alpha: 0.05;
   --auth-wash: 0.18;
@@ -150,7 +151,7 @@ body {
 }
 
 /* 1 — the wash. One tint, high and off to the side, so the page has a light source. Deliberately
-   milder than the old backdrop's three overlapping washes, which read as a sunset behind a form. */
+   milder than an earlier version's three overlapping washes, which read as a sunset behind a form. */
 .auth-bg::before {
   content: "";
   position: absolute;
@@ -160,42 +161,41 @@ body {
     radial-gradient(40rem 28rem at 4% 4%, rgba(34, 211, 238, calc(var(--auth-wash) * 0.55)), transparent 58%);
 }
 
-/* 2 — the bands: two curves sweeping across the foot of the page, the front one stronger.
+/* 2 — the orbit system. Centred, not tiled: the composition is built around the card sitting at the
+ * middle of it, and the node positions are checked against the card's footprint in the SVG itself.
+ * Tiling or anchoring this to a corner would put a tool under the password field.
  *
- * The SVG carries the shape only; both bands are filled black and the *alpha* difference between them
- * (1.0 and 0.5) is what makes the back one recede once it is used as a mask. The colour underneath is
- * the brand gradient, so the bands are violet-to-aqua rather than grey.
- *
- * Anchored to the bottom and never repeated, so there is no seam to get wrong. On a narrow phone
- * `100% auto` would squash the curves into a thin strip, so below 640px the mask is given a fixed
- * width wider than the viewport and allowed to overhang instead.
+ * The mask is sized in pixels rather than a percentage so the rings keep their proportions on any
+ * viewport and simply run off the edges on a small one — stretching them would flatten the tilt that
+ * makes them read as orbits. Below 640px it is scaled down, or the innermost ring falls outside the
+ * screen entirely and the phone shows an empty page.
  */
 .auth-bg::after {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(104deg, rgba(124, 92, 255, var(--auth-band-alpha)) 0%, rgba(34, 211, 238, var(--auth-band-alpha)) 100%);
-  -webkit-mask-image: url("/auth-bands.svg");
-  mask-image: url("/auth-bands.svg");
-  -webkit-mask-size: 100% auto;
-  mask-size: 100% auto;
-  -webkit-mask-position: bottom center;
-  mask-position: bottom center;
+  background-image: linear-gradient(112deg, rgba(124, 92, 255, var(--auth-orbit-alpha)) 0%, rgba(34, 211, 238, var(--auth-orbit-alpha)) 100%);
+  -webkit-mask-image: url("/auth-orbit.svg");
+  mask-image: url("/auth-orbit.svg");
+  -webkit-mask-size: 1700px 1200px;
+  mask-size: 1700px 1200px;
+  -webkit-mask-position: center;
+  mask-position: center;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
 
 @media (max-width: 640px) {
   .auth-bg::after {
-    -webkit-mask-size: 900px auto;
-    mask-size: 900px auto;
+    -webkit-mask-size: 1150px 812px;
+    mask-size: 1150px 812px;
   }
 }
 
 /* 3 — the grid. A hairline rule every 32px, which is what makes the ground read as *drawn* rather
-   than empty. It is masked to fade out towards the middle: at full strength behind the card the lines
-   run straight through the input boxes and the form gets harder to read, which is the exact failure
-   the backdrop is supposed to avoid. */
+   than empty, and gives the orbits something to sit on. Masked to fade out towards the middle: at full
+   strength behind the card the lines run straight through the input boxes and the form gets harder to
+   read, which is the exact failure the backdrop is supposed to avoid. */
 .auth-grid {
   position: absolute;
   inset: 0;

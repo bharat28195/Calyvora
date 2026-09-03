@@ -6,10 +6,10 @@ import { Wordmark } from "@/components/layout/wordmark";
  * The signed-out shell: login, register, invitation, verification and password reset.
  *
  * <p>These screens were a card centred on an empty page — the first thing anyone sees of Orbit, and
- * it looked unfinished. The backdrop gives the card a ground to sit on: a soft colour band sweeping
- * across the foot of the page and a hairline grid that fades out behind the card. It follows the
- * convention business software actually uses, after an earlier attempt at a tiled mandala wallpaper
- * turned out to look like a wallpaper sample rather than a payroll product.
+ * it looked unfinished. The backdrop now says what the product is: the HR tools — people, attendance,
+ * payroll, leave, documents, reports, hiring — in orbit around the card, on a hairline grid that fades
+ * out behind it. The node positions are checked against this layout, so changing the card width or the
+ * wordmark above it means re-running the placement check in auth-orbit.svg.
  *
  * <p>The colours all come from the theme tokens (see globals.css), so it follows light and dark on
  * its own. Everything here is `aria-hidden` and `pointer-events: none` and sits under the content, so
