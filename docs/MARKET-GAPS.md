@@ -36,7 +36,7 @@ Verified by exercising create, update and delete against the live deployment —
 | Core HR & org | People, departments, managers, onboarding, exits + checklist | ✅ | ✅ |
 | Attendance | Check-in/out, regularisation with approval, day view | Nearly | Nearly |
 | Shifts | Shift definitions, roster assignment | ✅ | ✅ |
-| Leave | 4 types, balances, approval flow | Nearly | ❌ |
+| Leave | 4 types, balances, approval flow scoped to a manager's own reports | Nearly | ❌ |
 | Payroll structure | Configurable components, payslips, real figures | Structure only | Structure only |
 | Statutory fields | PF, UAN, ESI, PT state, PAN modelled | Stored, not computed | Wrong country |
 | Expenses | Claim → approve → reimburse | ✅ | ✅ |
@@ -77,9 +77,11 @@ built almost entirely around this one step.
 notice-period recovery, leave encashment, gratuity after five years, pending reimbursements, and a
 settlement statement. Every departure currently ends in a spreadsheet.
 
-**5. Leave policy engine.** Four fixed types with a flat allowance is a demo, not a policy. Expected:
-monthly accrual, carry-forward with caps, encashment, comp-off against weekend work, sandwich-leave
-rules, probation restrictions.
+**5. Leave policy engine.** Manager approval landed on 5 September 2026 — a manager now sees and
+decides their own reports, HR and admins still see everything. The *policy* engine is still missing,
+and that is the part buyers ask about: four fixed types with a flat allowance is a demo, not a policy.
+Expected are monthly accrual, carry-forward with caps, encashment, comp-off against weekend work,
+sandwich-leave rules and probation restrictions.
 
 **6. Biometric device integration.** ESSL and ZKTeco machines are on the wall of most Indian SMB
 offices. "Our attendance comes from the machine at the door" is an early question, and a web check-in

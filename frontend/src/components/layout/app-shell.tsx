@@ -7,7 +7,7 @@ import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
-  CalendarClock, Building2, LifeBuoy, DoorOpen,
+  CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
@@ -69,6 +69,11 @@ const NAV: NavItem[] = [
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
   { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY },
   { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: MANAGES },
+  // Same reasoning as Exits below, and the same page HR reaches under People — a manager approving
+  // their team's leave would never find it nested inside a section their role cannot open. MANAGER
+  // only, rather than MANAGES, so HR and admins are not shown the same screen twice; the API returns
+  // the whole company to them and only their own reports to a manager.
+  { href: "/people/time-off", label: "Leave approvals", icon: CalendarCheck, roles: ["MANAGER"] },
   // Top-level rather than under People, which is HR-only: exit clearance is a manager's job, and
   // they would never see it nested under a section their role cannot open.
   { href: "/people/exits", label: "Exits", icon: DoorOpen, roles: MANAGES },

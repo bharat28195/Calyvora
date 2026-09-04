@@ -940,6 +940,31 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   sites; `calyvora.net` points at the `.in` copies so the two cannot drift._ Field list and rationale
   in [docs/LEGAL.md](docs/LEGAL.md).
 
+### PD-28 · 2026-09-05 · Managers approve their own team's leave
+- **Context:** listing and deciding leave were restricted to OWNER/ADMIN/HR, so a manager could see
+  their team but could not action a single request. Every holiday in the company funnelled through HR.
+  It surfaced in the role-by-role sweep as a `403` and was recorded as a product decision rather than a
+  defect — but the product was already contradicting itself: attendance regularizations have always
+  been scoped to the caller's reports, so **the same manager could approve a missed punch but not a
+  day off.**
+- **Built by copying, not inventing.** `RegularizationService.pending()` already had the shape — HR and
+  admins see everything, everyone else sees their own reports. Leave now uses the same rule, so there
+  is one idea in the codebase rather than two that drift.
+- **The half that mattered more than the feature.** Adding MANAGER to the role check alone would have
+  let *any* manager approve *any* employee's leave anywhere in the company — a wider hole than the one
+  being closed, and invisible in a demo with a single team, because Spring's role expressions cannot
+  say "and only for their own reports". The scoping is enforced in the service, and
+  `managerB_cannot_approve_managerAs_report` is the test that would have caught it.
+- **Two things found on the way.** The nav gated the approvals screen behind People, which is HR-only,
+  so a manager had no route to it — fixed the way Exits and Regularizations already were, as a
+  top-level item. And the screen itself gated its Approvals block on Owner/Admin, meaning **HR could
+  approve leave through the API and never saw the queue on the page** — the one role whose job it is.
+  Both were pre-existing; adding a fourth role is what exposed them.
+- **Final outcome:** _7 new tests in `LeaveManagerApprovalTest`, the 5 existing leave tests still
+  green._ Recorded as closed in [docs/GO-LIVE.md](docs/GO-LIVE.md). The leave **policy** engine —
+  accrual, carry-forward, encashment, comp-off — is still missing and is the part buyers actually ask
+  about; see [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md).
+
 ---
 
 ## 4. Architecture Decision Log

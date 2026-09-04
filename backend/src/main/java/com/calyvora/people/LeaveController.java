@@ -47,21 +47,29 @@ public class LeaveController {
         return leaveService.balance(principal);
     }
 
-    /** Approvals inbox — all company requests (admin). */
+    /**
+     * Approvals inbox — the whole company for HR and admins, a manager's own reports for a manager.
+     *
+     * <p>MANAGER is on this list, and on approve/reject below, because a manager who cannot decide
+     * their team's leave is not a manager: every holiday in the company funnelled through HR. The role
+     * check only decides who may reach the endpoint at all; <em>which</em> requests a manager may see
+     * and decide is enforced in {@link LeaveService}, because Spring's role expressions cannot express
+     * "and only for their own reports".
+     */
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
-    public List<LeaveRequestResponse> all() {
-        return leaveService.listAll();
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
+    public List<LeaveRequestResponse> all(@CurrentUser AuthPrincipal principal) {
+        return leaveService.listForApprover(principal);
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
     public LeaveRequestResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.approve(id, principal);
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
     public LeaveRequestResponse reject(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.reject(id, principal);
     }

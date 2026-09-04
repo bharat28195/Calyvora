@@ -11,12 +11,19 @@ import { Alert } from "@/components/ui/alert";
 import { MyLeave } from "@/components/leave/my-leave";
 
 /**
- * Time off: your own balance/requests (shared with the Me hub) plus, for Owner/Admin, the queue of
- * requests waiting on a decision.
+ * Time off: your own balance and requests (shared with the Me hub) plus, for anyone who approves, the
+ * queue waiting on a decision.
+ *
+ * <p>Who sees the queue is deliberately the same set the API allows, and it was not before. HR could
+ * approve leave through the API and never saw the queue on this screen, because the check here was
+ * Owner/Admin only — so the one role whose job this is had to be told to use a screen that did not
+ * show it. Managers now approve their own reports' leave too (the API scopes the list to their team),
+ * which is what added a fourth role and surfaced the older gap.
  */
 export default function TimeOffPage() {
   const { me } = useSession();
-  const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
+  const role = me?.user.role;
+  const canApprove = role === "OWNER" || role === "ADMIN" || role === "HR" || role === "MANAGER";
 
   return (
     <div>
@@ -26,7 +33,7 @@ export default function TimeOffPage() {
       </div>
 
       <MyLeave />
-      {isAdmin && <Approvals />}
+      {canApprove && <Approvals />}
     </div>
   );
 }

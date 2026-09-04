@@ -106,7 +106,7 @@ Not defects — decisions. Detail and market-by-market analysis in `MARKET-GAPS.
 
 | Gap | Effect on a deal |
 |---|---|
-| Managers cannot approve leave at all | Every holiday funnels through HR. Asked about in most demos. |
+| ~~Managers cannot approve leave~~ | **Fixed 5 Sep 2026.** Managers now see and decide their own reports' leave; HR and admins still see everything. |
 | HR cannot see the company members list | Strange line to draw in an HR product. |
 | No PF / ESI / PT / TDS computation | **Blocks the Indian sale.** Structure exists; the rules do not. |
 | No bank payment file | Someone retypes payroll into net banking. |

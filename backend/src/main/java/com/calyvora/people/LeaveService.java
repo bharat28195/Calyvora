@@ -107,11 +107,25 @@ public class LeaveService {
                 .toList();
     }
 
+    /**
+     * The approvals inbox: every request in the company for HR and admins, and a manager's own
+     * reports for everybody else who can reach this.
+     *
+     * <p>This used to be {@code listAll()}, restricted to OWNER/ADMIN/HR — which meant a manager could
+     * not see, let alone decide, their own team's leave, and every holiday in the company funnelled
+     * through HR. The product already contradicted itself here: attendance regularizations have always
+     * been scoped to the caller's reports ({@code RegularizationService.pending}), so the same manager
+     * could approve a missed punch but not a day off. This is that same scoping, applied to leave.
+     */
     @Transactional(readOnly = true)
-    public List<LeaveRequestResponse> listAll() {
+    public List<LeaveRequestResponse> listForApprover(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Map<UUID, String> names = new HashMap<>();
-        return leaveRepository.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
+        List<LeaveRequest> all = leaveRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
+        List<LeaveRequest> visible = seesEveryone(principal)
+                ? all
+                : all.stream().filter(r -> isMyReport(companyId, r.getEmployeeId(), principal.userId())).toList();
+        return visible.stream()
                 .map(r -> LeaveRequestResponse.of(r,
                         names.computeIfAbsent(r.getEmployeeId(), this::nameOfEmployeeId)))
                 .toList();
@@ -171,6 +185,13 @@ public class LeaveService {
         UUID companyId = TenantContext.getCompanyId();
         LeaveRequest req = leaveRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new NotFoundException("Request not found"));
+        // The role check on the endpoint says "a manager may decide leave"; it cannot say "this
+        // manager may decide THIS request". Without the line below, opening the endpoint to managers
+        // would let any manager approve any employee's leave in the company — a wider hole than the
+        // one being fixed.
+        if (!seesEveryone(principal) && !isMyReport(companyId, req.getEmployeeId(), principal.userId())) {
+            throw new ForbiddenException("You can only decide leave for people who report to you");
+        }
         if (req.getStatus() != LeaveStatus.PENDING) {
             throw new ApiException(ErrorCode.CONFLICT, "This request has already been decided");
         }
@@ -191,6 +212,33 @@ public class LeaveService {
     private Employee employeeForUser(UUID companyId, UUID userId) {
         return employeeRepository.findByUserId(userId)
                 .orElseGet(() -> employeeRepository.save(new Employee(UUID.randomUUID(), companyId, userId)));
+    }
+
+    /** Roles whose approvals inbox is the whole company rather than their own reports. */
+    private boolean seesEveryone(AuthPrincipal principal) {
+        String role = principal.role();
+        return "OWNER".equals(role) || "ADMIN".equals(role) || "HR".equals(role);
+    }
+
+    /**
+     * Whether {@code employeeId} reports to the employee record belonging to {@code managerUserId}.
+     *
+     * <p>Takes the manager's <em>user</em> id and resolves the employee row here, rather than taking an
+     * employee id: the caller only ever has a user id, and doing the lookup in one place stops the two
+     * kinds of id being confused at a call site — which would compare a user id against a manager_id
+     * column and silently match nothing, quietly denying every manager instead of failing loudly.
+     */
+    private boolean isMyReport(UUID companyId, UUID employeeId, UUID managerUserId) {
+        UUID managerEmployeeId = employeeRepository.findByUserId(managerUserId)
+                .map(Employee::getId)
+                .orElse(null);
+        if (managerEmployeeId == null) {
+            return false;
+        }
+        return employeeRepository.findByIdAndCompanyId(employeeId, companyId)
+                .map(Employee::getManagerId)
+                .filter(managerEmployeeId::equals)
+                .isPresent();
     }
 
     private String nameOf(Employee employee) {
