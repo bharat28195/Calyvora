@@ -38,6 +38,21 @@ Read in order the first time. After that, jump by concern.
 | 14 | [Engineering Standards](14-engineering-standards.md) | How we name, branch, test, review, and ship |
 | 15 | [Final Recommendation](15-final-recommendation.md) | The CTO's build-order and what to avoid |
 
+## Operational documents
+
+The numbered chapters above are the constitution — what the system *is*. These describe what is
+running right now, and change whenever it does.
+
+| Document | What it covers |
+|---|---|
+| [GO-LIVE.md](GO-LIVE.md) | **Start here before selling.** What stands between Orbit and a paying customer, worst first |
+| [DEPLOY.md](DEPLOY.md) | Deploying to Render, click by click |
+| [DATABASE.md](DATABASE.md) | Neon: connection, DBeaver, and the two traps that disable tenant isolation silently |
+| [QA.md](QA.md) | Testing the deployed app, and the latest results |
+| [LEGAL.md](LEGAL.md) | The privacy policy and terms — what must be filled in before publishing |
+| [PRICING.md](PRICING.md) | Both price lists, competitor research, and how to change a price |
+| [MARKET-GAPS.md](MARKET-GAPS.md) | What is missing to sell in India, and why the US answer is a different product |
+
 ## How this constitution is governed
 
 - **This is code.** The docs live in the same monorepo as the platform, are reviewed via

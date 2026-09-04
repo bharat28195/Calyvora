@@ -856,6 +856,90 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Final outcome:** _Adopted as the product map._ See [docs/03](docs/03-enterprise-os-overview.md),
   [docs/04](docs/04-product-map.md).
 
+### PD-25 · 2026-09-04 · The database moves to Neon, and the default role would have switched off isolation
+- **Context:** Render removes a free Postgres 30 days after it is created. Not sleeps — removes.
+  Everything else on that tier degrades; this one destroys the data, which makes it unusable for
+  anything we intend to keep. Moving was not an optimisation, it was a deadline.
+- **Considered and rejected — changing engine.** Asked whether a non-Postgres free database would do.
+  It would not: tenant isolation *is* a Postgres feature here. Twenty-one migrations carry row-level
+  security policies, and MySQL and PlanetScale have no equivalent — isolation would fall back to
+  "every query remembers its `WHERE company_id`", where one forgotten filter puts one customer's
+  payroll on another customer's screen. Add 161 `uuid` columns, 92 `timestamptz` and a Postgres
+  extension, and moving engines is weeks of work whose main achievement is deleting the security layer.
+- **Also rejected — schema-per-tenant**, asked separately. Same reasoning inverted: schema separation
+  relies entirely on the connection having the right `search_path`, so a bug leaks data where RLS
+  returns zero rows. Then migrations multiply by customer count (43 × N per deploy, with partial
+  failure leaving customers on different schema versions), the owner console's cross-tenant
+  aggregation becomes a UNION over N schemas, and 49 tables × 500 customers is 24,500 tables. Zoho
+  People, Keka and Freshteam all use shared-schema multi-tenancy. The answer to an enterprise buyer
+  who insists on physical separation is a dedicated deployment at a premium price — revenue, not a
+  rewrite.
+- **The finding that justified the whole exercise:** Neon's default role, `neondb_owner`, holds
+  **`BYPASSRLS`** — an attribute that makes Postgres ignore every row-level policy **without
+  erroring**. Had the application connected as it, every screen would have worked and the database
+  would have silently stopped being the thing separating customers. Caught by running
+  `select rolbypassrls …` before any data existed, not by assuming. A dedicated `calyvora` role was
+  created without it, and isolation was then *proved* on the real schema: `employees` returns 0 rows
+  until a tenant is bound, 6 after.
+- **Second trap, recorded because it fails just as quietly:** Neon's `-pooler` hostname is PgBouncer
+  in transaction mode, and `TenantAwareDataSource` binds the tenant with a *session*-scoped
+  `set_config(..., false)`. Under transaction pooling the setting and the query relying on it can land
+  on different server connections. The direct hostname is mandatory.
+- **No dump was taken.** Flyway builds the schema and `PlatformOwnerBootstrap` recreates the owner, so
+  an empty database was enough — and starting empty removed ten accumulated QA test companies for
+  free. One real row (`Bharat Enterprizes`) was lost and recreated.
+- **Final outcome:** _Live on Neon, Singapore, PostgreSQL 18.6._ 49 tables, 43 migrations, and an
+  identical role-by-role sweep before and after — same passes, same known gaps, nothing newly broken.
+  Runbook in [docs/DATABASE.md](docs/DATABASE.md).
+
+### PD-26 · 2026-09-04 · Sell payroll in India; sell HR without payroll in the United States
+- **Context:** with `calyvora.net` live in USD, the question was what is missing to sell in both
+  markets. The answer turned out to be different in kind, not degree.
+- **The finding that reframed it:** Orbit already has a payslip *engine* — `PayslipComponent` models
+  named components with percent-of-basic, fixed and remainder calculations, and the employee record
+  already stores PF number, UAN, ESI, PT state and PAN. What is missing is anything that knows the
+  **rules**: the ₹15,000 PF ceiling, the EPF/EPS split, the ₹21,000 ESI threshold, state PT slabs.
+  Structure without compliance — which is good news, because the architecture is done and what remains
+  is finite rule-writing.
+- **India: finish it.** PF/ESI/PT computation, then income tax (regime choice, 80C declarations,
+  monthly TDS, Form 24Q, Form 16), then a bank-ready payment file. Those three are table stakes at
+  greytHR and Keka; a buyer assumes them and discovers their absence during the trial.
+- **United States: do not build payroll.** Ten thousand-plus tax jurisdictions, per-state SUTA,
+  quarterly 941s, and money-transmitter licences in most states to actually remit. That is a
+  multi-year regulated business, not a module. **Decision: reposition `calyvora.net` as HR without
+  payroll** — people, hiring, performance, documents, "works alongside your payroll provider" — which
+  is the line BambooHR built a very large company on. Still required even there: I-9/W-4 onboarding
+  and accrual-based PTO, because US leave is earned per hour worked and our flat annual allowance
+  cannot express it.
+- **The asset we underuse:** Priority HR runs real payroll for real clients. That is a design partner
+  for the compliance engine that most founders pay dearly for.
+- **Final outcome:** _Recorded in [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md)._ India first, in the
+  market we already sell into.
+
+### PD-27 · 2026-09-04 · Publish the legal pages before taking any money
+- **Context:** both websites shipped with `href="#"` where Privacy and Terms should be. This was on
+  the debt list as a small thing. It is not a small thing.
+- **Why it blocks revenue, in three ways:** we hold other people's salaries, bank accounts and PAN, so
+  under the DPDP Act 2023 the entity holding it must be identifiable and must publish how it is
+  processed; **no Indian payment gateway activates an account without a published refund position**,
+  which arrives at the worst possible moment — when a customer is ready to pay; and the first serious
+  customer's compliance team asks.
+- **Written against the product, not from a template.** The policy names our four sub-processors
+  (Neon, Render, Cloudflare, Resend) and what each can see; states that data is in Singapore and
+  therefore leaves India, inviting anyone who needs residency to say so *before* subscribing rather
+  than discovering it later; and describes security specifically — row-level security in the database,
+  one-way password hashing — instead of saying "bank-grade". The terms say plainly that Orbit
+  generates payslips but does not compute or file statutory returns, and that there is **no
+  contractual uptime guarantee** on standard subscriptions. Publishing an SLA number we have not built
+  the redundancy to honour would be worse than publishing none.
+- **Deliberately unfinished:** every field needing the registered entity, address, CIN, grievance
+  officer and retention periods is left as `[[PLACEHOLDER]]` on a yellow highlight. Inventing a
+  registered address would be fabricating a legal record; making the gaps impossible to miss is the
+  honest alternative. Both pages need a lawyer's eye once.
+- **Final outcome:** _`privacy.html` and `terms.html` written and linked from every footer on both
+  sites; `calyvora.net` points at the `.in` copies so the two cannot drift._ Field list and rationale
+  in [docs/LEGAL.md](docs/LEGAL.md).
+
 ---
 
 ## 4. Architecture Decision Log

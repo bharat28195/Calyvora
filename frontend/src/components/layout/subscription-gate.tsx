@@ -29,10 +29,20 @@ export function SubscriptionGate() {
           </div>
           <h2 className="mt-4 text-xl font-semibold">Your subscription has ended</h2>
           <p className="mt-2 text-sm text-fg/60">
-            Access to your workspace is paused. Please contact your Priority HR account manager to
-            renew and restore access for your team.
+            Access to your workspace is paused. Your data is safe and nothing has been deleted — write
+            to us and we will restore access for your team.
           </p>
-          <p className="mt-4 text-xs text-fg/40">Priority HR · support@priorityhr.app</p>
+          {/*
+            A working address. This said support@priorityhr.app, a mailbox that does not exist, and it
+            is shown at the exact moment somebody is trying to give us money — the worst possible place
+            for a dead link. mailto: rather than plain text so it is one tap on a phone.
+          */}
+          <a
+            href="mailto:connect@calyvora.in?subject=Renewing%20our%20Orbit%20subscription"
+            className="mt-4 inline-block text-xs text-fg/60 underline underline-offset-2 hover:text-fg"
+          >
+            connect@calyvora.in
+          </a>
         </div>
       </div>
     );
