@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { MyLeave } from "@/components/leave/my-leave";
+import { CompOffApprovals, MyCompOff } from "@/components/leave/comp-off";
 
 /**
  * Time off: your own balance and requests (shared with the Me hub) plus, for anyone who approves, the
@@ -33,6 +34,8 @@ export default function TimeOffPage() {
       </div>
 
       <MyLeave />
+      <MyCompOff />
+      {canApprove && <CompOffApprovals />}
       {canApprove && <Approvals />}
     </div>
   );

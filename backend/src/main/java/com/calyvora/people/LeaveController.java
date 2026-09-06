@@ -5,6 +5,7 @@ import com.calyvora.common.security.CurrentUser;
 import com.calyvora.people.dto.CreateLeaveRequest;
 import com.calyvora.people.dto.LeaveBalanceResponse;
 import com.calyvora.people.dto.LeaveRequestResponse;
+import com.calyvora.people.dto.LeaveTypeBalanceResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,18 @@ public class LeaveController {
     @GetMapping("/balance")
     public LeaveBalanceResponse balance(@CurrentUser AuthPrincipal principal) {
         return leaveService.balance(principal);
+    }
+
+    /**
+     * Every leave type, with the accrual and carry-forward behind each number.
+     *
+     * <p>A second endpoint rather than a wider {@code /balance}: that one is whole-day and
+     * vacation-only by contract, and widening a response shape to add a feature breaks every caller
+     * that was perfectly happy with it.
+     */
+    @GetMapping("/balances")
+    public List<LeaveTypeBalanceResponse> balances(@CurrentUser AuthPrincipal principal) {
+        return leaveService.balances(principal);
     }
 
     /**

@@ -12,6 +12,10 @@ const tones: Record<string, string> = {
   APPROVED: "bg-emerald-500/15 text-emerald-300",
   REJECTED: "bg-red-500/15 text-red-300",
   CANCELLED: "bg-fg/10 text-fg/40",
+  // Comp-off credits: spent is a settled fact, expired is a loss — neither is a failure, so both
+  // stay quiet rather than borrowing the red used for a rejection.
+  CONSUMED: "bg-fg/10 text-fg/40",
+  EXPIRED: "bg-fg/10 text-fg/40",
 };
 
 export function Badge({ value }: { value: string }) {

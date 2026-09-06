@@ -965,6 +965,46 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   accrual, carry-forward, encashment, comp-off — is still missing and is the part buyers actually ask
   about; see [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md).
 
+### PD-29 · 2026-09-06 · Leave becomes a policy instead of a constant
+- **Context:** every company on the platform got 25 vacation days, because
+  `VACATION_ALLOWANCE_DAYS = 25` was a constant in `LeaveService`. No accrual, no carry-forward, no
+  comp-off. It is the first thing an Indian buyer asks about after statutory payroll, and "four fixed
+  types with a flat allowance" is a demo rather than a policy.
+- **Built:** per-company policy per leave type (V45) — paid or unpaid, ANNUAL or MONTHLY accrual,
+  days per year, carry-forward cap, comp-off expiry. Plus comp-off as a first-class type: a day
+  worked is claimed, approved, and later spent as leave.
+- **The migration's promise, and why it constrains the defaults.** The seeded default is vacation
+  25/ANNUAL/no carry-forward — *exactly* what the constant produced. An existing company sees no
+  change on the day this deploys. A migration that silently recomputed everybody's balances would be
+  the wrong kind of clever: people plan holidays against these numbers. Every other type seeds at
+  zero rather than a guess, because showing a company an allowance it never agreed to is worse than
+  showing it none.
+- **Comp-off is credits, not a counter.** Each is a row — worked on this date, approved by this
+  person, expires then, spent on that leave request. A single number would make "why do I have three
+  days?" unanswerable and expiry impossible. They are spent oldest-first so the credit nearest to
+  expiring goes before one with months left, and expiry is *computed* rather than stored, so no
+  scheduled job is needed and lengthening the window does not have to resurrect rows a batch already
+  killed.
+- **The accrual engine is a pure function, and that decision paid immediately.** No repository, no
+  clock — just (policy, join date, today, days used per year). Fifteen unit tests run in 0.1 seconds
+  where the integration suite takes twenty-five seconds per case, and **three of them failed on the
+  first run against real bugs**. The worst: counting anniversary months with `ChronoUnit.MONTHS`
+  gave **11 days for a full calendar year**, because January to 31 December is eleven anniversary
+  months — the twelfth lands on 1 January. A rule that cannot award a whole year to somebody who
+  worked one is the wrong rule; it is now whole calendar months, which is also what Indian payroll
+  actually does, so everyone gains a day on the same predictable date.
+- **A smaller lesson worth keeping:** `BigDecimal.ZERO` is scale 0 and `0.0` is scale 1, and they are
+  not `equals`. An early return with a bare ZERO made a caller's comparison depend on which branch
+  produced the number. Everything leaving the calculator now shares one scale.
+- **Pending days are subtracted from what is available**, not just shown alongside it. Otherwise two
+  requests made before either is decided both look affordable, and the second is refused at approval
+  time by an approver with no idea why.
+- **Final outcome:** _25 new tests (15 unit, 10 integration); the whole backend suite green._ The
+  balance endpoint keeps its old shape and a richer `/leave/balances` sits beside it — widening a
+  response to add a feature breaks every caller that was happy with it. Still missing and recorded in
+  [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md): **encashment**, sandwich-leave and probation rules, and
+  for any US sale an hours-worked accrual basis rather than months-of-service.
+
 ---
 
 ## 4. Architecture Decision Log

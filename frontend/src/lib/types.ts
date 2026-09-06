@@ -861,7 +861,9 @@ export interface WorkItem {
   overdue: boolean;
 }
 
-export type LeaveTypeT = "VACATION" | "SICK" | "PERSONAL" | "UNPAID";
+export type LeaveTypeT = "VACATION" | "SICK" | "PERSONAL" | "UNPAID" | "COMP_OFF";
+export type LeaveAccrualT = "ANNUAL" | "MONTHLY";
+export type CompOffStatusT = "PENDING" | "APPROVED" | "REJECTED" | "CONSUMED";
 export type LeaveStatusT = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
 export interface LeaveRequest {
@@ -883,6 +885,48 @@ export interface LeaveBalance {
   usedDays: number;
   remainingDays: number;
   pendingDays: number;
+}
+
+/** One company rule for one leave type. */
+export interface LeavePolicy {
+  type: LeaveTypeT;
+  paid: boolean;
+  accrual: LeaveAccrualT;
+  daysPerYear: number;
+  carryForwardCap: number;
+  compOffExpiryDays: number;
+}
+
+/**
+ * A balance for one leave type, with the working shown.
+ *
+ * `availableDays` already has pending requests subtracted — two requests made before either is
+ * decided must not both look affordable.
+ */
+export interface LeaveTypeBalance {
+  type: LeaveTypeT;
+  paid: boolean;
+  accrual: LeaveAccrualT;
+  entitlementPerYear: number;
+  earnedThisYear: number;
+  carriedForward: number;
+  usedDays: number;
+  pendingDays: number;
+  availableDays: number;
+}
+
+/** A day worked that was not owed, earning a day off later. */
+export interface CompOffCredit {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  workedOn: string;
+  reason: string | null;
+  status: CompOffStatusT;
+  expiresOn: string | null;
+  /** False for an approved credit past its expiry — the screen must not offer it. */
+  spendable: boolean;
+  createdAt: string;
 }
 
 export type ChecklistKind = "ONBOARDING" | "EXIT";

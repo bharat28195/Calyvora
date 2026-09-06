@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, CalendarPlus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { LeaveBalance, LeaveRequest } from "@/lib/types";
+import type { LeaveBalance, LeaveRequest, LeaveTypeBalance } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -11,7 +11,14 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
-const TYPES = ["VACATION", "SICK", "PERSONAL", "UNPAID"] as const;
+const TYPES = ["VACATION", "SICK", "PERSONAL", "UNPAID", "COMP_OFF"] as const;
+const LABELS: Record<string, string> = {
+  VACATION: "Vacation",
+  SICK: "Sick",
+  PERSONAL: "Personal",
+  UNPAID: "Unpaid",
+  COMP_OFF: "Comp-off",
+};
 const selectCls =
   "h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
 
@@ -21,14 +28,20 @@ const selectCls =
  */
 export function MyLeave({ onChanged }: { onChanged?: () => void }) {
   const [balance, setBalance] = useState<LeaveBalance | null>(null);
+  const [balances, setBalances] = useState<LeaveTypeBalance[]>([]);
   const [mine, setMine] = useState<LeaveRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [bal, my] = await Promise.all([api.leaveBalance(), api.myLeave()]);
+      const [bal, all, my] = await Promise.all([
+        api.leaveBalance(),
+        api.leaveBalances(),
+        api.myLeave(),
+      ]);
       setBalance(bal);
+      setBalances(all);
       setMine(my);
       onChanged?.();
     } catch (e) {
@@ -55,6 +68,8 @@ export function MyLeave({ onChanged }: { onChanged?: () => void }) {
         <Stat label="Pending" value={balance ? `${balance.pendingDays}d` : null} />
         <Stat label="Remaining" value={balance ? `${balance.remainingDays}d` : null} highlight />
       </div>
+
+      <TypeBalances balances={balances} />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-2">
         <RequestForm onSubmitted={load} onError={setError} />
@@ -88,6 +103,77 @@ export function MyLeave({ onChanged }: { onChanged?: () => void }) {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Every leave type, with the working shown.
+ *
+ * <p>The four stats above answer "how much vacation have I got". This answers the question they
+ * cannot: out of what, earned when, and how much came from last year. A single number invites an
+ * argument with HR; the breakdown ends it.
+ *
+ * <p>Types the company has not switched on (entitlement zero, nothing taken, nothing carried) are
+ * hidden. Listing "Sick: 0 of 0" for every company that never configured sick leave is noise that
+ * makes the rows that matter harder to find.
+ */
+function TypeBalances({ balances }: { balances: LeaveTypeBalance[] }) {
+  const shown = balances.filter(
+    (b) =>
+      b.entitlementPerYear > 0 ||
+      b.availableDays > 0 ||
+      b.usedDays > 0 ||
+      b.pendingDays > 0 ||
+      b.carriedForward > 0,
+  );
+  if (shown.length === 0) return null;
+
+  return (
+    <div className="mt-6">
+      <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Your balances</h2>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[34rem] text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-fg/40">
+              <th className="pb-2 pr-4 font-medium">Type</th>
+              <th className="pb-2 pr-4 font-medium">Earned</th>
+              <th className="pb-2 pr-4 font-medium">Carried</th>
+              <th className="pb-2 pr-4 font-medium">Used</th>
+              <th className="pb-2 pr-4 font-medium">Pending</th>
+              <th className="pb-2 font-medium">Available</th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums">
+            {shown.map((b) => (
+              <tr key={b.type} className="border-t border-fg/10">
+                <td className="py-2 pr-4">
+                  <span className="font-medium">{LABELS[b.type] ?? b.type}</span>
+                  {/* Why the earned number is what it is — a monthly policy is the usual reason
+                      somebody thinks their balance is wrong in March. */}
+                  {b.type !== "COMP_OFF" && (
+                    <span className="ml-2 text-xs text-fg/40">
+                      {b.accrual === "MONTHLY"
+                        ? `${b.entitlementPerYear}/yr, monthly`
+                        : `${b.entitlementPerYear}/yr`}
+                    </span>
+                  )}
+                  {!b.paid && <span className="ml-2 text-xs text-fg/40">unpaid</span>}
+                </td>
+                <td className="py-2 pr-4 text-fg/70">
+                  {b.type === "COMP_OFF" ? "—" : `${b.earnedThisYear}d`}
+                </td>
+                <td className="py-2 pr-4 text-fg/70">
+                  {b.type === "COMP_OFF" ? `${b.carriedForward}d earned` : `${b.carriedForward}d`}
+                </td>
+                <td className="py-2 pr-4 text-fg/70">{b.usedDays}d</td>
+                <td className="py-2 pr-4 text-fg/70">{b.pendingDays}d</td>
+                <td className="py-2 font-medium">{b.availableDays}d</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -137,7 +223,8 @@ function RequestForm({ onSubmitted, onError }: { onSubmitted: () => void; onErro
       <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
         <Field label="Type" htmlFor="type">
           <select id="type" className={selectCls} value={type} onChange={(e) => setType(e.target.value as (typeof TYPES)[number])}>
-            {TYPES.map((t) => <option key={t} value={t} className="bg-surface">{t.toLowerCase()}</option>)}
+            {/* Labelled rather than lower-cased: "comp_off" reads as a database column. */}
+            {TYPES.map((t) => <option key={t} value={t} className="bg-surface">{LABELS[t] ?? t}</option>)}
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-3">

@@ -36,7 +36,7 @@ Verified by exercising create, update and delete against the live deployment —
 | Core HR & org | People, departments, managers, onboarding, exits + checklist | ✅ | ✅ |
 | Attendance | Check-in/out, regularisation with approval, day view | Nearly | Nearly |
 | Shifts | Shift definitions, roster assignment | ✅ | ✅ |
-| Leave | 4 types, balances, approval flow scoped to a manager's own reports | Nearly | ❌ |
+| Leave | 5 types, per-company policy: annual or monthly accrual, carry-forward caps, comp-off credits; manager-scoped approval | ✅ | Nearly |
 | Payroll structure | Configurable components, payslips, real figures | Structure only | Structure only |
 | Statutory fields | PF, UAN, ESI, PT state, PAN modelled | Stored, not computed | Wrong country |
 | Expenses | Claim → approve → reimburse | ✅ | ✅ |
@@ -77,11 +77,11 @@ built almost entirely around this one step.
 notice-period recovery, leave encashment, gratuity after five years, pending reimbursements, and a
 settlement statement. Every departure currently ends in a spreadsheet.
 
-**5. Leave policy engine.** Manager approval landed on 5 September 2026 — a manager now sees and
-decides their own reports, HR and admins still see everything. The *policy* engine is still missing,
-and that is the part buyers ask about: four fixed types with a flat allowance is a demo, not a policy.
-Expected are monthly accrual, carry-forward with caps, encashment, comp-off against weekend work,
-sandwich-leave rules and probation restrictions.
+**5. ~~Leave policy engine~~ — mostly built, 6 September 2026.** Per-company policy for each type,
+annual or monthly accrual with pro-rating for joiners, carry-forward with a cap that compounds
+correctly across years, and comp-off earned per day worked and spent as single-use credits with
+expiry. What is still missing: **encashment**, sandwich-leave rules and probation restrictions.
+Manager approval landed the day before.
 
 **6. Biometric device integration.** ESSL and ZKTeco machines are on the wall of most Indian SMB
 offices. "Our attendance comes from the machine at the door" is an early question, and a web check-in
@@ -129,10 +129,11 @@ Even on that narrower line, three things are still required:
 onboarding is task-based; it needs to be document-based and legally attested. Required even if you
 never touch payroll.
 
-**PTO accrual and state sick-leave law.** US leave is accrual-based, not allowance-based: hours earned
-per hour worked, carry-over caps, and mandated paid sick leave differing by state and sometimes city.
-The flat annual allowance cannot express it, and getting it wrong is legal exposure rather than
-inconvenience.
+**PTO accrual and state sick-leave law.** Half of this now exists: the policy engine added on
+6 September does monthly accrual and carry-forward caps. The other half does not. US PTO accrues
+**per hour worked**, not per month of service, and mandated paid sick leave differs by state and
+sometimes by city. Getting it wrong is legal exposure rather than inconvenience, so the accrual model
+needs an hours-worked basis before any US sale — the shape is there, the unit is not.
 
 **FLSA timekeeping** for mid-market: exempt versus non-exempt classification, overtime above 40 hours
 weekly, meal and rest break records where mandated. Timesheets, not just check-in and check-out.

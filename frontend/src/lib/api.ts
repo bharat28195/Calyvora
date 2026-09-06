@@ -69,8 +69,11 @@ import {
   type GenerateDocInput,
   type MergeField,
   type Invitation,
+  type CompOffCredit,
   type LeaveBalance,
+  type LeavePolicy,
   type LeaveRequest,
+  type LeaveTypeBalance,
   type LoginResult,
   type OnboardingTask,
   type Project,
@@ -761,6 +764,37 @@ export const api = {
   },
   leaveBalance(): Promise<LeaveBalance> {
     return LIVE ? http<LeaveBalance>("/people/leave/balance") : mockBackend.leaveBalance(accessToken);
+  },
+  /**
+   * Every type's balance, with accrual and carry-forward broken out.
+   *
+   * <p>Separate from `leaveBalance` rather than replacing it: that one is whole-day and
+   * vacation-only by contract, and the mock backend serves it too. Only live mode has the richer
+   * view, so callers fall back to an empty list rather than crashing a demo.
+   */
+  leaveBalances(): Promise<LeaveTypeBalance[]> {
+    return LIVE ? http<LeaveTypeBalance[]>("/people/leave/balances") : Promise.resolve([]);
+  },
+  leavePolicies(): Promise<LeavePolicy[]> {
+    return LIVE ? http<LeavePolicy[]>("/people/leave-policies") : Promise.resolve([]);
+  },
+  updateLeavePolicy(type: string, input: Partial<Omit<LeavePolicy, "type">>): Promise<LeavePolicy> {
+    return http<LeavePolicy>(`/people/leave-policies/${type}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  },
+  claimCompOff(input: { workedOn: string; reason?: string }): Promise<CompOffCredit> {
+    return http<CompOffCredit>("/people/comp-off", { method: "POST", body: JSON.stringify(input) });
+  },
+  myCompOff(): Promise<CompOffCredit[]> {
+    return LIVE ? http<CompOffCredit[]>("/people/comp-off/mine") : Promise.resolve([]);
+  },
+  pendingCompOff(): Promise<CompOffCredit[]> {
+    return LIVE ? http<CompOffCredit[]>("/people/comp-off/pending") : Promise.resolve([]);
+  },
+  decideCompOff(id: string, action: "approve" | "reject"): Promise<CompOffCredit> {
+    return http<CompOffCredit>(`/people/comp-off/${id}/${action}`, { method: "POST" });
   },
   allLeave(): Promise<LeaveRequest[]> {
     return LIVE ? http<LeaveRequest[]>("/people/leave") : mockBackend.allLeave(accessToken);

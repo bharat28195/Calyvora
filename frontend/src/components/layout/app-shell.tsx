@@ -84,6 +84,7 @@ const NAV: NavItem[] = [
       { href: "/people/org", label: "Org chart" },
       { href: "/people/attendance", label: "Attendance" },
       { href: "/people/time-off", label: "Time off" },
+      { href: "/people/leave-policy", label: "Leave policy" },
       { href: "/people/holidays", label: "Holidays" },
     ],
   },
