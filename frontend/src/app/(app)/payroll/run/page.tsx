@@ -8,6 +8,7 @@ import type { PayrollRun } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { BankFilePanel } from "@/components/payroll/bank-file";
 import { money } from "@/lib/format";
 
 /** HR payroll run — every employee's net for a month, after attendance LOP. "Publish" makes payslips
@@ -95,6 +96,8 @@ export default function PayrollRunPage() {
               </tbody>
             </table>
           </Card>
+
+          {run.rows.length > 0 && <BankFilePanel month={run.month} currency={run.currency} />}
 
           {run.rows.length > 0 && (
             <Card className="mt-4 flex flex-wrap items-center justify-between gap-3">

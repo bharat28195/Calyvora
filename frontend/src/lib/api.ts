@@ -69,8 +69,10 @@ import {
   type GenerateDocInput,
   type MergeField,
   type Invitation,
+  type BankFilePreview,
   type CompOffCredit,
   type FeatureState,
+  type Plan,
   type LeaveBalance,
   type PfSettings,
   type LeavePolicy,
@@ -446,17 +448,37 @@ export const api = {
   createCompany(input: CreateCompanyInput): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>("/platform/companies", { method: "POST", body: JSON.stringify(input) }) : Promise.reject(new Error("The platform console requires the live backend."));
   },
-  /** Which capabilities are on for one customer (platform console). */
+  /** Which capabilities are on for one customer, and why (platform console). */
   companyFeaturesFor(companyId: string): Promise<FeatureState[]> {
     return LIVE ? http<FeatureState[]>(`/platform/companies/${companyId}/features`) : Promise.reject(new Error("live only"));
   },
-  setCompanyFeature(companyId: string, feature: string, enabled: boolean): Promise<FeatureState> {
-    return LIVE
-      ? http<FeatureState>(`/platform/companies/${companyId}/features`, {
-          method: "POST",
-          body: JSON.stringify({ feature, enabled }),
-        })
-      : Promise.reject(new Error("live only"));
+  /**
+   * Set or clear a company-specific override.
+   *
+   * <p>Passing null for `enabled` CLEARS it, putting the company back on whatever its plan says.
+   * That is a third state, not a synonym for false, and the UI needs all three.
+   */
+  setCompanyFeature(companyId: string, feature: string, enabled: boolean | null): Promise<FeatureState> {
+    return http<FeatureState>(`/platform/companies/${companyId}/features`, {
+      method: "POST",
+      body: JSON.stringify(enabled === null ? { feature } : { feature, enabled }),
+    });
+  },
+  plans(): Promise<Plan[]> {
+    return LIVE ? http<Plan[]>("/platform/plans") : Promise.reject(new Error("live only"));
+  },
+  createPlan(input: Partial<Plan> & { code: string; name: string }): Promise<Plan> {
+    return http<Plan>("/platform/plans", { method: "POST", body: JSON.stringify(input) });
+  },
+  updatePlan(code: string, input: Partial<Plan>): Promise<Plan> {
+    return http<Plan>(`/platform/plans/${code}`, { method: "PATCH", body: JSON.stringify(input) });
+  },
+  /** Put a company on a plan, or pass null to take it off one. Returns its resulting features. */
+  setCompanyPlan(companyId: string, planCode: string | null): Promise<FeatureState[]> {
+    return http<FeatureState[]>(`/platform/companies/${companyId}/plan`, {
+      method: "POST",
+      body: JSON.stringify({ planCode }),
+    });
   },
   endCompanySubscription(companyId: string): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/end`, { method: "POST" }) : Promise.reject(new Error("live only"));
@@ -997,6 +1019,35 @@ export const api = {
   payrollRun(month?: string): Promise<PayrollRun> {
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";
     return LIVE ? http<PayrollRun>(`/payroll/run${qs}`) : mockBackend.payrollRun(accessToken, month);
+  },
+  bankFilePreview(month?: string, format?: string): Promise<BankFilePreview> {
+    const qs = new URLSearchParams();
+    if (month) qs.set("month", month);
+    if (format) qs.set("format", format);
+    return http<BankFilePreview>(`/payroll/bank-file/preview?${qs}`);
+  },
+  /**
+   * The bank file itself, as a blob.
+   *
+   * <p>Its own fetch rather than `http()`, for two reasons: the response is CSV rather than JSON, and
+   * a plain `<a href>` would not carry the bearer token, so the download would 401. The caller turns
+   * this into a save via an object URL.
+   */
+  async downloadBankFile(month?: string, format?: string): Promise<Blob> {
+    const qs = new URLSearchParams();
+    if (month) qs.set("month", month);
+    if (format) qs.set("format", format);
+    const res = await fetch(`${BASE}/payroll/bank-file?${qs}`, {
+      credentials: "include",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
+    if (!res.ok) {
+      // The server refuses an empty file with a sentence worth showing — "nobody can be paid this
+      // month" is more useful than "download failed".
+      const body = await res.json().catch(() => null);
+      throw new ApiError(body ?? { timestamp: "", status: res.status, code: "INFRASTRUCTURE", message: "Could not build the bank file" });
+    }
+    return res.blob();
   },
   pfSettings(): Promise<PfSettings> {
     return http<PfSettings>("/payroll/pf-settings");

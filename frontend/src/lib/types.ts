@@ -1283,10 +1283,50 @@ export interface PfSettings {
   edliRate: number;
 }
 
-/** A capability, on or off for one company. */
+/**
+ * One capability, on or off for one company, and which rule decided it.
+ *
+ * `source` matters as much as `enabled`: "recruitment is off" is an unanswerable support question
+ * without knowing whether that came from an override, an agency, a plan or a default — only one of
+ * those four is a mistake.
+ */
 export interface FeatureState {
-  feature: "STATUTORY_PAYROLL";
+  feature: string;
+  label: string;
+  description: string;
   enabled: boolean;
+  source: "COMPANY" | "AGENCY" | "PLAN" | "DEFAULT";
+  /** The plan responsible, when source is PLAN. */
+  planCode: string | null;
+}
+
+/** A named package of features with a price — what a customer buys. */
+export interface Plan {
+  code: string;
+  name: string;
+  description: string | null;
+  /** Null means "charge the published price list rather than a plan price". */
+  pricePerEmployee: number | null;
+  sortOrder: number;
+  active: boolean;
+  features: string[];
+}
+
+export type BankFileFormatT = "GENERIC" | "HDFC" | "ICICI" | "AXIS";
+
+/**
+ * What the bank file would contain, before downloading it.
+ *
+ * <p>Carries no account numbers — the preview is for spotting missing details, and the download is
+ * the only place unmasked numbers belong.
+ */
+export interface BankFilePreview {
+  format: BankFileFormatT;
+  /** How many people are actually in the file. */
+  payable: number;
+  /** The sum in the file — not the payroll total. They differ exactly when somebody is excluded. */
+  total: number;
+  excluded: { employeeId: string; name: string; reason: string }[];
 }
 
 /**
