@@ -10,6 +10,7 @@ import {
   CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import { CommandBar } from "@/components/layout/command-bar";
@@ -27,6 +28,14 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: Role[]; // undefined = everyone
+  /**
+   * The module this section belongs to. Hidden when the company has not bought it.
+   *
+   * <p>Cosmetic on its own — the API refuses the same request regardless (FeatureGuardFilter), which
+   * is what actually enforces a plan. This exists so a customer on a smaller plan is not shown a
+   * section that answers 403 when they click it.
+   */
+  feature?: string;
   children?: NavChild[]; // sub-panes shown in the left pane when the section is active
 }
 
@@ -47,12 +56,13 @@ const NAV: NavItem[] = [
       { href: "/platform/requests", label: "Requests" },
       { href: "/platform/agencies", label: "Agencies" },
       { href: "/platform/pricing", label: "Pricing" },
+      { href: "/platform/plans", label: "Plans & features" },
     ],
   },
   // An agency sees only this — no company surface at all, because it holds no employees of its own.
   { href: "/agency", label: "My companies", icon: Building2, roles: ["AGENCY_OWNER"] },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
-  { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS },
+  { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS, feature: "ANALYTICS" },
   {
     href: "/me", label: "Me", icon: CircleUser, roles: COMPANY,
     children: [
@@ -67,7 +77,7 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
-  { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY },
+  { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY, feature: "HELPDESK" },
   { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: MANAGES },
   // Same reasoning as Exits below, and the same page HR reaches under People — a manager approving
   // their team's leave would never find it nested inside a section their role cannot open. MANAGER
@@ -88,11 +98,11 @@ const NAV: NavItem[] = [
       { href: "/people/holidays", label: "Holidays" },
     ],
   },
-  { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: HR_PLUS },
-  { href: "/shifts", label: "Shifts", icon: CalendarClock, roles: HR_PLUS },
-  { href: "/performance", label: "Performance", icon: ClipboardCheck, roles: HR_PLUS },
+  { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: HR_PLUS, feature: "RECRUITMENT" },
+  { href: "/shifts", label: "Shifts", icon: CalendarClock, roles: HR_PLUS, feature: "SHIFTS" },
+  { href: "/performance", label: "Performance", icon: ClipboardCheck, roles: HR_PLUS, feature: "PERFORMANCE" },
   {
-    href: "/payroll", label: "Payroll", icon: Wallet, roles: HR_PLUS,
+    href: "/payroll", label: "Payroll", icon: Wallet, roles: HR_PLUS, feature: "PAYROLL",
     children: [
       { href: "/payroll", label: "Salaries" },
       { href: "/payroll/run", label: "Payroll run" },
@@ -103,7 +113,7 @@ const NAV: NavItem[] = [
       { href: "/payroll/statutory", label: "Statutory (PF)" },
     ],
   },
-  { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS },
+  { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS, feature: "EXPENSES" },
   {
     href: "/documents", label: "Documents", icon: FileText, roles: HR_PLUS,
     children: [
@@ -123,6 +133,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  // Null until known. Nothing is hidden while it loads: showing a section briefly and then removing
+  // it is far better than hiding one the customer has paid for because a request was slow.
+  const [features, setFeatures] = useState<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    api.companyFeatures()
+      .then((list) => setFeatures(Object.fromEntries(list.map((f) => [f.feature, f.enabled]))))
+      .catch(() => setFeatures(null));
+  }, []);
 
   // The platform OWNER (vendor) has no company app — send them to the Platform console.
   const role = session.me?.user.role;
@@ -141,7 +160,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const { user, company } = session.me;
-  const nav = NAV.filter((n) => !n.roles || n.roles.includes(user.role));
+  const nav = NAV
+    .filter((n) => !n.roles || n.roles.includes(user.role))
+    .filter((n) => !n.feature || features === null || features[n.feature] !== false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   async function logout() {

@@ -4,6 +4,8 @@ import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.CurrentUser;
 import com.calyvora.feature.Feature;
 import com.calyvora.feature.FeatureService;
+import com.calyvora.feature.PlanService;
+import com.calyvora.feature.dto.FeatureStateResponse;
 import com.calyvora.platform.dto.CompanySummaryResponse;
 import com.calyvora.platform.dto.CreateCompanyRequest;
 import com.calyvora.platform.dto.SeatRequestResponse;
@@ -34,13 +36,16 @@ public class PlatformController {
     private final PlatformService service;
     private final com.calyvora.trial.TrialRequestService trialRequests;
     private final FeatureService featureService;
+    private final PlanService planService;
 
     public PlatformController(PlatformService service,
                               com.calyvora.trial.TrialRequestService trialRequests,
-                              FeatureService featureService) {
+                              FeatureService featureService,
+                              PlanService planService) {
         this.service = service;
         this.trialRequests = trialRequests;
         this.featureService = featureService;
+        this.planService = planService;
     }
 
     @GetMapping("/companies")
@@ -113,20 +118,34 @@ public class PlatformController {
      * time, after their numbers have been checked against a real run.
      */
     @GetMapping("/companies/{id}/features")
-    public List<FeatureService.FeatureState> features(@PathVariable UUID id) {
-        return featureService.statesFor(id);
+    public List<FeatureStateResponse> features(@PathVariable UUID id) {
+        return featureService.statesFor(id).stream().map(FeatureStateResponse::of).toList();
     }
 
-    /** Body: {"feature":"STATUTORY_PAYROLL","enabled":true}. */
+    /**
+     * Body: {"feature":"RECRUITMENT","enabled":true}.
+     *
+     * <p>Omitting "enabled" entirely CLEARS the override rather than meaning false, so a company can
+     * be put back on whatever its plan says. Without that, "undo this" would be impossible to express
+     * and an owner would have to remember what the plan included.
+     */
     @PostMapping("/companies/{id}/features")
-    public FeatureService.FeatureState setFeature(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+    public FeatureStateResponse setFeature(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         Object feature = body.get("feature");
         if (feature == null) {
             throw new com.calyvora.common.error.ApiException(
                     com.calyvora.common.error.ErrorCode.VALIDATION_ERROR, "Which feature?");
         }
-        return featureService.set(id, Feature.parse(feature.toString()),
-                Boolean.TRUE.equals(body.get("enabled")));
+        Boolean enabled = body.containsKey("enabled") && body.get("enabled") != null
+                ? Boolean.TRUE.equals(body.get("enabled")) : null;
+        return FeatureStateResponse.of(featureService.set(id, Feature.parse(feature.toString()), enabled));
+    }
+
+    /** Put a company on a plan, or take it off one. Body: {"planCode":"GROWTH"} — null to clear. */
+    @PostMapping("/companies/{id}/plan")
+    public List<FeatureStateResponse> setPlan(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        planService.assign(id, body.get("planCode"));
+        return featureService.statesFor(id).stream().map(FeatureStateResponse::of).toList();
     }
 
     /** Set the subscription end date directly (edit/reset). Body: {"endsAt":"YYYY-MM-DD"}. */

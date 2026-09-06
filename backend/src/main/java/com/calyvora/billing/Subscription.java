@@ -28,6 +28,7 @@ public class Subscription {
     @Column(name = "company_id", nullable = false, unique = true)
     private UUID companyId;
 
+    /** The pricing MODEL (PER_EMPLOYEE). Not the feature package — that lives on Company.planCode. */
     @Column(nullable = false, length = 40)
     private String plan = "PER_EMPLOYEE";
 

@@ -78,10 +78,12 @@ with proof-submission windows, projected annual tax spread across remaining mont
 deduction, Form 24Q quarterly returns, Form 16 at year end. The largest single piece of work on this
 list, and the one finance teams judge you on.
 
-**3. Salary disbursement.** A bank-ready payment file (ICICI, HDFC, Axis formats) or a payout
-integration. You already collect account number, IFSC and payment mode — the last mile is producing the
-file that moves money. Without it, someone retypes payroll into net banking. RazorpayX Payroll was
-built almost entirely around this one step.
+**3. ~~Salary disbursement~~ — built 6 September 2026.** The payroll run produces a bank-ready
+bulk transfer file in HDFC, ICICI, Axis or generic CSV format, generated server-side because it is the
+only place unmasked account numbers belong. The valuable half is the validation: a missing IFSC, a
+malformed one or a zero net is reported by name *before* the download, since banks reject the whole
+batch rather than the one bad row. **Still missing:** a payout API integration, so the file is
+uploaded by hand rather than money moving automatically.
 
 ### Loses deals
 

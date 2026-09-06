@@ -70,6 +70,7 @@ public class SecurityConfig {
             JwtAuthFilter jwtAuthFilter,
             TenantFilter tenantFilter,
             com.calyvora.common.security.SubscriptionLockFilter subscriptionLockFilter,
+            com.calyvora.common.security.FeatureGuardFilter featureGuardFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler
     ) throws Exception {
@@ -86,10 +87,14 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 // JWT first (populates SecurityContext), then TenantContext binding, then the
-                // subscription lock — which needs the tenant bound before it can look one up.
+                // subscription lock — which needs the tenant bound before it can look one up — and
+                // last the feature guard. That order is deliberate: an expired subscription is a
+                // stronger and more urgent answer than a missing module, and a locked tenant should
+                // be told about the lock rather than about a feature they cannot reach either way.
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(tenantFilter, JwtAuthFilter.class)
-                .addFilterAfter(subscriptionLockFilter, TenantFilter.class);
+                .addFilterAfter(subscriptionLockFilter, TenantFilter.class)
+                .addFilterAfter(featureGuardFilter, com.calyvora.common.security.SubscriptionLockFilter.class);
 
         return http.build();
     }

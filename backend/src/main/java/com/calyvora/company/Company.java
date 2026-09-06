@@ -53,6 +53,17 @@ public class Company {
     @Column(name = "agency_id")
     private UUID agencyId;
 
+    /**
+     * The feature package this company is on, or null for "no plan" — in which case each feature
+     * falls back to its own default, and every module defaults on.
+     *
+     * <p>Here rather than on the subscription, which looks like the natural home until you notice
+     * that a subscription row is created lazily: a company that self-registered has none, so a plan
+     * kept there could not be assigned to a brand-new customer. Entitlement is not a billing fact.
+     */
+    @Column(name = "plan_code", length = 32)
+    private String planCode;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -123,6 +134,14 @@ public class Company {
 
     public UUID getAgencyId() {
         return agencyId;
+    }
+
+    public String getPlanCode() {
+        return planCode;
+    }
+
+    public void setPlanCode(String planCode) {
+        this.planCode = planCode;
     }
 
     public void setAgencyId(UUID agencyId) {

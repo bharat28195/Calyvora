@@ -1044,6 +1044,52 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   (with the mid-period threshold rule), professional tax, TDS and Form 16, then the ECR and bank
   payment files.
 
+### PD-31 · 2026-09-06 · The bank file, and plans that can actually be enforced
+- **Context:** two asks in one session. First the bank file — the last mile of payroll, without which
+  correct numbers on a screen still end with somebody retyping them into net banking. Then a control
+  console: "if a very small organisation wants limited features, how do I turn features on or off for
+  any agency or company, and decide which features go in how much money?"
+
+- **The bank file is mostly validation, and that is the valuable half.** Producing a CSV is twenty
+  lines; refusing to produce a bad one is the point. A missing IFSC found here costs a minute; found
+  by the bank it costs a re-run of payday, because **banks reject the whole batch rather than the one
+  bad row**. So nothing is silently dropped — every excluded person is named with a reason before the
+  download, and the total shown is what the file actually pays rather than what payroll said. Those
+  differ exactly when somebody has been excluded, which is when the difference matters most.
+- **Generated server-side, necessarily.** Account numbers are masked in every other response
+  (`bankAccountMasked`), so a file assembled in the browser could not contain the numbers it needs —
+  and making it able to would undo the masking everywhere else. One endpoint returns them, and it is
+  HR-only.
+- **The escaping test earns its place:** an unescaped comma in a name shifts every column after it, so
+  an account number lands in the amount field. The bank either rejects the batch or pays a number that
+  happened to parse.
+
+- **Plans: a package of features with a price, plus a per-company override.** Four rules decide any
+  feature — the company's own override, then their agency's, then their plan, then the feature
+  default. The order encodes a judgement: **a promise made in a sales call outranks a table**, so an
+  override wins even over the plan, in both directions.
+- **Three states, not two.** On, Off, and *Plan* — the third clears the override and puts them back on
+  whatever the package says. Without it there is no way to undo a change except by remembering what
+  the plan contained. On the API, omitting `enabled` clears rather than meaning false.
+- **Every module defaults ON**, so the day plans arrived nobody lost a screen. A plan must be assigned
+  deliberately. People, attendance, leave and documents are not switchable at all: they are what an HR
+  product *is*, and a switch that must never be flipped is a liability rather than a feature.
+- **Enforced server-side by `FeatureGuardFilter`, and that is what makes a plan real.** Hiding a nav
+  entry while the API stays open leaves the module one typed URL away — precisely the mistake the
+  subscription lock made before PD-10 fixed it. 403 rather than 404: pretending the endpoint does not
+  exist is a lie that costs a support call, where "you don't have it" is a sales conversation.
+- **The design error the tests caught, worth recording.** `plan_code` first went on `subscriptions`,
+  reasoning that seats and price already live there. Nine tests failed instantly with 404: a
+  subscription row is created **lazily** by `BillingService.getOrCreate`, so a self-registered company
+  has none, and a plan kept there could not be assigned to a new customer at all. Moved to
+  `companies`. The lesson underneath it: **entitlement is not a billing fact** — what a company may
+  use must be answerable on every request, including for a trial that has never been invoiced.
+- **Plans are retired, never deleted.** A company pointing at a deleted plan would fall back to
+  feature defaults, and every module defaults on — so deleting a plan would silently hand its
+  customers the entire product.
+- **Final outcome:** _30 new tests (16 bank file, 14 plans and enforcement); the whole backend suite
+  green._ Documented in [docs/PLANS-AND-FEATURES.md](docs/PLANS-AND-FEATURES.md).
+
 ---
 
 ## 4. Architecture Decision Log
