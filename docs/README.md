@@ -50,6 +50,7 @@ running right now, and change whenever it does.
 | [DATABASE.md](DATABASE.md) | Neon: connection, DBeaver, and the two traps that disable tenant isolation silently |
 | [QA.md](QA.md) | Testing the deployed app, and the latest results |
 | [LEGAL.md](LEGAL.md) | The privacy policy and terms — what must be filled in before publishing |
+| [STATUTORY-PAYROLL.md](STATUTORY-PAYROLL.md) | Provident Fund, the per-customer switch, and how to turn it on |
 | [PRICING.md](PRICING.md) | Both price lists, competitor research, and how to change a price |
 | [MARKET-GAPS.md](MARKET-GAPS.md) | What is missing to sell in India, and why the US answer is a different product |
 

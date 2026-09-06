@@ -18,12 +18,17 @@ company. It can express *"Provident Fund = 12% of Basic"* today.
 The employee record **already stores** PF number, UAN, ESI number, professional-tax state, PAN, bank
 account and IFSC.
 
-What does not exist is anything that **knows the rules**: the ₹15,000 PF wage ceiling, the split
+What did not exist was anything that **knew the rules**: the ₹15,000 PF wage ceiling, the split
 between EPF and EPS, the employer's matching share, the ₹21,000 ESI eligibility threshold, or
 state-wise PT slabs.
 
-**Structure without compliance.** That distinction is the whole analysis, and it is good news: the
-hard architectural work is done, and what remains is well-defined, finite rule-writing.
+**Structure without compliance.** That distinction was the whole analysis, and it proved to be good
+news: the hard architectural work was already done, and what remained was well-defined, finite
+rule-writing.
+
+**Since then, PF has been written** (6 September 2026, behind a per-customer switch) and it took a
+session rather than a quarter — which is the evidence for the claim above. ESI, professional tax and
+TDS are the same shape of work.
 
 ---
 
@@ -37,8 +42,8 @@ Verified by exercising create, update and delete against the live deployment —
 | Attendance | Check-in/out, regularisation with approval, day view | Nearly | Nearly |
 | Shifts | Shift definitions, roster assignment | ✅ | ✅ |
 | Leave | 5 types, per-company policy: annual or monthly accrual, carry-forward caps, comp-off credits; manager-scoped approval | ✅ | Nearly |
-| Payroll structure | Configurable components, payslips, real figures | Structure only | Structure only |
-| Statutory fields | PF, UAN, ESI, PT state, PAN modelled | Stored, not computed | Wrong country |
+| Payroll structure | Configurable components, payslips, real figures | ✅ | ✅ |
+| Statutory payroll | **PF computed** behind a per-customer switch; ESI/PT/TDS fields stored but not computed | Partly | Wrong country |
 | Expenses | Claim → approve → reimburse | ✅ | ✅ |
 | Documents | Letterhead, 5 templates, 22 merge fields, offer letters | ✅ | ✅ |
 | Recruitment | Jobs, pipeline, offer letter, hire → employee | ✅ | ✅ |
@@ -56,10 +61,17 @@ absence during the trial.
 
 ### Deal-breakers
 
-**1. Statutory computation — PF, ESI, PT.** Not the fields, the *rules*. The ₹15,000 PF wage ceiling,
-employee and employer shares split across EPF and EPS, the ₹21,000 ESI threshold and what happens when
-someone crosses it mid-contribution-period, and PT slabs that differ by state. The component engine can
-hold the numbers; nothing computes them.
+**1. Statutory computation — ~~PF~~, ESI, PT.** Not the fields, the *rules*.
+
+**PF landed 6 September 2026**, behind a per-customer switch — the ₹15,000 wage ceiling, the split of
+the employer's 12% between EPS and EPF, the ceiling opt-out, admin charges and EDLI, computed on basic
+rather than gross, with the employer cost reported on the payroll run. Off for every company until you
+switch it on. See [STATUTORY-PAYROLL.md](STATUTORY-PAYROLL.md).
+
+**Still missing: ESI and professional tax.** ESI is 0.75%/3.25% with a ₹21,000 eligibility threshold
+and the rule that somebody who crosses it mid-contribution-period stays in until the period ends —
+which is where implementations usually go wrong. PT is slab tables that differ by state: tedious
+rather than hard, and needed by any customer operating in more than one.
 
 **2. Income tax — declarations, TDS, Form 16.** Old versus new regime selection, 80C/80D declarations
 with proof-submission windows, projected annual tax spread across remaining months, monthly TDS

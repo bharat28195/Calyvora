@@ -1005,6 +1005,45 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md): **encashment**, sandwich-leave and probation rules, and
   for any US sale an hours-worked accrual basis rather than months-of-service.
 
+### PD-30 · 2026-09-06 · Statutory payroll starts, behind a switch you control per customer
+- **Context:** PF/ESI/PT is the deal-breaker for an Indian sale (PD-26). It is also the first thing in
+  the product that can print a wrong figure on somebody's payslip and have them act on it. Those two
+  facts pull in opposite directions, and the resolution was asked for explicitly: build it, but keep
+  it behind a flag that can be turned on and off per customer.
+- **Built:** Provident Fund end to end — the ₹15,000 wage ceiling, the employer's 12% split between
+  EPS and EPF, the ceiling opt-out, admin charges and EDLI. Rates live in a `pf_settings` row per
+  company, not in constants, because statutes change and a rate change should be an UPDATE rather
+  than a redeploy.
+- **Two independent gates, and neither implies the other.** The company-level flag is the vendor's
+  (platform console); the per-employee `pfStatus` is HR's. A company with the feature on still
+  deducts nothing from someone not enrolled, and an employee marked enrolled at a company without the
+  feature sees nothing change. Both directions are tested, as is the one that would be worst:
+  **turning it on for one company must leave another alone.** A flag that leaked across tenants would
+  deduct money from the salaries of a customer who never asked for it.
+- **`company_features` has no row-level security, deliberately.** The platform owner toggles these for
+  *other* tenants from a session bound to its own platform company; an RLS policy keyed on
+  `calyvora.company_id` would make every such write invisible and silently do nothing. It joins
+  companies, users and subscriptions on the un-RLS'd control surface and holds no personal data.
+  `pf_settings` is RLS'd, because it is tenant data.
+- **The two errors the calculator is built to avoid**, both of which look fine on a payslip:
+  **(1)** EPS is capped at the ceiling even when the employer contributes on a higher wage — computing
+  8.33% of a ₹50,000 basic overstates the pension share fourfold while leaving the employer total
+  unchanged, so nothing looks wrong until the EPFO rejects the return; **(2)** PF is computed on
+  *basic*, not gross — using gross would roughly double every deduction in the company and remain
+  entirely plausible on the document. `PayslipTemplateService.Computed` now returns the basis amount
+  explicitly so no caller has to guess.
+- **Same pure-function approach as the leave engine**, for a stronger reason: this number leaves
+  somebody's bank account. Ten unit tests in 0.11 seconds, each a wage and a split checkable by hand
+  against the Act, including the ceiling opt-out and a moved ceiling.
+- **The employer contribution is reported separately** on the payslip and the payroll run. It is
+  neither gross nor net — the company pays it on top and the employee never banks it — and there was
+  previously nowhere to read what a month actually costs.
+- **Final outcome:** _20 new tests (10 unit, 10 integration); the whole backend suite green._ Off for
+  every company until switched on. Documented in
+  [docs/STATUTORY-PAYROLL.md](docs/STATUTORY-PAYROLL.md), including the order for what follows: ESI
+  (with the mid-period threshold rule), professional tax, TDS and Form 16, then the ECR and bank
+  payment files.
+
 ---
 
 ## 4. Architecture Decision Log

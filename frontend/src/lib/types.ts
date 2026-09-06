@@ -1244,6 +1244,49 @@ export interface Payslip {
   workingDays: number;
   lopDays: number;
   payableDays: number;
+  /**
+   * Statutory contributions, or null when the company does not have statutory payroll switched on or
+   * this person is not enrolled. Null rather than zeroes: "PF: 0" reads as an error to the person
+   * holding the payslip; an absent section reads as "not applicable", which is the truth.
+   */
+  statutory: PayslipStatutory | null;
+}
+
+/**
+ * The employer's side of statutory contributions.
+ *
+ * <p>`employeePf` also appears as a deduction line and is already inside `net` — it is repeated here
+ * so the statutory block can be read on its own.
+ */
+export interface PayslipStatutory {
+  /** The wages PF was computed on, after any ceiling. Printed because it answers the most common
+   *  payslip question in India: "why is my PF 1,800 when my basic is 50,000?" */
+  pfWages: number;
+  employeePf: number;
+  employerEps: number;
+  employerEpf: number;
+  employerAdminCharges: number;
+  employerEdli: number;
+  employerTotal: number;
+}
+
+/** One company's Provident Fund rates, plus whether statutory payroll is switched on at all. */
+export interface PfSettings {
+  /** The vendor's switch, not the customer's. The screen explains it rather than offering it. */
+  enabled: boolean;
+  wageCeiling: number;
+  restrictToCeiling: boolean;
+  employeeRate: number;
+  employerRate: number;
+  epsRate: number;
+  adminChargeRate: number;
+  edliRate: number;
+}
+
+/** A capability, on or off for one company. */
+export interface FeatureState {
+  feature: "STATUTORY_PAYROLL";
+  enabled: boolean;
 }
 
 /**
@@ -1281,6 +1324,10 @@ export interface PayrollRunRow {
   gross: number;
   lopDays: number;
   net: number;
+  /** Deducted from this person, already inside `net`. Zero when statutory payroll is off. */
+  employeePf: number;
+  /** Paid by the company on top — outside both `gross` and `net`. */
+  employerContribution: number;
 }
 export interface PayrollRun {
   month: string;
@@ -1290,6 +1337,11 @@ export interface PayrollRun {
   totalNet: number;
   totalLopDays: number;
   employees: number;
+  /**
+   * Employer statutory contributions for the month. Neither gross nor net — the company pays it on
+   * top of salary and the employee never sees it. What a month actually costs is gross + this.
+   */
+  totalEmployerContribution: number;
 }
 
 /** Shape of the one API error envelope (Sprint1 §13). */

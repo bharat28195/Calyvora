@@ -31,8 +31,16 @@ public class PayslipTemplateService {
     }
 
     /** The result of applying the template to a monthly gross. */
+    /**
+     * @param basic the amount of the component marked as the basis — "Basic" in every template that
+     *              has one. Exposed because Provident Fund is computed on basic plus dearness
+     *              allowance rather than on gross, and a caller that had to guess would either
+     *              re-derive the template's arithmetic or, far worse, use gross and overstate every
+     *              deduction in the company. Zero when a template has no basis component.
+     */
     public record Computed(List<Line> earnings, List<Line> deductions,
-                           BigDecimal gross, BigDecimal totalDeductions, BigDecimal net) {}
+                           BigDecimal gross, BigDecimal totalDeductions, BigDecimal net,
+                           BigDecimal basic) {}
 
     @Transactional
     public List<PayslipComponentResponse> template() {
@@ -134,7 +142,7 @@ public class PayslipTemplateService {
         if (net.signum() < 0) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Payslip deductions exceed gross pay — check the template");
         }
-        return new Computed(earnings, deductions, gross, totalDed, net);
+        return new Computed(earnings, deductions, gross, totalDed, net, basisAmount);
     }
 
     // ---- validation ----

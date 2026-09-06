@@ -2,6 +2,8 @@ package com.calyvora.platform;
 
 import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.CurrentUser;
+import com.calyvora.feature.Feature;
+import com.calyvora.feature.FeatureService;
 import com.calyvora.platform.dto.CompanySummaryResponse;
 import com.calyvora.platform.dto.CreateCompanyRequest;
 import com.calyvora.platform.dto.SeatRequestResponse;
@@ -31,11 +33,14 @@ public class PlatformController {
 
     private final PlatformService service;
     private final com.calyvora.trial.TrialRequestService trialRequests;
+    private final FeatureService featureService;
 
     public PlatformController(PlatformService service,
-                              com.calyvora.trial.TrialRequestService trialRequests) {
+                              com.calyvora.trial.TrialRequestService trialRequests,
+                              FeatureService featureService) {
         this.service = service;
         this.trialRequests = trialRequests;
+        this.featureService = featureService;
     }
 
     @GetMapping("/companies")
@@ -97,6 +102,31 @@ public class PlatformController {
     @PostMapping("/companies/{id}/seats")
     public CompanySummaryResponse setSeats(@PathVariable UUID id, @RequestBody Map<String, Integer> body) {
         return service.setSeats(id, body.getOrDefault("seats", 5));
+    }
+
+    /**
+     * Which capabilities are switched on for one customer.
+     *
+     * <p>The vendor's decision, not the customer's, which is why it lives here and the company-side
+     * endpoint is read-only. Statutory payroll is the first of these: it is the first thing in the
+     * product that can print a wrong figure on somebody's payslip, so it is trusted one company at a
+     * time, after their numbers have been checked against a real run.
+     */
+    @GetMapping("/companies/{id}/features")
+    public List<FeatureService.FeatureState> features(@PathVariable UUID id) {
+        return featureService.statesFor(id);
+    }
+
+    /** Body: {"feature":"STATUTORY_PAYROLL","enabled":true}. */
+    @PostMapping("/companies/{id}/features")
+    public FeatureService.FeatureState setFeature(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        Object feature = body.get("feature");
+        if (feature == null) {
+            throw new com.calyvora.common.error.ApiException(
+                    com.calyvora.common.error.ErrorCode.VALIDATION_ERROR, "Which feature?");
+        }
+        return featureService.set(id, Feature.parse(feature.toString()),
+                Boolean.TRUE.equals(body.get("enabled")));
     }
 
     /** Set the subscription end date directly (edit/reset). Body: {"endsAt":"YYYY-MM-DD"}. */

@@ -23,6 +23,11 @@ export default function PayrollRunPage() {
     api.payrollRun(month).then(setRun).catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load"));
   }, [month]);
 
+  // Whether to show the statutory columns at all. Driven by the run's own numbers rather than by a
+  // separate call for the feature flag: if nothing was contributed, an empty PF column is noise, and
+  // a company with the feature on but nobody enrolled is in exactly that position.
+  const hasPf = (run?.totalEmployerContribution ?? 0) > 0;
+
   return (
     <div>
       <Link href="/payroll" className="inline-flex items-center gap-1 text-sm text-fg/50 hover:text-fg"><ArrowLeft className="h-4 w-4" /> Payroll</Link>
@@ -48,6 +53,15 @@ export default function PayrollRunPage() {
             <Kpi label="LOP days" value={String(run.totalLopDays)} />
           </div>
 
+          {/* Only when statutory payroll is on for this company. A zero here would read as a bug
+              rather than as "not applicable", which is what it would actually mean. */}
+          {run.totalEmployerContribution > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Kpi label="Employer PF" value={money(run.totalEmployerContribution)} />
+              <Kpi label="Total cost" value={money(run.totalGross + run.totalEmployerContribution)} />
+            </div>
+          )}
+
           <Card className="mt-6 overflow-x-auto p-0">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
@@ -55,12 +69,13 @@ export default function PayrollRunPage() {
                   <th className="px-5 py-3 font-medium">Employee</th>
                   <th className="px-3 py-3 font-medium text-right">Gross</th>
                   <th className="px-3 py-3 font-medium text-right">LOP</th>
+                  {hasPf && <th className="px-3 py-3 font-medium text-right">PF</th>}
                   <th className="px-5 py-3 font-medium text-right">Net</th>
                 </tr>
               </thead>
               <tbody>
                 {run.rows.length === 0 ? (
-                  <tr><td colSpan={4} className="px-5 py-8 text-center text-fg/50">No salaries on record for this month.</td></tr>
+                  <tr><td colSpan={hasPf ? 5 : 4} className="px-5 py-8 text-center text-fg/50">No salaries on record for this month.</td></tr>
                 ) : run.rows.map((r) => (
                   <tr key={r.employeeId} className="border-b border-fg/5 last:border-0">
                     <td className="px-5 py-3">
@@ -69,6 +84,11 @@ export default function PayrollRunPage() {
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-fg/70">{money(r.gross)}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{r.lopDays > 0 ? <span className="text-amber-400">{r.lopDays}</span> : <span className="text-fg/30">—</span>}</td>
+                    {hasPf && (
+                      <td className="px-3 py-3 text-right tabular-nums text-fg/70">
+                        {r.employeePf > 0 ? money(r.employeePf) : <span className="text-fg/30">—</span>}
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-right tabular-nums font-semibold text-emerald-400">{money(r.net)}</td>
                   </tr>
                 ))}

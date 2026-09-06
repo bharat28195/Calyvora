@@ -97,6 +97,10 @@ const NAV: NavItem[] = [
       { href: "/payroll", label: "Salaries" },
       { href: "/payroll/run", label: "Payroll run" },
       { href: "/payroll/template", label: "Payslip template" },
+      // Always listed, whether or not the feature is switched on for this company: the screen itself
+      // says which, so HR can check the rates before asking us to turn it on. Hiding it would leave
+      // somebody told "PF starts next month" with nowhere to look.
+      { href: "/payroll/statutory", label: "Statutory (PF)" },
     ],
   },
   { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS },

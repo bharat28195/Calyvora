@@ -286,8 +286,23 @@ function RowActions({ company: c, busy, act }: {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<null | "date" | "seats" | "price">(null);
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+  const [statutory, setStatutory] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fetched when the menu opens rather than for every row on page load: the console lists every
+  // company on the platform, and one request per row to decide the wording of one menu item would be
+  // dozens of calls to render a table nobody has clicked yet.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    api.companyFeaturesFor(c.companyId)
+      .then((fs) => {
+        if (!cancelled) setStatutory(fs.some((f) => f.feature === "STATUTORY_PAYROLL" && f.enabled));
+      })
+      .catch(() => { /* the menu still works; the label just reads as "turn on" */ });
+    return () => { cancelled = true; };
+  }, [open, c.companyId]);
 
   const MENU_WIDTH = 224; // w-56
 
@@ -352,6 +367,16 @@ function RowActions({ company: c, busy, act }: {
   if (!c.locked) {
     items.push({ label: "End subscription", run: () => act(c.companyId, () => api.endCompanySubscription(c.companyId)), danger: true });
   }
+  // Statutory payroll, one customer at a time. It is the first thing in the product that can print a
+  // wrong figure on somebody payslip, so it stays off until their numbers have been checked against a
+  // real run — and turning it back off must be as easy as turning it on.
+  items.push({
+    label: statutory ? "Turn off statutory payroll (PF)" : "Turn on statutory payroll (PF)",
+    run: () => act(c.companyId, async () => {
+      await api.setCompanyFeature(c.companyId, "STATUTORY_PAYROLL", !statutory);
+      setStatutory(!statutory);
+    }),
+  });
 
   return (
     <div className="flex items-center justify-end gap-1.5">

@@ -8,6 +8,8 @@ import com.calyvora.identity.UserRepository;
 import com.calyvora.people.dto.AddCompensationRequest;
 import com.calyvora.people.dto.CompensationResponse;
 import com.calyvora.people.dto.CompensationResponse.Entry;
+import com.calyvora.feature.Feature;
+import com.calyvora.payroll.PfCalculator;
 import com.calyvora.people.dto.PayslipResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,8 @@ public class CompensationService {
     private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
     private final EmployeeFinanceService financeService;
     private final DepartmentRepository departmentRepository;
+    private final com.calyvora.feature.FeatureService featureService;
+    private final com.calyvora.payroll.PfSettingsService pfSettingsService;
 
     public CompensationService(CompensationRepository compensationRepository,
                                EmployeeRepository employeeRepository, UserRepository userRepository,
@@ -45,7 +49,9 @@ public class CompensationService {
                                com.calyvora.company.CompanyRepository companyRepository,
                                com.calyvora.company.CompanySettingsRepository companySettingsRepository,
                                EmployeeFinanceService financeService,
-                               DepartmentRepository departmentRepository) {
+                               DepartmentRepository departmentRepository,
+                               com.calyvora.feature.FeatureService featureService,
+                               com.calyvora.payroll.PfSettingsService pfSettingsService) {
         this.financeService = financeService;
         this.departmentRepository = departmentRepository;
         this.compensationRepository = compensationRepository;
@@ -56,6 +62,8 @@ public class CompensationService {
         this.employeeService = employeeService;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
+        this.featureService = featureService;
+        this.pfSettingsService = pfSettingsService;
     }
 
     @Transactional(readOnly = true)
@@ -136,22 +144,30 @@ public class CompensationService {
                 ? java.time.YearMonth.now() : java.time.YearMonth.parse(month);
         List<com.calyvora.people.dto.PayrollRunResponse.Row> rows = new java.util.ArrayList<>();
         BigDecimal totalGross = BigDecimal.ZERO, totalNet = BigDecimal.ZERO;
+        BigDecimal totalEmployer = BigDecimal.ZERO;
         double totalLop = 0;
         String currency = companyCurrency(TenantContext.getCompanyId());
         for (var e : employeeService.directory()) {
             try {
                 PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString());
+                // Absent statutory block = the feature is off or this person is not enrolled. Zero
+                // rather than null so the row arithmetic works without every caller null-checking.
+                BigDecimal employeePf = p.statutory() == null ? BigDecimal.ZERO : p.statutory().employeePf();
+                BigDecimal employerContribution =
+                        p.statutory() == null ? BigDecimal.ZERO : p.statutory().employerTotal();
                 rows.add(new com.calyvora.people.dto.PayrollRunResponse.Row(
-                        e.id(), p.employeeName(), e.jobTitle(), p.gross(), p.lopDays(), p.net()));
+                        e.id(), p.employeeName(), e.jobTitle(), p.gross(), p.lopDays(), p.net(),
+                        employeePf, employerContribution));
                 totalGross = totalGross.add(p.gross());
                 totalNet = totalNet.add(p.net());
+                totalEmployer = totalEmployer.add(employerContribution);
                 totalLop += p.lopDays();
             } catch (NotFoundException noSalary) {
                 // Employee has no salary on record yet — not part of this run.
             }
         }
         return new com.calyvora.people.dto.PayrollRunResponse(
-                ym.toString(), currency, rows, totalGross, totalNet, totalLop, rows.size());
+                ym.toString(), currency, rows, totalGross, totalNet, totalLop, rows.size(), totalEmployer);
     }
 
     /**
@@ -212,6 +228,30 @@ public class CompensationService {
         List<PayslipResponse.Line> deductions = new java.util.ArrayList<>(c.deductions());
         BigDecimal totalDed = c.totalDeductions();
         BigDecimal net = c.net();
+
+        // --- Provident Fund, when the company has statutory payroll switched on ------------------
+        //
+        // Two switches, both of which must be on: the company-level feature (the vendor's decision,
+        // off for everybody until their numbers have been checked) and this employee's own PF status.
+        // Neither implies the other — a company can run PF and still have employees who are not
+        // enrolled, and an employee marked ENABLED at a company without the feature must not suddenly
+        // see a deduction appear.
+        //
+        // Computed on BASIC, not gross. Using gross here would overstate every PF deduction in the
+        // company by roughly a factor of two, and it would look plausible on the payslip.
+        EmployeeFinance financeForPf = financeService.rawOrNull(employeeId);
+        PayslipResponse.Statutory statutory = null;
+        if (featureService.isEnabled(companyId, Feature.STATUTORY_PAYROLL)
+                && financeForPf != null && "ENABLED".equals(financeForPf.getPfStatus())) {
+            PfCalculator.Result pf = PfCalculator.compute(c.basic(), pfSettingsService.effective(companyId));
+            if (pf.employee().signum() > 0) {
+                deductions.add(new PayslipResponse.Line("Provident Fund (employee)", pf.employee()));
+                totalDed = totalDed.add(pf.employee());
+                net = net.subtract(pf.employee());
+            }
+            statutory = new PayslipResponse.Statutory(pf.pfWages(), pf.employee(), pf.employerEps(),
+                    pf.employerEpf(), pf.adminCharges(), pf.edli(), pf.employerTotal());
+        }
         if (lopDays > 0 && workingDays > 0) {
             BigDecimal perDay = gross.divide(BigDecimal.valueOf(workingDays), 2, RoundingMode.HALF_UP);
             BigDecimal lop = perDay.multiply(BigDecimal.valueOf(lopDays)).setScale(2, RoundingMode.HALF_UP);
@@ -231,7 +271,8 @@ public class CompensationService {
 
         // Who it's for, and the statutory identifiers a payslip is expected to carry. All optional —
         // a company that hasn't filled in PF/PAN yet still gets a valid payslip, just a sparser one.
-        EmployeeFinance finance = financeService.rawOrNull(employeeId);
+        // Same row the PF block read above; one fetch, because it is the same fact.
+        EmployeeFinance finance = financeForPf;
         String department = employee.getDepartmentId() == null ? null
                 : departmentRepository.findById(employee.getDepartmentId())
                         .map(Department::getName).orElse(null);
@@ -248,7 +289,7 @@ public class CompensationService {
                 finance == null ? null : maskPan(finance.getPanNumber()),
                 c.earnings(), deductions, c.gross(), totalDed, net,
                 AmountInWords.of(net, cur),
-                workingDays, lopDays, payableDays);
+                workingDays, lopDays, payableDays, statutory);
     }
 
     /** PAN as {@code XXXXXX894N} — a payslip identifies the PAN without reprinting it in full. */

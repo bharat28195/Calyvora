@@ -614,6 +614,9 @@ export const mockBackend = {
       deductions, gross, totalDeductions: totalDed, net,
       netInWords: amountInWords(net, comp.currency),
       workingDays, lopDays, payableDays: Math.max(0, workingDays - lopDays),
+      // Null, not zeroes: statutory payroll needs the live backend, and an absent block is how the
+      // payslip says "not applicable" rather than "your PF is nil".
+      statutory: null,
     };
   },
 
@@ -665,10 +668,12 @@ export const mockBackend = {
       const comp = buildCompensation(db, e.id);
       if (comp.currentAnnual == null) continue;
       const p = await this.payslip(accessToken, e.id, month);
-      rows.push({ employeeId: e.id, name: p.employeeName, jobTitle: e.jobTitle ?? null, gross: p.gross, lopDays: p.lopDays, net: p.net });
+      // Statutory payroll is a live-backend feature; the mock reports zero rather than inventing
+      // contributions, and the payroll screen hides the columns when the total is zero.
+      rows.push({ employeeId: e.id, name: p.employeeName, jobTitle: e.jobTitle ?? null, gross: p.gross, lopDays: p.lopDays, net: p.net, employeePf: 0, employerContribution: 0 });
       totalGross = round2(totalGross + p.gross); totalNet = round2(totalNet + p.net); totalLopDays += p.lopDays; currency = p.currency;
     }
-    return { month: month || new Date().toISOString().slice(0, 7), currency, rows, totalGross, totalNet, totalLopDays, employees: rows.length };
+    return { month: month || new Date().toISOString().slice(0, 7), currency, rows, totalGross, totalNet, totalLopDays, employees: rows.length, totalEmployerContribution: 0 };
   },
 
   async clients(accessToken: string | null): Promise<Client[]> {

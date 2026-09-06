@@ -167,6 +167,27 @@ export default function MyPayslipPage() {
                   )}
                 </div>
 
+                {/* The employer's side of PF. Not part of A − B — the company pays it on top and it
+                    never reaches the bank account — but it is the employee's pension, so a payslip
+                    that hides it is telling half the story. Absent entirely when statutory payroll is
+                    off or this person is not enrolled. */}
+                {slip.statutory && (
+                  <div className="mt-5 rounded-lg border border-fg/10 px-4 py-3">
+                    <p className="mb-2 text-xs uppercase tracking-wide text-fg/40">
+                      Employer contributions (not deducted from your salary)
+                    </p>
+                    <Row label="Pension fund (EPS)" value={money(slip.statutory.employerEps, currency)} />
+                    <Row label="Provident fund (EPF)" value={money(slip.statutory.employerEpf, currency)} />
+                    <Row label="Admin charges" value={money(slip.statutory.employerAdminCharges, currency)} />
+                    <Row label="EDLI" value={money(slip.statutory.employerEdli, currency)} />
+                    <Row label="Total contributed for you" value={money(slip.statutory.employerTotal, currency)} strong />
+                    <p className="mt-2 border-t border-fg/10 pt-2 text-[11px] text-fg/40">
+                      Contributions are calculated on PF wages of {money(slip.statutory.pfWages, currency)} for
+                      this month.
+                    </p>
+                  </div>
+                )}
+
                 <p className="mt-4 text-[11px] italic text-fg/40">
                   All amounts are in {currency}. This is a computer-generated statement and does not
                   require a signature.

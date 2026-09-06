@@ -70,7 +70,9 @@ import {
   type MergeField,
   type Invitation,
   type CompOffCredit,
+  type FeatureState,
   type LeaveBalance,
+  type PfSettings,
   type LeavePolicy,
   type LeaveRequest,
   type LeaveTypeBalance,
@@ -443,6 +445,18 @@ export const api = {
   },
   createCompany(input: CreateCompanyInput): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>("/platform/companies", { method: "POST", body: JSON.stringify(input) }) : Promise.reject(new Error("The platform console requires the live backend."));
+  },
+  /** Which capabilities are on for one customer (platform console). */
+  companyFeaturesFor(companyId: string): Promise<FeatureState[]> {
+    return LIVE ? http<FeatureState[]>(`/platform/companies/${companyId}/features`) : Promise.reject(new Error("live only"));
+  },
+  setCompanyFeature(companyId: string, feature: string, enabled: boolean): Promise<FeatureState> {
+    return LIVE
+      ? http<FeatureState>(`/platform/companies/${companyId}/features`, {
+          method: "POST",
+          body: JSON.stringify({ feature, enabled }),
+        })
+      : Promise.reject(new Error("live only"));
   },
   endCompanySubscription(companyId: string): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/end`, { method: "POST" }) : Promise.reject(new Error("live only"));
@@ -983,6 +997,22 @@ export const api = {
   payrollRun(month?: string): Promise<PayrollRun> {
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";
     return LIVE ? http<PayrollRun>(`/payroll/run${qs}`) : mockBackend.payrollRun(accessToken, month);
+  },
+  pfSettings(): Promise<PfSettings> {
+    return http<PfSettings>("/payroll/pf-settings");
+  },
+  updatePfSettings(patch: Partial<Omit<PfSettings, "enabled">>): Promise<PfSettings> {
+    return http<PfSettings>("/payroll/pf-settings", { method: "PATCH", body: JSON.stringify(patch) });
+  },
+  /**
+   * Which capabilities are on for my own company.
+   *
+   * <p>Falls back to everything-off rather than throwing when the mock backend is in use: a screen
+   * that hides itself is the correct behaviour for an unavailable feature, and a demo should not
+   * break on a capability it does not have.
+   */
+  companyFeatures(): Promise<FeatureState[]> {
+    return LIVE ? http<FeatureState[]>("/company/features") : Promise.resolve([]);
   },
   searchPages(q: string): Promise<PageSummary[]> {
     return LIVE

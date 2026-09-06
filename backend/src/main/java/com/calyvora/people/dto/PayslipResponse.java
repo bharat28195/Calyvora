@@ -46,7 +46,33 @@ public record PayslipResponse(
         // Attendance linkage: LOP (unpaid absence) reduces net pay for the month.
         int workingDays,
         double lopDays,
-        double payableDays
+        double payableDays,
+
+        /**
+         * Statutory contributions, or null when the company does not have statutory payroll switched
+         * on or this employee is not enrolled.
+         *
+         * <p>Nullable rather than a block of zeroes: a payslip showing "PF: 0" reads as an error to
+         * the person holding it, where an absent section reads as "not applicable", which is the
+         * truth.
+         */
+        Statutory statutory
 ) {
     public record Line(String label, BigDecimal amount) {}
+
+    /**
+     * What the employer pays on top of salary, and on what.
+     *
+     * <p>The employee's own PF contribution is <em>not</em> here — it is a deduction line like any
+     * other, because it comes out of their pay and must be inside the net calculation. This block is
+     * the employer's side, which never touches net and which the employee is nonetheless entitled to
+     * see: it is their pension.
+     *
+     * @param pfWages the wages the contribution was computed on, after any ceiling — printed because
+     *                "why is my PF 1,800 when my basic is 50,000?" is the most common payslip
+     *                question in India, and the answer is this number
+     */
+    public record Statutory(BigDecimal pfWages, BigDecimal employeePf, BigDecimal employerEps,
+                            BigDecimal employerEpf, BigDecimal employerAdminCharges,
+                            BigDecimal employerEdli, BigDecimal employerTotal) {}
 }
