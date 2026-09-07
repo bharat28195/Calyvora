@@ -4,6 +4,44 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-07 — My team, and visibility that follows the org chart instead of the job title
+**Symptom the founder reported:** _"manager should see data only for his team, not for the full
+company — right now his and admin both have the same data and sections."_ True, and worse than it
+looked: each module decided scope for itself and they disagreed, so a manager saw either everything or
+nothing depending on which page they opened.
+
+- **`OrgScope` is now the single answer to "who may this person see."** The whole company for OWNER,
+  ADMIN and HR — whose job *is* the company — and self plus your transitive downline for everyone
+  else. **MANAGER is deliberately not on the whole-company list:** a manager's reach comes from having
+  reports, so a manager of nobody now sees nobody.
+- **`/team` — "My team", for anyone with reports, whatever their role is called.** A senior engineer
+  with two interns leads a team; a MANAGER with an empty team does not. Attendance, time off,
+  expenses, performance, and a roster showing each person's month. **No pay, and not merely hidden** —
+  the API never assembles it (`TeamService`).
+- **Transitive, not one level.** Team reviews were keyed on the review row's own manager column, so a
+  head of department with four leads under them saw four reviews and none of the thirty their leads
+  write. Leave and regularization approvals had the same ceiling, which left a queue stuck whenever a
+  direct manager was away.
+- **Fixed leak: `/people/exits` listed every resignation in the company** to anybody who could open
+  the screen — which was every manager. Now scoped to the caller's own org; HR and admins still get
+  the business.
+- **Fixed leak: a manager could read each report's exact salary** off the review list.
+  `PerformanceReviewResponse.withoutPay()` strips the figures for everyone but HR and the person
+  themselves. A hike is still proposed as a percentage, which is all the judgement needs.
+- **Reporting loops are now refused** (`requireNoCycle`). Only self-management was blocked before; now
+  that the tree carries authority, A→B→A would make each of them the other's subordinate and hand them
+  each other's attendance, leave and reviews — an escalation two profile edits deep.
+- **Designations (Flyway V48): the ladder a company defines for itself** — Intern, Junior, Senior,
+  Lead, whatever they call theirs. Editable under People → Designations. **It grants nothing**, and
+  the page says so: a permission you could award yourself by renaming your own row would not be a
+  permission. Optional — existing customers keep their job titles and nothing changes for them.
+- **Nav: Finance and Performance moved out of "Me".** Payday is the one thing an employee opens this
+  product for most months, and it sat three clicks deep inside a section that reads as "my profile".
+  `/me/payslip`, `/me/finances`, `/me/performance` and `/me/review` remain as redirects — notification
+  rows already sitting in customer databases carry those URLs.
+- **Not done, deliberately:** approving a team's expenses is still Admin/HR work, so the team expenses
+  page is read-only rather than offering a button that would 403.
+
 ### 2026-08-09 — Brand icon in the browser tab
 **Symptom:** every tab — marketing site and app alike — showed the browser's blank-globe placeholder.
 No favicon had ever been added, so `/favicon.ico` 404'd and the browser fell back to its default.

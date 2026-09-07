@@ -57,8 +57,8 @@ class PayrollBillingIntegrationTest extends IntegrationTestBase {
         // Northwind is on the published price list, well inside the first tier (₹149 up to 100).
         assertThat(b.get("pricePerEmployee").asDouble()).isEqualTo(149.0);
         assertThat(b.get("pricePerEmployeePerYear").asDouble()).isEqualTo(1788.0);
-        assertThat(b.get("billableEmployees").asInt()).isEqualTo(6);
-        // 6 × ₹149 is ₹894, below the ₹1,299 monthly minimum — so the floor is what they pay.
+        assertThat(b.get("billableEmployees").asInt()).isEqualTo(7);
+        // 7 × ₹149 is ₹1,043, still below the ₹1,299 monthly minimum — so the floor is what they pay.
         assertThat(b.get("monthlyCharge").asDouble()).isEqualTo(1299.0);
         assertThat(b.get("minimumApplied").asBoolean()).isTrue();
         assertThat(b.get("annualCharge").asDouble()).isEqualTo(15588.0);        // 12 months

@@ -43,9 +43,13 @@ public class LeaveService {
     private final LeavePolicyService policyService;
     private final CompOffService compOffService;
 
+    private final OrgScope orgScope;
+
     public LeaveService(LeaveRequestRepository leaveRepository, EmployeeRepository employeeRepository,
                         UserRepository userRepository, NotificationService notificationService,
-                        LeavePolicyService policyService, CompOffService compOffService) {
+                        LeavePolicyService policyService, CompOffService compOffService,
+                        OrgScope orgScope) {
+        this.orgScope = orgScope;
         this.leaveRepository = leaveRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
@@ -302,31 +306,32 @@ public class LeaveService {
                 .orElseGet(() -> employeeRepository.save(new Employee(UUID.randomUUID(), companyId, userId)));
     }
 
-    /** Roles whose approvals inbox is the whole company rather than their own reports. */
+    /** Roles whose approvals inbox is the whole company rather than their own org. */
     private boolean seesEveryone(AuthPrincipal principal) {
-        String role = principal.role();
-        return "OWNER".equals(role) || "ADMIN".equals(role) || "HR".equals(role);
+        return orgScope.seesWholeCompany(principal);
     }
 
     /**
-     * Whether {@code employeeId} reports to the employee record belonging to {@code managerUserId}.
+     * Whether {@code employeeId} sits anywhere beneath the caller in the reporting tree.
      *
-     * <p>Takes the manager's <em>user</em> id and resolves the employee row here, rather than taking an
-     * employee id: the caller only ever has a user id, and doing the lookup in one place stops the two
-     * kinds of id being confused at a call site — which would compare a user id against a manager_id
-     * column and silently match nothing, quietly denying every manager instead of failing loudly.
+     * <p>Was a single-level check against {@code manager_id}. That is wrong at the first company with
+     * three layers: a head of department whose leads are away could not approve anything, because
+     * nobody in the queue reported to them <em>directly</em>. Anyone up the chain can now decide, which
+     * is what happens in practice when the direct manager is the one on holiday.
+     *
+     * <p>The signature still takes the caller's <em>user</em> id and resolves the employee row inside,
+     * so a call site cannot pass the user id it happens to hold where an employee id is meant and
+     * silently match nobody.
      */
     private boolean isMyReport(UUID companyId, UUID employeeId, UUID managerUserId) {
         UUID managerEmployeeId = employeeRepository.findByUserId(managerUserId)
+                .filter(e -> companyId.equals(e.getCompanyId()))
                 .map(Employee::getId)
                 .orElse(null);
         if (managerEmployeeId == null) {
             return false;
         }
-        return employeeRepository.findByIdAndCompanyId(employeeId, companyId)
-                .map(Employee::getManagerId)
-                .filter(managerEmployeeId::equals)
-                .isPresent();
+        return orgScope.downlineOf(managerEmployeeId, false).contains(employeeId);
     }
 
     private String nameOf(Employee employee) {

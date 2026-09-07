@@ -51,6 +51,7 @@ running right now, and change whenever it does.
 | [QA.md](QA.md) | Testing the deployed app, and the latest results |
 | [LEGAL.md](LEGAL.md) | The privacy policy and terms — what must be filled in before publishing |
 | [PLANS-AND-FEATURES.md](PLANS-AND-FEATURES.md) | Selling a smaller product: plans, per-customer overrides, and how they are enforced |
+| [ORG-AND-VISIBILITY.md](ORG-AND-VISIBILITY.md) | Who sees whose data: roles vs. the reporting tree, "My team", and customer-defined designations |
 | [STATUTORY-PAYROLL.md](STATUTORY-PAYROLL.md) | Provident Fund, the per-customer switch, and how to turn it on |
 | [PRICING.md](PRICING.md) | Both price lists, competitor research, and how to change a price |
 | [MARKET-GAPS.md](MARKET-GAPS.md) | What is missing to sell in India, and why the US answer is a different product |

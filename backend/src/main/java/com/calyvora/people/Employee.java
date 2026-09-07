@@ -36,6 +36,18 @@ public class Employee {
     @Column(name = "job_title", length = 120)
     private String jobTitle;
 
+    /**
+     * The rung on the company's own ladder, if it keeps one. Nullable and staying that way: existing
+     * customers have job titles and no ladder, and inventing designations for them at migration time
+     * would guess wrong on every misspelling.
+     *
+     * <p>Sits alongside {@link #jobTitle} rather than replacing it — the designation is the level
+     * ("Senior Engineer"), the job title is what goes on the business card ("Senior Engineer,
+     * Payments"). Neither one grants any access; see {@link Designation}.
+     */
+    @Column(name = "designation_id")
+    private UUID designationId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "employment_type", length = 24)
     private EmploymentType employmentType;
@@ -154,6 +166,14 @@ public class Employee {
 
     public void setManagerId(UUID managerId) {
         this.managerId = managerId;
+    }
+
+    public UUID getDesignationId() {
+        return designationId;
+    }
+
+    public void setDesignationId(UUID designationId) {
+        this.designationId = designationId;
     }
 
     public String getWorkLocation() {

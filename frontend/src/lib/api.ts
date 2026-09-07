@@ -101,6 +101,9 @@ import {
   type OfferResult,
   type HireInput,
   type HireResult,
+  type TeamStanding,
+  type TeamSummary,
+  type Designation,
 } from "@/lib/types";
 import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
@@ -1065,6 +1068,56 @@ export const api = {
   companyFeatures(): Promise<FeatureState[]> {
     return LIVE ? http<FeatureState[]>("/company/features") : Promise.resolve([]);
   },
+
+  // --- my team: anyone with people reporting to them, whatever their role is called ---
+  //
+  // In mock mode these answer "you lead nobody" rather than throwing, so the demo simply does not
+  // offer the section — same reasoning as companyFeatures above.
+
+  myTeamStanding(): Promise<TeamStanding> {
+    return LIVE
+      ? http<TeamStanding>("/team/mine")
+      : Promise.resolve({ leadsTeam: false, directCount: 0, totalCount: 0 });
+  },
+  teamSummary(opts?: { direct?: boolean; month?: string }): Promise<TeamSummary> {
+    const qs = new URLSearchParams();
+    if (opts?.direct) qs.set("direct", "true");
+    if (opts?.month) qs.set("month", opts.month);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return LIVE
+      ? http<TeamSummary>(`/team${suffix}`)
+      : Promise.resolve({
+        month: new Date().toISOString().slice(0, 7), directCount: 0, totalCount: 0,
+        presentToday: 0, onLeaveToday: 0, pendingLeaveRequests: 0, openExpenseClaims: 0, members: [],
+      });
+  },
+  teamLeave(direct = false): Promise<LeaveRequest[]> {
+    return LIVE ? http<LeaveRequest[]>(`/team/leave?direct=${direct}`) : Promise.resolve([]);
+  },
+  teamExpenses(direct = false): Promise<ExpenseClaim[]> {
+    return LIVE ? http<ExpenseClaim[]>(`/team/expenses?direct=${direct}`) : Promise.resolve([]);
+  },
+  teamPerformance(): Promise<PerformanceReview[]> {
+    return LIVE ? http<PerformanceReview[]>("/team/performance") : Promise.resolve([]);
+  },
+
+  // --- designations: the ladder a company defines for itself ---
+
+  designations(includeArchived = false): Promise<Designation[]> {
+    return LIVE
+      ? http<Designation[]>(`/designations?includeArchived=${includeArchived}`)
+      : Promise.resolve([]);
+  },
+  createDesignation(body: { name: string; level: number; archived: boolean }): Promise<Designation> {
+    return http<Designation>("/designations", { method: "POST", body: JSON.stringify(body) });
+  },
+  updateDesignation(id: string, body: { name: string; level: number; archived: boolean }): Promise<Designation> {
+    return http<Designation>(`/designations/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  },
+  deleteDesignation(id: string): Promise<void> {
+    return http<void>(`/designations/${id}`, { method: "DELETE" });
+  },
+
   searchPages(q: string): Promise<PageSummary[]> {
     return LIVE
       ? http<PageSummary[]>(`/knowledge/search?q=${encodeURIComponent(q)}`)

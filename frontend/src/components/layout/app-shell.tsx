@@ -36,7 +36,18 @@ interface NavItem {
    * section that answers 403 when they click it.
    */
   feature?: string;
+  /**
+   * Show this section only to somebody who has people reporting to them.
+   *
+   * Deliberately not a role. A senior engineer with two interns under them leads a team whatever
+   * their title says, and a MANAGER with nobody under them leads none — so the reporting tree
+   * decides, exactly as it does on the server (OrgScope). Cosmetic either way: the team API returns
+   * an empty roster to a caller with no reports regardless of what the nav shows.
+   */
+  leadsTeam?: boolean;
   children?: NavChild[]; // sub-panes shown in the left pane when the section is active
+  /** Sub-panes only some roles may open, merged into `children` for those roles. */
+  hrChildren?: NavChild[];
 }
 
 // HR-only product surface (feature/hr-suite). Work, Knowledge, Clients and Feed are intentionally
@@ -63,35 +74,71 @@ const NAV: NavItem[] = [
   { href: "/agency", label: "My companies", icon: Building2, roles: ["AGENCY_OWNER"] },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS, feature: "ANALYTICS" },
+  // "Me" is now attendance, time off and expenses only. Pay moved to Finance and reviews to
+  // Performance, because both were buried three clicks deep inside a section people read as "my
+  // profile" — payday is the single thing an employee opens this product for most months.
   {
     href: "/me", label: "Me", icon: CircleUser, roles: COMPANY,
     children: [
       { href: "/me", label: "Overview" },
       { href: "/me/attendance", label: "Attendance" },
       { href: "/me/leave", label: "Time off" },
-      { href: "/me/performance", label: "Performance" },
-      { href: "/me/review", label: "Review" },
-      { href: "/me/payslip", label: "My pay" },
-      { href: "/me/finances", label: "My finances" },
       { href: "/me/expenses", label: "Expenses" },
+    ],
+  },
+  // Anyone who leads people, whatever their role is called. No payroll here, ever — see TeamService.
+  {
+    href: "/team", label: "My team", icon: Users, roles: COMPANY, leadsTeam: true,
+    children: [
+      { href: "/team", label: "Overview" },
+      { href: "/team/attendance", label: "Attendance" },
+      { href: "/team/leave", label: "Time off" },
+      { href: "/team/expenses", label: "Expenses" },
+      { href: "/team/performance", label: "Performance" },
+    ],
+  },
+  // Everyone has finances; only HR has payroll. Keeping the two apart is the point of the split —
+  // "Finance" is what the company owes me, "Payroll" is what the company pays everybody.
+  {
+    href: "/finance", label: "Finance", icon: Wallet, roles: COMPANY,
+    children: [
+      { href: "/finance/pay", label: "My pay" },
+      { href: "/finance/mine", label: "My finances" },
+    ],
+  },
+  // One Performance section for everybody, with two extra panes for HR rather than a second
+  // top-level entry — a member and an HR lead both mean "performance" by the same word.
+  {
+    href: "/performance", label: "Performance", icon: ClipboardCheck, roles: COMPANY,
+    feature: "PERFORMANCE",
+    children: [
+      { href: "/performance/me", label: "My goals" },
+      { href: "/performance/review", label: "My review" },
+    ],
+    hrChildren: [
+      { href: "/performance", label: "Review cycles" },
     ],
   },
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
   { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY, feature: "HELPDESK" },
   { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: MANAGES },
-  // Same reasoning as Exits below, and the same page HR reaches under People — a manager approving
-  // their team's leave would never find it nested inside a section their role cannot open. MANAGER
-  // only, rather than MANAGES, so HR and admins are not shown the same screen twice; the API returns
-  // the whole company to them and only their own reports to a manager.
-  { href: "/people/time-off", label: "Leave approvals", icon: CalendarCheck, roles: ["MANAGER"] },
-  // Top-level rather than under People, which is HR-only: exit clearance is a manager's job, and
-  // they would never see it nested under a section their role cannot open.
-  { href: "/people/exits", label: "Exits", icon: DoorOpen, roles: MANAGES },
+  // Approvals, which is not the same thing as the team's leave calendar under My team — one is a
+  // queue you have to act on, the other is a view. Shown to anyone who leads people rather than to
+  // the MANAGER role, because the server now lets the whole chain above someone decide their
+  // requests, and a lead who can approve but cannot find the queue is the same bug in a new place.
+  // MANAGER/MEMBER rather than everyone, so HR and admins are not shown the same page twice — they
+  // already reach it as People > Time off.
+  { href: "/people/time-off", label: "Leave approvals", icon: CalendarCheck, leadsTeam: true, roles: ["MANAGER", "MEMBER"] },
+  // Top-level rather than under People, which is HR-only: exit clearance is a lead's job, and they
+  // would never see it nested under a section their role cannot open. HR and admins reach the same
+  // page and get the whole company; a lead now gets only their own org (ExitService.leaving).
+  { href: "/people/exits", label: "Exits", icon: DoorOpen, roles: COMPANY, leadsTeam: true },
   {
     href: "/people", label: "People", icon: Users, roles: HR_PLUS,
     children: [
       { href: "/people", label: "Directory" },
       { href: "/people/org", label: "Org chart" },
+      { href: "/people/designations", label: "Designations" },
       { href: "/people/attendance", label: "Attendance" },
       { href: "/people/time-off", label: "Time off" },
       { href: "/people/leave-policy", label: "Leave policy" },
@@ -100,7 +147,9 @@ const NAV: NavItem[] = [
   },
   { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: HR_PLUS, feature: "RECRUITMENT" },
   { href: "/shifts", label: "Shifts", icon: CalendarClock, roles: HR_PLUS, feature: "SHIFTS" },
-  { href: "/performance", label: "Performance", icon: ClipboardCheck, roles: HR_PLUS, feature: "PERFORMANCE" },
+  // The HR-only Performance entry that used to sit here is gone: there is now one Performance section
+  // for everybody (above), and HR gets the Review cycles pane inside it via hrChildren. Two nav
+  // entries with the same label pointing at the same route is how a screen gets reported missing.
   {
     href: "/payroll", label: "Payroll", icon: Wallet, roles: HR_PLUS, feature: "PAYROLL",
     children: [
@@ -136,11 +185,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Null until known. Nothing is hidden while it loads: showing a section briefly and then removing
   // it is far better than hiding one the customer has paid for because a request was slow.
   const [features, setFeatures] = useState<Record<string, boolean> | null>(null);
+  // Whether this person has anybody reporting to them. False until known, the opposite of `features`
+  // above: showing a section that then vanishes is the right trade for a paid module, but "My team"
+  // flashing up for somebody who has no team reads as a bug, and one extra second before a lead sees
+  // it costs nothing.
+  const [leadsTeam, setLeadsTeam] = useState(false);
 
   useEffect(() => {
     api.companyFeatures()
       .then((list) => setFeatures(Object.fromEntries(list.map((f) => [f.feature, f.enabled]))))
       .catch(() => setFeatures(null));
+    api.myTeamStanding()
+      .then((s) => setLeadsTeam(s.leadsTeam))
+      .catch(() => setLeadsTeam(false));
   }, []);
 
   // The platform OWNER (vendor) has no company app — send them to the Platform console.
@@ -160,9 +217,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const { user, company } = session.me;
+  const seesWholeCompany = user.role === "ADMIN" || user.role === "HR" || user.role === "OWNER";
   const nav = NAV
     .filter((n) => !n.roles || n.roles.includes(user.role))
-    .filter((n) => !n.feature || features === null || features[n.feature] !== false);
+    .filter((n) => !n.feature || features === null || features[n.feature] !== false)
+    // A whole-company role is never gated by the team check: HR who happens to have nobody reporting
+    // to them still runs exits for the business.
+    .filter((n) => !n.leadsTeam || leadsTeam || seesWholeCompany)
+    // hrChildren are appended, not substituted: HR still has their own goals and their own review,
+    // and a section that swapped one set for the other would take those away from them.
+    .map((n) => (n.hrChildren && seesWholeCompany
+      ? { ...n, children: [...(n.children ?? []), ...n.hrChildren] }
+      : n));
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   async function logout() {

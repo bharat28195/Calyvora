@@ -33,15 +33,22 @@ public class ExitController {
         this.exitService = exitService;
     }
 
-    /** Everyone currently serving notice. Managers can see it too — it is their queue of work. */
+    /**
+     * Who is serving notice: the whole company for HR and leadership, your own org for everyone else.
+     *
+     * <p>No role check, deliberately. The old one — OWNER/ADMIN/HR/MANAGER — got both halves wrong at
+     * once: it handed every manager every resignation in the business, including departments they have
+     * nothing to do with, and it denied the screen entirely to a senior engineer with two interns
+     * whose exit clearance is just as much their job. {@link ExitService#leaving} scopes to the
+     * reporting tree instead, and answers an empty list to somebody who leads nobody.
+     */
     @GetMapping("/exits")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
     public List<ExitResponse> leaving(@CurrentUser AuthPrincipal principal) {
         return exitService.leaving(principal);
     }
 
+    /** One person's exit. 403 unless they are in the caller's org, or the caller is HR/leadership. */
     @GetMapping("/employees/{employeeId}/exit")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
     public ExitResponse get(@PathVariable UUID employeeId, @CurrentUser AuthPrincipal principal) {
         return exitService.get(employeeId, principal);
     }

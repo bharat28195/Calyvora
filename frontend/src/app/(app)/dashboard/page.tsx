@@ -67,8 +67,8 @@ export default function DashboardPage() {
           <QuickTile href="/me/attendance" icon={<Clock className="h-5 w-5 text-violet" />} label="Attendance" />
           <QuickTile href="/me/leave" icon={<Palmtree className="h-5 w-5 text-amber-400" />}
             label="Time off" sub={leaveLeft != null ? `${leaveLeft} days left` : undefined} />
-          <QuickTile href="/me/payslip" icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="My pay" />
-          <QuickTile href="/me/review" icon={<Target className="h-5 w-5 text-aqua" />} label="My review" />
+          <QuickTile href="/finance/pay" icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="My pay" />
+          <QuickTile href="/performance/review" icon={<Target className="h-5 w-5 text-aqua" />} label="My review" />
           <QuickTile href="/me/expenses" icon={<Receipt className="h-5 w-5 text-violet" />} label="Expenses" />
           <QuickTile href="/inbox" icon={<Inbox className="h-5 w-5 text-amber-400" />} label="Inbox" />
         </div>

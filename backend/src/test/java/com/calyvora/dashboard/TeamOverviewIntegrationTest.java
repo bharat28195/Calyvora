@@ -26,8 +26,8 @@ class TeamOverviewIntegrationTest extends IntegrationTestBase {
         boolean weekend = java.time.LocalDate.now().getDayOfWeek().getValue() >= 6;
         mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.headcount").value(6))
-                .andExpect(jsonPath("$.presentToday").value(weekend ? 0 : 6))
+                .andExpect(jsonPath("$.headcount").value(7))
+                .andExpect(jsonPath("$.presentToday").value(weekend ? 0 : 7))
                 .andExpect(jsonPath("$.onLeaveToday").value(0));
     }
 

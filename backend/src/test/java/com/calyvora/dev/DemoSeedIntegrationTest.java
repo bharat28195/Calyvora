@@ -28,8 +28,9 @@ class DemoSeedIntegrationTest extends IntegrationTestBase {
         JsonNode creds = objectMapper.readTree(seeded.getResponse().getContentAsString());
         Session owner = login(creds.get("email").asText(), creds.get("password").asText());
 
-        // People: 6 employees with real profiles.
-        assertThat(getJson("/api/v1/people/employees", owner).size()).isEqualTo(6);
+        // People: 7 employees with real profiles — the seventh is the intern under Priya, which is
+        // what gives the demo a third level of reporting and therefore a "My team" for a MEMBER.
+        assertThat(getJson("/api/v1/people/employees", owner).size()).isEqualTo(7);
         assertThat(getJson("/api/v1/people/departments", owner).size()).isEqualTo(4);
 
         // Work: the Atlas project exists with an active sprint and tasks.

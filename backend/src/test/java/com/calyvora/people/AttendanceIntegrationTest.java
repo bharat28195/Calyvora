@@ -162,7 +162,7 @@ class AttendanceIntegrationTest extends IntegrationTestBase {
         Session owner = login("ava.chen@northwind.demo", "demopass123");
 
         JsonNode overview = getJson("/api/v1/dashboard/team", owner);
-        assertThat(overview.get("headcount").asInt()).isEqualTo(6);
+        assertThat(overview.get("headcount").asInt()).isEqualTo(7);
         assertThat(overview.has("unmarkedToday")).isTrue();
         assertThat(overview.get("presentToday").asInt() + overview.get("onLeaveToday").asInt())
                 .isLessThanOrEqualTo(overview.get("headcount").asInt());

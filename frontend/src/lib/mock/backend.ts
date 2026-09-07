@@ -3069,6 +3069,8 @@ function toEmployee(db: DB, user: User): Employee {
     role: user.role,
     employeeNo: row.employeeNo,
     jobTitle: row.jobTitle,
+    // The mock backend has no ladder — designations are a live-mode feature.
+    designationId: null,
     employmentType: row.employmentType,
     employmentStatus: row.employmentStatus,
     departmentId: row.departmentId,

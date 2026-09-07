@@ -106,6 +106,7 @@ public class DemoSeedService {
     private final com.calyvora.helpdesk.HelpdeskService helpdeskService;
     private final com.calyvora.people.RegularizationService regularizationService;
     private final com.calyvora.people.EmployeeFinanceService employeeFinanceService;
+    private final com.calyvora.people.DesignationService designationService;
 
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
@@ -130,7 +131,9 @@ public class DemoSeedService {
                            com.calyvora.platform.SeatRequestRepository seatRequestRepository,
                            com.calyvora.helpdesk.HelpdeskService helpdeskService,
                            com.calyvora.people.RegularizationService regularizationService,
-                           com.calyvora.people.EmployeeFinanceService employeeFinanceService) {
+                           com.calyvora.people.EmployeeFinanceService employeeFinanceService,
+                           com.calyvora.people.DesignationService designationService) {
+        this.designationService = designationService;
         this.employeeFinanceService = employeeFinanceService;
         this.helpdeskService = helpdeskService;
         this.regularizationService = regularizationService;
@@ -181,11 +184,15 @@ public class DemoSeedService {
         User leo = createUser(company.getId(), "leo.martins@northwind.demo", "Leo", "Martins", Role.HR);
         User sara = createUser(company.getId(), "sara.okoro@northwind.demo", "Sara", "Okoro", Role.MEMBER);
         User tom = createUser(company.getId(), "tom.becker@northwind.demo", "Tom", "Becker", Role.MANAGER);
+        // Dev reports to Priya, who is a plain MEMBER. That one reporting line is the whole demo of
+        // PD-32: Priya gets "My team" because somebody reports to her, not because of anything her
+        // role or her job title says. Without a third level the feature cannot be shown at all.
+        User dev = createUser(company.getId(), "dev.sharma@northwind.demo", "Dev", "Sharma", Role.MEMBER);
 
         TenantContext.setCompanyId(company.getId());
         try {
             AuthPrincipal principal = new AuthPrincipal(owner.getId(), company.getId(), "OWNER", OWNER_EMAIL);
-            seedTenant(principal, marcus, priya, leo, sara, tom);
+            seedTenant(principal, marcus, priya, leo, sara, tom, dev);
         } finally {
             TenantContext.clear();
         }
@@ -347,7 +354,8 @@ public class DemoSeedService {
         return logins;
     }
 
-    private void seedTenant(AuthPrincipal owner, User marcus, User priya, User leo, User sara, User tom) {
+    private void seedTenant(AuthPrincipal owner, User marcus, User priya, User leo, User sara, User tom,
+                            User dev) {
         // --- People: departments + profiles ---------------------------------
         DepartmentResponse engineering = departmentService.create(dept("Engineering", marcus.getId()));
         DepartmentResponse design = departmentService.create(dept("Design", leo.getId()));
@@ -372,6 +380,13 @@ public class DemoSeedService {
                 java.util.List.of("Customer Success", "Zendesk", "Troubleshooting"), 4);
         profile(emp, tom.getEmail(), "NR-006", "Sales Manager", sales.id(), mgrAva, "2021-11-08",
                 java.util.List.of("B2B Sales", "Negotiation", "CRM"), 3);
+        // The third level. Ava sees all six below her; Marcus sees Priya and Dev; Priya sees Dev and
+        // nobody else; Dev sees nobody.
+        profile(emp, dev.getEmail(), "NR-007", "Engineering Intern", engineering.id(),
+                emp.get(priya.getEmail()).id(), "2026-06-15",
+                java.util.List.of("Java", "Testing"), 3);
+
+        seedDesignations(emp, priya, dev, marcus);
 
         // Bank / PF / ESI / PAN, so "My Finances" and the payslip header aren't a page of dashes.
         seedFinance(emp);
@@ -788,6 +803,33 @@ public class DemoSeedService {
      * header have something real to show. Values are obviously fictional but correctly shaped —
      * a UAN is 12 digits and a PAN matches its format, so the validation rules are exercised too.
      */
+    /**
+     * A ladder for Northwind, so the Designations screen is not an empty page in a demo.
+     *
+     * <p>Sparse levels (10, 20, 30, 40) because that is the convention the editor defaults to, and a
+     * demo that contradicts the tool it is demonstrating teaches the wrong thing. Assigned to three
+     * people rather than all seven: a ladder with gaps in it is what a real customer's looks like a
+     * week after they set one up, and the headcount column is only interesting if it varies.
+     */
+    private void seedDesignations(Map<String, EmployeeResponse> emp, User priya, User dev, User marcus) {
+        Map<String, String> rungs = new LinkedHashMap<>();
+        int level = 10;
+        for (String name : List.of("Intern", "Software Engineer", "Senior Software Engineer", "Lead")) {
+            rungs.put(name, designationService.create(
+                    new com.calyvora.people.dto.DesignationRequest(name, level, false)).id());
+            level += 10;
+        }
+        assignDesignation(emp, dev.getEmail(), rungs.get("Intern"));
+        assignDesignation(emp, priya.getEmail(), rungs.get("Senior Software Engineer"));
+        assignDesignation(emp, marcus.getEmail(), rungs.get("Lead"));
+    }
+
+    private void assignDesignation(Map<String, EmployeeResponse> emp, String email, String designationId) {
+        EmployeeResponse e = emp.get(email);
+        employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
+                null, null, designationId, null, null, null, null, null, null, null, null, null, null));
+    }
+
     private void seedFinance(Map<String, EmployeeResponse> emp) {
         finance(emp, "ava.chen@northwind.demo", "HDFC Bank", "50100424268412", "HDFC0003939",
                 "ENABLED", "GJVAT35530670000010105", "101794989961", "2021-01-04",
@@ -840,7 +882,7 @@ public class DemoSeedService {
                          java.util.List<String> skills, Integer rating) {
         EmployeeResponse e = emp.get(email);
         employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
-                employeeNo, title, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate,
+                employeeNo, title, null, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate,
                 null, skills, rating));
     }
 

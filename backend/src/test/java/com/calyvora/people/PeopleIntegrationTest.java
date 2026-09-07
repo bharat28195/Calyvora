@@ -25,8 +25,8 @@ class PeopleIntegrationTest extends IntegrationTestBase {
 
         JsonNode page0 = getJson("/api/v1/people/employees/page?size=2&page=0", owner);
         assertThat(page0.get("content").size()).isEqualTo(2);
-        assertThat(page0.get("totalElements").asInt()).isEqualTo(6);
-        assertThat(page0.get("totalPages").asInt()).isEqualTo(3);
+        assertThat(page0.get("totalElements").asInt()).isEqualTo(7);
+        assertThat(page0.get("totalPages").asInt()).isEqualTo(4);
 
         JsonNode search = getJson("/api/v1/people/employees/page?q=priya&page=0&size=25", owner);
         assertThat(search.get("totalElements").asInt()).isEqualTo(1);

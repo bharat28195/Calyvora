@@ -15,6 +15,7 @@ public record EmployeeResponse(
         String role,
         String employeeNo,
         String jobTitle,
+        String designationId,
         String employmentType,
         String employmentStatus,
         String departmentId,
@@ -36,6 +37,7 @@ public record EmployeeResponse(
                 user.getRole().name(),
                 e.getEmployeeNo(),
                 e.getJobTitle(),
+                e.getDesignationId() == null ? null : e.getDesignationId().toString(),
                 e.getEmploymentType() == null ? null : e.getEmploymentType().name(),
                 e.getEmploymentStatus().name(),
                 e.getDepartmentId() == null ? null : e.getDepartmentId().toString(),
@@ -55,7 +57,7 @@ public record EmployeeResponse(
      */
     public EmployeeResponse withoutRating() {
         return rating == null ? this : new EmployeeResponse(id, userId, firstName, lastName, email, role,
-                employeeNo, jobTitle, employmentType, employmentStatus, departmentId, managerId,
+                employeeNo, jobTitle, designationId, employmentType, employmentStatus, departmentId, managerId,
                 workLocation, phone, startDate, endDate, skills, null);
     }
 

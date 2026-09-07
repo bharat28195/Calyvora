@@ -59,4 +59,21 @@ public record PerformanceReviewResponse(
                 r.getDecidedAt() == null ? null : r.getDecidedAt().toString(),
                 currency, currentSalary, goalsAchieved, goalsTotal, goals);
     }
+
+    /**
+     * The same review with every money figure removed.
+     *
+     * <p>A team lead decides a hike as a PERCENTAGE, which is all the judgement needs. The absolute
+     * salary it applies to belongs to HR, and the review screen is where it would otherwise be handed
+     * to every lead in the company at once. Nulling the fields rather than adding a flag the page must
+     * remember to honour: a payload that never carries the number cannot leak it.
+     */
+    public PerformanceReviewResponse withoutPay() {
+        return new PerformanceReviewResponse(
+                id, cycleId, cycleName, periodStart, periodEnd, cycleStatus,
+                employeeId, employeeName, jobTitle, managerId, managerName, status,
+                selfAssessment, selfSubmittedAt, rating, summary, strengths, improvements,
+                hikeType, hikePercent, null, hikeNote, managerSubmittedAt, decidedAt,
+                currency, null, goalsAchieved, goalsTotal, goals);
+    }
 }

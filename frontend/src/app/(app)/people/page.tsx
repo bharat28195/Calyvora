@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Search, Mail, Phone, MapPin, Briefcase, Building2, ListChecks, Plus, Trash2, CheckCircle2, Circle, Wallet } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
-import type { Department, Employee, OnboardingTask } from "@/lib/types";
+import type { Department, Designation, Employee, OnboardingTask } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -339,6 +339,7 @@ function EditEmployeeDialog({
 }) {
   const [form, setForm] = useState({
     jobTitle: employee.jobTitle ?? "",
+    designationId: employee.designationId ?? "",
     employeeNo: employee.employeeNo ?? "",
     employmentType: employee.employmentType ?? "",
     employmentStatus: employee.employmentStatus,
@@ -353,6 +354,13 @@ function EditEmployeeDialog({
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Active rungs only — an archived one is still shown on whoever already holds it, but offering it
+  // to a new person is how a retired level quietly comes back.
+  const [designations, setDesignations] = useState<Designation[]>([]);
+  useEffect(() => {
+    if (!admin) return;
+    api.designations().then(setDesignations).catch(() => setDesignations([]));
+  }, [admin]);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -364,6 +372,7 @@ function EditEmployeeDialog({
       if (admin) {
         await api.updateEmployee(employee.id, {
           jobTitle: form.jobTitle,
+          designationId: form.designationId,
           employeeNo: form.employeeNo,
           employmentType: (form.employmentType || null) as Employee["employmentType"],
           employmentStatus: form.employmentStatus,
@@ -401,6 +410,19 @@ function EditEmployeeDialog({
             <Field label="Job title" htmlFor="jobTitle">
               <Input id="jobTitle" value={form.jobTitle} onChange={set("jobTitle")} />
             </Field>
+            {/* Only offered once the company has defined a ladder. A picker with one empty option is
+                a question nobody can answer, and designations are optional by design. */}
+            {designations.length > 0 && (
+              <Field label="Designation" htmlFor="designationId">
+                <select id="designationId" className={selectCls} value={form.designationId}
+                  onChange={set("designationId")}>
+                  <option value="" className="bg-surface">None</option>
+                  {designations.map((d) => (
+                    <option key={d.id} value={d.id} className="bg-surface">{d.name}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Employee no." htmlFor="employeeNo">
                 <Input id="employeeNo" value={form.employeeNo} onChange={set("employeeNo")} />

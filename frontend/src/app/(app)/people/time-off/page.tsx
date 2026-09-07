@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { MyLeave } from "@/components/leave/my-leave";
 import { CompOffApprovals, MyCompOff } from "@/components/leave/comp-off";
+import { useTeamStanding } from "@/components/team/team-bits";
 
 /**
  * Time off: your own balance and requests (shared with the Me hub) plus, for anyone who approves, the
@@ -18,13 +19,18 @@ import { CompOffApprovals, MyCompOff } from "@/components/leave/comp-off";
  * <p>Who sees the queue is deliberately the same set the API allows, and it was not before. HR could
  * approve leave through the API and never saw the queue on this screen, because the check here was
  * Owner/Admin only — so the one role whose job this is had to be told to use a screen that did not
- * show it. Managers now approve their own reports' leave too (the API scopes the list to their team),
- * which is what added a fourth role and surfaced the older gap.
+ * show it.
+ *
+ * <p>The manager half is no longer a role check either. Anybody with people under them can decide
+ * their requests — a senior engineer with two interns leads a team whatever their title says — so the
+ * gate here is "do you have reports", the same question the server asks (OrgScope). Keying it on the
+ * MANAGER role would have recreated the exact gap described above, for a different role.
  */
 export default function TimeOffPage() {
   const { me } = useSession();
+  const standing = useTeamStanding();
   const role = me?.user.role;
-  const canApprove = role === "OWNER" || role === "ADMIN" || role === "HR" || role === "MANAGER";
+  const canApprove = role === "OWNER" || role === "ADMIN" || role === "HR" || !!standing?.leadsTeam;
 
   return (
     <div>

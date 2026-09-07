@@ -74,6 +74,8 @@ export interface Employee {
   role: Role;
   employeeNo: string | null;
   jobTitle: string | null;
+  /** A rung on the company's own ladder. Grants nothing — see {@link Designation}. */
+  designationId: string | null;
   employmentType: EmploymentType | null;
   employmentStatus: EmploymentStatus;
   departmentId: string | null;
@@ -84,6 +86,62 @@ export interface Employee {
   endDate: string | null;
   skills: string[];
   rating: number | null;
+}
+
+/**
+ * A rung on the ladder a company defines for itself — Intern, Junior, Senior, Lead.
+ *
+ * It is a label and nothing more. Access comes from the reporting tree and the role; neither reads
+ * this. That is what makes it safe to let customers edit it.
+ */
+export interface Designation {
+  id: string;
+  name: string;
+  /** Ascending, sparse by convention (0, 10, 20) so a rung can be slotted between two others. */
+  level: number;
+  archived: boolean;
+  headcount: number;
+}
+
+/** One person on the "My team" roster. Deliberately carries no pay of any kind. */
+export interface TeamMember {
+  employeeId: string;
+  userId: string | null;
+  name: string;
+  jobTitle: string | null;
+  department: string | null;
+  managerName: string | null;
+  /** Reports to the viewer directly, as opposed to somewhere further down the tree. */
+  direct: boolean;
+  depth: number;
+  employmentStatus: EmploymentStatus | null;
+  todayStatus: AttendanceStatus | null;
+  presentDays: number;
+  absentDays: number;
+  leaveDays: number;
+  pendingLeaveRequests: number;
+  openExpenseClaims: number;
+  openExpenseAmount: number;
+  rating: number | null;
+  reviewStatus: ReviewStatus | null;
+}
+
+export interface TeamSummary {
+  month: string;
+  directCount: number;
+  totalCount: number;
+  presentToday: number;
+  onLeaveToday: number;
+  pendingLeaveRequests: number;
+  openExpenseClaims: number;
+  members: TeamMember[];
+}
+
+/** Whether the signed-in person leads anybody — what decides if "My team" is in the nav. */
+export interface TeamStanding {
+  leadsTeam: boolean;
+  directCount: number;
+  totalCount: number;
 }
 
 export interface Client {

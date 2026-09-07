@@ -50,13 +50,16 @@ public class ExitService {
     private final DocumentService documentService;
     private final GeneratedDocumentRepository documentRepository;
     private final UserRepository userRepository;
+    private final OrgScope orgScope;
 
     public ExitService(EmployeeRepository employeeRepository,
                        OnboardingTaskRepository taskRepository,
                        OnboardingService onboardingService,
                        DocumentService documentService,
                        GeneratedDocumentRepository documentRepository,
-                       UserRepository userRepository) {
+                       UserRepository userRepository,
+                       OrgScope orgScope) {
+        this.orgScope = orgScope;
         this.employeeRepository = employeeRepository;
         this.taskRepository = taskRepository;
         this.onboardingService = onboardingService;
@@ -138,16 +141,30 @@ public class ExitService {
 
     @Transactional(readOnly = true)
     public ExitResponse get(UUID employeeId, AuthPrincipal principal) {
+        if (!orgScope.seesWholeCompany(principal) && !orgScope.canSee(principal, employeeId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "That person is not in your team.");
+        }
         return view(requireEmployee(employeeId), principal);
     }
 
-    /** Everyone currently serving notice — the exits screen. */
+    /**
+     * Who is serving notice — the whole company for HR and leadership, the caller's own org for
+     * everyone else.
+     *
+     * <p>This was unfiltered, so a manager opening Exits saw every resignation in the business,
+     * including departments they have nothing to do with and people well senior to them. Who is
+     * leaving is among the most sensitive facts an HR system holds before it has been announced, and
+     * the screen was already on a manager's nav.
+     */
     @Transactional(readOnly = true)
     public List<ExitResponse> leaving(AuthPrincipal principal) {
-        return employeeRepository.findByCompanyIdAndEmploymentStatus(
-                        TenantContext.getCompanyId(), EmploymentStatus.NOTICE).stream()
-                .map(e -> view(e, principal))
-                .toList();
+        List<Employee> onNotice = employeeRepository.findByCompanyIdAndEmploymentStatus(
+                TenantContext.getCompanyId(), EmploymentStatus.NOTICE);
+        if (!orgScope.seesWholeCompany(principal)) {
+            Set<UUID> mine = orgScope.downline(principal, false);
+            onNotice = onNotice.stream().filter(e -> mine.contains(e.getId())).toList();
+        }
+        return onNotice.stream().map(e -> view(e, principal)).toList();
     }
 
     // ---- helpers ----

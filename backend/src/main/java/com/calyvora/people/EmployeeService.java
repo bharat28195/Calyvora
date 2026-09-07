@@ -33,11 +33,14 @@ public class EmployeeService {
     private final DepartmentRepository departmentRepository;
     private final com.calyvora.invitation.InvitationRepository invitationRepository;
     private final OnboardingTaskRepository onboardingTaskRepository;
+    private final DesignationRepository designationRepository;
 
     public EmployeeService(EmployeeRepository employeeRepository, UserRepository userRepository,
                            DepartmentRepository departmentRepository,
                            com.calyvora.invitation.InvitationRepository invitationRepository,
-                           OnboardingTaskRepository onboardingTaskRepository) {
+                           OnboardingTaskRepository onboardingTaskRepository,
+                           DesignationRepository designationRepository) {
+        this.designationRepository = designationRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
         this.departmentRepository = departmentRepository;
@@ -186,6 +189,9 @@ public class EmployeeService {
         if (request.departmentId() != null) {
             employee.setDepartmentId(resolveDepartment(companyId, request.departmentId()));
         }
+        if (request.designationId() != null) {
+            employee.setDesignationId(resolveDesignation(companyId, request.designationId()));
+        }
 
         User user = userRepository.findById(employee.getUserId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
@@ -246,7 +252,51 @@ public class EmployeeService {
         }
         employeeRepository.findByIdAndCompanyId(mgr, companyId)
                 .orElseThrow(() -> new NotFoundException("Manager not found"));
+        requireNoCycle(companyId, employeeId, mgr);
         return mgr;
+    }
+
+    /**
+     * Refuse a manager who already reports to this employee, directly or through a chain.
+     *
+     * <p>Only self-management was blocked before, which was enough when the tree was decoration. It is
+     * not now: the tree decides who can read whose attendance, leave and reviews (see {@code OrgScope}),
+     * so A reporting to B while B reports to A would make each of them the other's subordinate and hand
+     * them each other's data — a privilege escalation two profile edits deep, available to anybody who
+     * can edit an org chart.
+     *
+     * <p>Walks upward from the proposed manager, which is at most the depth of the org, rather than
+     * expanding the employee's whole subtree.
+     */
+    private void requireNoCycle(UUID companyId, UUID employeeId, UUID proposedManagerId) {
+        java.util.Set<UUID> seen = new java.util.HashSet<>();
+        UUID cursor = proposedManagerId;
+        while (cursor != null && seen.add(cursor)) {
+            if (cursor.equals(employeeId)) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                        "That person already reports to this employee, so making them the manager "
+                                + "would create a loop in the org chart.");
+            }
+            cursor = employeeRepository.findByIdAndCompanyId(cursor, companyId)
+                    .map(Employee::getManagerId)
+                    .orElse(null);
+        }
+    }
+
+    /** A rung on the company ladder. Blank clears it; an unknown id is an error, not a silent null. */
+    private UUID resolveDesignation(UUID companyId, String designationId) {
+        if (designationId.isBlank()) {
+            return null;
+        }
+        UUID id;
+        try {
+            id = UUID.fromString(designationId);
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Invalid designation id");
+        }
+        designationRepository.findByIdAndCompanyId(id, companyId)
+                .orElseThrow(() -> new NotFoundException("Designation not found"));
+        return id;
     }
 
     private UUID resolveDepartment(UUID companyId, String departmentId) {

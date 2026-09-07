@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Plus, ClipboardCheck, ChevronRight, Lock } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { useSession } from "@/hooks/useSession";
 import type { ReviewCycle, PerformanceReview } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,21 +14,42 @@ import { ReviewCard } from "@/components/performance/review-card";
 import { cn } from "@/lib/utils";
 
 /**
- * Performance cycles (Owner/Admin). Open a cycle, watch it fill in, and approve reviews — approval
+ * Performance cycles (Owner/Admin/HR). Open a cycle, watch it fill in, and approve reviews — approval
  * applies each recommended hike to compensation. The place to answer "who achieved what, and what
  * raise did they get" for the year.
+ *
+ * Performance is now a section everybody has and this is its root, so a member landing here would hit
+ * a 403 on a screen the nav had just offered them. They are sent to their own goals instead.
  */
 export default function PerformancePage() {
+  const session = useSession();
+  const router = useRouter();
   const [cycles, setCycles] = useState<ReviewCycle[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
+  const role = session.me?.user.role;
+  const runsCycles = role === "OWNER" || role === "ADMIN" || role === "HR";
+
   useEffect(() => {
+    if (role && !runsCycles) router.replace("/performance/me");
+  }, [role, runsCycles, router]);
+
+  useEffect(() => {
+    if (!runsCycles) return;
     api.reviewCycles().then(setCycles).catch((e) => {
       setCycles([]); setError(e instanceof ApiError ? e.message : "Failed to load cycles");
     });
-  }, []);
+  }, [runsCycles]);
+
+  if (!runsCycles) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-violet" />
+      </div>
+    );
+  }
 
   function upsertCycle(c: ReviewCycle) {
     setCycles((cur) => {

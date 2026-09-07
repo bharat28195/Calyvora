@@ -52,12 +52,15 @@ public class PerformanceReviewService {
     private final GoalRepository goalRepository;
     private final CompensationService compensationService;
     private final NotificationService notificationService;
+    private final com.calyvora.people.OrgScope orgScope;
 
     public PerformanceReviewService(ReviewCycleRepository cycleRepository,
                                     PerformanceReviewRepository reviewRepository,
                                     EmployeeRepository employeeRepository, UserRepository userRepository,
                                     GoalRepository goalRepository, CompensationService compensationService,
-                                    NotificationService notificationService) {
+                                    NotificationService notificationService,
+                                    com.calyvora.people.OrgScope orgScope) {
+        this.orgScope = orgScope;
         this.cycleRepository = cycleRepository;
         this.reviewRepository = reviewRepository;
         this.employeeRepository = employeeRepository;
@@ -132,17 +135,31 @@ public class PerformanceReviewService {
                 .map(this::toResponse).toList();
     }
 
-    // ---------- team reviews (manager) ----------
+    // ---------- team reviews (anyone who leads people) ----------
 
+    /**
+     * Reviews for everyone below the caller in the reporting tree.
+     *
+     * <p>Was {@code findByManagerId} — the review row's own manager column, which is one level deep. A
+     * head of engineering with four leads under them therefore saw four reviews and none of the thirty
+     * people those leads write, which is the opposite of what a skip-level needs. {@link OrgScope}
+     * walks the whole subtree instead.
+     *
+     * <p>Pay is stripped for everyone but HR and leadership, including from a direct manager, who
+     * could previously read each report's exact salary off this list. See
+     * {@link PerformanceReviewResponse#withoutPay()}.
+     */
     @Transactional(readOnly = true)
     public List<PerformanceReviewResponse> teamReviews(AuthPrincipal principal) {
-        UUID companyId = TenantContext.getCompanyId();
-        Employee me = employeeRepository.findByUserId(principal.userId())
-                .filter(e -> e.getCompanyId().equals(companyId))
-                .orElse(null);
-        if (me == null) return List.of();
-        return reviewRepository.findByManagerIdOrderByCreatedAtDesc(me.getId()).stream()
-                .map(this::toResponse).toList();
+        java.util.Set<UUID> roster = orgScope.downline(principal, false);
+        if (roster.isEmpty()) return List.of();
+        boolean maySeePay = orgScope.seesWholeCompany(principal);
+        return reviewRepository.findByEmployeeIdInOrderByCreatedAtDesc(roster).stream()
+                .map(this::toResponse)
+                .map(r -> maySeePay ? r : r.withoutPay())
+                .sorted(java.util.Comparator.comparing(
+                        PerformanceReviewResponse::employeeName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     // ---------- a single review ----------
@@ -151,7 +168,11 @@ public class PerformanceReviewService {
     public PerformanceReviewResponse get(UUID reviewId, AuthPrincipal principal) {
         PerformanceReview review = requireReview(reviewId);
         requireCanView(review, principal);
-        return toResponse(review);
+        // Leadership and the person whose salary it is see the figures; a manager or a skip-level
+        // reading the same review does not.
+        boolean maySeePay = orgScope.seesWholeCompany(principal) || isSelf(review, principal);
+        PerformanceReviewResponse response = toResponse(review);
+        return maySeePay ? response : response.withoutPay();
     }
 
     /** Member saves/submits their self-assessment. */
@@ -352,8 +373,16 @@ public class PerformanceReviewService {
     }
 
     /** Anyone on the review: the employee, their manager, or an admin. */
+    /**
+     * Read access: leadership, the person themselves, their reporting manager — and anyone further up
+     * the same chain. The skip-level clause is what lets a head of department open a review written by
+     * one of their leads; writing it stays with the direct manager (see
+     * {@link #requireIsManagerOrAdmin}), because two people editing one review is how a rating gets
+     * quietly overwritten.
+     */
     private void requireCanView(PerformanceReview review, AuthPrincipal principal) {
         if (isAdmin(principal) || isSelf(review, principal) || isManager(review, principal)) return;
+        if (orgScope.downline(principal, false).contains(review.getEmployeeId())) return;
         throw new ApiException(ErrorCode.FORBIDDEN, "You can't view this review");
     }
 

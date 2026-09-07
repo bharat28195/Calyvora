@@ -36,11 +36,13 @@ public class RegularizationService {
     private final EmployeeService employeeService;
     private final UserRepository userRepository;
     private final NotificationService notifications;
+    private final OrgScope orgScope;
 
     public RegularizationService(AttendanceRegularizationRepository repository,
                                  AttendanceRepository attendanceRepository, EmployeeRepository employeeRepository,
                                  EmployeeService employeeService, UserRepository userRepository,
-                                 NotificationService notifications) {
+                                 NotificationService notifications, OrgScope orgScope) {
+        this.orgScope = orgScope;
         this.repository = repository;
         this.attendanceRepository = attendanceRepository;
         this.employeeRepository = employeeRepository;
@@ -151,9 +153,13 @@ public class RegularizationService {
         return "ADMIN".equals(role) || "HR".equals(role) || "OWNER".equals(role);
     }
 
+    /**
+     * Anywhere beneath the caller in the reporting tree, not only one level down — so a lead can clear
+     * an attendance correction for somebody in their org while the direct manager is away, which was
+     * previously impossible and left the queue stuck.
+     */
     private boolean isMyReport(UUID companyId, UUID employeeId, UUID managerEmployeeId) {
-        return employeeRepository.findByIdAndCompanyId(employeeId, companyId)
-                .map(Employee::getManagerId).filter(managerEmployeeId::equals).isPresent();
+        return orgScope.downlineOf(managerEmployeeId, false).contains(employeeId);
     }
 
     private UUID managerUserId(UUID companyId, Employee employee) {

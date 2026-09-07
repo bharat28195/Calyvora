@@ -11,6 +11,8 @@ import java.util.List;
 public record UpdateEmployeeRequest(
         @Size(max = 32) String employeeNo,
         @Size(max = 120) String jobTitle,
+        /** A rung on the company's own ladder. Blank clears it; null leaves it alone. */
+        String designationId,
         @Pattern(regexp = "FULL_TIME|PART_TIME|CONTRACT|INTERN", message = "invalid employment type")
         String employmentType,
         @Pattern(regexp = "ONBOARDING|ACTIVE|TERMINATED", message = "invalid status")

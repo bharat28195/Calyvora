@@ -29,4 +29,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     long countByCompanyIdAndEmploymentStatus(UUID companyId, EmploymentStatus employmentStatus);
 
     List<Employee> findByManagerId(UUID managerId);
+
+    /** How many people hold a designation — shown next to it so archiving one is an informed choice. */
+    long countByDesignationId(UUID designationId);
 }

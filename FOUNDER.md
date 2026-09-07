@@ -1090,6 +1090,60 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Final outcome:** _30 new tests (16 bank file, 14 plans and enforcement); the whole backend suite
   green._ Documented in [docs/PLANS-AND-FEATURES.md](docs/PLANS-AND-FEATURES.md).
 
+### PD-32 · 2026-09-07 · The org chart becomes the permission, not the job title
+- **Context:** the founder, reviewing the app: _"manager should see data only for his team not for
+  all full company — right now his and admin both have same data and sections"_, plus a request for a
+  My-team surface and for the ladder itself to be editable: _"admin team, hr team, managers, leads,
+  senior devs, junior devs, interns … all these roles can be decided by any company I am selling to."_
+
+- **This reverses part of PD-10's fixed role ladder, deliberately and only partly.** The six roles
+  stay as the *capability* layer — who may run payroll, invite people, open a review cycle. What
+  changes is that **visibility now comes from the reporting tree instead of the role**. Offered the
+  alternative (customer-defined roles with a permission matrix), we chose the tree; the matrix stays
+  on the shelf until a real customer asks to move a specific permission.
+- **Why the tree and not editable roles.** A designation is customer-editable free text. If a title
+  granted access, **a permission you can award yourself by renaming your own row is not a
+  permission**. The tree cannot be edited by the person it constrains, so it is the only one of the
+  two that can safely carry authority. Designations are therefore a pure label, and the screen says
+  so, because "designations" reads like permissions to anyone who has used another HR product.
+- **One class, `OrgScope`, is now the single answer to "who may this person see".** Each module used
+  to decide for itself, and they disagreed: the directory was open to everyone, attendance and
+  expenses were HR-only, leave had its own manager check. A MANAGER therefore saw either the whole
+  company or nothing at all depending on which page they opened — the founder's report, exactly.
+- **MANAGER is deliberately absent from the whole-company list.** A manager's reach comes from having
+  reports, so a manager of nobody now sees nobody. And a MEMBER with two interns under them leads a
+  team. **"My team" belongs to whoever has reports, not to a role** — which is what the founder's
+  real-world scenario actually describes.
+- **Transitive, not one level.** `teamReviews` was keyed on the review row's own manager column, so a
+  head of department with four leads under them saw four reviews and none of the thirty their leads
+  write. Same for approvals: a single-level check meant a head could not decide anything while their
+  leads were away, because nobody in the queue reported to them *directly*.
+- **The leak worth naming: Exits.** `/people/exits` listed **every resignation in the business** to
+  anybody who could open the screen, which was every manager. Who is leaving, before it is announced,
+  is among the most sensitive facts an HR system holds.
+- **A reporting loop became a security bug the moment the tree carried authority.** Only
+  self-management was blocked before. A→B→A would make each of them the other's subordinate and hand
+  them each other's attendance, leave and reviews — **a privilege escalation two profile edits deep,
+  available to anybody who can edit an org chart.** `requireNoCycle` now walks upward and refuses.
+- **No pay on any team screen, and it is enforced server-side.** A lead needs to know somebody was
+  absent nine days; what the company pays them is HR's. A manager could previously read each report's
+  exact salary off the review list, so `withoutPay()` strips the figures for everyone but HR and the
+  person themselves. A hike is still decided as a **percentage**, which is all the judgement needs.
+- **Nav: Finance and Performance came out of "Me".** Payday is the single thing an employee opens this
+  product for most months, and it was three clicks deep inside a section that reads as "my profile".
+  Old paths stay as redirect stubs — **notification rows already sitting in customer databases carry
+  those URLs**, and rewriting history is not an option.
+- **Still missing, on purpose:** approving a team's *expenses* is still Admin/HR, so that page is
+  read-only rather than showing a button that 403s. Departments already have a parent and a lead, so
+  "teams with their own manager" needed no new table — only the UI to make it obvious.
+- **Final outcome:** _7 new tests (`OrgScopeTest`); 405 backend tests green; frontend typecheck and
+  build clean._ Documented in [docs/ORG-AND-VISIBILITY.md](docs/ORG-AND-VISIBILITY.md).
+- **Lesson, logged the hard way.** The intern added to the demo seed moved headcount 6 → 7 and broke
+  five tests that hard-coded 6 — analytics, attendance, billing, directory paging and team overview.
+  Worse, an interim run was reported as green off a *partial* log and a completion code that came from
+  a shell `echo` rather than from Maven. **Read the build tool's own tally, not a proxy for it.** And
+  a demo seed is a fixture half the suite depends on: changing its shape is a test-wide change.
+
 ---
 
 ## 4. Architecture Decision Log

@@ -21,8 +21,9 @@ class AnalyticsIntegrationTest extends IntegrationTestBase {
 
         JsonNode o = getJson("/api/v1/analytics/overview", owner);
 
-        // People: the demo has 6 active users; headcount growth is a 12-month series ending at 6.
-        assertThat(o.get("people").get("headcount").asInt()).isEqualTo(6);
+        // People: the demo has 7 active users (the seventh is the intern under Priya, which gives the
+        // demo a third level of reporting); headcount growth is a 12-month series ending at 7.
+        assertThat(o.get("people").get("headcount").asInt()).isEqualTo(7);
         assertThat(o.get("people").get("headcountGrowth")).hasSize(12);
         assertThat(o.get("people").get("byDepartment").size()).isGreaterThan(0);
 
