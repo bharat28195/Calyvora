@@ -138,7 +138,11 @@
             <scope>test</scope>
         </dependency>
         <!-- embedded-postgres engine: also usable at runtime via the 'embedded' profile so the app
-             can run locally with no Docker/Postgres. optional=true keeps it off downstream classpaths. -->
+             can run locally with no Docker/Postgres. Compile scope is required, not a choice —
+             EmbeddedPostgresConfig is a main source and imports it.
+
+             It stays on the classpath; what must NOT ship is the platform BINARIES it drags in. See
+             the spring-boot-maven-plugin excludeGroupIds below, which is where that is handled. -->
         <dependency>
             <groupId>io.zonky.test</groupId>
             <artifactId>embedded-postgres</artifactId>
@@ -177,6 +181,22 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Keep the Postgres SERVER BINARIES out of the deployable jar.
+                         `optional=true` on those dependencies does not do this: optional only stops a
+                         dependency propagating to downstream CONSUMERS of this artifact, and nothing
+                         consumes this one — it is an application. They stayed on the runtime classpath
+                         and repackage bundled every platform it could find: darwin-amd64,
+                         windows-amd64, linux-amd64 and linux-amd64-alpine. 81 MB of a 145 MB jar, for
+                         a database engine the deployed app never starts, because it talks to Neon.
+                         Excluding by GROUP rather than by artifact so a binary for a platform nobody
+                         has added yet cannot reappear silently — the group holds nothing else.
+                         Effect is limited to the packaged jar: compile, test and `spring-boot:run`
+                         still see the binaries, so the tests and the local no-Docker profile are
+                         untouched. What no longer works is SPRING_PROFILES_ACTIVE=embedded from
+                         inside the built jar, which is not something any deployment does. -->
+                    <excludeGroupIds>io.zonky.test.postgres</excludeGroupIds>
+                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -31,6 +31,15 @@ services:
     runtime: docker
     plan: free
     region: singapore            # pick the region closest to you / your customers
+    # The branch that gets deployed, stated HERE rather than left to the dashboard.
+    #
+    # Without this key the branch is whatever was picked in the UI at setup — state invisible from the
+    # repo, so "which commit is production on?" cannot be answered without opening the dashboard. On
+    # 2026-09-08 the deployed backend was several commits behind this branch with auto-deploy report-
+    # edly on, and ruling the branch in or out cost a diagnosis round-trip this line makes unnecessary.
+    #
+    # Takes effect on a blueprint sync (Dashboard > Blueprints > this repo > Sync), not on a push.
+    branch: product/hr-platform
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /actuator/health
@@ -125,6 +134,10 @@ services:
     runtime: node
     plan: free
     region: singapore
+    # Same branch as the backend, and stated for the same reason — see the note there. The two must
+    # never drift: the frontend nav links to routes the backend has to know about, so a frontend built
+    # from a different commit shows sections whose API answers 404.
+    branch: product/hr-platform
     rootDir: frontend
     buildCommand: npm ci && npm run build
     startCommand: npm start
