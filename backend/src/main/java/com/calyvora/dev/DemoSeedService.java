@@ -75,6 +75,8 @@ public class DemoSeedService {
     // The platform owner is not seeded here any more — PlatformOwnerBootstrap creates it at startup so
     // it exists in prod too, where this dev-only seeder never runs.
     private static final String AGENCY_OWNER_EMAIL = "owner@vertexgroup.demo";
+    /** The third reporting level: a MEMBER under a MEMBER, which is what makes "My team" demonstrable. */
+    private static final String INTERN_EMAIL = "dev.sharma@northwind.demo";
 
     private final CompanyRepository companyRepository;
     private final CompanySettingsRepository companySettingsRepository;
@@ -187,7 +189,7 @@ public class DemoSeedService {
         // Dev reports to Priya, who is a plain MEMBER. That one reporting line is the whole demo of
         // PD-32: Priya gets "My team" because somebody reports to her, not because of anything her
         // role or her job title says. Without a third level the feature cannot be shown at all.
-        User dev = createUser(company.getId(), "dev.sharma@northwind.demo", "Dev", "Sharma", Role.MEMBER);
+        User dev = createUser(company.getId(), INTERN_EMAIL, "Dev", "Sharma", Role.MEMBER);
 
         TenantContext.setCompanyId(company.getId());
         try {
@@ -248,9 +250,62 @@ public class DemoSeedService {
             if (anyMissing) {
                 seedFinance(emp);
             }
+
+            // The third reporting level and the designation ladder (PD-32).
+            topUpOrgDepth(companyId);
         } finally {
             TenantContext.clear();
         }
+    }
+
+    /**
+     * Adds the intern under Priya and the designation ladder to a demo company that already exists.
+     *
+     * <p>Needed because {@link #seed()} returns early once Northwind is present, so everything added to
+     * the fresh-seed path after a company was first created never reaches it. The deployed demo had
+     * been seeded months before either of these existed, which left the live Designations screen empty
+     * and no plain MEMBER anywhere in the org leading a team — so the one thing PD-32 is about could
+     * not be demonstrated on the very environment used to demonstrate it.
+     *
+     * <p>Every step checks before it writes. This runs on a real, long-lived company on every call to
+     * the seed endpoint, so a second run must change nothing, and a customer who has since renamed a
+     * designation or moved somebody's reporting line must not have it undone.
+     */
+    private void topUpOrgDepth(UUID companyId) {
+        // 1. The intern. Only created if absent; if somebody deleted them, they come back, and if they
+        //    were moved under a different manager that is left alone (only a missing manager is set).
+        if (!userRepository.existsByEmail(INTERN_EMAIL)) {
+            createUser(companyId, INTERN_EMAIL, "Dev", "Sharma", Role.MEMBER);
+        }
+        Map<String, EmployeeResponse> emp = employeesByEmail();
+        EmployeeResponse intern = emp.get(INTERN_EMAIL);
+        EmployeeResponse priya = emp.get("priya.nair@northwind.demo");
+        if (intern != null && priya != null && isBlank(intern.managerId())) {
+            String engineering = departmentService.list().stream()
+                    .filter(d -> "Engineering".equals(d.name()))
+                    .map(DepartmentResponse::id)
+                    .findFirst().orElse(null);
+            profile(emp, INTERN_EMAIL, "NR-007", "Engineering Intern", engineering, priya.id(),
+                    "2026-06-15", List.of("Java", "Testing"), 3);
+        }
+
+        // 2. The ladder, only if the company has none. A company that has defined its own rungs is
+        //    left completely alone — appending ours to a customer's list would be us editing their
+        //    org, which is exactly what the feature exists to let them do themselves.
+        if (!designationService.list(true).isEmpty()) {
+            return;
+        }
+        Map<String, String> rungs = new LinkedHashMap<>();
+        int level = 10;
+        for (String name : List.of("Intern", "Software Engineer", "Senior Software Engineer", "Lead")) {
+            rungs.put(name, designationService.create(
+                    new com.calyvora.people.dto.DesignationRequest(name, level, false)).id());
+            level += 10;
+        }
+        Map<String, EmployeeResponse> current = employeesByEmail();
+        assignDesignation(current, INTERN_EMAIL, rungs.get("Intern"));
+        assignDesignation(current, "priya.nair@northwind.demo", rungs.get("Senior Software Engineer"));
+        assignDesignation(current, "marcus.reed@northwind.demo", rungs.get("Lead"));
     }
 
     private static boolean isBlank(String s) {
@@ -824,8 +879,18 @@ public class DemoSeedService {
         assignDesignation(emp, marcus.getEmail(), rungs.get("Lead"));
     }
 
+    /**
+     * Puts somebody on a rung, skipping quietly if that person is not there.
+     *
+     * <p>The null check matters now this also runs as a top-up against a company that has been live for
+     * months: somebody may have been offboarded, and a demo helper must not take the seed endpoint down
+     * with a NullPointerException over a person who left.
+     */
     private void assignDesignation(Map<String, EmployeeResponse> emp, String email, String designationId) {
         EmployeeResponse e = emp.get(email);
+        if (e == null || designationId == null) {
+            return;
+        }
         employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
                 null, null, designationId, null, null, null, null, null, null, null, null, null, null));
     }
