@@ -102,7 +102,10 @@ await feature("Attendance — check in / out", async () => {
 
 await feature("Leave — request then approve", async () => {
   const req = must(await call("POST", "/api/v1/people/leave", {
-    type: "CASUAL", startDate: "2026-12-22", endDate: "2026-12-23", reason: `QA ${stamp}`,
+    // VACATION, not CASUAL. There has never been a CASUAL type — LeaveType is
+    // VACATION|SICK|PERSONAL|UNPAID|COMP_OFF — so this reported "leave is broken" on every run
+    // while leave was working perfectly and rejecting an invalid type exactly as it should.
+    type: "VACATION", startDate: "2026-12-22", endDate: "2026-12-23", reason: `QA ${stamp}`,
   }, memberTok), "member requests");
   const inbox = must(await call("GET", "/api/v1/people/leave"), "approver inbox");
   if (!inbox.find((l) => l.id === req.id)) throw new Error("request not visible to the approver");
@@ -144,7 +147,8 @@ await feature("Recruitment — job, candidate, pipeline", async () => {
     employmentType: "FULL_TIME", description: "Feature test", openings: 1,
   }), "create job");
   const cand = must(await call("POST", `/api/v1/recruit/jobs/${job.id}/candidates`, {
-    firstName: "Test", lastName: "Candidate", email: `qa.cand.${stamp}@example.test`, phone: "+911234567890",
+    // CandidatePayload takes a single required `name`, not firstName/lastName.
+    name: `Test Candidate ${stamp}`, email: `qa.cand.${stamp}@example.test`, phone: "+911234567890",
   }), "add candidate");
   const moved = must(await call("POST", `/api/v1/recruit/candidates/${cand.id}/move`, { stage: "INTERVIEW" }), "move stage");
   must(await call("DELETE", `/api/v1/recruit/jobs/${job.id}`), "delete job");
@@ -224,7 +228,8 @@ await feature("Clients — client and request", async () => {
     name: `QA Client ${stamp}`, contactName: "Test Contact", contactEmail: `qa.client.${stamp}@example.test`, status: "ACTIVE",
   }), "create client");
   const req = must(await call("POST", `/api/v1/clients/${c.id}/requests`, {
-    title: `QA requirement ${stamp}`, description: "2 developers", status: "OPEN",
+    // Valid statuses are REQUESTED|IN_PROGRESS|DELIVERED|DECLINED. "OPEN" is not one of them.
+    title: `QA requirement ${stamp}`, description: "2 developers", status: "REQUESTED",
   }), "add request");
   must(await call("DELETE", `/api/v1/clients/${c.id}/requests/${req.id}`), "delete request");
   must(await call("DELETE", `/api/v1/clients/${c.id}`), "delete client");
@@ -280,6 +285,81 @@ await feature("Trial request (public signup)", async () => {
     phone: "+911234567890", teamSize: "11-50", note: "Feature test", source: "qa",
   }, null), "submit");
   return `received=${r.received}, emailSent=${r.emailSent}`;
+});
+
+// --- PD-32, and the modules that reached production alongside it ---------------------------------
+//
+// These shipped after this harness was written, and four of them had never been deployed at all: a
+// broken V45 migration aborted every deploy for weeks, so "the tests pass" said nothing about whether
+// the code had ever run anywhere real. Covered here so the next stuck deploy shows up in one run.
+
+await feature("My team — visibility from the tree", async () => {
+  // Priya is a plain MEMBER with one report. leadsTeam=false here means either the demo top-up has
+  // not run, or visibility has quietly gone back to being decided by role.
+  const priya = must(await call("GET", "/api/v1/team/mine", null, memberTok), "member standing");
+  if (!priya.leadsTeam) throw new Error("a MEMBER with a report does not lead a team");
+
+  const managerTok = await login("tom.becker@northwind.demo", "demopass123");
+  const tom = must(await call("GET", "/api/v1/team", null, managerTok), "manager roster");
+  const seen = (tom.members ?? []).length;
+  // The original defect: a manager seeing the whole company.
+  if (seen === 0) throw new Error("manager sees nobody");
+  if (seen >= employees.length) throw new Error(`manager sees ${seen} of ${employees.length} — not scoped`);
+
+  // And no pay anywhere on a team surface. Matched as exact JSON KEYS, not as substrings of the
+  // whole document: a bare /ctc/i search reports a leak on `directCount` (dire-ctC-ount), which is
+  // the sort of false positive that gets a real check deleted for crying wolf.
+  const banned = ["salary", "currentSalary", "proposedSalary", "ctc", "payslip",
+                  "bankAccount", "bankAccountNumber", "grossPay", "netPay"];
+  const keys = new Set();
+  JSON.parse(JSON.stringify(tom), function (k) { keys.add(k); return this[k]; });
+  const leaked = banned.filter((b) => keys.has(b));
+  if (leaked.length) throw new Error(`pay leaked onto the team payload: ${leaked.join(", ")}`);
+  return `member leads ${priya.directCount}; manager sees ${seen}/${employees.length}, no pay`;
+});
+
+await feature("Designations — the company's own ladder", async () => {
+  const before = must(await call("GET", "/api/v1/designations?includeArchived=true"), "list");
+  const made = must(await call("POST", "/api/v1/designations",
+    { name: `QA Rung ${stamp}`, level: 900, archived: false }), "create");
+  const renamed = must(await call("PATCH", `/api/v1/designations/${made.id}`,
+    { name: `QA Rung ${stamp} v2`, level: 900, archived: false }), "rename");
+  if (!renamed.name.endsWith("v2")) throw new Error("rename did not stick");
+  must(await call("DELETE", `/api/v1/designations/${made.id}`), "delete");
+  return `${before.length} existing rungs; create, rename, delete`;
+});
+
+await feature("Statutory payroll (PF)", async () => {
+  const s = must(await call("GET", "/api/v1/payroll/pf-settings"), "pf settings");
+  // Ships OFF for every company until switched on per customer, so enabled=false is correct here,
+  // not a failure. What is being checked is that the screen answers at all.
+  return `enabled=${s.enabled ?? false}, wage ceiling ${s.wageCeiling ?? "n/a"}`;
+});
+
+await feature("Bank file — the payroll last mile", async () => {
+  const p = await call("GET", "/api/v1/payroll/bank-file/preview?month=2026-08&format=GENERIC");
+  if (p.status !== 200) throw new Error(`preview -> ${p.status} ${p.text?.slice(0, 120)}`);
+  const rows = p.json?.rows?.length ?? 0;
+  const flagged = p.json?.problems?.length ?? p.json?.excluded?.length ?? 0;
+  return `preview ok — ${rows} payable rows, ${flagged} flagged before download`;
+});
+
+await feature("Plans & per-customer features", async () => {
+  if (!PLATFORM_PW) return "skipped — set PLATFORM_OWNER_PASSWORD";
+  const plans = must(await call("GET", "/api/v1/platform/plans", null, platformTok), "plans");
+  const mine = must(await call("GET", "/api/v1/company/features"), "own company features");
+  const on = mine.filter((f) => f.enabled).length;
+  return `${plans.length} plans; this company has ${on}/${mine.length} modules on`;
+});
+
+await feature("Leave policy — leave is a policy, not a constant", async () => {
+  const p = must(await call("GET", "/api/v1/people/leave-policies"), "policies");
+  const vacation = p.find((x) => x.type === "VACATION");
+  if (!vacation) throw new Error("no VACATION policy — the V45 backfill did not run");
+  // 25 days is exactly the old hard-coded constant. A different number here means the migration
+  // changed somebody's entitlement, which it must never do.
+  if (Number(vacation.daysPerYear) !== 25) throw new Error(`vacation is ${vacation.daysPerYear}, expected 25`);
+  return `${p.length} policies; vacation ${vacation.daysPerYear}d — unchanged from the old constant`;
 });
 
 // --- summary ------------------------------------------------------------------------------------

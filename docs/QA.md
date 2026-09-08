@@ -14,7 +14,58 @@ PLATFORM_OWNER_PASSWORD='…' node tools/qa/features.mjs         # functional, a
 
 ---
 
-## Latest run — 4 September 2026, on Neon
+## Latest run — 8 September 2026, on Neon
+
+**30 of 30 modules working**, and **6/6 roles clean on every read endpoint**
+(`sweep.mjs`: owner 72/72, admin 16/16, platform owner 8/8; HR, manager and member show only the
+403s they are supposed to show).
+
+The six modules beyond the 24 below are new, and four of them had **never run in production before
+this week** — a broken V45 migration aborted every deploy for weeks, so a green test suite was saying
+nothing about whether the code had ever executed anywhere real.
+
+| Module | What was proven |
+|---|---|
+| My team (PD-32) | A plain MEMBER with one report leads a team; a MANAGER sees **1 of 7** people, not the company; no pay field anywhere on the payload |
+| Designations | Create → rename → delete, on the company's own ladder |
+| Statutory payroll (PF) | Answers, `enabled=false`, wage ceiling 15,000 — off per customer by design |
+| Bank file | Preview renders; problems flagged **before** download, not by the bank |
+| Plans & features | 3 plans; this company has 12/13 modules on |
+| Leave policy | 5 policies; vacation **25 days — unchanged from the old hard-coded constant** |
+
+### Three "failures" that were the harness, not the product
+
+The first run reported 21/24. All three were stale request payloads, and each produced a 400 that
+reads exactly like a broken feature:
+
+| Reported as broken | Actually |
+|---|---|
+| Leave — request then approve | Harness sent `type: "CASUAL"`. There has never been a CASUAL type. Leave works; the API rejected an invalid enum with a precise field error |
+| Recruitment — add candidate | Harness sent `firstName`/`lastName`; `CandidatePayload` takes a single `name` |
+| Clients — add request | Harness sent `status: "OPEN"`; valid values are `REQUESTED\|IN_PROGRESS\|DELIVERED\|DECLINED` |
+
+Each was confirmed working against production with a correct payload before the harness was changed —
+the harness is not evidence until its own request shape has been checked against the DTO. This is the
+failure mode the file header already warned about, which is worth noting: the warning was there and
+the payloads drifted anyway.
+
+A fourth "failure" was a bug in a **new check**: a `/ctc/i` search for leaked pay matched
+`directCount` (dire-**ctC**-ount). Now matched as exact JSON keys. A check that cries wolf gets
+deleted, so a false positive is not a harmless one.
+
+### Open finding
+
+**The platform owner account is on its built-in default password in production.** That account reads
+every customer on the platform. `PlatformOwnerBootstrap` warns about exactly this at boot. Set
+`PLATFORM_OWNER_PASSWORD` in the Render dashboard and restart.
+
+---
+
+## Previous run — 4 September 2026, on Neon
+
+> **Superseded by the 8 September 2026 run below.** Kept because it is the last run before the
+> deploy pipeline was found to be broken, and therefore the last run whose "working" meant "working in
+> production" rather than "working in a build nobody shipped".
 
 **24 of 24 modules working.** Exercised through create, update and delete, not page loads.
 
