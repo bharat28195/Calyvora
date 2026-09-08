@@ -36,11 +36,8 @@ create table leave_policies (
 );
 create index idx_leave_policy_company on leave_policies(company_id);
 
-alter table leave_policies enable row level security;
-alter table leave_policies force row level security;
-create policy tenant_isolation on leave_policies
-    using (company_id = nullif(current_setting('calyvora.company_id', true), '')::uuid)
-    with check (company_id = nullif(current_setting('calyvora.company_id', true), '')::uuid);
+-- NOTE: Row-Level Security for leave_policies is switched on at the END of this file, deliberately,
+-- after the backfill below. See the comment there — turning it on here is what broke the deploy.
 
 -- ---------------------------------------------------------------------------
 -- comp_off_credits — a day worked that was not owed, earning a day off later.
@@ -98,3 +95,33 @@ cross join (values
 where not exists (
     select 1 from leave_policies lp where lp.company_id = c.id and lp.type = p.type
 );
+
+-- ---------------------------------------------------------------------------
+-- Row-Level Security for leave_policies — LAST, after the backfill above.
+--
+-- THIS ORDERING IS THE MIGRATION. It was at the top, next to the table, which is the natural place
+-- to put it and where every other table in this schema has it. That failed on deploy:
+--
+--   ERROR: new row violates row-level security policy for table "leave_policies"  (SQLSTATE 42501)
+--
+-- `force row level security` subjects the table OWNER to the policy too — that is the whole point of
+-- `force`, and it is what we want at runtime. But Flyway migrates on a connection with no tenant
+-- bound, so `current_setting('calyvora.company_id', true)` is empty, the WITH CHECK evaluates to
+-- NULL for every row, and a backfill that spans all companies cannot insert a single one.
+--
+-- Why the whole test suite missed it: the tests run against embedded Postgres as a SUPERUSER, and a
+-- superuser bypasses RLS entirely, so the insert sailed through locally. Neon hands the app a
+-- NOSUPERUSER role without BYPASSRLS — which TenantIsolationVerifier deliberately REQUIRES at boot —
+-- so the policy is live there and the migration aborts. The gap is not the SQL; it is that
+-- "migrations pass" was only ever proven under a role that ignores the rules. FlywayUnderRlsTest now
+-- runs the whole migration history as a non-superuser to close it.
+--
+-- Seeding before the policy exists is the fix, rather than weakening the policy to tolerate an unset
+-- tenant. A WITH CHECK that passes when no tenant is bound would let any code path that forgets to
+-- set the GUC write rows belonging to nobody, permanently, to make one backfill convenient.
+-- ---------------------------------------------------------------------------
+alter table leave_policies enable row level security;
+alter table leave_policies force row level security;
+create policy tenant_isolation on leave_policies
+    using (company_id = nullif(current_setting('calyvora.company_id', true), '')::uuid)
+    with check (company_id = nullif(current_setting('calyvora.company_id', true), '')::uuid);
