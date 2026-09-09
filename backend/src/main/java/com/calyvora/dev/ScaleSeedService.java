@@ -104,7 +104,27 @@ public class ScaleSeedService {
                               int headcount, int departments, int attendanceRows,
                               int maxDownline, long millis) {}
 
-    @Transactional
+    /**
+     * NOT {@code @Transactional}, and that is load-bearing rather than an oversight.
+     *
+     * <p>{@code TenantAwareDataSource} binds {@code calyvora.company_id} when a connection is BORROWED,
+     * reading {@link TenantContext} at that moment. A transaction borrows its connection when the
+     * method is entered — before this method has decided which company it is creating — so the whole
+     * transaction would run with an empty tenant and every insert into an RLS'd table
+     * (departments, employees, attendance_records) would be refused by its WITH CHECK policy.
+     *
+     * <p>Without the annotation each repository call borrows a fresh connection after
+     * {@code TenantContext} is set, which is exactly what {@code DemoSeedService.seed()} does and why
+     * that one has always worked.
+     *
+     * <p>This cost a deployment to find, because it cannot fail locally: the embedded Postgres used by
+     * the tests connects as a SUPERUSER and superusers bypass RLS, so the inserts sail through. Neon
+     * hands the app a NOSUPERUSER role — which {@code TenantIsolationVerifier} deliberately requires —
+     * and there the policy is live. Same blind spot that made V45 abort every deploy for weeks.
+     *
+     * <p>What is given up is atomicity: a failure partway leaves a half-built company. Acceptable for
+     * a dev fixture that {@link #remove()} deletes whole, and the alternative does not work at all.
+     */
     public ScaleResult seed(int headcount, int attendanceDays) {
         long started = System.currentTimeMillis();
         int people = Math.max(10, Math.min(headcount, 5000));
@@ -220,8 +240,12 @@ public class ScaleSeedService {
      * savepoint and retried on the next pass, by which time its children are gone. The loop ends when
      * a pass deletes nothing, which either means everything is gone or that no order exists — and the
      * second case reports what is left rather than pretending success.
+     *
+     * <p>Not {@code @Transactional}, for the same reason as {@link #seed(int, int)} and with a nastier
+     * failure mode: a transaction borrows its connection before the tenant is known, so under RLS the
+     * USING policy would make every row invisible and each DELETE would remove nothing while reporting
+     * success. Silently deleting zero rows is worse than failing.
      */
-    @Transactional
     public boolean remove() {
         Optional<User> admin = userRepository.findByEmail(ADMIN_EMAIL);
         if (admin.isEmpty()) {
@@ -281,24 +305,21 @@ public class ScaleSeedService {
      * would take the successful ones with it. The savepoint is what makes "try, and retry next pass"
      * possible at all.
      */
+    /**
+     * One tenant-scoped delete, reporting whether it worked rather than throwing.
+     *
+     * <p>No savepoints, because there is no surrounding transaction to protect: each statement commits
+     * on its own, so one failing on a foreign key leaves the successful ones alone and can simply be
+     * retried on the next pass. The earlier savepoint version existed only to survive being inside a
+     * transaction, which turned out to be the thing that broke tenant binding in the first place.
+     */
     private boolean deleteQuietly(String table, UUID companyId) {
-        // Savepoints taken on the JDBC connection directly, not through the transaction manager:
-        // JpaTransactionManager refuses them outright ("JpaDialect does not support savepoints")
-        // unless nested transactions are enabled globally, and turning that on across the whole
-        // application to tidy up a dev fixture would be a poor trade.
-        return Boolean.TRUE.equals(jdbc.execute((java.sql.Connection c) -> {
-            java.sql.Savepoint savepoint = c.setSavepoint();
-            try (java.sql.PreparedStatement ps =
-                         c.prepareStatement("delete from " + table + " where company_id = ?")) {
-                ps.setObject(1, companyId);
-                ps.executeUpdate();
-                c.releaseSavepoint(savepoint);
-                return true;
-            } catch (java.sql.SQLException e) {
-                c.rollback(savepoint);
-                return false;
-            }
-        }));
+        try {
+            jdbc.update("delete from " + table + " where company_id = ?", companyId);
+            return true;
+        } catch (org.springframework.dao.DataAccessException e) {
+            return false;   // children still reference it — a later pass will get it
+        }
     }
 
     // --- helpers ---------------------------------------------------------------
