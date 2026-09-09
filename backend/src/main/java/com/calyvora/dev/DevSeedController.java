@@ -17,14 +17,37 @@ import org.springframework.web.bind.annotation.RestController;
 public class DevSeedController {
 
     private final DemoSeedService demoSeedService;
+    private final ScaleSeedService scaleSeedService;
 
-    public DevSeedController(DemoSeedService demoSeedService) {
+    public DevSeedController(DemoSeedService demoSeedService, ScaleSeedService scaleSeedService) {
         this.demoSeedService = demoSeedService;
+        this.scaleSeedService = scaleSeedService;
     }
 
     @PostMapping("/seed-demo")
     public DemoSeedService.DemoCredentials seed() {
         return demoSeedService.seed();
+    }
+
+    /**
+     * A company large enough to be worth timing — 1,000 people over 14 days of attendance by default,
+     * in its own tenant so the demo company is untouched.
+     *
+     * <p>Not a demo seed and deliberately separate from one: nobody shows a customer a thousand rows of
+     * generated names. It exists so "does this stay usable at 200 seats" is answered by measuring
+     * instead of by reasoning about the code.
+     */
+    @PostMapping("/seed-scale")
+    public ScaleSeedService.ScaleResult seedScale(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "1000") int employees,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "14") int attendanceDays) {
+        return scaleSeedService.seed(employees, attendanceDays);
+    }
+
+    /** Delete the scale tenant whole, so a thousand invented people never appear in a customer demo. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/seed-scale")
+    public java.util.Map<String, Boolean> removeScale() {
+        return java.util.Map.of("removed", scaleSeedService.remove());
     }
 
     /** Provision 5 varied sample companies so the platform-owner console has a full picture. */
