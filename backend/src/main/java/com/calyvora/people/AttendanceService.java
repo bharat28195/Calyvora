@@ -139,6 +139,43 @@ public class AttendanceService {
 
     // ---- one employee's month ----
 
+    /**
+     * One month for every employee in the company, in a fixed number of queries.
+     *
+     * <p>Exists for the payroll run, which needs everybody's attendance to work out loss of pay.
+     * Calling {@link #month} per person costs three queries each — employee, user, records — so two
+     * hundred people is six hundred round trips to the database, and that was most of the seven
+     * seconds a two-hundred-person run took.
+     *
+     * <p>The arithmetic is not reimplemented here. It walks the same days and calls the same
+     * {@link #resolve} as {@link #month}, so a holiday, a week-off or an approved leave is decided in
+     * exactly one place. A second copy of that logic would drift, and it would drift silently on
+     * payslips — the one document where being quietly wrong matters most.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, AttendanceMonthResponse> monthForEveryone(YearMonth month) {
+        UUID companyId = TenantContext.getCompanyId();
+        LocalDate from = month.atDay(1);
+        LocalDate to = month.atEndOfMonth();
+
+        List<Employee> employees = employeeRepository.findByCompanyId(companyId);
+        Map<UUID, User> usersById = usersById(companyId);
+        Map<UUID, List<LeaveRequest>> leaveByEmployee = approvedLeaveByEmployee(companyId);
+
+        Map<UUID, Map<LocalDate, AttendanceRecord>> markedByEmployee = new HashMap<>();
+        for (AttendanceRecord r : attendanceRepository.findByCompanyIdAndDateBetween(companyId, from, to)) {
+            markedByEmployee.computeIfAbsent(r.getEmployeeId(), k -> new HashMap<>()).put(r.getDate(), r);
+        }
+
+        Map<UUID, AttendanceMonthResponse> out = new HashMap<>();
+        for (Employee e : employees) {
+            out.put(e.getId(), buildMonth(e, usersById.get(e.getUserId()), month,
+                    markedByEmployee.getOrDefault(e.getId(), Map.of()),
+                    leaveByEmployee.getOrDefault(e.getId(), List.of())));
+        }
+        return out;
+    }
+
     @Transactional(readOnly = true)
     public AttendanceMonthResponse month(UUID employeeId, YearMonth month) {
         UUID companyId = TenantContext.getCompanyId();
@@ -154,7 +191,22 @@ public class AttendanceService {
             marked.put(r.getDate(), r);
         }
         List<LeaveRequest> leave = approvedLeaveByEmployee(companyId).getOrDefault(employeeId, List.of());
+        return buildMonth(employee, user, month, marked, leave);
+    }
 
+    /**
+     * Walks a month for one person and totals it.
+     *
+     * <p>The one implementation, shared by {@link #month} and {@link #monthForEveryone}: the two differ
+     * only in how they fetch, never in what they conclude. Keeping the arithmetic here is what stops a
+     * payroll run and a payslip disagreeing about the same person's loss of pay — the sort of
+     * discrepancy nobody finds until an employee does.
+     */
+    private AttendanceMonthResponse buildMonth(Employee employee, User user, YearMonth month,
+                                               Map<LocalDate, AttendanceRecord> marked,
+                                               List<LeaveRequest> leave) {
+        LocalDate from = month.atDay(1);
+        LocalDate to = month.atEndOfMonth();
         List<AttendanceEntryResponse> days = new ArrayList<>();
         Map<String, Long> counts = new LinkedHashMap<>();
         for (AttendanceStatus s : AttendanceStatus.values()) {
@@ -183,7 +235,7 @@ public class AttendanceService {
 
         String name = user == null ? "Employee" : (user.getFirstName() + " " + user.getLastName()).trim();
         Double rate = expected == 0 ? null : Math.round(worked * 1000.0 / expected) / 10.0;
-        return new AttendanceMonthResponse(employeeId.toString(), name, month.toString(), days, counts,
+        return new AttendanceMonthResponse(employee.getId().toString(), name, month.toString(), days, counts,
                 Math.round(worked * 10.0) / 10.0, expected, rate);
     }
 

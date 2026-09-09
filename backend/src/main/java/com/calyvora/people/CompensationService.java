@@ -146,10 +146,25 @@ public class CompensationService {
         BigDecimal totalGross = BigDecimal.ZERO, totalNet = BigDecimal.ZERO;
         BigDecimal totalEmployer = BigDecimal.ZERO;
         double totalLop = 0;
-        String currency = companyCurrency(TenantContext.getCompanyId());
+        UUID runCompanyId = TenantContext.getCompanyId();
+        String currency = companyCurrency(runCompanyId);
+
+        // A month of attendance for EVERYBODY, in one batch rather than one query set per person.
+        //
+        // The run called payslip() per employee, and payslip() fetches a month of attendance (three
+        // queries), a salary, a finance row, a department and a user for that person — plus the
+        // company's payslip template, currency, feature flags and settings, which are identical for
+        // all of them and were re-read every single time. Roughly a dozen round trips each: about
+        // 2,600 queries and seven seconds at 200 people, and thirty seconds at 1,000.
+        //
+        // Attendance is the biggest of those and the easiest to hoist without touching any arithmetic.
+        java.util.Map<UUID, com.calyvora.people.dto.AttendanceMonthResponse> attendanceByEmployee =
+                attendanceService.monthForEveryone(ym);
+
         for (var e : employeeService.directory()) {
             try {
-                PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString());
+                PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString(),
+                        attendanceByEmployee.get(UUID.fromString(e.id())));
                 // Absent statutory block = the feature is off or this person is not enrolled. Zero
                 // rather than null so the row arithmetic works without every caller null-checking.
                 BigDecimal employeePf = p.statutory() == null ? BigDecimal.ZERO : p.statutory().employeePf();
@@ -191,6 +206,21 @@ public class CompensationService {
 
     @Transactional(readOnly = true)
     public PayslipResponse payslip(UUID employeeId, String month) {
+        return payslip(employeeId, month, null);
+    }
+
+    /**
+     * One payslip, optionally reusing attendance the caller has already loaded.
+     *
+     * <p>{@code prefetchedAttendance} is the only difference between a payslip opened on screen and one
+     * computed inside a payroll run. Passing it in rather than giving the run its own copy of the
+     * calculation is deliberate: a run and a payslip that disagreed about the same person's loss of pay
+     * would be found by the employee, not by us. Null means fetch it, which is what every single-payslip
+     * caller does.
+     */
+    @Transactional(readOnly = true)
+    public PayslipResponse payslip(UUID employeeId, String month,
+                                   com.calyvora.people.dto.AttendanceMonthResponse prefetchedAttendance) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireEmployee(employeeId, companyId);
         String name = nameOf(employee);
@@ -212,7 +242,7 @@ public class CompensationService {
         PayslipTemplateService.Computed c = payslipTemplateService.compute(companyId, gross);
 
         // --- Attendance linkage: unpaid absences (LOP) reduce the month's pay -----------------
-        var att = attendanceService.month(employeeId, ym);
+        var att = prefetchedAttendance != null ? prefetchedAttendance : attendanceService.month(employeeId, ym);
         int workingDays = 0;
         double lopDays = 0;
         for (var d : att.days()) {

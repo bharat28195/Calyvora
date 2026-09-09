@@ -10,6 +10,26 @@ spring:
     url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:calyvora}}
     username: ${DB_USERNAME:calyvora}
     password: ${DB_PASSWORD:calyvora_local_dev}
+    hikari:
+      # Stated rather than defaulted. The default is 10, which is a fine number — but an unstated
+      # default is one nobody reviews, and the pool is the first thing that breaks under concurrency:
+      # Tomcat accepts 200 simultaneous requests and they all queue for these connections.
+      #
+      # Bigger is not better. Past roughly cores × 2 the contention simply moves from the application
+      # into the database, and every tenant-bound connection here costs a Postgres backend — which is
+      # also the ceiling on how many app instances can run at once, because session-scoped tenant
+      # binding rules out a transaction-mode pooler (see docs/ARCHITECTURE-SCALE.md §6).
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      # FAIL, rather than hang, when the pool is saturated. Without this a request waits 30s and the
+      # user sees a spinner that never resolves; with it the server says so and the log names the
+      # cause. A visible failure under load is worth far more than an invisible one.
+      connection-timeout: ${DB_POOL_TIMEOUT_MS:10000}
+      # Free-tier instances sleep and managed databases drop idle connections; retiring them before
+      # the database does avoids handing out a dead one on the first request after a quiet period.
+      max-lifetime: 600000
+      idle-timeout: 300000
+      pool-name: calyvora-pool
   jpa:
     hibernate:
       ddl-auto: validate          # Flyway owns the schema; JPA only validates
