@@ -158,8 +158,19 @@ public class CompensationService {
         // 2,600 queries and seven seconds at 200 people, and thirty seconds at 1,000.
         //
         // Attendance is the biggest of those and the easiest to hoist without touching any arithmetic.
+        // Only for people who are actually being paid. A payroll run skips anybody with no salary on
+        // record, and computing a month of attendance for them is work thrown away — at a thousand
+        // employees with no compensation that was the entire request, and it turned a 30-second run
+        // into one that timed out. Restricting first is what makes the batch a win rather than a loss.
+        java.util.Set<UUID> paid = new java.util.HashSet<>();
+        for (var e : employeeService.directory()) {
+            UUID id = UUID.fromString(e.id());
+            if (!compensationRepository.findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(id).isEmpty()) {
+                paid.add(id);
+            }
+        }
         java.util.Map<UUID, com.calyvora.people.dto.AttendanceMonthResponse> attendanceByEmployee =
-                attendanceService.monthForEveryone(ym);
+                attendanceService.monthForEveryone(ym, paid);
 
         for (var e : employeeService.directory()) {
             try {

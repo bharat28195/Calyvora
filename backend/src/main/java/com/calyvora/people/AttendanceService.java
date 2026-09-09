@@ -153,12 +153,24 @@ public class AttendanceService {
      * payslips — the one document where being quietly wrong matters most.
      */
     @Transactional(readOnly = true)
-    public Map<UUID, AttendanceMonthResponse> monthForEveryone(YearMonth month) {
+    public Map<UUID, AttendanceMonthResponse> monthForEveryone(YearMonth month, java.util.Set<UUID> only) {
         UUID companyId = TenantContext.getCompanyId();
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
 
-        List<Employee> employees = employeeRepository.findByCompanyId(companyId);
+        // The company's holidays for the month, once. resolve() otherwise queries them per DAY per
+        // EMPLOYEE — thirty thousand queries for a thousand people, which is the whole cost of this.
+        Map<LocalDate, Holiday> holidays = new HashMap<>();
+        for (Holiday h : holidayRepository.findByCompanyIdAndDateBetweenOrderByDateAsc(companyId, from, to)) {
+            holidays.putIfAbsent(h.getDate(), h);
+        }
+
+        // Only the people the caller actually needs. A payroll run skips anybody without a salary, and
+        // computing a month for them is work whose result is thrown away — at a thousand employees
+        // with no compensation on record that was the entire request.
+        List<Employee> employees = employeeRepository.findByCompanyId(companyId).stream()
+                .filter(e -> only == null || only.contains(e.getId()))
+                .toList();
         Map<UUID, User> usersById = usersById(companyId);
         Map<UUID, List<LeaveRequest>> leaveByEmployee = approvedLeaveByEmployee(companyId);
 
@@ -171,7 +183,7 @@ public class AttendanceService {
         for (Employee e : employees) {
             out.put(e.getId(), buildMonth(e, usersById.get(e.getUserId()), month,
                     markedByEmployee.getOrDefault(e.getId(), Map.of()),
-                    leaveByEmployee.getOrDefault(e.getId(), List.of())));
+                    leaveByEmployee.getOrDefault(e.getId(), List.of()), holidays));
         }
         return out;
     }
@@ -191,7 +203,7 @@ public class AttendanceService {
             marked.put(r.getDate(), r);
         }
         List<LeaveRequest> leave = approvedLeaveByEmployee(companyId).getOrDefault(employeeId, List.of());
-        return buildMonth(employee, user, month, marked, leave);
+        return buildMonth(employee, user, month, marked, leave, null);
     }
 
     /**
@@ -204,7 +216,8 @@ public class AttendanceService {
      */
     private AttendanceMonthResponse buildMonth(Employee employee, User user, YearMonth month,
                                                Map<LocalDate, AttendanceRecord> marked,
-                                               List<LeaveRequest> leave) {
+                                               List<LeaveRequest> leave,
+                                               Map<LocalDate, Holiday> holidays) {
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
         List<AttendanceEntryResponse> days = new ArrayList<>();
@@ -218,7 +231,7 @@ public class AttendanceService {
 
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             AttendanceEntryResponse entry = resolve(employee, user, d,
-                    Optional.ofNullable(marked.get(d)), leave);
+                    Optional.ofNullable(marked.get(d)), leave, holidays);
             days.add(entry);
             if (entry.status() == null) {
                 continue;
@@ -340,6 +353,18 @@ public class AttendanceService {
      */
     private AttendanceEntryResponse resolve(Employee employee, User user, LocalDate date,
                                             Optional<AttendanceRecord> marked, List<LeaveRequest> leave) {
+        return resolve(employee, user, date, marked, leave, null);
+    }
+
+    /**
+     * As above, with the company's holidays for the period already in hand.
+     *
+     * <p>Null means "look it up", which is what every single-day caller does. A map means the caller is
+     * walking many days for many people and has fetched them once.
+     */
+    private AttendanceEntryResponse resolve(Employee employee, User user, LocalDate date,
+                                            Optional<AttendanceRecord> marked, List<LeaveRequest> leave,
+                                            Map<LocalDate, Holiday> prefetchedHolidays) {
         if (marked.isPresent()) {
             return of(employee, user, date, marked.get(), false);
         }
@@ -351,10 +376,17 @@ public class AttendanceService {
             }
         }
         // A company holiday closes the day for everyone (unless someone marked otherwise above).
-        Optional<Holiday> holiday = holidayRepository
-                .findByCompanyIdAndDateBetweenOrderByDateAsc(employee.getCompanyId(), date, date).stream()
-                .filter(h -> !h.isOptional())
-                .findFirst();
+        //
+        // Read from a prefetched map when the caller has one. This lookup used to be a query PER DAY
+        // PER EMPLOYEE — a month for one person was thirty queries, and a payroll run over a thousand
+        // people was thirty thousand. It is the single most expensive thing in this class and it was
+        // invisible, because at seven employees thirty queries a head is unnoticeable.
+        Optional<Holiday> holiday = (prefetchedHolidays != null
+                ? Optional.ofNullable(prefetchedHolidays.get(date))
+                : holidayRepository
+                        .findByCompanyIdAndDateBetweenOrderByDateAsc(employee.getCompanyId(), date, date).stream()
+                        .findFirst())
+                .filter(h -> !h.isOptional());
         if (holiday.isPresent()) {
             return entry(employee, user, date, AttendanceStatus.HOLIDAY.name(), null, null,
                     holiday.get().getName(), true);
