@@ -162,17 +162,26 @@ public class CompensationService {
         // record, and computing a month of attendance for them is work thrown away — at a thousand
         // employees with no compensation that was the entire request, and it turned a 30-second run
         // into one that timed out. Restricting first is what makes the batch a win rather than a loss.
+        // ONE query to find out who is on payroll at all.
+        //
+        // Asking per employee was a thousand round trips to discover that a thousand people have no
+        // salary — slower than the attendance work it was added to avoid, and the reason a run over the
+        // scale tenant still took two minutes after the first fix. The lesson is narrow and worth
+        // keeping: a guard that costs a query per row is not a guard, it is the same N+1 wearing a hat.
         java.util.Set<UUID> paid = new java.util.HashSet<>();
-        for (var e : employeeService.directory()) {
-            UUID id = UUID.fromString(e.id());
-            if (!compensationRepository.findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(id).isEmpty()) {
-                paid.add(id);
-            }
+        for (CompensationRecord r : compensationRepository
+                .findByCompanyIdOrderByEffectiveDateDescCreatedAtDesc(runCompanyId)) {
+            paid.add(r.getEmployeeId());
         }
         java.util.Map<UUID, com.calyvora.people.dto.AttendanceMonthResponse> attendanceByEmployee =
                 attendanceService.monthForEveryone(ym, paid);
 
+        // Resolved once and reused: directory() builds a DTO per employee, and it was being called
+        // twice for the same list.
         for (var e : employeeService.directory()) {
+            if (!paid.contains(UUID.fromString(e.id()))) {
+                continue;   // nobody to pay — the run has never included them
+            }
             try {
                 PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString(),
                         attendanceByEmployee.get(UUID.fromString(e.id())));
