@@ -117,11 +117,20 @@ public class AttendanceService {
         }
         Map<UUID, List<LeaveRequest>> leave = approvedLeaveByEmployee(companyId);
 
+        // Is this ONE day a holiday: asked once, not once per employee. resolve() looks it up itself
+        // when given nothing, which on a day sheet meant a query per person — a thousand queries to
+        // answer a question with a single answer for the whole company.
+        Map<LocalDate, Holiday> holidays = new HashMap<>();
+        for (Holiday h : holidayRepository.findByCompanyIdAndDateBetweenOrderByDateAsc(companyId, date, date)) {
+            holidays.putIfAbsent(h.getDate(), h);
+        }
+
         List<AttendanceEntryResponse> entries = new ArrayList<>();
         long present = 0, onLeave = 0, absent = 0, unmarked = 0;
         for (Employee e : employees) {
             AttendanceEntryResponse entry = resolve(e, users.get(e.getUserId()), date,
-                    Optional.ofNullable(marked.get(e.getId())), leave.getOrDefault(e.getId(), List.of()));
+                    Optional.ofNullable(marked.get(e.getId())), leave.getOrDefault(e.getId(), List.of()),
+                    holidays);
             entries.add(entry);
             if (entry.status() == null) {
                 unmarked++;
