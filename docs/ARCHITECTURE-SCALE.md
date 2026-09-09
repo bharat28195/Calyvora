@@ -56,6 +56,36 @@ request in the company unbounded.
 call (132 ms at 200) but the app shell requests it on **every navigation**, so it is a floor under
 every screen in the product.
 
+## 2a. Verified after the fixes (1,000 people, production, content-checked)
+
+| Screen | Before | After |
+|---|---|---|
+| **Payroll run** | 29.5 s | **1.3–1.6 s** |
+| `team/mine` (every page load) | 896 ms | 0.22–0.64 s |
+| Attendance day sheet | 17.4 s | **16.5 s — still slow** |
+
+Every reading above was discarded unless the response actually contained data. That check matters:
+two earlier numbers in this work were quoted from responses that turned out to be a Cloudflare
+challenge page and an empty payload. **A timing without a content check is not a measurement.**
+
+Also: this free tier is noisy. The identical Northwind payroll run measured 3.7 s and 7.4 s minutes
+apart. Below roughly ten seconds, one reading cannot be told from instance variance.
+
+### Four N+1s, all the same shape
+
+Every one was a **per-company fact fetched per row**, and none of them failed a test:
+
+1. Holidays, per day per employee (monthly path) — fixed
+2. Holidays, per employee (daily path) — fixed
+3. Salary-existence check, per employee — fixed (it was added as a *guard against* an N+1, and was one)
+4. Payslip template, currency, PF settings, per employee — **outstanding**, see §4a
+
+409 tests passed through every wrong version of this work, including one that made the run four times
+slower and one that made it time out entirely. The suite protects correctness — the payslip-equality
+check genuinely does guard the money — and says nothing about cost. The gap is not in the tests, it is
+in the environment: **seven employees and a superuser database**, which is also what hid the RLS bug in
+V45. Local does not resemble production in the two ways that matter most.
+
 ## 3. What has been fixed
 
 **Payroll run: attendance batched.** `AttendanceService.monthForEveryone(month)` loads the whole
@@ -76,8 +106,18 @@ per-run context. Removes ~5 queries × headcount. *Low risk, no arithmetic touch
 **b. Batch the remaining per-employee reads in the run** — salary, finance, department, user — into
 four company-wide queries. Takes the run to roughly constant query count.
 
-**c. Fix the attendance day sheet.** Drop the redundant `directory()` call, and bound the leave query
-by the month being displayed instead of reading the company's entire leave history.
+**c. Fix the attendance day sheet — still 16.5 s at 1,000 people, the worst screen left.** Hoisting
+holidays barely moved it, so the cost is elsewhere and is now known:
+
+- The employee list is loaded **three times** per request: `employeeService.directory()` (which also
+  builds a DTO per employee), then `employeeRepository.findByCompanyId`, then `usersById`.
+- `approvedLeaveByEmployee` reads the company's **entire** leave history, unbounded, to answer a
+  question about one day.
+- The method is `@Transactional` and not `readOnly`, because `directory()` may provision missing
+  profiles — so Hibernate dirty-checks a thousand loaded entities at flush.
+
+The fix is to load the list once, bound the leave query to the date being shown, and move
+profile-provisioning out of the read path so the day sheet can be `readOnly`.
 
 **d. Make `OrgScope` a query, not a scan.** Today it loads every employee and walks the tree in
 memory. A recursive CTE over `employees(manager_id)` — already indexed — answers "who is beneath this
