@@ -1,10 +1,14 @@
 name: CI
 
+# Watch the branches work actually happens on, not just main. product/hr-platform is what Render
+# deploys from and what every commit lands on, so a workflow watching only main was watching nothing:
+# the full suite has not run in CI for any of this work. Those 23 minutes are free here and blocking
+# on a laptop, which is the entire argument for CI owning them.
 on:
   push:
-    branches: [ main ]
+    branches: [ main, "product/**", "feature/**" ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, "product/**" ]
 
 concurrency:
   group: ci-${{ github.ref }}
