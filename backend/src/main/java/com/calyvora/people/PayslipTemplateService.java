@@ -90,10 +90,24 @@ public class PayslipTemplateService {
      */
     @Transactional(readOnly = true)
     public Computed compute(UUID companyId, BigDecimal gross) {
+        return compute(components(companyId), gross);
+    }
+
+    /**
+     * The company's template, fetched once.
+     *
+     * <p>Split out from {@link #compute} so a payroll run reads it a single time instead of once per
+     * employee. The template is a per-company fact, and re-reading it for every payslip was one of
+     * the four company-wide lookups a run was paying for on every person it paid.
+     */
+    @Transactional(readOnly = true)
+    public List<PayslipComponent> components(UUID companyId) {
         List<PayslipComponent> components = repository.findByCompanyIdOrderBySortOrderAsc(companyId);
-        if (components.isEmpty()) {
-            components = defaultComponents(companyId);
-        }
+        return components.isEmpty() ? defaultComponents(companyId) : components;
+    }
+
+    /** As above, with the template already in hand. */
+    public Computed compute(List<PayslipComponent> components, BigDecimal gross) {
 
         // Earnings — everything except the remainder first, so we know how much of gross is left.
         BigDecimal basisAmount = BigDecimal.ZERO;

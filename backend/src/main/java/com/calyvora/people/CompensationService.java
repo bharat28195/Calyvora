@@ -41,6 +41,7 @@ public class CompensationService {
     private final DepartmentRepository departmentRepository;
     private final com.calyvora.feature.FeatureService featureService;
     private final com.calyvora.payroll.PfSettingsService pfSettingsService;
+    private final EmployeeFinanceRepository employeeFinanceRepository;
 
     public CompensationService(CompensationRepository compensationRepository,
                                EmployeeRepository employeeRepository, UserRepository userRepository,
@@ -51,7 +52,9 @@ public class CompensationService {
                                EmployeeFinanceService financeService,
                                DepartmentRepository departmentRepository,
                                com.calyvora.feature.FeatureService featureService,
-                               com.calyvora.payroll.PfSettingsService pfSettingsService) {
+                               com.calyvora.payroll.PfSettingsService pfSettingsService,
+                               EmployeeFinanceRepository employeeFinanceRepository) {
+        this.employeeFinanceRepository = employeeFinanceRepository;
         this.financeService = financeService;
         this.departmentRepository = departmentRepository;
         this.compensationRepository = compensationRepository;
@@ -168,13 +171,52 @@ public class CompensationService {
         // salary — slower than the attendance work it was added to avoid, and the reason a run over the
         // scale tenant still took two minutes after the first fix. The lesson is narrow and worth
         // keeping: a guard that costs a query per row is not a guard, it is the same N+1 wearing a hat.
+        // Ordered newest-first, so the FIRST row seen for a person is their current salary. One query
+        // answers both "who is on payroll" and "what are they paid" — the run used to ask the second
+        // question again, once per employee.
         java.util.Set<UUID> paid = new java.util.HashSet<>();
+        java.util.Map<UUID, CompensationRecord> currentSalary = new java.util.HashMap<>();
         for (CompensationRecord r : compensationRepository
                 .findByCompanyIdOrderByEffectiveDateDescCreatedAtDesc(runCompanyId)) {
             paid.add(r.getEmployeeId());
+            currentSalary.putIfAbsent(r.getEmployeeId(), r);
         }
         java.util.Map<UUID, com.calyvora.people.dto.AttendanceMonthResponse> attendanceByEmployee =
                 attendanceService.monthForEveryone(ym, paid);
+
+        // Everything else the run needs, once. Four company-wide facts that payslip() was reading per
+        // employee, and three per-employee tables read in one query each rather than one per row.
+        java.util.Map<UUID, Employee> employeesById = new java.util.HashMap<>();
+        for (Employee e : employeeRepository.findByCompanyId(runCompanyId)) {
+            employeesById.put(e.getId(), e);
+        }
+        java.util.Map<UUID, User> usersById = new java.util.HashMap<>();
+        for (User u : userRepository.findByCompanyIdOrderByCreatedAtAsc(runCompanyId)) {
+            usersById.put(u.getId(), u);
+        }
+        java.util.Map<UUID, EmployeeFinance> financeByEmployee = new java.util.HashMap<>();
+        for (EmployeeFinance f : employeeFinanceRepository.findByCompanyId(runCompanyId)) {
+            financeByEmployee.put(f.getEmployeeId(), f);
+        }
+        var runSettings = companySettingsRepository.findById(runCompanyId).orElse(null);
+        String runCompanyName = runSettings != null && runSettings.getLegalName() != null
+                && !runSettings.getLegalName().isBlank()
+                ? runSettings.getLegalName()
+                : companyRepository.findById(runCompanyId)
+                        .map(com.calyvora.company.Company::getName).orElse("");
+        java.util.Map<UUID, String> departmentNames = new java.util.HashMap<>();
+        for (Department d : departmentRepository.findByCompanyIdOrderByName(runCompanyId)) {
+            departmentNames.put(d.getId(), d.getName());
+        }
+        RunContext ctx = new RunContext(currency,
+                payslipTemplateService.components(runCompanyId),
+                featureService.isEnabled(runCompanyId, Feature.STATUTORY_PAYROLL),
+                pfSettingsService.effective(runCompanyId),
+                employeesById, usersById, currentSalary, financeByEmployee,
+                runCompanyName,
+                runSettings == null ? null : runSettings.getAddress(),
+                runSettings == null ? null : runSettings.getLogoUrl(),
+                departmentNames);
 
         // Resolved once and reused: directory() builds a DTO per employee, and it was being called
         // twice for the same list.
@@ -184,7 +226,7 @@ public class CompensationService {
             }
             try {
                 PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString(),
-                        attendanceByEmployee.get(UUID.fromString(e.id())));
+                        attendanceByEmployee.get(UUID.fromString(e.id())), ctx);
                 // Absent statutory block = the feature is off or this person is not enrolled. Zero
                 // rather than null so the row arithmetic works without every caller null-checking.
                 BigDecimal employeePf = p.statutory() == null ? BigDecimal.ZERO : p.statutory().employeePf();
@@ -241,25 +283,68 @@ public class CompensationService {
     @Transactional(readOnly = true)
     public PayslipResponse payslip(UUID employeeId, String month,
                                    com.calyvora.people.dto.AttendanceMonthResponse prefetchedAttendance) {
+        return payslip(employeeId, month, prefetchedAttendance, null);
+    }
+
+    /**
+     * Everything a payroll run can know before it starts.
+     *
+     * <p>Four of these are per-<em>company</em> facts that {@link #payslip} was reading once per
+     * employee: the currency, the payslip template, whether statutory payroll is on, and the PF
+     * rates. The other four are per-employee rows a run can fetch in one query each rather than one
+     * query each <em>per person</em>.
+     *
+     * <p>Together that was eight queries a head — eight thousand round trips at a thousand people,
+     * for a screen that needs about a dozen. It stayed invisible because the tenant it was measured
+     * against had no salaries at all, so the run skipped everybody and looked instant.
+     */
+    private record RunContext(String currency,
+                              List<PayslipComponent> template,
+                              boolean statutoryEnabled,
+                              com.calyvora.payroll.PfSettings pfSettings,
+                              java.util.Map<UUID, Employee> employees,
+                              java.util.Map<UUID, com.calyvora.identity.User> users,
+                              java.util.Map<UUID, CompensationRecord> currentSalary,
+                              java.util.Map<UUID, EmployeeFinance> finance,
+                              String companyName,
+                              String companyAddress,
+                              String companyLogoUrl,
+                              java.util.Map<UUID, String> departmentNames) {}
+
+    private PayslipResponse payslip(UUID employeeId, String month,
+                                    com.calyvora.people.dto.AttendanceMonthResponse prefetchedAttendance,
+                                    RunContext ctx) {
         UUID companyId = TenantContext.getCompanyId();
-        Employee employee = requireEmployee(employeeId, companyId);
-        String name = nameOf(employee);
+        Employee employee = ctx != null && ctx.employees().containsKey(employeeId)
+                ? ctx.employees().get(employeeId)
+                : requireEmployee(employeeId, companyId);
+        String name = ctx != null ? nameOf(employee, ctx.users()) : nameOf(employee);
         YearMonth ym = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
 
-        List<CompensationRecord> records = compensationRepository
-                .findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(employeeId);
-        if (records.isEmpty()) {
-            throw new NotFoundException("No salary on record for this employee");
+        CompensationRecord current;
+        if (ctx != null) {
+            current = ctx.currentSalary().get(employeeId);
+            if (current == null) {
+                throw new NotFoundException("No salary on record for this employee");
+            }
+        } else {
+            List<CompensationRecord> records = compensationRepository
+                    .findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(employeeId);
+            if (records.isEmpty()) {
+                throw new NotFoundException("No salary on record for this employee");
+            }
+            current = records.get(0);
         }
-        CompensationRecord current = records.get(0);
         // The company's configured currency is the single source of truth for what money on a payslip
         // means. A salary row carries its own code only as history (and older rows default to USD), so
         // reading it here printed "USD" on an INR company's payslip.
-        String cur = companyCurrency(companyId);
+        String cur = ctx != null ? ctx.currency() : companyCurrency(companyId);
         BigDecimal gross = current.getAnnualAmount().divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
 
         // Generate the lines from the company's configurable payslip template.
-        PayslipTemplateService.Computed c = payslipTemplateService.compute(companyId, gross);
+        PayslipTemplateService.Computed c = ctx != null
+                ? payslipTemplateService.compute(ctx.template(), gross)
+                : payslipTemplateService.compute(companyId, gross);
 
         // --- Attendance linkage: unpaid absences (LOP) reduce the month's pay -----------------
         var att = prefetchedAttendance != null ? prefetchedAttendance : attendanceService.month(employeeId, ym);
@@ -289,11 +374,14 @@ public class CompensationService {
         //
         // Computed on BASIC, not gross. Using gross here would overstate every PF deduction in the
         // company by roughly a factor of two, and it would look plausible on the payslip.
-        EmployeeFinance financeForPf = financeService.rawOrNull(employeeId);
+        EmployeeFinance financeForPf = ctx != null ? ctx.finance().get(employeeId) : financeService.rawOrNull(employeeId);
         PayslipResponse.Statutory statutory = null;
-        if (featureService.isEnabled(companyId, Feature.STATUTORY_PAYROLL)
+        boolean statutoryOn = ctx != null ? ctx.statutoryEnabled()
+                : featureService.isEnabled(companyId, Feature.STATUTORY_PAYROLL);
+        if (statutoryOn
                 && financeForPf != null && "ENABLED".equals(financeForPf.getPfStatus())) {
-            PfCalculator.Result pf = PfCalculator.compute(c.basic(), pfSettingsService.effective(companyId));
+            PfCalculator.Result pf = PfCalculator.compute(c.basic(),
+                    ctx != null ? ctx.pfSettings() : pfSettingsService.effective(companyId));
             if (pf.employee().signum() > 0) {
                 deductions.add(new PayslipResponse.Line("Provident Fund (employee)", pf.employee()));
                 totalDed = totalDed.add(pf.employee());
@@ -311,21 +399,36 @@ public class CompensationService {
             net = net.subtract(lop);
         }
 
-        // Payslip header — legal name (falling back to company name), address and logo.
-        var settings = companySettingsRepository.findById(companyId).orElse(null);
-        String companyName = settings != null && settings.getLegalName() != null && !settings.getLegalName().isBlank()
-                ? settings.getLegalName()
-                : companyRepository.findById(companyId).map(com.calyvora.company.Company::getName).orElse("");
-        String companyAddress = settings == null ? null : settings.getAddress();
-        String companyLogoUrl = settings == null ? null : settings.getLogoUrl();
+        // Payslip header — legal name (falling back to company name), address and logo. One company,
+        // one letterhead: read once for a run rather than re-read for every payslip in it.
+        String companyName;
+        String companyAddress;
+        String companyLogoUrl;
+        if (ctx != null) {
+            companyName = ctx.companyName();
+            companyAddress = ctx.companyAddress();
+            companyLogoUrl = ctx.companyLogoUrl();
+        } else {
+            var settings = companySettingsRepository.findById(companyId).orElse(null);
+            companyName = settings != null && settings.getLegalName() != null && !settings.getLegalName().isBlank()
+                    ? settings.getLegalName()
+                    : companyRepository.findById(companyId).map(com.calyvora.company.Company::getName).orElse("");
+            companyAddress = settings == null ? null : settings.getAddress();
+            companyLogoUrl = settings == null ? null : settings.getLogoUrl();
+        }
 
         // Who it's for, and the statutory identifiers a payslip is expected to carry. All optional —
         // a company that hasn't filled in PF/PAN yet still gets a valid payslip, just a sparser one.
         // Same row the PF block read above; one fetch, because it is the same fact.
         EmployeeFinance finance = financeForPf;
+        // A company has a handful of departments and a run pays hundreds of people, so this was the
+        // same "one of six answers, fetched per row" that cost the attendance day sheet a query per
+        // employee. Fifth instance of that shape in this codebase, second in this file.
         String department = employee.getDepartmentId() == null ? null
-                : departmentRepository.findById(employee.getDepartmentId())
-                        .map(Department::getName).orElse(null);
+                : ctx != null
+                        ? ctx.departmentNames().get(employee.getDepartmentId())
+                        : departmentRepository.findById(employee.getDepartmentId())
+                                .map(Department::getName).orElse(null);
 
         return new PayslipResponse(employeeId.toString(), name, ym.toString(), cur,
                 companyName, companyAddress, companyLogoUrl,
@@ -363,6 +466,12 @@ public class CompensationService {
 
     private String nameOf(Employee employee) {
         return userRepository.findById(employee.getUserId()).map(User::fullName).orElse("Employee");
+    }
+
+    /** As above, from a map the caller already loaded — one query for the company, not one per row. */
+    private String nameOf(Employee employee, java.util.Map<UUID, User> users) {
+        User u = users.get(employee.getUserId());
+        return u == null ? nameOf(employee) : u.fullName();
     }
 
     private static String blankToNull(String s) {
