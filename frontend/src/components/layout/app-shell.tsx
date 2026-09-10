@@ -74,25 +74,21 @@ const NAV: NavItem[] = [
   { href: "/agency", label: "My companies", icon: Building2, roles: ["AGENCY_OWNER"] },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS, feature: "ANALYTICS" },
-  // "Me" is now attendance, time off and expenses only. Pay moved to Finance and reviews to
-  // Performance, because both were buried three clicks deep inside a section people read as "my
-  // profile" — payday is the single thing an employee opens this product for most months.
+  // "Me" is attendance and time off. Everything that is really about money went to Finance and
+  // everything about other people went to My team — this section is what I did, not what I am owed
+  // or who I work with.
   {
     href: "/me", label: "Me", icon: CircleUser, roles: COMPANY,
     children: [
       { href: "/me", label: "Overview" },
       { href: "/me/attendance", label: "Attendance" },
       { href: "/me/leave", label: "Time off" },
-      { href: "/me/expenses", label: "Expenses" },
-      // Everyone has a place in the company, so everyone can see the chart. It opens on your own
-      // line with the rest of the org one click away (see OrgTree), which is what makes it safe to
-      // show a member. It used to live only under People — HR_PLUS — so a lead or an intern could
-      // not reach it at all, and the reporting tree is the one thing this product decides
-      // everything else from.
-      { href: "/people/org", label: "Org chart" },
     ],
   },
   // Anyone who leads people, whatever their role is called. No payroll here, ever — see TeamService.
+  //
+  // A whole-company role always passes the leadsTeam gate (see the nav filter), so putting the org
+  // chart here keeps it in reach of an admin who happens to lead nobody.
   {
     href: "/team", label: "My team", icon: Users, roles: COMPANY, leadsTeam: true,
     children: [
@@ -101,15 +97,23 @@ const NAV: NavItem[] = [
       { href: "/team/leave", label: "Time off" },
       { href: "/team/expenses", label: "Expenses" },
       { href: "/team/performance", label: "Performance" },
+      // The chart is about the people around you, so it belongs with them rather than under "Me".
+      // It opens on your own line with the rest of the org one click away (see OrgTree), which is
+      // what makes it safe to show anybody.
+      { href: "/people/org", label: "Org chart" },
     ],
   },
   // Everyone has finances; only HR has payroll. Keeping the two apart is the point of the split —
   // "Finance" is what the company owes me, "Payroll" is what the company pays everybody.
+  //
+  // Claiming an expense is asking to be paid back, so it sits with the rest of the money rather than
+  // beside my attendance.
   {
     href: "/finance", label: "Finance", icon: Wallet, roles: COMPANY,
     children: [
       { href: "/finance/pay", label: "My pay" },
       { href: "/finance/mine", label: "My finances" },
+      { href: "/me/expenses", label: "Expenses" },
     ],
   },
   // One Performance section for everybody, with two extra panes for HR rather than a second

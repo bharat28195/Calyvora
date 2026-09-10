@@ -313,6 +313,7 @@ function OrgNode({
   onToggle,
   meId,
   matches,
+  isLast,
 }: {
   employee: Employee;
   childrenOf: Map<string | null, Employee[]>;
@@ -322,6 +323,7 @@ function OrgNode({
   onToggle: (id: string) => void;
   meId?: string;
   matches: Set<string> | null;
+  isLast?: boolean;
 }) {
   const reports = childrenOf.get(employee.id) ?? [];
   const hasReports = reports.length > 0;
@@ -330,14 +332,25 @@ function OrgNode({
   const isMatch = matches?.has(employee.id) ?? false;
 
   return (
-    <li>
+    // The connector lines are drawn in CSS rather than with indentation, because indentation alone
+    // stops reading as a hierarchy past about two levels — at four you are counting pixels to work
+    // out who reports to whom. The vertical rule runs the height of a branch and stops halfway down
+    // its last child, which is what turns a stack of rows into a tree.
+    <li
+      className={cn(
+        "relative",
+        depth > 0 && "pl-5",
+        depth > 0 && "before:absolute before:left-0 before:top-0 before:w-px before:bg-fg/15 before:content-['']",
+        depth > 0 && (isLast ? "before:h-[18px]" : "before:h-full"),
+        depth > 0 && "after:absolute after:left-0 after:top-[18px] after:h-px after:w-3.5 after:bg-fg/15 after:content-['']",
+      )}
+    >
       <div
         className={cn(
           "flex items-center gap-2 rounded-md py-1 pr-2",
           isMe && "bg-violet/10",
           isMatch && !isMe && "bg-amber-400/10",
         )}
-        style={{ paddingLeft: depth * 20 }}
       >
         {hasReports ? (
           <button
@@ -373,8 +386,10 @@ function OrgNode({
         )}
       </div>
       {isOpen && (
-        <ul className="flex flex-col gap-0.5">
-          {reports.map((r) => (
+        // ml-2.5 puts a child's trunk under the middle of its parent's chevron, so the line appears
+        // to come out of the control that opened it.
+        <ul className="ml-2.5 flex flex-col gap-0.5">
+          {reports.map((r, i) => (
             <OrgNode
               key={r.id}
               employee={r}
@@ -385,6 +400,7 @@ function OrgNode({
               onToggle={onToggle}
               meId={meId}
               matches={matches}
+              isLast={i === reports.length - 1}
             />
           ))}
         </ul>
