@@ -7,7 +7,7 @@ import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
-  CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck,
+  CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { api } from "@/lib/api";
@@ -97,12 +97,16 @@ const NAV: NavItem[] = [
       { href: "/team/leave", label: "Time off" },
       { href: "/team/expenses", label: "Expenses" },
       { href: "/team/performance", label: "Performance" },
-      // The chart is about the people around you, so it belongs with them rather than under "Me".
-      // It opens on your own line with the rest of the org one click away (see OrgTree), which is
-      // what makes it safe to show anybody.
-      { href: "/people/org", label: "Org chart" },
     ],
   },
+  // Top level, and it took three attempts to get here. Under People it was HR-only, so a lead could
+  // not open it. Under Me it was reachable but nobody looks for the company's shape inside their own
+  // profile. Under My team it disappeared for exactly the people who most need it — that section is
+  // gated on having reports, and someone with none is precisely who needs to look up where they sit.
+  //
+  // Everyone has a place in the company, so this is everyone's. It opens on your own line with the
+  // rest of the org one click away (see OrgTree), which is what makes it safe to show anybody.
+  { href: "/people/org", label: "Org chart", icon: Network, roles: COMPANY },
   // Everyone has finances; only HR has payroll. Keeping the two apart is the point of the split —
   // "Finance" is what the company owes me, "Payroll" is what the company pays everybody.
   //
