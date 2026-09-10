@@ -72,18 +72,47 @@ public class ScaleSeedService {
     private static final String[] TEAMS = {
             "Engineering", "Sales", "Support", "Finance", "Operations", "Marketing", "Legal", "IT"};
 
+    /**
+     * The ladder, and the titles that go with it, indexed by rank: 0 admin, 1 HR, 2 head, 3 lead,
+     * 4 everyone else. Rank comes from where a person sits in the tree, so a title never contradicts
+     * the org chart — a "Managing Director" with a manager above them reads as a bug in the product.
+     */
+    private static final String[] RUNGS = {
+            "Managing Director", "People Partner", "Department Head", "Team Lead", "Associate"};
+    private static final String[] TITLES = {
+            "Managing Director", "Head of People", "Head of Department", "Team Lead", "Senior Associate"};
+    private static final String[] LOCATIONS = {
+            "Ahmedabad", "Bengaluru", "Pune", "Hyderabad", "Remote"};
+    /** Real IFSC-shaped codes, so the bank file looks like a bank file rather than filler. */
+    private static final String[][] BANKS = {
+            {"HDFC Bank", "HDFC0003939"}, {"ICICI Bank", "ICIC0000024"}, {"State Bank of India", "SBIN0011513"},
+            {"Axis Bank", "UTIB0000103"}, {"Kotak Mahindra Bank", "KKBK0000958"}};
+
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final AttendanceRepository attendanceRepository;
+    private final com.calyvora.people.CompensationRepository compensationRepository;
+    private final com.calyvora.people.EmployeeFinanceRepository employeeFinanceRepository;
+    private final com.calyvora.people.DesignationRepository designationRepository;
+    private final com.calyvora.people.HolidayRepository holidayRepository;
     private final PasswordEncoder passwordEncoder;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public ScaleSeedService(CompanyRepository companyRepository, UserRepository userRepository,
                             EmployeeRepository employeeRepository, DepartmentRepository departmentRepository,
-                            AttendanceRepository attendanceRepository, PasswordEncoder passwordEncoder,
+                            AttendanceRepository attendanceRepository,
+                            com.calyvora.people.CompensationRepository compensationRepository,
+                            com.calyvora.people.EmployeeFinanceRepository employeeFinanceRepository,
+                            com.calyvora.people.DesignationRepository designationRepository,
+                            com.calyvora.people.HolidayRepository holidayRepository,
+                            PasswordEncoder passwordEncoder,
                             org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.compensationRepository = compensationRepository;
+        this.employeeFinanceRepository = employeeFinanceRepository;
+        this.designationRepository = designationRepository;
+        this.holidayRepository = holidayRepository;
         this.jdbc = jdbc;
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
@@ -199,7 +228,12 @@ public class ScaleSeedService {
 
             // Employee rows, then the reporting lines wired on a second pass — a manager_id has to
             // point at an employee id, which does not exist until the row does.
+            // The ladder these people sit on. Created before the employee rows so a profile can point
+            // at a rung as it is built, rather than in a second pass over a thousand rows.
+            List<com.calyvora.people.Designation> ladder = seedDesignations(companyId);
+
             java.util.Map<UUID, UUID> employeeIdByUser = new java.util.HashMap<>();
+            int seq = 0;
             for (User u : users) {
                 UUID empId = UUID.randomUUID();
                 employeeIdByUser.put(u.getId(), empId);
@@ -207,6 +241,15 @@ public class ScaleSeedService {
                 e.setEmploymentStatus(EmploymentStatus.ACTIVE);
                 e.setEmploymentType(EmploymentType.FULL_TIME);
                 e.setStartDate(LocalDate.now().minusDays(200 + (empId.hashCode() & 0x3FF)));
+                // A directory of a thousand blank profiles demonstrates nothing. Rank comes from where
+                // the person sits in the tree, so the title and the rung agree with the org chart
+                // instead of being sprinkled at random.
+                int rank = rankOf(u.getId(), adminId, hrId, headUserIds, leadUserIds);
+                e.setEmployeeNo(String.format("SW-%04d", ++seq));
+                e.setJobTitle(TITLES[rank]);
+                e.setDesignationId(ladder.get(rank).getId());
+                e.setWorkLocation(LOCATIONS[Math.abs(empId.hashCode()) % LOCATIONS.length]);
+                e.setPhone(String.format("+91 9%09d", Math.abs(empId.hashCode()) % 1_000_000_000));
                 employees.add(e);
             }
             wireTree(employeeIdByUser, adminId, hrId, headUserIds, leadUserIds, memberUserIds,
@@ -214,6 +257,9 @@ public class ScaleSeedService {
             saveInBatches(employees, employeeRepository::saveAll);
 
             int attendanceRows = seedAttendance(companyId, employees, days, adminId);
+            seedCompensation(companyId, employees, adminId);
+            seedFinance(companyId, employees);
+            seedHolidays(companyId);
 
             int maxDownline = rest / Math.max(leads, 1) * leadsPerHead + leadsPerHead;
             long millis = System.currentTimeMillis() - started;
@@ -364,6 +410,129 @@ public class ScaleSeedService {
      * read a month of it for every person on the roster. A mix of statuses rather than all PRESENT, so
      * the counts on the page are not all identical and a grouping bug would be visible.
      */
+    /**
+     * A salary for everybody, because without one this tenant cannot run payroll at all.
+     *
+     * <p>It could not, until now. {@code payrollRun} collects the company's salary rows, builds the
+     * set of people who have one, and skips everyone else — so a thousand-person tenant with no
+     * compensation produced a run of zero payslips, very quickly. That made the tenant useless for
+     * demonstrating the single most expensive screen in the product, and it made a timing taken
+     * against it meaningless: the run was not fast, it was empty.
+     *
+     * <p>Amounts vary by level and by person so the payroll totals are not one number multiplied by
+     * headcount — a grouping or rounding bug is invisible when every payslip is identical.
+     */
+    private void seedCompensation(UUID companyId, List<Employee> employees, UUID createdBy) {
+        List<com.calyvora.people.CompensationRecord> batch = new ArrayList<>(BATCH);
+        LocalDate effective = LocalDate.now().withDayOfMonth(1).minusMonths(6);
+        for (Employee e : employees) {
+            // Deterministic from the id, so re-seeding the same tenant gives the same payroll and a
+            // demo does not quietly change its numbers between runs.
+            // Pay follows the ladder, so the payroll total is not one figure times headcount and a
+            // grouping or rounding bug has somewhere to show itself.
+            int rank = java.util.Arrays.asList(TITLES).indexOf(e.getJobTitle());
+            long band = switch (rank < 0 ? TITLES.length - 1 : rank) {
+                case 0 -> 6_000_000L;
+                case 1 -> 2_800_000L;
+                case 2 -> 3_600_000L;
+                case 3 -> 2_000_000L;
+                default -> 900_000L;
+            };
+            long annual = band + Math.abs(e.getId().hashCode() % 250_000);
+            batch.add(new com.calyvora.people.CompensationRecord(
+                    UUID.randomUUID(), companyId, e.getId(), effective,
+                    java.math.BigDecimal.valueOf(annual), "INR",
+                    com.calyvora.people.CompensationChangeType.INITIAL, "Starting salary", createdBy));
+            if (batch.size() >= BATCH) {
+                compensationRepository.saveAll(batch);
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty()) {
+            compensationRepository.saveAll(batch);
+        }
+    }
+
+    /** Where someone sits: 0 admin, 1 HR, 2 head, 3 lead, 4 member. Drives title, rung and pay. */
+    private static int rankOf(UUID userId, UUID adminId, UUID hrId, List<UUID> heads, List<UUID> leads) {
+        if (userId.equals(adminId)) return 0;
+        if (userId.equals(hrId)) return 1;
+        if (heads.contains(userId)) return 2;
+        if (leads.contains(userId)) return 3;
+        return 4;
+    }
+
+    /** The customer-editable ladder. Grants nothing — it is a label, exactly as in Northwind (PD-32). */
+    private List<com.calyvora.people.Designation> seedDesignations(UUID companyId) {
+        List<com.calyvora.people.Designation> rungs = new ArrayList<>();
+        for (int i = 0; i < RUNGS.length; i++) {
+            // Level counts down from the top, so the Managing Director is the highest number.
+            rungs.add(new com.calyvora.people.Designation(
+                    UUID.randomUUID(), companyId, RUNGS[i], RUNGS.length - i));
+        }
+        designationRepository.saveAll(rungs);
+        return rungs;
+    }
+
+    /**
+     * Bank, PF and PAN details for everybody — what payroll actually needs to produce a bank file.
+     *
+     * <p>Without these a thousand-person payroll run produces payslips nobody can be paid from, and
+     * the two features most recently built (statutory PF and the bank advice file) have nothing to
+     * demonstrate on the only tenant big enough to be worth demonstrating them on.
+     *
+     * <p>Every value is derived from the employee id, so re-seeding gives the same numbers and a demo
+     * does not change its own figures between runs.
+     */
+    private void seedFinance(UUID companyId, List<Employee> employees) {
+        List<com.calyvora.people.EmployeeFinance> batch = new ArrayList<>(BATCH);
+        for (Employee e : employees) {
+            int h = Math.abs(e.getId().hashCode());
+            String[] bank = BANKS[h % BANKS.length];
+            var f = new com.calyvora.people.EmployeeFinance(e.getId(), companyId);
+            f.setPaymentMode("BANK_TRANSFER");
+            f.setBankName(bank[0]);
+            f.setBankIfsc(bank[1]);
+            f.setBankAccountNo(String.format("%014d", h % 100_000_000_000_000L));
+            f.setBankBranch(LOCATIONS[h % LOCATIONS.length]);
+            f.setPfStatus("ENABLED");
+            f.setPfNumber(String.format("GJVAT%016d", h % 1_000_000_000L));
+            f.setUan(String.format("1%011d", h % 100_000_000_000L));
+            f.setPfJoinDate(e.getStartDate());
+            f.setEsiStatus("NOT_ELIGIBLE");
+            f.setPtState("Gujarat");
+            f.setPtLocation("Gujarat");
+            // PAN is shaped the way the real thing is — five letters, four digits, a letter — because
+            // a validator that only ever sees "ABCDE1234F" has not been tested.
+            f.setPanNumber(String.format("A%sPC%04dA", (char) ('A' + h % 26), h % 10_000));
+            f.setPanVerified(true);
+            f.setDateOfBirth(LocalDate.of(1980 + (h % 20), 1 + (h % 12), 1 + (h % 28)));
+            batch.add(f);
+            if (batch.size() >= BATCH) {
+                employeeFinanceRepository.saveAll(batch);
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty()) {
+            employeeFinanceRepository.saveAll(batch);
+        }
+    }
+
+    /** A handful of company holidays, so attendance and payroll have non-working days to reckon with. */
+    private void seedHolidays(UUID companyId) {
+        int year = LocalDate.now().getYear();
+        List<com.calyvora.people.Holiday> days = List.of(
+                new com.calyvora.people.Holiday(UUID.randomUUID(), companyId, "Republic Day",
+                        LocalDate.of(year, 1, 26), false, null, null),
+                new com.calyvora.people.Holiday(UUID.randomUUID(), companyId, "Independence Day",
+                        LocalDate.of(year, 8, 15), false, null, null),
+                new com.calyvora.people.Holiday(UUID.randomUUID(), companyId, "Gandhi Jayanti",
+                        LocalDate.of(year, 10, 2), false, null, null),
+                new com.calyvora.people.Holiday(UUID.randomUUID(), companyId, "Christmas",
+                        LocalDate.of(year, 12, 25), false, null, null));
+        holidayRepository.saveAll(days);
+    }
+
     private int seedAttendance(UUID companyId, List<Employee> employees, int days, UUID markedBy) {
         if (days == 0) {
             return 0;
