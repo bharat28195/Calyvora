@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Expense claims: submit → approve → reimburse, edit windows, RBAC and notifications. */
@@ -116,6 +117,33 @@ class ExpenseIntegrationTest extends IntegrationTestBase {
         for (JsonNode c : getJson("/api/v1/expenses/me", leo).get("claims")) {
             assertThat(c.get("employeeName").asText()).isEqualTo("Leo Martins");
         }
+    }
+
+    @Test
+    void a_lead_decides_their_own_report_and_nobody_else() throws Exception {
+        seedDemo();
+        // Priya is a senior engineer, not an admin. Dev is her intern. Leo reports to Ava, not Priya.
+        Session priya = login("priya.nair@northwind.demo", DEMO_PW);
+        Session dev = login("dev.sharma@northwind.demo", DEMO_PW);
+        Session leo = login("leo.martins@northwind.demo", DEMO_PW);
+
+        String mine = submit(dev, "Client visit taxi", "TRAVEL", 1200);
+        String notMine = submit(leo, "Design conference", "TRAVEL", 9000);
+
+        // The point of the change: a lead can now clear their own report's claim. Before this the
+        // endpoint was gated on OWNER/ADMIN, so the team screen could only watch.
+        mockMvc.perform(post("/api/v1/expenses/" + mine + "/approve").header("Authorization", bearer(priya)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+
+        // And the half that matters more: opening it by role alone would have let any lead approve
+        // anyone's spending in the company. The tree, not the title, is what refuses here.
+        mockMvc.perform(post("/api/v1/expenses/" + notMine + "/approve").header("Authorization", bearer(priya)))
+                .andExpect(status().isForbidden());
+
+        // Approving is the manager's judgement; paying is finance's. A lead still cannot reimburse.
+        mockMvc.perform(post("/api/v1/expenses/" + mine + "/reimburse").header("Authorization", bearer(priya)))
+                .andExpect(status().isForbidden());
     }
 
     @Test

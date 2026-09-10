@@ -42,10 +42,13 @@ public class ExpenseService {
     private final EmployeeService employeeService;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final com.calyvora.people.OrgScope orgScope;
 
     public ExpenseService(ExpenseClaimRepository claimRepository, EmployeeRepository employeeRepository,
                           EmployeeService employeeService, UserRepository userRepository,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          com.calyvora.people.OrgScope orgScope) {
+        this.orgScope = orgScope;
         this.claimRepository = claimRepository;
         this.employeeRepository = employeeRepository;
         this.employeeService = employeeService;
@@ -143,6 +146,15 @@ public class ExpenseService {
     public ExpenseResponse decide(UUID claimId, boolean approve, String note, AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         ExpenseClaim claim = require(claimId, companyId);
+        // This class has always documented itself as "their manager — or any Owner/Admin — approves",
+        // but the endpoint was gated on the OWNER/ADMIN roles alone, so a lead could watch their
+        // team's claims sit there and do nothing about them.
+        //
+        // The role check cannot be the whole answer: it can say "a lead may decide expenses", never
+        // "this lead may decide THIS claim". Opening the endpoint by role alone would let any lead
+        // approve anyone's spending — a wider hole than the one being closed. The tree decides, which
+        // is the same rule leave already applies (PD-32).
+        requireCanDecide(companyId, claim, principal);
         if (claim.getStatus() != ExpenseStatus.SUBMITTED) {
             throw new ApiException(ErrorCode.CONFLICT, "This claim has already been decided");
         }
@@ -221,6 +233,40 @@ public class ExpenseService {
         UUID employeeId = employeeService.ensureEmployeeId(companyId, principal.userId());
         return employeeRepository.findByIdAndCompanyId(employeeId, companyId)
                 .orElseThrow(() -> new NotFoundException("No employee profile for this user"));
+    }
+
+    /**
+     * Who may approve or reject this claim: whoever the claimant reports to, at any depth, plus the
+     * people whose job is the whole company.
+     *
+     * <p>Transitive on purpose. A head of department with four leads under them should be able to
+     * clear a claim from one of the thirty people beneath those leads — which is exactly what has to
+     * happen when the direct manager is the one on holiday. Leave and regularization already work
+     * this way; expenses were the last approval still stuck at the role.
+     *
+     * <p>Note what this deliberately does <em>not</em> use: {@code OrgScope.seesWholeCompany}, which
+     * the leave and performance checks do use. That set includes HR, and HR has never been able to
+     * approve spending here. {@code seesWholeCompany} answers "who may this person <em>see</em>",
+     * and reusing it for authority would quietly hand HR a power over money that nobody granted them.
+     * Visibility and authority are different questions and this class needs the second one.
+     *
+     * <p>A lead cannot approve their own claim, because {@code downlineOf} never contains the person
+     * it is asked about. An Owner/Admin still can, and that is left alone deliberately: in a
+     * five-person company the admin is frequently the only approver, and forbidding self-approval
+     * would leave them unable to claim expenses at all. Separation of duties there is a policy
+     * decision with real consequences for small customers, not a defect to fix in passing.
+     */
+    private void requireCanDecide(UUID companyId, ExpenseClaim claim, AuthPrincipal principal) {
+        if ("OWNER".equals(principal.role()) || "ADMIN".equals(principal.role())) {
+            return;
+        }
+        UUID mine = employeeRepository.findByUserId(principal.userId())
+                .filter(e -> companyId.equals(e.getCompanyId()))
+                .map(Employee::getId)
+                .orElse(null);
+        if (mine == null || !orgScope.downlineOf(mine, false).contains(claim.getEmployeeId())) {
+            throw new ForbiddenException("You can only decide expenses for people who report to you");
+        }
     }
 
     private ExpenseClaim require(UUID claimId, UUID companyId) {

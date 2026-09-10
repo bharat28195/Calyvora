@@ -8,6 +8,7 @@ import { money } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { NoTeam, ScopeToggle, TeamHeader, useTeamStanding } from "@/components/team/team-bits";
 
 /**
@@ -16,14 +17,19 @@ import { NoTeam, ScopeToggle, TeamHeader, useTeamStanding } from "@/components/t
  * An expense is not pay: it is money the person is out of pocket for, and the lead who approved the
  * trip is the one who can say whether the taxi was real. So it belongs here, where salary does not.
  *
- * Read-only for now — approving a claim is still Admin/HR work (ExpenseController), so showing a
- * button that 403s would be worse than showing none. See the follow-up note in FOUNDER.md.
+ * A lead can decide these now. It used to be read-only because approving was gated on the OWNER and
+ * ADMIN roles, and a button that 403s is worse than no button. The backend check is the reporting
+ * tree now, so the button is honest.
+ *
+ * Reimbursing is deliberately still not here: approving says the spend was legitimate, which is the
+ * manager's judgement to make; paying it is money leaving the company, which is finance's.
  */
 export default function TeamExpensesPage() {
   const standing = useTeamStanding();
   const [direct, setDirect] = useState(false);
   const [claims, setClaims] = useState<ExpenseClaim[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deciding, setDeciding] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -34,6 +40,19 @@ export default function TeamExpensesPage() {
   }, [direct]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const decide = useCallback(async (id: string, action: "approve" | "reject") => {
+    setDeciding(id);
+    setError(null);
+    try {
+      await api.decideExpense(id, action);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't record that decision");
+    } finally {
+      setDeciding(null);
+    }
+  }, [load]);
 
   if (standing && !standing.leadsTeam) {
     return <div><TeamHeader title="Team expenses" blurb="Claims from the people you lead." /><NoTeam /></div>;
@@ -74,7 +93,23 @@ export default function TeamExpensesPage() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="tabular-nums">{money(c.amount, c.currency)}</span>
-                <Badge value={c.status} />
+                {c.status === "SUBMITTED" ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={deciding === c.id}
+                      onClick={() => void decide(c.id, "reject")}
+                    >
+                      Decline
+                    </Button>
+                    <Button size="sm" disabled={deciding === c.id} onClick={() => void decide(c.id, "approve")}>
+                      {deciding === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve"}
+                    </Button>
+                  </div>
+                ) : (
+                  <Badge value={c.status} />
+                )}
               </div>
             </Card>
           ))

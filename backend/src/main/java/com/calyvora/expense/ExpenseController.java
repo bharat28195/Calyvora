@@ -69,8 +69,12 @@ public class ExpenseController {
         return expenseService.all();
     }
 
+    // No @PreAuthorize on approve/reject, and that is the change rather than an omission. A role can
+    // say "a lead may decide expenses"; it can never say "this lead may decide THIS claim", so
+    // gating by role would have to open the endpoint to every lead in the company at once. The
+    // reporting tree answers the second question, and ExpenseService.requireCanDecide asks it —
+    // the same shape as leave and regularization (PD-32).
     @PostMapping("/{claimId}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ExpenseResponse approve(@PathVariable UUID claimId,
                                    @RequestBody(required = false) Map<String, String> body,
                                    @CurrentUser AuthPrincipal principal) {
@@ -78,13 +82,15 @@ public class ExpenseController {
     }
 
     @PostMapping("/{claimId}/reject")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ExpenseResponse reject(@PathVariable UUID claimId,
                                   @RequestBody(required = false) Map<String, String> body,
                                   @CurrentUser AuthPrincipal principal) {
         return expenseService.decide(claimId, false, body == null ? null : body.get("note"), principal);
     }
 
+    // Reimbursement stays with Owner/Admin. Approving a claim is a judgement about whether the spend
+    // was legitimate, which is the manager's to make; paying it is money leaving the company, which
+    // is finance's. Keeping the two apart is worth more than the convenience of merging them.
     @PostMapping("/{claimId}/reimburse")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     public ExpenseResponse reimburse(@PathVariable UUID claimId, @CurrentUser AuthPrincipal principal) {

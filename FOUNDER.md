@@ -1215,6 +1215,31 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   been attempted. It would have passed against a broken migration. **A test that cannot fail is not
   evidence** — and this is the second time that specific shape of gap has appeared in this file.
 
+### PD-35 · 2026-09-10 · Visibility is not authority
+- **Context:** third item off the triage list. Leads could see their team's expense claims and not act
+  on them, so the team screen carried a note explaining why its buttons were missing.
+
+- **The near-miss is the point of this entry.** The obvious implementation was to copy what leave
+  does: `if (!orgScope.seesWholeCompany(principal) && !isMyReport(...)) throw`. It compiles, it reads
+  well, and it would have **silently granted HR the power to approve company spending** — because
+  `seesWholeCompany` is `{OWNER, ADMIN, HR}`. It was caught only because a demo account used in an
+  existing test turned out to be `Role.HR` while a comment beside it called them a member.
+- **So: `seesWholeCompany` answers "who may this person *see*".** Approval is a question about
+  authority. The two sets overlap enough that one reads like a drop-in for the other, and reusing the
+  visibility helper for authority is how a permission widens without anyone deciding it should. The
+  expense check names OWNER and ADMIN explicitly, so the change only ever **adds** leads.
+- **What a role can and cannot say.** A role can say "a lead may decide expenses". It can never say
+  "this lead may decide *this* claim" — so gating by role alone would have opened every claim in the
+  company to every lead, a wider hole than the one being closed. The tree answers the second
+  question, which is the PD-32 rule applied to the last approval that was still stuck on a title.
+- **Approving and paying are split on purpose.** Approving is a judgement that the spend was
+  legitimate, and the manager who authorised the trip is best placed to make it. Reimbursing is money
+  leaving the company. Keeping those apart is worth more than the convenience of merging them.
+- **One thing deliberately left alone.** An Owner/Admin can still approve their own claim. Blocking
+  self-approval is better control in a company big enough to have two approvers, and in a five-person
+  customer it would leave the admin unable to claim expenses at all. That is a policy decision with
+  real consequences, and it belongs to the founder rather than to a bug fix.
+
 ---
 
 ## 4. Architecture Decision Log

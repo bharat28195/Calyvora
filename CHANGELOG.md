@@ -4,6 +4,25 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-10 — A lead can approve their own team's expenses
+`ExpenseService` has always documented itself as _"their manager — or any Owner/Admin — approves"_,
+but the endpoints were gated on the OWNER and ADMIN roles alone. A lead could watch their team's
+claims sit unactioned and do nothing about them, so `/team/expenses` was deliberately read-only.
+
+- **The reporting tree decides, transitively.** A head of department can clear a claim from someone
+  two levels down — which is exactly what has to happen when the direct manager is on holiday.
+- **The role check could not have been the whole answer.** It can say "a lead may decide expenses";
+  it can never say "this lead may decide *this* claim". Opening the endpoint by role would have let
+  any lead approve anyone's spending — a wider hole than the one being closed.
+- **Reimbursing stays with Owner/Admin.** Approving says the spend was legitimate, which is the
+  manager's judgement; paying is money leaving the company, which is finance's.
+- **Team expenses page has real Approve and Decline buttons**, replacing the note explaining why it
+  couldn't.
+
+_Deliberately not changed: an Owner/Admin can still approve their own claim. In a five-person company
+the admin is often the only approver, and forbidding it would leave them unable to claim expenses at
+all — a policy decision with real consequences for small customers, not a defect to fix in passing._
+
 ### 2026-09-10 — Employee profiles are created with the person, not by whoever reads first
 Profiles were provisioned lazily, on the first authenticated read of the directory. That made **every
 GET a potential write**: the attendance day sheet could not run in a read-only transaction, so
