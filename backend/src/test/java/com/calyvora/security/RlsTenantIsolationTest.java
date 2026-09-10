@@ -25,6 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * as one, so the check drops to a NOSUPERUSER role via {@code SET ROLE} (which IS subject to RLS)
  * and drives visibility purely through the {@code calyvora.company_id} session GUC.
  */
+// This test manages roles and privileges itself, so it needs a connection that still has them.
+// Everything else in the suite now runs as a role RLS applies to; these two are about RLS rather
+// than merely subject to it.
+@org.springframework.test.context.TestPropertySource(properties = "calyvora.test.rls-role=false")
 class RlsTenantIsolationTest extends IntegrationTestBase {
 
     private static final String PW = "password1234";

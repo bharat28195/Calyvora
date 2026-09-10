@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = "calyvora.security.registration.open=true")
 @AutoConfigureMockMvc
 @AutoConfigureEmbeddedDatabase(provider = ZONKY, refresh = AFTER_EACH_TEST_METHOD)
-@Import(RecordingEmailService.class)
+@Import({RecordingEmailService.class, RlsRoleConfig.class})
 public abstract class IntegrationTestBase {
 
     @Autowired

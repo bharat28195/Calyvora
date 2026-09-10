@@ -44,6 +44,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * <p>Deliberately asserts on the whole history rather than on V45, so the next migration that seeds a
  * tenant-scoped table is covered on the day it is written.
  */
+// This test manages roles and privileges itself, so it needs a connection that still has them.
+// Everything else in the suite now runs as a role RLS applies to; these two are about RLS rather
+// than merely subject to it.
+@org.springframework.test.context.TestPropertySource(properties = "calyvora.test.rls-role=false")
 class FlywayUnderRlsTest extends IntegrationTestBase {
 
     /** The version immediately before the first migration that backfills a tenant-scoped table. */

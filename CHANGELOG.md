@@ -23,8 +23,18 @@ table's isolation off instead of solving it.
   Without it, quietly losing the wrapper would leave four tests that cannot fail and nothing to say
   so — which is what had already happened to `FlywayUnderRlsTest`.
 
-_Staged deliberately: this is the mechanism plus a targeted class, not yet the default for all 416
-tests. Flipping the default is the next step and is expected to surface real failures._
+**It is now the default for the whole suite.** All 416 tests run as `NOSUPERUSER NOBYPASSRLS`, so
+every policy in V12 is enforced on every test rather than on none of them.
+
+The flip was expected to surface real failures and surfaced **none**. Exactly two tests needed an
+opt-out (`calyvora.test.rls-role=false`), and neither was an application bug: `FlywayUnderRlsTest`
+needs `create database` for its scratch schema, and `RlsTenantIsolationTest` arranges its fixture on
+an unrestricted connection before dropping privileges itself. Both are tests **about** Row-Level
+Security rather than tests that merely run under it.
+
+That result is worth stating plainly: **the application code was already correct.** The blind spot was
+never in the policies or the tenant binding — it was that nothing had ever verified them. A
+V45-shaped bug now fails at commit time instead of on the deploy.
 
 ### 2026-09-10 — A dropdown asks for three letters, not for a thousand names
 Two screens downloaded every employee in the company to populate one assignee dropdown: the letter
