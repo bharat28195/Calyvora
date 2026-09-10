@@ -4,6 +4,28 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-10 — The application can now be tested as a role that Row-Level Security applies to
+The test database connects as a Postgres **superuser**, and a superuser bypasses RLS entirely. Every
+policy written in V12 has therefore been inert under test since the day it was written.
+
+That is not a theoretical gap. It is why V45 blocked every deploy for weeks behind a green suite, why
+the scale seeder failed only in production, and why V30 answered the same problem by switching a
+table's isolation off instead of solving it.
+
+- **`RlsRoleDataSource`** drops to a `NOSUPERUSER NOBYPASSRLS` role on every borrowed connection —
+  migrations included, so the schema is created and owned by that role exactly as in production.
+  (`FORCE ROW LEVEL SECURITY` exists precisely because an owner is otherwise exempt from its own
+  policies.)
+- **`RlsRuntimeTest`** runs the real endpoints under it: registering a workspace, accepting an
+  invitation with no tenant bound, one tenant reading another's people, and the demo seed.
+- **The first test in that class asserts the class can fail.** The other four would pass just as
+  happily against a superuser, so it checks `current_user`, `rolsuper` and `rolbypassrls` directly.
+  Without it, quietly losing the wrapper would leave four tests that cannot fail and nothing to say
+  so — which is what had already happened to `FlywayUnderRlsTest`.
+
+_Staged deliberately: this is the mechanism plus a targeted class, not yet the default for all 416
+tests. Flipping the default is the next step and is expected to surface real failures._
+
 ### 2026-09-10 — A dropdown asks for three letters, not for a thousand names
 Two screens downloaded every employee in the company to populate one assignee dropdown: the letter
 generator, and the project workspace — which threaded the whole roster through eight components to
