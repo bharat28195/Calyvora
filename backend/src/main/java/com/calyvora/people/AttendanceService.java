@@ -100,22 +100,34 @@ public class AttendanceService {
     /**
      * Every employee's status for one day. Owner/Admin (enforced in the controller).
      *
-     * <p>Not {@code readOnly}: asking People for the directory may provision missing profiles, and a
-     * read-only transaction would swallow those inserts without flushing them.
+     * <p>Not {@code readOnly}: asking People for the roster may provision missing profiles, and a
+     * read-only transaction would swallow those inserts without flushing them. That is a layering
+     * problem rather than a performance one — a GET should not write — and it is tracked separately;
+     * what mattered here was that the screen took seventeen seconds at a thousand people, and none of
+     * that was the provisioning.
+     *
+     * <p>It was four things, and all four were the same thing: <em>company-wide data fetched more
+     * than once</em>. The company's people were loaded three times over (directory, then employees,
+     * then users). Every leave request the company had ever filed was read to answer a question about
+     * one day. And the department name — six possible answers — was looked up once per employee.
      */
     @Transactional
     public AttendanceDayResponse day(LocalDate date) {
         UUID companyId = TenantContext.getCompanyId();
-        // Profiles are provisioned lazily by People; ask for the directory first so a company that
-        // has never opened it still gets a full day sheet instead of an empty one.
-        employeeService.directory();
-        List<Employee> employees = employeeRepository.findByCompanyId(companyId);
-        Map<UUID, User> users = usersById(companyId);
+        // Profiles are provisioned lazily by People; ask for the roster so a company that has never
+        // opened the directory still gets a full day sheet instead of an empty one. One load of users
+        // and one of employees, and no response objects built for a list we are not returning.
+        EmployeeService.Roster roster = employeeService.roster();
+        List<Employee> employees = roster.employees();
+        Map<UUID, User> users = new HashMap<>();
+        for (User u : roster.users()) {
+            users.put(u.getId(), u);
+        }
         Map<UUID, AttendanceRecord> marked = new HashMap<>();
         for (AttendanceRecord r : attendanceRepository.findByCompanyIdAndDate(companyId, date)) {
             marked.put(r.getEmployeeId(), r);
         }
-        Map<UUID, List<LeaveRequest>> leave = approvedLeaveByEmployee(companyId);
+        Map<UUID, List<LeaveRequest>> leave = approvedLeaveByEmployee(companyId, date, date);
 
         // Is this ONE day a holiday: asked once, not once per employee. resolve() looks it up itself
         // when given nothing, which on a day sheet meant a query per person — a thousand queries to
@@ -124,13 +136,14 @@ public class AttendanceService {
         for (Holiday h : holidayRepository.findByCompanyIdAndDateBetweenOrderByDateAsc(companyId, date, date)) {
             holidays.putIfAbsent(h.getDate(), h);
         }
+        Prefetch prefetch = new Prefetch(holidays, departmentNames(companyId));
 
         List<AttendanceEntryResponse> entries = new ArrayList<>();
         long present = 0, onLeave = 0, absent = 0, unmarked = 0;
         for (Employee e : employees) {
             AttendanceEntryResponse entry = resolve(e, users.get(e.getUserId()), date,
                     Optional.ofNullable(marked.get(e.getId())), leave.getOrDefault(e.getId(), List.of()),
-                    holidays);
+                    prefetch);
             entries.add(entry);
             if (entry.status() == null) {
                 unmarked++;
@@ -181,7 +194,8 @@ public class AttendanceService {
                 .filter(e -> only == null || only.contains(e.getId()))
                 .toList();
         Map<UUID, User> usersById = usersById(companyId);
-        Map<UUID, List<LeaveRequest>> leaveByEmployee = approvedLeaveByEmployee(companyId);
+        Map<UUID, List<LeaveRequest>> leaveByEmployee = approvedLeaveByEmployee(companyId, from, to);
+        Prefetch prefetch = new Prefetch(holidays, departmentNames(companyId));
 
         Map<UUID, Map<LocalDate, AttendanceRecord>> markedByEmployee = new HashMap<>();
         for (AttendanceRecord r : attendanceRepository.findByCompanyIdAndDateBetween(companyId, from, to)) {
@@ -192,7 +206,7 @@ public class AttendanceService {
         for (Employee e : employees) {
             out.put(e.getId(), buildMonth(e, usersById.get(e.getUserId()), month,
                     markedByEmployee.getOrDefault(e.getId(), Map.of()),
-                    leaveByEmployee.getOrDefault(e.getId(), List.of()), holidays));
+                    leaveByEmployee.getOrDefault(e.getId(), List.of()), prefetch));
         }
         return out;
     }
@@ -211,8 +225,15 @@ public class AttendanceService {
                 .findByEmployeeIdAndDateBetweenOrderByDateAsc(employeeId, from, to)) {
             marked.put(r.getDate(), r);
         }
-        List<LeaveRequest> leave = approvedLeaveByEmployee(companyId).getOrDefault(employeeId, List.of());
-        return buildMonth(employee, user, month, marked, leave, null);
+        List<LeaveRequest> leave = approvedLeaveFor(employeeId, from, to);
+        // One person is still thirty days, and this walk asks for both the holiday and the department
+        // on every one of them. Passing null here would have been a query per day for each.
+        Map<LocalDate, Holiday> holidays = new HashMap<>();
+        for (Holiday h : holidayRepository.findByCompanyIdAndDateBetweenOrderByDateAsc(companyId, from, to)) {
+            holidays.putIfAbsent(h.getDate(), h);
+        }
+        return buildMonth(employee, user, month, marked, leave,
+                new Prefetch(holidays, departmentNames(companyId)));
     }
 
     /**
@@ -226,7 +247,7 @@ public class AttendanceService {
     private AttendanceMonthResponse buildMonth(Employee employee, User user, YearMonth month,
                                                Map<LocalDate, AttendanceRecord> marked,
                                                List<LeaveRequest> leave,
-                                               Map<LocalDate, Holiday> holidays) {
+                                               Prefetch prefetch) {
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
         List<AttendanceEntryResponse> days = new ArrayList<>();
@@ -240,7 +261,7 @@ public class AttendanceService {
 
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             AttendanceEntryResponse entry = resolve(employee, user, d,
-                    Optional.ofNullable(marked.get(d)), leave, holidays);
+                    Optional.ofNullable(marked.get(d)), leave, prefetch);
             days.add(entry);
             if (entry.status() == null) {
                 continue;
@@ -286,7 +307,7 @@ public class AttendanceService {
         validateTimes(record);
 
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
-        return of(employee, user, date, record, false);
+        return of(employee, user, date, record, false, null);
     }
 
     /** The signed-in employee clocks in for today. Idempotent â€” a second call won't move the time. */
@@ -306,7 +327,7 @@ public class AttendanceService {
             }
         }
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
-        return of(employee, user, today, record, false);
+        return of(employee, user, today, record, false, null);
     }
 
     /** The signed-in employee clocks out. Later calls overwrite â€” leaving twice means the later one. */
@@ -320,7 +341,7 @@ public class AttendanceService {
         record.setCheckOut(nowTime());
         validateTimes(record);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
-        return of(employee, user, today, record, false);
+        return of(employee, user, today, record, false, null);
     }
 
     /** Clear today's clock-in/out for the signed-in employee, so the day is open again. */
@@ -333,7 +354,7 @@ public class AttendanceService {
                 .ifPresent(attendanceRepository::delete);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
         return resolve(employee, user, today, Optional.empty(),
-                approvedLeaveByEmployee(companyId).getOrDefault(employee.getId(), List.of()));
+                approvedLeaveFor(employee.getId(), today, today));
     }
 
     /** Today's row for the signed-in employee (null status when they haven't clocked in). */
@@ -345,7 +366,7 @@ public class AttendanceService {
         LocalDate today = today();
         return resolve(employee, user, today,
                 attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today),
-                approvedLeaveByEmployee(companyId).getOrDefault(employee.getId(), List.of()));
+                approvedLeaveFor(employee.getId(), today, today));
     }
 
     /** The employee behind the signed-in user, for `/me` endpoints. */
@@ -366,22 +387,32 @@ public class AttendanceService {
     }
 
     /**
-     * As above, with the company's holidays for the period already in hand.
+     * The per-company facts a walk over many people needs, fetched once instead of per row.
      *
-     * <p>Null means "look it up", which is what every single-day caller does. A map means the caller is
-     * walking many days for many people and has fetched them once.
+     * <p>Every performance defect found in this class has had the same shape: a fact that is the same
+     * for the whole company, looked up again for every employee — holidays, and then department names.
+     * Naming the pattern makes the next one harder to write, because a bulk caller now has an obvious
+     * place to put what it has already fetched.
+     *
+     * <p>Null means "look it up", which is what every single-row caller does and should: one query for
+     * one row is the right trade.
+     */
+    private record Prefetch(Map<LocalDate, Holiday> holidays, Map<UUID, String> departmentNames) {}
+
+    /**
+     * As above, with the company's holidays and departments for the period already in hand.
      */
     private AttendanceEntryResponse resolve(Employee employee, User user, LocalDate date,
                                             Optional<AttendanceRecord> marked, List<LeaveRequest> leave,
-                                            Map<LocalDate, Holiday> prefetchedHolidays) {
+                                            Prefetch prefetch) {
         if (marked.isPresent()) {
-            return of(employee, user, date, marked.get(), false);
+            return of(employee, user, date, marked.get(), false, prefetch);
         }
         for (LeaveRequest lr : leave) {
             if (!date.isBefore(lr.getStartDate()) && !date.isAfter(lr.getEndDate())) {
                 return entry(employee, user, date, AttendanceStatus.ON_LEAVE.name(), null, null,
                         lr.getType().name().toLowerCase() + (lr.getReason() == null ? "" : " Â· " + lr.getReason()),
-                        true);
+                        true, prefetch);
             }
         }
         // A company holiday closes the day for everyone (unless someone marked otherwise above).
@@ -390,60 +421,106 @@ public class AttendanceService {
         // PER EMPLOYEE — a month for one person was thirty queries, and a payroll run over a thousand
         // people was thirty thousand. It is the single most expensive thing in this class and it was
         // invisible, because at seven employees thirty queries a head is unnoticeable.
-        Optional<Holiday> holiday = (prefetchedHolidays != null
-                ? Optional.ofNullable(prefetchedHolidays.get(date))
+        Optional<Holiday> holiday = (prefetch != null && prefetch.holidays() != null
+                ? Optional.ofNullable(prefetch.holidays().get(date))
                 : holidayRepository
                         .findByCompanyIdAndDateBetweenOrderByDateAsc(employee.getCompanyId(), date, date).stream()
                         .findFirst())
                 .filter(h -> !h.isOptional());
         if (holiday.isPresent()) {
             return entry(employee, user, date, AttendanceStatus.HOLIDAY.name(), null, null,
-                    holiday.get().getName(), true);
+                    holiday.get().getName(), true, prefetch);
         }
         if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-            return entry(employee, user, date, AttendanceStatus.WEEK_OFF.name(), null, null, null, true);
+            return entry(employee, user, date, AttendanceStatus.WEEK_OFF.name(), null, null, null, true, prefetch);
         }
-        return entry(employee, user, date, null, null, null, null, true);
+        return entry(employee, user, date, null, null, null, null, true, prefetch);
     }
 
     private AttendanceEntryResponse of(Employee employee, User user, LocalDate date,
-                                       AttendanceRecord r, boolean derived) {
+                                       AttendanceRecord r, boolean derived, Prefetch prefetch) {
         return entry(employee, user, date, r.getStatus().name(),
                 r.getCheckIn() == null ? null : r.getCheckIn().toString(),
                 r.getCheckOut() == null ? null : r.getCheckOut().toString(),
-                r.getNote(), derived);
+                r.getNote(), derived, prefetch);
     }
 
     private AttendanceEntryResponse entry(Employee employee, User user, LocalDate date, String status,
-                                          String checkIn, String checkOut, String note, boolean derived) {
+                                          String checkIn, String checkOut, String note, boolean derived,
+                                          Prefetch prefetch) {
         String name = user == null ? "Employee" : (user.getFirstName() + " " + user.getLastName()).trim();
         return new AttendanceEntryResponse(employee.getId().toString(), name, employee.getJobTitle(),
-                departmentName(employee), date.toString(), status, checkIn, checkOut, note, derived);
+                departmentName(employee, prefetch == null ? null : prefetch.departmentNames()),
+                date.toString(), status, checkIn, checkOut, note, derived);
     }
 
     /**
-     * Department name, for the "who's out in this team" breakdown. A company has a handful of
-     * departments and the lookup is by primary key, so this stays cheap without a cache that would
-     * have to be tenant-scoped to be safe.
+     * Department name, for the "who's out in this team" breakdown.
+     *
+     * <p>The old comment here said this stayed cheap because a company has a handful of departments
+     * and the lookup is by primary key. Both halves were true and the conclusion was still wrong: it
+     * ran <em>once per row</em>. A day sheet for a thousand people asked the database a thousand times
+     * which of six departments somebody was in. Cheap per call is not the same as cheap.
+     *
+     * <p>Bulk callers pass the names in. Single-row callers pass nothing and still pay one query,
+     * which for one row is the right trade.
      */
-    private String departmentName(Employee employee) {
+    private String departmentName(Employee employee, Map<UUID, String> prefetched) {
         if (employee.getDepartmentId() == null) {
             return null;
+        }
+        if (prefetched != null) {
+            return prefetched.get(employee.getDepartmentId());
         }
         return departmentRepository.findByIdAndCompanyId(employee.getDepartmentId(), employee.getCompanyId())
                 .map(Department::getName).orElse(null);
     }
 
+    /** Every department name in the company, by id — one query, for a walk over many people. */
+    private Map<UUID, String> departmentNames(UUID companyId) {
+        Map<UUID, String> names = new HashMap<>();
+        for (Department d : departmentRepository.findByCompanyIdOrderByName(companyId)) {
+            names.put(d.getId(), d.getName());
+        }
+        return names;
+    }
+
     // ---- helpers ----
 
-    private Map<UUID, List<LeaveRequest>> approvedLeaveByEmployee(UUID companyId) {
+    /**
+     * Approved leave for the whole company, bounded to the dates being asked about.
+     *
+     * <p>This used to read every leave request the company had ever filed — for a day sheet, for a
+     * month, and even to decide whether one person is on leave today. The filtering then happened in
+     * Java. A young company has a few hundred rows and nobody notices; two years in it is tens of
+     * thousands, fetched on a screen that people open every morning.
+     *
+     * <p>The window is the question. Anything that neither starts before the window ends nor ends
+     * after it begins cannot affect a single day in it, so the database should never have sent it.
+     */
+    private Map<UUID, List<LeaveRequest>> approvedLeaveByEmployee(UUID companyId, LocalDate from, LocalDate to) {
         Map<UUID, List<LeaveRequest>> byEmployee = new HashMap<>();
-        for (LeaveRequest lr : leaveRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)) {
-            if (lr.getStatus() == LeaveStatus.APPROVED) {
-                byEmployee.computeIfAbsent(lr.getEmployeeId(), k -> new ArrayList<>()).add(lr);
-            }
+        for (LeaveRequest lr : leaveRepository
+                .findByCompanyIdAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                        companyId, LeaveStatus.APPROVED, to, from)) {
+            byEmployee.computeIfAbsent(lr.getEmployeeId(), k -> new ArrayList<>()).add(lr);
         }
         return byEmployee;
+    }
+
+    /**
+     * Approved leave for one person over a window. Goes by employee id rather than filtering a
+     * company-wide fetch — asking "am I on leave today" should not read anybody else's leave.
+     */
+    private List<LeaveRequest> approvedLeaveFor(UUID employeeId, LocalDate from, LocalDate to) {
+        List<LeaveRequest> out = new ArrayList<>();
+        for (LeaveRequest lr : leaveRepository.findByEmployeeIdOrderByCreatedAtDesc(employeeId)) {
+            if (lr.getStatus() == LeaveStatus.APPROVED
+                    && !lr.getStartDate().isAfter(to) && !lr.getEndDate().isBefore(from)) {
+                out.add(lr);
+            }
+        }
+        return out;
     }
 
     private Map<UUID, User> usersById(UUID companyId) {

@@ -4,6 +4,31 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-10 — The attendance day sheet stops reading the whole company four times over
+The day sheet took **16.5 seconds** for a thousand people. It was four separate faults with one
+shape: data that is the same for the whole company, fetched again for every row.
+
+- **The company's people were loaded three times per request.** Once through the directory — which
+  also built and sorted a response object for every employee, all of it thrown away — then the
+  employees again, then the users again. Now one `EmployeeService.roster()`: one load of each table,
+  and no response objects built for a list nobody is returning.
+- **Answering "who is on leave today" read every leave request the company had ever filed.** Now a
+  bounded overlap query, with an index to match (`V49`). A company two years old has tens of thousands
+  of those rows, and one day is touched by a handful of them.
+- **A fifth N+1, found while reading the rest.** The department name — one of about six answers —
+  was queried once per employee, on a screen that lists a thousand of them.
+- **`today()` and `clearToday()` also read the company's entire leave history** to decide whether
+  *one person* is off today. That runs on every page load. Now scoped to the one employee.
+- **`month()` fetched a holiday and a department per day** — thirty of each for one person's month.
+
+The per-company facts a bulk walk needs are now carried in one place (`Prefetch`) rather than passed
+as loose maps, because this is the fifth defect of exactly this kind and the next one should have an
+obvious place to go.
+
+_Not changed: the day sheet still cannot be `readOnly`, because reading the roster may provision
+missing profiles. That is a layering fault worth its own fix — and none of the 16.5 s was the
+provisioning._
+
 ### 2026-09-07 — My team, and visibility that follows the org chart instead of the job title
 **Symptom the founder reported:** _"manager should see data only for his team, not for the full
 company — right now his and admin both have the same data and sections."_ True, and worse than it

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -94,13 +95,53 @@ public class EmployeeService {
         }
     }
 
+    /**
+     * Everyone in the company as entities, with missing profiles provisioned — users, employees and
+     * the mapping between them, from one load of each table.
+     *
+     * <p>Exists because callers that needed the raw rows were going through {@link #directory()} and
+     * then re-loading both tables themselves. The day sheet did exactly that: it asked for the
+     * directory (users + employees, plus a response object built and sorted for every person, all of
+     * it discarded), then loaded employees again, then loaded users again. Three loads of the whole
+     * company to answer one question, and at a thousand people that is most of what the screen cost.
+     *
+     * <p>Returns entities, not DTOs, on purpose. A caller that wants presentation asks for
+     * {@link #directory()}; a caller that wants to compute over the company should not pay to build a
+     * thousand response objects it is going to throw away.
+     */
     @Transactional
-    public List<EmployeeResponse> directory() {
+    public Roster roster() {
         UUID companyId = TenantContext.getCompanyId();
         List<User> users = userRepository.findByCompanyIdOrderByCreatedAtAsc(companyId);
-        Map<UUID, Employee> byUser = ensureProfiles(companyId, users);
-        return users.stream()
-                .map(u -> EmployeeResponse.of(u, byUser.get(u.getId())))
+        List<Employee> employees = new ArrayList<>(employeeRepository.findByCompanyId(companyId));
+        Map<UUID, Employee> byUser = new HashMap<>();
+        for (Employee e : employees) {
+            byUser.put(e.getUserId(), e);
+        }
+        for (User u : users) {
+            byUser.computeIfAbsent(u.getId(), uid -> {
+                Employee provisioned = provision(companyId, uid);
+                employees.add(provisioned);
+                return provisioned;
+            });
+        }
+        return new Roster(users, employees, byUser);
+    }
+
+    /**
+     * The company's people, loaded once.
+     *
+     * <p>{@code employees} is not simply {@code byUser.values()}: a profile can outlive the user it
+     * was provisioned for, and attendance still has to account for that person. Keeping both means a
+     * caller never has to decide which list it wanted.
+     */
+    public record Roster(List<User> users, List<Employee> employees, Map<UUID, Employee> byUser) {}
+
+    @Transactional
+    public List<EmployeeResponse> directory() {
+        Roster roster = roster();
+        return roster.users().stream()
+                .map(u -> EmployeeResponse.of(u, roster.byUser().get(u.getId())))
                 .sorted(Comparator.comparing(EmployeeResponse::firstName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
@@ -224,17 +265,6 @@ public class EmployeeService {
     private Employee getOrCreate(UUID companyId, UUID userId) {
         return employeeRepository.findByUserId(userId)
                 .orElseGet(() -> provision(companyId, userId));
-    }
-
-    private Map<UUID, Employee> ensureProfiles(UUID companyId, List<User> users) {
-        Map<UUID, Employee> byUser = new HashMap<>();
-        for (Employee e : employeeRepository.findByCompanyId(companyId)) {
-            byUser.put(e.getUserId(), e);
-        }
-        for (User u : users) {
-            byUser.computeIfAbsent(u.getId(), uid -> provision(companyId, uid));
-        }
-        return byUser;
     }
 
     private UUID resolveManager(UUID companyId, UUID employeeId, String managerId) {

@@ -1144,6 +1144,43 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   a shell `echo` rather than from Maven. **Read the build tool's own tally, not a proxy for it.** And
   a demo seed is a fixture half the suite depends on: changing its shape is a test-wide change.
 
+### PD-33 · 2026-09-10 · The day sheet, and the fifth instance of one habit
+- **Context:** the founder, working down a triage list: _"lets start one by one fixing so that i can
+  sell it better."_ First item was the attendance day sheet — 16.5 s for a thousand people, the worst
+  screen left after the payroll run was fixed.
+
+- **The screen was slow for four reasons and all four were the same reason.** The company's people
+  were loaded **three times** in one request (`directory()`, which also built and sorted a thousand
+  response objects that were then discarded, then `findByCompanyId`, then `usersById`). Every leave
+  request the company had ever filed was read to answer a question about **one day**. And the
+  department name — six possible answers — was looked up **once per employee**.
+- **The fifth N+1 was hiding behind a correct comment.** `departmentName()` carried a note explaining
+  that it stayed cheap because a company has a handful of departments and the lookup is by primary
+  key. Both halves are true. The conclusion was still wrong, because it ran per row. **"Cheap per
+  call" and "cheap" are different claims, and a comment asserting the first reads like the second.**
+- **So the pattern now has a name in the code.** A `Prefetch` record carries the per-company facts a
+  bulk walk needs. This is the fifth time the same defect has been found in this codebase — holidays
+  per day per employee, holidays per employee, a salary-existence guard that was itself an N+1,
+  payslip config per employee, and now departments — and every one was *a per-company fact fetched
+  per row*. Naming it gives the next bulk caller somewhere obvious to put what it already has.
+- **`today()` was the quiet one.** Asking "am I on leave today" read the entire company's leave
+  history. That is on every page load, for every user, and it never appeared in any measurement
+  because at seven employees it is free.
+- **What was deliberately not done.** The day sheet still is not `readOnly`, because asking People for
+  the roster may provision missing profiles. That is a layering fault — **a GET should not write** —
+  and it is worth fixing on its own terms, not smuggled into a performance change. None of the 16.5 s
+  was the provisioning.
+- **On the directory-paging item: the answer was "change nothing."** It was on the list at 3.1 s, but
+  the paged path is a count, a page query and one `IN` batch — three queries for twenty-five rows at
+  any company size. The reading sits inside the free tier's own noise band (an identical payroll run
+  measured 3.7 s and 7.4 s minutes apart) and was taken immediately after the *unpaged* whole-list
+  call. **The defect was real but elsewhere:** five UI screens fetch the whole company to populate a
+  dropdown. That wants a search endpoint, not pagination.
+- **Standing caveat, restated because it keeps mattering.** 409 tests pass. They passed through a
+  version of the payroll work that made the run four times slower and one that made it time out.
+  Green means correct; it says nothing about cost, and it will not until the suite runs as a
+  non-superuser against more than seven people.
+
 ---
 
 ## 4. Architecture Decision Log
