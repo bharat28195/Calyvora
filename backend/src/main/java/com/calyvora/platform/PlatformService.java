@@ -58,11 +58,14 @@ public class PlatformService {
     private final SeatRequestRepository seatRequestRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.calyvora.billing.PricingService pricingService;
+    private final com.calyvora.people.EmployeeService employeeService;
 
     public PlatformService(CompanyRepository companyRepository, CompanySettingsRepository settingsRepository,
                            UserRepository userRepository, SubscriptionRepository subscriptionRepository,
                            SeatRequestRepository seatRequestRepository, PasswordEncoder passwordEncoder,
-                           com.calyvora.billing.PricingService pricingService) {
+                           com.calyvora.billing.PricingService pricingService,
+                           com.calyvora.people.EmployeeService employeeService) {
+        this.employeeService = employeeService;
         this.pricingService = pricingService;
         this.companyRepository = companyRepository;
         this.settingsRepository = settingsRepository;
@@ -134,6 +137,10 @@ public class PlatformService {
         admin.setPasswordHash(passwordEncoder.encode(req.password()));
         admin.setEmailVerifiedAt(Instant.now());
         userRepository.save(admin);
+        // Bound to the NEW company, not the platform's own — which is precisely why this goes through
+        // provisionFor rather than a plain save. V30 met this same problem for company_settings and
+        // answered it by switching that table's RLS off; this answers it by naming the tenant.
+        employeeService.provisionFor(company.getId(), admin.getId());
 
         Subscription sub = new Subscription(UUID.randomUUID(), company.getId(), DEFAULT_PRICE, currency, null);
         sub.setSeats(Math.max(1, req.seats()));

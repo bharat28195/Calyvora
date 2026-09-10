@@ -4,6 +4,30 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-10 — Employee profiles are created with the person, not by whoever reads first
+Profiles were provisioned lazily, on the first authenticated read of the directory. That made **every
+GET a potential write**: the attendance day sheet could not run in a read-only transaction, so
+Hibernate dirty-checked a thousand loaded entities to answer a question that changed nothing.
+
+- **Profiles are now created where the user is** — accepting an invitation, registering a workspace,
+  and creating a customer company from the platform console. `V50` backfills everyone who came first.
+- **`TenantBinder`, for writes that belong to a company other than the request's own.** Accepting an
+  invitation is public and has no tenant bound, which is the reason provisioning was deferred to a
+  read in the first place. But the tenant was never unknown — it is written on the invitation. This
+  states it for the insert, which is what Row-Level Security wants to be told.
+- **It sets the GUC on the connection actually in use.** Setting `TenantContext` inside an open
+  transaction does nothing at all: the connection was bound when it was borrowed, on entry. That
+  mistake has now caused two production-only failures here, both invisible in tests because the test
+  database connects as a superuser and RLS is inert.
+- **The day sheet is `@Transactional(readOnly = true)`.**
+- **`FlywayUnderRlsTest` now plants a user, not just a company.** Without one, V50's per-company loop
+  finds nothing to do, the guarded insert is never attempted, and the test would happily certify a
+  broken migration — the same blind spot the test's own notes warn about.
+
+_Noted, not changed: `V30` switched off Row-Level Security for `company_settings` entirely, because
+"the owner provisions a new company's settings row from the platform context, so RLS would block that
+insert." That is the exact problem `TenantBinder` solves, so the trade-off is now reversible._
+
 ### 2026-09-10 — The attendance day sheet stops reading the whole company four times over
 The day sheet took **16.5 seconds** for a thousand people. It was four separate faults with one
 shape: data that is the same for the whole company, fetched again for every row.

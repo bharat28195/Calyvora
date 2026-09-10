@@ -49,6 +49,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final EmailService emailService;
     private final AppProperties props;
+    private final com.calyvora.people.EmployeeService employeeService;
 
     public AuthService(CompanyRepository companyRepository,
                        CompanySettingsRepository companySettingsRepository,
@@ -58,7 +59,9 @@ public class AuthService {
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        EmailService emailService,
-                       AppProperties props) {
+                       AppProperties props,
+                       com.calyvora.people.EmployeeService employeeService) {
+        this.employeeService = employeeService;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
         this.userRepository = userRepository;
@@ -113,6 +116,9 @@ public class AuthService {
             admin.setEmailVerifiedAt(Instant.now());
         }
         userRepository.save(admin);
+        // Their profile, with them. The founder of a new workspace is its first employee, and every
+        // read path is now allowed to assume a user has one.
+        employeeService.provisionFor(company.getId(), admin.getId());
 
         // The email still goes out when a mailbox is configured — it's a useful welcome and confirms
         // the address — but with verification off it never stands between someone and their workspace.

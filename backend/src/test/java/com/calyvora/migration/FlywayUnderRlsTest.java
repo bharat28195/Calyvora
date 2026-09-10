@@ -71,9 +71,13 @@ class FlywayUnderRlsTest extends IntegrationTestBase {
             // 1. Everything up to the point where the schema exists but the backfill has not run.
             migrate(scratchUrl, BEFORE_BACKFILL);
 
-            // 2. A company, planted as the superuser — this is the row every real customer already
-            //    has, and the row that makes the backfill actually insert something.
+            // 2. A company and one of its users, planted as the superuser — the rows every real
+            //    customer already has, and the rows that make the backfills actually insert
+            //    something. Without the user, V50's per-company loop finds nothing to do and the
+            //    insert it guards is never attempted, which would make this test agree that a broken
+            //    migration is fine.
             UUID companyId = plantCompany(scratchUrl);
+            UUID userId = plantUser(scratchUrl, companyId);
 
             // 3. The rest of the history, as the restricted role. This is the assertion: before the
             //    fix it failed here with SQLSTATE 42501 on leave_policies.
@@ -87,6 +91,15 @@ class FlywayUnderRlsTest extends IntegrationTestBase {
             assertThat(countLeavePolicies(scratchUrl, companyId))
                     .as("every existing company gets its five seeded leave policies")
                     .isEqualTo(5);
+
+            // 5. Same again for V50, which backfills an employee profile for every existing user so
+            //    that reading the directory can stop creating them. employees is under FORCE row
+            //    level security, so this insert is refused unless the migration binds the tenant per
+            //    company — and a refusal here is silent in the worst way: no profile means the person
+            //    simply stops appearing on every screen that lists them.
+            assertThat(countEmployeesForUser(scratchUrl, userId))
+                    .as("every pre-existing user is backfilled with exactly one employee profile")
+                    .isEqualTo(1);
         } finally {
             try (Connection admin = dataSource.getConnection()) {
                 dropScratchDatabase(admin);
@@ -126,6 +139,27 @@ class FlywayUnderRlsTest extends IntegrationTestBase {
                     + "', 'ACTIVE')");
         }
         return id;
+    }
+
+    /** A member of that company, as every real deployment has — the row V50 has to find. */
+    private static UUID plantUser(String url, UUID companyId) throws SQLException {
+        UUID id = UUID.randomUUID();
+        try (Connection c = connect(url); Statement st = c.createStatement()) {
+            st.execute("insert into users (id, company_id, email, first_name, last_name, role, status)"
+                    + " values ('" + id + "', '" + companyId + "', 'legacy-"
+                    + id.toString().substring(0, 8) + "@example.test', 'Legacy', 'Member',"
+                    + " 'ADMIN', 'ACTIVE')");
+        }
+        return id;
+    }
+
+    private static int countEmployeesForUser(String url, UUID userId) throws SQLException {
+        try (Connection c = connect(url); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "select count(*) from employees where user_id = '" + userId + "'")) {
+            rs.next();
+            return rs.getInt(1);
+        }
     }
 
     private static int countLeavePolicies(String url, UUID companyId) throws SQLException {

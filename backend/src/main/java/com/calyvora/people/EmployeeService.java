@@ -29,18 +29,23 @@ import java.util.UUID;
 @Service
 public class EmployeeService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EmployeeService.class);
+
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
     private final com.calyvora.invitation.InvitationRepository invitationRepository;
     private final OnboardingTaskRepository onboardingTaskRepository;
     private final DesignationRepository designationRepository;
+    private final com.calyvora.common.security.TenantBinder tenantBinder;
 
     public EmployeeService(EmployeeRepository employeeRepository, UserRepository userRepository,
                            DepartmentRepository departmentRepository,
                            com.calyvora.invitation.InvitationRepository invitationRepository,
                            OnboardingTaskRepository onboardingTaskRepository,
-                           DesignationRepository designationRepository) {
+                           DesignationRepository designationRepository,
+                           com.calyvora.common.security.TenantBinder tenantBinder) {
+        this.tenantBinder = tenantBinder;
         this.designationRepository = designationRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
@@ -57,6 +62,33 @@ public class EmployeeService {
      * no tenant bound, and {@code employees} is under Row-Level Security, so an insert there has no
      * company to belong to. The first authenticated read of the directory does have one.
      */
+    /**
+     * Give a brand-new user their employee profile, at the moment the user is created.
+     *
+     * <p>This is where provisioning belongs, and it is worth saying why it did not start here. The
+     * comment on {@link #provision} explains the original reasoning: accepting an invitation is a
+     * public, unauthenticated call, {@code employees} is under forced Row-Level Security, and an
+     * insert with no tenant bound is refused. All true. The conclusion drawn from it — provision on
+     * the first authenticated <em>read</em> instead — is what made every directory read a potential
+     * write, which in turn is why the day sheet could not be {@code readOnly} and why Hibernate
+     * dirty-checked a thousand entities to answer a GET.
+     *
+     * <p>The premise was wrong in one place: the tenant is not unknown at accept time, it is simply
+     * not bound. The invitation names the company. Binding it around the insert states which tenant
+     * the row belongs to, which is exactly what RLS wants to be told — it is not a way around the
+     * policy, it is the policy being used as intended.
+     *
+     * <p>Goes through {@link TenantBinder} rather than simply setting {@link TenantContext}: the
+     * caller is usually already inside a transaction, and by then the connection has been borrowed
+     * and bound. Setting the context at that point changes nothing, and the insert is refused. That
+     * mistake has already been made twice here.
+     */
+    @Transactional
+    public Employee provisionFor(UUID companyId, UUID userId) {
+        return tenantBinder.callAs(companyId, () -> employeeRepository.findByUserId(userId)
+                .orElseGet(() -> provision(companyId, userId)));
+    }
+
     private Employee provision(UUID companyId, UUID userId) {
         Employee employee = new Employee(UUID.randomUUID(), companyId, userId);
         userRepository.findByIdAndCompanyId(userId, companyId)
@@ -124,6 +156,38 @@ public class EmployeeService {
                 employees.add(provisioned);
                 return provisioned;
             });
+        }
+        return new Roster(users, employees, byUser);
+    }
+
+    /**
+     * The same roster, for a read that must not write.
+     *
+     * <p>Profiles are created with their user now ({@link #provisionFor}) and everyone who predates
+     * that was backfilled in V50, so by the time a read happens there is nothing left to provision.
+     * That is what lets a screen like the attendance day sheet run in a genuinely read-only
+     * transaction — which is worth more than it sounds: a read-only transaction does not dirty-check
+     * the thousand entities it just loaded, can be routed to a replica, and cannot surprise anyone by
+     * writing during a GET.
+     *
+     * <p>If the invariant is ever broken, this says so and carries on without that person rather than
+     * silently writing. A missing profile is then a visible bug in whatever created the user, which is
+     * where it should be fixed — not papered over on every read for the life of the product.
+     */
+    @Transactional(readOnly = true)
+    public Roster rosterForRead() {
+        UUID companyId = TenantContext.getCompanyId();
+        List<User> users = userRepository.findByCompanyIdOrderByCreatedAtAsc(companyId);
+        List<Employee> employees = employeeRepository.findByCompanyId(companyId);
+        Map<UUID, Employee> byUser = new HashMap<>();
+        for (Employee e : employees) {
+            byUser.put(e.getUserId(), e);
+        }
+        for (User u : users) {
+            if (!byUser.containsKey(u.getId())) {
+                log.warn("User {} in company {} has no employee profile; leaving them out of this read. "
+                        + "Whatever created this user should have called provisionFor.", u.getId(), companyId);
+            }
         }
         return new Roster(users, employees, byUser);
     }

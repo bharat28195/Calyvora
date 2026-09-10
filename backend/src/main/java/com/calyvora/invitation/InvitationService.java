@@ -44,6 +44,7 @@ public class InvitationService {
     private final PasswordEncoder passwordEncoder;
     private final AppProperties props;
     private final com.calyvora.billing.SubscriptionRepository subscriptionRepository;
+    private final com.calyvora.people.EmployeeService employeeService;
 
     public InvitationService(InvitationRepository invitationRepository,
                              UserRepository userRepository,
@@ -51,7 +52,9 @@ public class InvitationService {
                              EmailService emailService,
                              PasswordEncoder passwordEncoder,
                              AppProperties props,
-                             com.calyvora.billing.SubscriptionRepository subscriptionRepository) {
+                             com.calyvora.billing.SubscriptionRepository subscriptionRepository,
+                             com.calyvora.people.EmployeeService employeeService) {
+        this.employeeService = employeeService;
         this.invitationRepository = invitationRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
@@ -201,6 +204,15 @@ public class InvitationService {
         userRepository.save(user);
 
         invitation.accept();
+
+        // The profile is created here, with the person, rather than on whichever read happens to
+        // touch them first. This endpoint is public and has no tenant bound, which is the reason
+        // provisioning was originally deferred to a read — but the tenant is not unknown here, it is
+        // written on the invitation, and TenantBinder states it for the insert.
+        //
+        // After invitation.accept() on purpose: provisioning applies the hire details recorded on the
+        // invitation, and looks for it in ACCEPTED state.
+        employeeService.provisionFor(invitation.getCompanyId(), user.getId());
     }
 
     // ---- helpers ----

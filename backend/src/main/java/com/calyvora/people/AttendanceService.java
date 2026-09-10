@@ -100,24 +100,22 @@ public class AttendanceService {
     /**
      * Every employee's status for one day. Owner/Admin (enforced in the controller).
      *
-     * <p>Not {@code readOnly}: asking People for the roster may provision missing profiles, and a
-     * read-only transaction would swallow those inserts without flushing them. That is a layering
-     * problem rather than a performance one — a GET should not write — and it is tracked separately;
-     * what mattered here was that the screen took seventeen seconds at a thousand people, and none of
-     * that was the provisioning.
+     * <p>It was slow for four reasons and all four were the same reason: <em>company-wide data
+     * fetched more than once</em>. The company's people were loaded three times over (directory, then
+     * employees, then users). Every leave request the company had ever filed was read to answer a
+     * question about one day. And the department name — six possible answers — was looked up once per
+     * employee.
      *
-     * <p>It was four things, and all four were the same thing: <em>company-wide data fetched more
-     * than once</em>. The company's people were loaded three times over (directory, then employees,
-     * then users). Every leave request the company had ever filed was read to answer a question about
-     * one day. And the department name — six possible answers — was looked up once per employee.
+     * <p>{@code readOnly} since profiles stopped being provisioned on the read path. That is not a
+     * cosmetic annotation here: without it Hibernate dirty-checks every one of the thousand entities
+     * this method loads, at flush, to discover that a GET changed nothing.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public AttendanceDayResponse day(LocalDate date) {
         UUID companyId = TenantContext.getCompanyId();
-        // Profiles are provisioned lazily by People; ask for the roster so a company that has never
-        // opened the directory still gets a full day sheet instead of an empty one. One load of users
-        // and one of employees, and no response objects built for a list we are not returning.
-        EmployeeService.Roster roster = employeeService.roster();
+        // One load of users and one of employees, and no response objects built for a list we are not
+        // returning. Nothing is provisioned: profiles are created with their user now.
+        EmployeeService.Roster roster = employeeService.rosterForRead();
         List<Employee> employees = roster.employees();
         Map<UUID, User> users = new HashMap<>();
         for (User u : roster.users()) {

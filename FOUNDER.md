@@ -1181,6 +1181,40 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   Green means correct; it says nothing about cost, and it will not until the suite runs as a
   non-superuser against more than seven people.
 
+### PD-34 · 2026-09-10 · A GET should not write, and the tenant was never unknown
+- **Context:** second item off the founder's triage list, straight after the day sheet. It is what
+  stopped that screen being read-only, and it is a layering fault rather than a performance one.
+
+- **The original reasoning was right in its premise and wrong in its conclusion.** `provision()`
+  argued that a profile could not be created at invitation-accept, because that endpoint is public,
+  no tenant is bound, and `employees` is under FORCE row level security, so the insert is refused.
+  Every clause of that is true. The conclusion drawn — provision on the first authenticated *read*
+  instead — is what made every directory read a potential write. **The tenant was never unknown at
+  accept time. It is written on the invitation. It simply was not bound.**
+- **The trap underneath it, now hit three times.** `TenantAwareDataSource` binds the GUC when a
+  connection is **borrowed**, and a `@Transactional` method borrows on entry. Setting `TenantContext`
+  inside such a method therefore changes nothing — and the failure is not a loud one: writes are
+  refused, reads quietly return nothing, and a delete quietly removes nothing while reporting success.
+  This broke the scale seeder, it is why V30 exists, and it nearly broke this change. It now has a
+  name and one implementation: `TenantBinder`.
+- **`TenantBinder` flushes before it restores.** Hibernate would otherwise defer the insert to the end
+  of the transaction, by which point the connection is back on the caller's tenant and the policy
+  refuses it — a bug that would have passed every test, because the test database is a superuser.
+- **A finding worth acting on later.** V30 turned Row-Level Security *off* for `company_settings`,
+  reasoning that the owner provisions a new company's settings row from the platform context and RLS
+  would block it. That is exactly the problem now solved, so the protection can be restored.
+  `subscriptions` is a genuine exemption — the owner really does read across tenants — but
+  `company_settings` was a workaround wearing a design decision's clothes.
+- **Scoping call, stated so it is not mistaken for finished.** `directory()` still provisions, because
+  the demo and scale seeds rely on it. The hot path uses a read-only roster that provisions nothing
+  and **logs a warning** if a user has no profile, rather than silently writing. A missing profile is
+  then a visible bug in whatever created the user, which is where it should be fixed — not papered
+  over on every read for the life of the product.
+- **The test was extended before it was trusted.** `FlywayUnderRlsTest` planted a company but no user,
+  so V50's per-company loop would have found nothing to do and the guarded insert would never have
+  been attempted. It would have passed against a broken migration. **A test that cannot fail is not
+  evidence** — and this is the second time that specific shape of gap has appeared in this file.
+
 ---
 
 ## 4. Architecture Decision Log
