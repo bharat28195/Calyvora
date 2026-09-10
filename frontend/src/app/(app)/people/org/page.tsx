@@ -72,7 +72,10 @@ export default function OrgPage() {
       {loading ? (
         <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
       ) : (
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        // Stacked rather than side by side. The chart draws cards in rows now, so half a width
+        // wrapped it after two siblings — the shape of the org is the point of this screen, and
+        // showing a shape needs the room.
+        <div className="mt-8 flex flex-col gap-8">
           {/* Departments */}
           <div>
             <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-fg/40">
@@ -86,7 +89,8 @@ export default function OrgPage() {
                 </Button>
               </form>
             )}
-            <div className="mt-3 flex flex-col gap-2">
+            {/* Full width now, so departments read across rather than as one tall column. */}
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {departments!.length === 0 ? (
                 <Card className="text-sm text-fg/50">No departments yet.</Card>
               ) : (
@@ -252,7 +256,7 @@ function OrgTree({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
           <Input
@@ -285,126 +289,158 @@ function OrgTree({
         </p>
       )}
 
-      <ul className="flex flex-col gap-0.5">
-        {shown.map((e) => (
-          <OrgNode
-            key={e.id}
-            employee={e}
-            childrenOf={childrenOf}
-            deptName={deptName}
-            depth={0}
-            expanded={openNow}
-            onToggle={toggle}
-            meId={me?.id}
-            matches={matches}
-          />
-        ))}
-      </ul>
+      {/* The chart is as wide as the widest open level, which at a thousand people is wider than any
+          screen. It scrolls in its own box so the page around it never does. */}
+      <div className="-mx-2 overflow-x-auto px-2 pb-2">
+        {/* w-max, not just min-w-full: in a horizontal scroller justify-center on a child wider
+            than its container clips the left overflow, and those cards can never be scrolled to. */}
+        <div className="flex w-max min-w-full justify-center gap-6 pt-1">
+          {shown.map((e) => (
+            <OrgNode
+              key={e.id}
+              employee={e}
+              childrenOf={childrenOf}
+              deptName={deptName}
+              expanded={openNow}
+              onToggle={toggle}
+              meId={me?.id}
+              matches={matches}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
+/** Stable per-department colour, so a branch reads as one team at a glance. */
+const DEPT_TINTS = [
+  "border-t-sky-400/70",
+  "border-t-emerald-400/70",
+  "border-t-amber-400/70",
+  "border-t-violet/70",
+  "border-t-rose-400/70",
+  "border-t-teal-400/70",
+];
+
+function tintFor(departmentId: string | null) {
+  if (!departmentId) return "border-t-fg/20";
+  let h = 0;
+  for (let i = 0; i < departmentId.length; i++) h = (h * 31 + departmentId.charCodeAt(i)) >>> 0;
+  return DEPT_TINTS[h % DEPT_TINTS.length];
+}
+
+/**
+ * One person, drawn as a card with their branch hanging beneath them.
+ *
+ * <p>Top-down rather than an indented list. An indented list is compact and reads as a file tree; a
+ * chart like this reads as an organisation, which is what people expect when they ask to see one —
+ * and it makes siblings visibly siblings instead of two rows at the same left margin.
+ *
+ * <p>The connectors are three plain divs per level: a stem down from the parent, one horizontal rule
+ * spanning the children, and a stem down into each child. The first and last child clip that rule to
+ * half width so it starts and stops under a card rather than hanging in the air.
+ */
 function OrgNode({
   employee,
   childrenOf,
   deptName,
-  depth,
   expanded,
   onToggle,
   meId,
   matches,
-  isLast,
 }: {
   employee: Employee;
   childrenOf: Map<string | null, Employee[]>;
   deptName: (id: string | null) => string | undefined;
-  depth: number;
   expanded: Set<string>;
   onToggle: (id: string) => void;
   meId?: string;
   matches: Set<string> | null;
-  isLast?: boolean;
 }) {
   const reports = childrenOf.get(employee.id) ?? [];
   const hasReports = reports.length > 0;
   const isOpen = hasReports && expanded.has(employee.id);
   const isMe = employee.id === meId;
   const isMatch = matches?.has(employee.id) ?? false;
+  const department = deptName(employee.departmentId);
 
   return (
-    // The connector lines are drawn in CSS rather than with indentation, because indentation alone
-    // stops reading as a hierarchy past about two levels — at four you are counting pixels to work
-    // out who reports to whom. The vertical rule runs the height of a branch and stops halfway down
-    // its last child, which is what turns a stack of rows into a tree.
-    <li
-      className={cn(
-        "relative",
-        depth > 0 && "pl-5",
-        depth > 0 && "before:absolute before:left-0 before:top-0 before:w-px before:bg-fg/15 before:content-['']",
-        depth > 0 && (isLast ? "before:h-[18px]" : "before:h-full"),
-        depth > 0 && "after:absolute after:left-0 after:top-[18px] after:h-px after:w-3.5 after:bg-fg/15 after:content-['']",
-      )}
-    >
+    <div className="flex flex-col items-center">
       <div
         className={cn(
-          "flex items-center gap-2 rounded-md py-1 pr-2",
-          isMe && "bg-violet/10",
-          isMatch && !isMe && "bg-amber-400/10",
+          "w-[232px] shrink-0 rounded-lg border border-fg/10 border-t-[3px] bg-surface p-3 shadow-sm transition-colors",
+          tintFor(employee.departmentId),
+          isMe && "ring-2 ring-violet",
+          isMatch && !isMe && "ring-2 ring-amber-400/70",
         )}
       >
-        {hasReports ? (
+        <div className="flex items-start gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet/20 text-xs font-semibold text-violet">
+            {employee.firstName[0]}{employee.lastName[0]}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium leading-tight">
+              {employee.firstName} {employee.lastName}
+              {isMe && <span className="ml-1.5 text-[11px] font-normal text-violet">you</span>}
+            </p>
+            <p className="truncate text-xs text-fg/50">{employee.jobTitle ?? "—"}</p>
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex flex-col gap-0.5 border-t border-fg/5 pt-2 text-[11px] text-fg/45">
+          {department && <p className="truncate">{department}</p>}
+          <p className="truncate">{employee.email}</p>
+          {employee.workLocation && <p className="truncate">{employee.workLocation}</p>}
+        </div>
+
+        {hasReports && (
           <button
             type="button"
             onClick={() => onToggle(employee.id)}
             aria-expanded={isOpen}
             aria-label={`${isOpen ? "Collapse" : "Expand"} the team under ${employee.firstName} ${employee.lastName}`}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-fg/40 hover:bg-fg/10 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-fg/5 py-1 text-[11px] text-fg/60 hover:bg-fg/10 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
           >
+            <span className="tabular-nums">{reports.length}</span>
+            <span>{reports.length === 1 ? "report" : "reports"}</span>
             <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-90")} />
           </button>
-        ) : (
-          // A dot rather than an empty box, so names still line up under their siblings.
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-fg/20">·</span>
-        )}
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet/20 text-[10px] font-semibold text-violet">
-          {employee.firstName[0]}{employee.lastName[0]}
-        </span>
-        <span className="truncate text-sm">
-          {employee.firstName} {employee.lastName}
-          {isMe && <span className="ml-1.5 text-xs text-violet">you</span>}
-        </span>
-        <span className="truncate text-xs text-fg/40">
-          {employee.jobTitle ?? "—"}
-          {deptName(employee.departmentId) ? ` · ${deptName(employee.departmentId)}` : ""}
-        </span>
-        {hasReports && !isOpen && (
-          // What the click will cost you. Direct reports, not the whole branch: a badge reading 30
-          // that opens to reveal four rows teaches people to distrust the badge.
-          <span className="ml-auto shrink-0 rounded-full bg-fg/5 px-2 py-0.5 text-[11px] tabular-nums text-fg/40">
-            {reports.length}
-          </span>
         )}
       </div>
+
       {isOpen && (
-        // ml-2.5 puts a child's trunk under the middle of its parent's chevron, so the line appears
-        // to come out of the control that opened it.
-        <ul className="ml-2.5 flex flex-col gap-0.5">
-          {reports.map((r, i) => (
-            <OrgNode
-              key={r.id}
-              employee={r}
-              childrenOf={childrenOf}
-              deptName={deptName}
-              depth={depth + 1}
-              expanded={expanded}
-              onToggle={onToggle}
-              meId={meId}
-              matches={matches}
-              isLast={i === reports.length - 1}
-            />
-          ))}
-        </ul>
+        <>
+          {/* Stem out of the bottom of this card. */}
+          <div className="h-5 w-px bg-fg/15" />
+          <div className="flex items-start">
+            {reports.map((r, i) => (
+              <div key={r.id} className="relative flex flex-col items-center px-3">
+                {/* The rule joining the siblings. One child needs none; the outermost two are clipped
+                    to half so the line begins and ends under a card. */}
+                {reports.length > 1 && (
+                  <div
+                    className={cn(
+                      "absolute top-0 h-px bg-fg/15",
+                      i === 0 ? "left-1/2 right-0" : i === reports.length - 1 ? "left-0 right-1/2" : "left-0 right-0",
+                    )}
+                  />
+                )}
+                <div className="h-5 w-px bg-fg/15" />
+                <OrgNode
+                  employee={r}
+                  childrenOf={childrenOf}
+                  deptName={deptName}
+                  expanded={expanded}
+                  onToggle={onToggle}
+                  meId={meId}
+                  matches={matches}
+                />
+              </div>
+            ))}
+          </div>
+        </>
       )}
-    </li>
+    </div>
   );
 }
