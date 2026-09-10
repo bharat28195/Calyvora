@@ -238,6 +238,47 @@ public class EmployeeService {
         return com.calyvora.common.dto.PageResponse.of(userPage, u -> EmployeeResponse.of(u, byUser.get(u.getId())));
     }
 
+    /**
+     * The top few people matching a typed fragment — what a person picker actually needs.
+     *
+     * <p>Five screens were loading the entire company to fill a dropdown. Two of them genuinely need
+     * everyone (the org chart draws the whole tree; payroll pays everyone), but a dropdown never does:
+     * nobody scrolls a thousand names, they type three letters. Paginating the dropdown would have
+     * been the wrong fix for the same reason — the interaction is search, so the endpoint is search.
+     *
+     * <p>Reuses the directory's own query, so a picker and the directory agree on what "matches"
+     * means. Read-only and provisions nothing: a user with no profile cannot be assigned work, so
+     * skipping them is the right answer rather than writing a row on a keystroke.
+     */
+    @Transactional(readOnly = true)
+    public List<com.calyvora.people.dto.EmployeeOption> search(String q, int limit) {
+        UUID companyId = TenantContext.getCompanyId();
+        int safeLimit = Math.min(Math.max(limit, 1), 50);
+        var pageable = org.springframework.data.domain.PageRequest.of(0, safeLimit,
+                org.springframework.data.domain.Sort.by("firstName").ascending()
+                        .and(org.springframework.data.domain.Sort.by("lastName").ascending()));
+        var matches = userRepository.directoryPage(companyId, q == null ? "" : q.trim(), pageable);
+
+        List<UUID> userIds = matches.getContent().stream().map(User::getId).toList();
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Employee> byUser = new HashMap<>();
+        for (Employee e : employeeRepository.findByCompanyIdAndUserIdIn(companyId, userIds)) {
+            byUser.put(e.getUserId(), e);
+        }
+        List<com.calyvora.people.dto.EmployeeOption> out = new ArrayList<>();
+        for (User u : matches.getContent()) {
+            Employee e = byUser.get(u.getId());
+            if (e == null) {
+                continue;
+            }
+            out.add(new com.calyvora.people.dto.EmployeeOption(e.getId().toString(),
+                    (u.getFirstName() + " " + u.getLastName()).trim(), u.getEmail(), e.getJobTitle()));
+        }
+        return out;
+    }
+
     @Transactional
     public EmployeeResponse get(UUID employeeId) {
         UUID companyId = TenantContext.getCompanyId();

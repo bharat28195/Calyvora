@@ -71,13 +71,15 @@ function initials(name: string) {
 export default function WorkspacePage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [view, setView] = useState<View>("board");
   const [error, setError] = useState<string | null>(null);
 
+  // The company roster used to be loaded here and threaded through every board, dialog and card to
+  // populate two assignee dropdowns. Cards show the name the task itself carries, so the roster was
+  // only ever feeding the pickers — and those search the server as you type now.
   useEffect(() => {
-    void Promise.all([api.getProject(projectId), api.listEmployees()])
-      .then(([p, emps]) => { setProject(p); setEmployees(emps); })
+    void api.getProject(projectId)
+      .then(setProject)
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load project"));
   }, [projectId]);
 
@@ -110,11 +112,11 @@ export default function WorkspacePage() {
         </aside>
 
         <section className="min-w-0">
-          {view === "board" && <BoardView projectId={projectId} employees={employees} />}
-          {view === "backlog" && <BacklogView projectId={projectId} employees={employees} />}
+          {view === "board" && <BoardView projectId={projectId} />}
+          {view === "backlog" && <BacklogView projectId={projectId} />}
           {view === "sprints" && <SprintsView projectId={projectId} />}
           {view === "report" && <ReportView projectId={projectId} />}
-          {view === "tickets" && <TicketsView projectId={projectId} employees={employees} />}
+          {view === "tickets" && <TicketsView projectId={projectId} />}
         </section>
       </div>
     </div>
@@ -123,7 +125,7 @@ export default function WorkspacePage() {
 
 // ============================ BOARD ============================
 
-function BoardView({ projectId, employees }: { projectId: string; employees: Employee[] }) {
+function BoardView({ projectId }: { projectId: string }) {
   const [board, setBoard] = useState<Board | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -232,7 +234,7 @@ function BoardView({ projectId, employees }: { projectId: string; employees: Emp
       </div>
 
       {adding && (
-        <TaskDialog title="Add task" employees={employees} sprints={sprints}
+        <TaskDialog title="Add task" sprints={sprints}
           onClose={() => setAdding(false)}
           onSubmit={async (data) => {
             const { sprintId, storyPoints, ...create } = data;
@@ -242,7 +244,7 @@ function BoardView({ projectId, employees }: { projectId: string; employees: Emp
           }} />
       )}
       {detail && (
-        <TaskDetailDialog task={detail} employees={employees} sprints={sprints}
+        <TaskDetailDialog task={detail} sprints={sprints}
           onClose={() => setDetail(null)}
           onSaved={() => { setDetail(null); void load(); }}
           onDeleted={() => { setDetail(null); void load(); }} />
@@ -253,7 +255,7 @@ function BoardView({ projectId, employees }: { projectId: string; employees: Emp
 
 // ============================ BACKLOG ============================
 
-function BacklogView({ projectId, employees }: { projectId: string; employees: Employee[] }) {
+function BacklogView({ projectId }: { projectId: string }) {
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -316,7 +318,7 @@ function BacklogView({ projectId, employees }: { projectId: string; employees: E
       </div>
 
       {adding && (
-        <TaskDialog title="Add to backlog" employees={employees} sprints={[]}
+        <TaskDialog title="Add to backlog" sprints={[]}
           onClose={() => setAdding(false)}
           onSubmit={async (data) => {
             const { sprintId: _drop, storyPoints, ...create } = data;
@@ -326,7 +328,7 @@ function BacklogView({ projectId, employees }: { projectId: string; employees: E
           }} />
       )}
       {detail && (
-        <TaskDetailDialog task={detail} employees={employees} sprints={sprints}
+        <TaskDetailDialog task={detail} sprints={sprints}
           onClose={() => setDetail(null)}
           onSaved={() => { setDetail(null); void load(); }}
           onDeleted={() => { setDetail(null); void load(); }} />
@@ -489,7 +491,7 @@ function SprintDialog({ projectId, onClose, onCreated }: { projectId: string; on
 
 // ============================ TICKETS ============================
 
-function TicketsView({ projectId, employees }: { projectId: string; employees: Employee[] }) {
+function TicketsView({ projectId }: { projectId: string }) {
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -539,12 +541,12 @@ function TicketsView({ projectId, employees }: { projectId: string; employees: E
       </div>
 
       {creating && (
-        <TicketDialog title="New ticket" employees={employees}
+        <TicketDialog title="New ticket"
           onClose={() => setCreating(false)}
           onSubmit={async (data) => { await api.createTicket(projectId, data); setCreating(false); void load(); }} />
       )}
       {detail && (
-        <TicketDialog title={`${detail.ref} · edit`} employees={employees} initial={detail}
+        <TicketDialog title={`${detail.ref} · edit`} initial={detail}
           onClose={() => setDetail(null)}
           onSubmit={async (data) => { await api.updateTicket(detail.id, data); setDetail(null); void load(); }}
           onDelete={async () => { await api.deleteTicket(detail.id); setDetail(null); void load(); }} />
@@ -559,10 +561,9 @@ interface TicketForm {
 }
 
 function TicketDialog({
-  title, employees, initial, onClose, onSubmit, onDelete,
+  title, initial, onClose, onSubmit, onDelete,
 }: {
   title: string;
-  employees: Employee[];
   initial?: Ticket;
   onClose: () => void;
   onSubmit: (data: TicketForm) => Promise<void>;
@@ -615,7 +616,7 @@ function TicketDialog({
           </Field>
         </div>
         <Field label="Assignee" htmlFor="tk-assignee">
-          <MemberSelect employees={employees} value={form.assigneeId}
+          <MemberSelect value={form.assigneeId}
             onChange={(id) => setForm((f) => ({ ...f, assigneeId: id }))} />
         </Field>
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -648,10 +649,9 @@ interface TaskForm {
 }
 
 function TaskDialog({
-  title, employees, sprints, initial, onClose, onSubmit, onDelete,
+  title, sprints, initial, onClose, onSubmit, onDelete,
 }: {
   title: string;
-  employees: Employee[];
   sprints: Sprint[];
   initial?: Partial<TaskForm>;
   onClose: () => void;
@@ -702,7 +702,7 @@ function TaskDialog({
         </Field>
         <div className={cn("grid gap-3", showSprint ? "grid-cols-2" : "grid-cols-1")}>
           <Field label="Assignee" htmlFor="t-assignee">
-            <MemberSelect employees={employees} value={form.assigneeId}
+            <MemberSelect value={form.assigneeId}
               onChange={(id) => setForm((f) => ({ ...f, assigneeId: id }))} />
           </Field>
           {showSprint && (
@@ -731,10 +731,9 @@ function TaskDialog({
 }
 
 function TaskDetailDialog({
-  task, employees, sprints, onClose, onSaved, onDeleted,
+  task, sprints, onClose, onSaved, onDeleted,
 }: {
   task: Task;
-  employees: Employee[];
   sprints: Sprint[];
   onClose: () => void;
   onSaved: () => void;
@@ -743,7 +742,7 @@ function TaskDetailDialog({
   return (
     <TaskDialog
       title={`${task.ref} · edit`}
-      employees={employees}
+     
       sprints={sprints}
       initial={{
         title: task.title,

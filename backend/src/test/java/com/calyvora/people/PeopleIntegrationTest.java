@@ -33,6 +33,32 @@ class PeopleIntegrationTest extends IntegrationTestBase {
         assertThat(search.get("content").get(0).get("firstName").asText()).isEqualTo("Priya");
     }
 
+    @Test
+    void the_picker_search_returns_a_few_matches_and_cannot_carry_a_rating() throws Exception {
+        mockMvc.perform(post("/api/v1/dev/seed-demo")).andExpect(status().isOk());
+        Session owner = login("ava.chen@northwind.demo", "demopass123");
+
+        JsonNode hits = getJson("/api/v1/people/employees/search?q=priya", owner);
+        assertThat(hits.size()).isEqualTo(1);
+        assertThat(hits.get(0).get("name").asText()).isEqualTo("Priya Nair");
+        assertThat(hits.get(0).get("email").asText()).isEqualTo("priya.nair@northwind.demo");
+
+        // The reason this endpoint exists rather than reusing the directory: a dropdown needs a name,
+        // an email to tell two Priyas apart, and a title for context — and structurally cannot carry a
+        // colleague's performance rating or phone number. A picker that cannot hold the field cannot
+        // leak it, which is a stronger guarantee than remembering to strip it.
+        assertThat(hits.get(0).has("rating")).isFalse();
+        assertThat(hits.get(0).has("phone")).isFalse();
+
+        // Bounded whatever the caller asks for. A picker must not become a whole-company download by
+        // way of a query parameter — which is the very thing this endpoint was added to stop.
+        JsonNode capped = getJson("/api/v1/people/employees/search?q=&limit=500", owner);
+        assertThat(capped.size()).isLessThanOrEqualTo(50);
+
+        JsonNode none = getJson("/api/v1/people/employees/search?q=zzzznobody", owner);
+        assertThat(none.size()).isZero();
+    }
+
     /** Onboard an owner, invite+accept a member, return the two sessions. */
     private Session[] companyWithMember(String owner, String member) throws Exception {
         Session ownerS = onboardOwner("Acme", owner, PW);

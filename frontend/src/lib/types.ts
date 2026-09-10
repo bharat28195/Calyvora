@@ -65,6 +65,20 @@ export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN";
 /** NOTICE = exit started, last working day not yet reached (PD-20). */
 export type EmploymentStatus = "ONBOARDING" | "ACTIVE" | "NOTICE" | "TERMINATED";
 
+/**
+ * One line in a person picker.
+ *
+ * Deliberately not an Employee: that carries phone, start date, employment status, skills and a
+ * performance rating, none of which belongs in an assignee dropdown. A picker that cannot carry the
+ * rating cannot leak it.
+ */
+export interface EmployeeOption {
+  id: string;
+  name: string;
+  email: string;
+  jobTitle: string | null;
+}
+
 export interface Employee {
   id: string;
   userId: string;

@@ -4,6 +4,24 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-10 — A dropdown asks for three letters, not for a thousand names
+Two screens downloaded every employee in the company to populate one assignee dropdown: the letter
+generator, and the project workspace — which threaded the whole roster through eight components to
+feed two pickers.
+
+- **`GET /people/employees/search`** returns the top matches for what you typed, capped at 50 however
+  the caller asks. Pagination would have been the wrong fix: nobody pages through a dropdown.
+- **`EmployeeOption` carries a name, an email and a job title, and nothing else.** The directory has
+  to *remember* to strip a colleague's performance rating; this record has no field to strip. A picker
+  that cannot hold the value cannot leak it.
+- **`MemberSelect` gained a remote mode.** Omit `employees` and it searches the server as you type,
+  debounced, discarding stale responses; keep passing them and it behaves exactly as before, so a
+  screen that already has the roster for its own reasons pays nothing extra.
+
+_Not part of this: the org chart and the payroll screen still load everyone, and correctly so — one
+draws the whole tree and the other pays every person. This was five screens when first counted; on
+inspection it was two._
+
 ### 2026-09-10 — A lead can approve their own team's expenses
 `ExpenseService` has always documented itself as _"their manager — or any Owner/Admin — approves"_,
 but the endpoints were gated on the OWNER and ADMIN roles alone. A lead could watch their team's

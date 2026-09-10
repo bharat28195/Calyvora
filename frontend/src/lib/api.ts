@@ -38,6 +38,7 @@ import {
   type PayrollRun,
   type Department,
   type Employee,
+  type EmployeeOption,
   type WorkItem,
   type Goal,
   type ReviewCycle,
@@ -727,6 +728,30 @@ export const api = {
   directoryPage(q: string, page: number, size = 24): Promise<Page<Employee>> {
     const qs = `?q=${encodeURIComponent(q)}&page=${page}&size=${size}`;
     return LIVE ? http<Page<Employee>>(`/people/employees/page${qs}`) : mockBackend.directoryPage(accessToken, q, page, size);
+  },
+  /**
+   * Typeahead for person pickers: the top few matches, never the whole company.
+   *
+   * Separate from directoryPage because a picker is not a small directory. It wants a name, the email
+   * that tells two Priyas apart, and a job title for context — for what you just typed. Paginating a
+   * dropdown would have been the wrong fix: nobody scrolls a thousand names, they type three letters.
+   */
+  searchEmployees(q: string, limit = 20): Promise<EmployeeOption[]> {
+    const qs = `?q=${encodeURIComponent(q)}&limit=${limit}`;
+    return LIVE
+      ? http<EmployeeOption[]>(`/people/employees/search${qs}`)
+      : mockBackend.listEmployees(accessToken).then((list) =>
+          list
+            .filter((e) => `${e.firstName} ${e.lastName} ${e.email} ${e.jobTitle ?? ""}`
+              .toLowerCase()
+              .includes(q.trim().toLowerCase()))
+            .slice(0, limit)
+            .map((e) => ({
+              id: e.id,
+              name: `${e.firstName} ${e.lastName}`.trim(),
+              email: e.email,
+              jobTitle: e.jobTitle ?? null,
+            })));
   },
   getEmployee(id: string): Promise<Employee> {
     return LIVE ? http<Employee>(`/people/employees/${id}`) : mockBackend.getEmployee(accessToken, id);

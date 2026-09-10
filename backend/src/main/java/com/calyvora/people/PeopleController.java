@@ -48,6 +48,19 @@ public class PeopleController {
         return result.map(e -> RatingVisibility.filter(e, principal, myEmployeeId(principal)));
     }
 
+    /**
+     * Typeahead for person pickers. Returns at most a handful of matches, never the company.
+     *
+     * <p>No rating filtering here, and that is the design rather than an omission: {@code
+     * EmployeeOption} has no rating to strip. A picker that cannot carry the field cannot leak it.
+     */
+    @GetMapping("/employees/search")
+    public List<com.calyvora.people.dto.EmployeeOption> search(
+            @org.springframework.web.bind.annotation.RequestParam(name = "q", required = false) String q,
+            @org.springframework.web.bind.annotation.RequestParam(name = "limit", defaultValue = "20") int limit) {
+        return employeeService.search(q, limit);
+    }
+
     @GetMapping("/employees/{id}")
     public EmployeeResponse get(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return RatingVisibility.filter(employeeService.get(id), principal, myEmployeeId(principal));

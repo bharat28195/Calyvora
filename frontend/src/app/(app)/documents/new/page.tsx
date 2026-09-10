@@ -23,7 +23,6 @@ export default function GenerateDocumentPage() {
   const router = useRouter();
 
   const [templates, setTemplates] = useState<DocumentTemplate[] | null>(null);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [fields, setFields] = useState<MergeField[]>([]);
   const [templateId, setTemplateId] = useState("");
   // Deep links from People ("generate a letter for this person") arrive as ?employee=…
@@ -39,10 +38,11 @@ export default function GenerateDocumentPage() {
     const q = new URLSearchParams(window.location.search);
     if (q.get("employee")) setEmployeeId(q.get("employee")!);
     const wanted = q.get("template");
-    Promise.all([api.docTemplates(), api.listEmployees(), api.mergeFields()])
-      .then(([t, e, f]) => {
+    // No employee list here: the picker searches the server as you type. Fetching every employee to
+    // fill one dropdown was a whole-company download on a page that issues a single letter.
+    Promise.all([api.docTemplates(), api.mergeFields()])
+      .then(([t, f]) => {
         setTemplates(t);
-        setEmployees(e);
         setFields(f);
         setTemplateId(t.find((x) => x.id === wanted)?.id ?? t[0]?.id ?? "");
       })
@@ -123,7 +123,6 @@ export default function GenerateDocumentPage() {
               <div className="mt-3 flex flex-col gap-3">
                 <Field label="Employee" htmlFor="doc-emp">
                   <MemberSelect
-                    employees={employees}
                     value={employeeId}
                     onChange={setEmployeeId}
                     placeholder="Nobody selected"
