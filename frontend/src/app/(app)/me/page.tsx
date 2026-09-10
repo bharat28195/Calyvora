@@ -56,7 +56,7 @@ export default function MePage() {
           hint={balance ? `${balance.usedDays}d used · ${balance.pendingDays}d pending` : undefined}
         />
         <StatLink
-          href="/me/performance"
+          href="/performance/me"
           icon={<Target className="h-5 w-5 text-violet" />}
           label="Open goals"
           value={goals ? String(openGoals.length) : null}

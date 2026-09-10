@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2, Building2, Users, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Trash2, Building2, Users, ChevronRight, Search, Eye, EyeOff } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import type { Department, Employee } from "@/lib/types";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 export default function OrgPage() {
   const { me } = useSession();
@@ -116,7 +117,7 @@ export default function OrgPage() {
               <Users className="h-4 w-4" /> Reporting structure
             </h2>
             <Card className="mt-3">
-              <OrgTree employees={employees!} departments={departments!} />
+              <OrgTree employees={employees!} departments={departments!} myUserId={me?.user.id} />
             </Card>
           </div>
         </div>
@@ -125,7 +126,32 @@ export default function OrgPage() {
   );
 }
 
-function OrgTree({ employees, departments }: { employees: Employee[]; departments: Department[] }) {
+/**
+ * The reporting tree, with a real expansion model.
+ *
+ * It used to render every node in the company, always: the chevron on each row was a static icon with
+ * no click handler and no state behind it anywhere. Nothing was failing to close — nothing had ever
+ * been openable. At a thousand people that also meant a thousand rows drawn on load.
+ *
+ * Three things decide what you see:
+ *
+ *  - **Your line opens by default.** The path from the top of the company down to you is expanded and
+ *    your own reports are showing; everything else is shut. An org chart is read from where you stand,
+ *    and an intern should not have to hunt four levels down to find themselves.
+ *  - **A collapsed row says how many people are under it**, because that is what decides whether
+ *    opening it is worth the click.
+ *  - **A collapsed row renders none of its subtree.** That is what keeps this cheap at a thousand
+ *    people, and it is why offering the whole-company view costs nothing until someone opens a branch.
+ */
+function OrgTree({
+  employees,
+  departments,
+  myUserId,
+}: {
+  employees: Employee[];
+  departments: Department[];
+  myUserId?: string;
+}) {
   const childrenOf = useMemo(() => {
     const map = new Map<string | null, Employee[]>();
     for (const e of employees) {
@@ -133,22 +159,148 @@ function OrgTree({ employees, departments }: { employees: Employee[]; department
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(e);
     }
+    for (const list of map.values()) {
+      list.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+    }
     return map;
   }, [employees]);
 
+  const byId = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
+  const me = useMemo(
+    () => (myUserId ? employees.find((e) => e.userId === myUserId) ?? null : null),
+    [employees, myUserId],
+  );
+
+  /** Me, and every manager above me. Walked with a visited set: a cycle must not hang the page. */
+  const myLine = useMemo(() => {
+    const ids = new Set<string>();
+    let cursor: Employee | null = me;
+    while (cursor && !ids.has(cursor.id)) {
+      ids.add(cursor.id);
+      cursor = cursor.managerId ? byId.get(cursor.managerId) ?? null : null;
+    }
+    return ids;
+  }, [me, byId]);
+
+  // Memoised, and not for tidiness. A fresh array each render makes `topLevel` a new Set each
+  // render, which makes the effect below fire on every render and wipe the expansion state — every
+  // chevron click undone the instant it happened. The lint rule caught a real bug here.
+  const roots = useMemo(() => childrenOf.get(null) ?? [], [childrenOf]);
+  const topLevel = useMemo(() => new Set(roots.map((r) => r.id)), [roots]);
+
+  const [mode, setMode] = useState<"mine" | "all">(me ? "mine" : "all");
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(me ? myLine : topLevel));
+  const [query, setQuery] = useState("");
+
+  // Switching mode resets what is open rather than layering one view's state onto the other's. Two
+  // modes that quietly share expansion state stop being two modes and become one confusing one.
+  useEffect(() => {
+    setExpanded(new Set(mode === "mine" ? myLine : topLevel));
+  }, [mode, myLine, topLevel]);
+
+  const term = query.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (term.length < 2) return null;
+    const hit = new Set<string>();
+    for (const e of employees) {
+      const hay = `${e.firstName} ${e.lastName} ${e.email} ${e.jobTitle ?? ""}`.toLowerCase();
+      if (hay.includes(term)) hit.add(e.id);
+    }
+    return hit;
+  }, [employees, term]);
+
+  // A search that only highlights is useless when the match sits four collapsed levels down, so every
+  // match's managers are opened. Derived rather than written into state: typing must not permanently
+  // rearrange what someone had open, and clearing the box must put it back exactly as it was.
+  const openNow = useMemo(() => {
+    if (!matches || matches.size === 0) return expanded;
+    const open = new Set(expanded);
+    for (const id of matches) {
+      let cursor: Employee | null = byId.get(id) ?? null;
+      const seen = new Set<string>();
+      while (cursor && !seen.has(cursor.id)) {
+        seen.add(cursor.id);
+        if (cursor.managerId) open.add(cursor.managerId);
+        cursor = cursor.managerId ? byId.get(cursor.managerId) ?? null : null;
+      }
+    }
+    return open;
+  }, [matches, expanded, byId]);
+
+  const toggle = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   const deptName = (id: string | null) => departments.find((d) => d.id === id)?.name;
-  const roots = childrenOf.get(null) ?? [];
 
   if (roots.length === employees.length) {
-    return <p className="text-sm text-fg/50">No reporting lines set yet. Assign managers on the directory to build the chart.</p>;
+    return (
+      <p className="text-sm text-fg/50">
+        No reporting lines set yet. Assign managers on the directory to build the chart.
+      </p>
+    );
   }
 
+  // In "my line" mode only the branch containing you is drawn from the top. A search overrides that,
+  // because looking for someone you do not report to is the ordinary reason to search.
+  const shown = mode === "mine" && me && !matches ? roots.filter((r) => myLine.has(r.id)) : roots;
+
   return (
-    <ul className="flex flex-col gap-1">
-      {roots.map((e) => (
-        <OrgNode key={e.id} employee={e} childrenOf={childrenOf} deptName={deptName} depth={0} />
-      ))}
-    </ul>
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find a person…"
+            className="pl-9"
+            aria-label="Find a person in the org chart"
+          />
+        </div>
+        {me && (
+          <Button
+            type="button"
+            variant={mode === "all" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setMode((m) => (m === "mine" ? "all" : "mine"))}
+            aria-pressed={mode === "all"}
+          >
+            {mode === "all" ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {mode === "all" ? "My line" : "Whole org"}
+          </Button>
+        )}
+      </div>
+
+      {matches && (
+        <p className="mb-2 text-xs text-fg/40">
+          {matches.size === 0
+            ? "Nobody matches that."
+            : `${matches.size} ${matches.size === 1 ? "person" : "people"} matched — their managers are opened below.`}
+        </p>
+      )}
+
+      <ul className="flex flex-col gap-0.5">
+        {shown.map((e) => (
+          <OrgNode
+            key={e.id}
+            employee={e}
+            childrenOf={childrenOf}
+            deptName={deptName}
+            depth={0}
+            expanded={openNow}
+            onToggle={toggle}
+            meId={me?.id}
+            matches={matches}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -157,29 +309,83 @@ function OrgNode({
   childrenOf,
   deptName,
   depth,
+  expanded,
+  onToggle,
+  meId,
+  matches,
 }: {
   employee: Employee;
   childrenOf: Map<string | null, Employee[]>;
   deptName: (id: string | null) => string | undefined;
   depth: number;
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
+  meId?: string;
+  matches: Set<string> | null;
 }) {
   const reports = childrenOf.get(employee.id) ?? [];
+  const hasReports = reports.length > 0;
+  const isOpen = hasReports && expanded.has(employee.id);
+  const isMe = employee.id === meId;
+  const isMatch = matches?.has(employee.id) ?? false;
+
   return (
     <li>
-      <div className="flex items-center gap-2 rounded-md py-1" style={{ paddingLeft: depth * 20 }}>
-        {reports.length > 0 ? <ChevronRight className="h-3.5 w-3.5 text-fg/30" /> : <span className="w-3.5" />}
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet/20 text-[10px] font-semibold text-violet">
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-md py-1 pr-2",
+          isMe && "bg-violet/10",
+          isMatch && !isMe && "bg-amber-400/10",
+        )}
+        style={{ paddingLeft: depth * 20 }}
+      >
+        {hasReports ? (
+          <button
+            type="button"
+            onClick={() => onToggle(employee.id)}
+            aria-expanded={isOpen}
+            aria-label={`${isOpen ? "Collapse" : "Expand"} the team under ${employee.firstName} ${employee.lastName}`}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-fg/40 hover:bg-fg/10 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+          >
+            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-90")} />
+          </button>
+        ) : (
+          // A dot rather than an empty box, so names still line up under their siblings.
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-fg/20">·</span>
+        )}
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet/20 text-[10px] font-semibold text-violet">
           {employee.firstName[0]}{employee.lastName[0]}
         </span>
-        <span className="text-sm">{employee.firstName} {employee.lastName}</span>
-        <span className="text-xs text-fg/40">
-          {employee.jobTitle ?? "—"}{deptName(employee.departmentId) ? ` · ${deptName(employee.departmentId)}` : ""}
+        <span className="truncate text-sm">
+          {employee.firstName} {employee.lastName}
+          {isMe && <span className="ml-1.5 text-xs text-violet">you</span>}
         </span>
+        <span className="truncate text-xs text-fg/40">
+          {employee.jobTitle ?? "—"}
+          {deptName(employee.departmentId) ? ` · ${deptName(employee.departmentId)}` : ""}
+        </span>
+        {hasReports && !isOpen && (
+          // What the click will cost you. Direct reports, not the whole branch: a badge reading 30
+          // that opens to reveal four rows teaches people to distrust the badge.
+          <span className="ml-auto shrink-0 rounded-full bg-fg/5 px-2 py-0.5 text-[11px] tabular-nums text-fg/40">
+            {reports.length}
+          </span>
+        )}
       </div>
-      {reports.length > 0 && (
-        <ul className="flex flex-col gap-1">
+      {isOpen && (
+        <ul className="flex flex-col gap-0.5">
           {reports.map((r) => (
-            <OrgNode key={r.id} employee={r} childrenOf={childrenOf} deptName={deptName} depth={depth + 1} />
+            <OrgNode
+              key={r.id}
+              employee={r}
+              childrenOf={childrenOf}
+              deptName={deptName}
+              depth={depth + 1}
+              expanded={expanded}
+              onToggle={onToggle}
+              meId={meId}
+              matches={matches}
+            />
           ))}
         </ul>
       )}

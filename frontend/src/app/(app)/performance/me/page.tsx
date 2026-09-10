@@ -38,7 +38,7 @@ export default function MyPerformancePage() {
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
       {openReview && (
-        <Link href="/me/review"
+        <Link href="/performance/review"
           className="mt-6 flex items-center gap-3 rounded-xl border border-violet/30 bg-violet/5 px-4 py-3 transition-colors hover:bg-violet/10">
           <ClipboardCheck className="h-5 w-5 shrink-0 text-violet" />
           <div className="min-w-0 flex-1">

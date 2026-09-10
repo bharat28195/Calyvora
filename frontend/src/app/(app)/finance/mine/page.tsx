@@ -64,7 +64,7 @@ export default function MyFinancesPage() {
             <Stat label="Loss of pay" value={String(slip.lopDays)} />
             <div>
               <p className="text-xs uppercase tracking-wide text-fg/40">Payslip</p>
-              <Link href="/me/payslip" className="mt-1 block text-sm text-violet hover:underline">
+              <Link href="/finance/pay" className="mt-1 block text-sm text-violet hover:underline">
                 View payslip
               </Link>
             </div>

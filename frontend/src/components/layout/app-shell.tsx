@@ -84,6 +84,12 @@ const NAV: NavItem[] = [
       { href: "/me/attendance", label: "Attendance" },
       { href: "/me/leave", label: "Time off" },
       { href: "/me/expenses", label: "Expenses" },
+      // Everyone has a place in the company, so everyone can see the chart. It opens on your own
+      // line with the rest of the org one click away (see OrgTree), which is what makes it safe to
+      // show a member. It used to live only under People — HR_PLUS — so a lead or an intern could
+      // not reach it at all, and the reporting tree is the one thing this product decides
+      // everything else from.
+      { href: "/people/org", label: "Org chart" },
     ],
   },
   // Anyone who leads people, whatever their role is called. No payroll here, ever — see TeamService.
@@ -137,7 +143,6 @@ const NAV: NavItem[] = [
     href: "/people", label: "People", icon: Users, roles: HR_PLUS,
     children: [
       { href: "/people", label: "Directory" },
-      { href: "/people/org", label: "Org chart" },
       { href: "/people/designations", label: "Designations" },
       { href: "/people/attendance", label: "Attendance" },
       { href: "/people/time-off", label: "Time off" },
