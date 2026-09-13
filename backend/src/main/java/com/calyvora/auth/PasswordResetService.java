@@ -113,7 +113,15 @@ public class PasswordResetService {
         codeRepository.save(new PasswordResetCode(UUID.randomUUID(), user.getId(),
                 TokenGenerator.sha256(code), "EMAIL", Instant.now().plus(TTL)));
 
-        emailService.sendPasswordResetCode(user.getEmail(), code, TTL.toMinutes());
+        // The result was being thrown away, which made "why didn't I get the email" unanswerable: a
+        // provider rejection looked identical to a delivered message — 202 to the browser, nothing in
+        // the log. The caller must still learn nothing, which is the whole design of this method, but
+        // the operator has to be able to see it. The address is deliberately kept out of the line.
+        var result = emailService.sendPasswordResetCode(user.getEmail(), code, TTL.toMinutes());
+        if (!result.delivered()) {
+            log.warn("Password reset code for user {} was NOT delivered via {}: {}",
+                    user.getId(), result.provider(), result.error());
+        }
     }
 
     /**
