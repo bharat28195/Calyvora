@@ -41,9 +41,18 @@ public class PasswordResetService {
 
     /** Long enough to fetch a mail on another device, short enough that a stolen code goes stale. */
     static final Duration TTL = Duration.ofMinutes(15);
-    /** Requests allowed per account per hour, so this endpoint cannot be used to mail-bomb someone. */
-    static final int MAX_REQUESTS_PER_HOUR = 5;
-    private static final Duration THROTTLE_WINDOW = Duration.ofHours(1);
+    /**
+     * Minimum gap between two mails to the same account.
+     *
+     * <p>This replaced a cap of five per hour, which locked out exactly the person it should have
+     * helped: someone whose first mail landed in spam clicks again, and again, and after the fifth
+     * click is silently ignored for an hour with no way to know why. A gap instead of a cap never
+     * bites a human — nobody types an address and reads a mail faster than this — but still turns a
+     * script aimed at one inbox from thousands of messages an hour into two a minute, which the
+     * sending domain's reputation survives. That domain is shared by every tenant's payslips and
+     * invitations, which is why some limit has to exist even though the endpoint is public.
+     */
+    static final Duration COOLDOWN = Duration.ofSeconds(30);
 
     private final UserRepository userRepository;
     private final PasswordResetCodeRepository codeRepository;
@@ -74,8 +83,8 @@ public class PasswordResetService {
      * "does this person have an account here?", one address at a time, and the answer is worth having
      * for anyone building a list to attack.
      *
-     * <p>For the same reason it reports nothing about throttling: a caller who could tell "too many
-     * requests" from "sent" would learn the address exists.
+     * <p>For the same reason it reports nothing about the cooldown: a caller who could tell "too
+     * soon" from "sent" would learn the address exists. The browser shows its own countdown instead.
      */
     @Transactional
     public void requestCode(String rawEmail) {
@@ -94,9 +103,9 @@ public class PasswordResetService {
             log.info("Password reset requested for a disabled account; ignoring.");
             return;
         }
-        if (codeRepository.countByUserIdAndCreatedAtAfter(
-                user.getId(), Instant.now().minus(THROTTLE_WINDOW)) >= MAX_REQUESTS_PER_HOUR) {
-            log.warn("Password reset throttled for user {}.", user.getId());
+        if (codeRepository.countByUserIdAndCreatedAtAfter(user.getId(), Instant.now().minus(COOLDOWN)) > 0) {
+            log.info("Password reset for user {} asked again within {}s; not resending.",
+                    user.getId(), COOLDOWN.toSeconds());
             return;
         }
 

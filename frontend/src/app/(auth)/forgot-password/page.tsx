@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, MailCheck, AlertTriangle } from "lucide-react";
+import { Loader2, MailCheck, AlertTriangle, RefreshCw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +18,39 @@ import { Alert } from "@/components/ui/alert";
  * The backend answers identically whether or not it does, so that this endpoint cannot be used to
  * ask "does this person work here?" one address at a time. A screen that said "sent!" for real
  * addresses and "not found" for others would hand back exactly what the backend refuses to give.
+ *
+ * <p>Resending is allowed, but not faster than the server will honour it. The backend sends at most
+ * one mail per address every RESEND_SECONDS and says nothing when it declines (see above — "too
+ * soon" would leak that the address exists). So the countdown lives here: without it, a second
+ * click inside the window would look exactly like a delivery, and the person would sit waiting
+ * for a mail that was never sent.
  */
+const RESEND_SECONDS = 30;
+
+/** Seconds left before another mail to this address will actually go out. */
+function useCountdown(since: number | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (since === null) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [since]);
+  if (since === null) return 0;
+  return Math.max(0, Math.ceil((since + RESEND_SECONDS * 1000 - now) / 1000));
+}
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  // The address and moment of the last send, so the timer follows the address rather than the
+  // screen: going back to the form and resubmitting the same email is still a resend.
+  const [lastSend, setLastSend] = useState<{ email: string; at: number } | null>(null);
+  const secondsLeft = useCountdown(lastSend?.at ?? null);
+  const sameAddress = lastSend !== null && lastSend.email === email.trim().toLowerCase();
+  const waiting = sameAddress && secondsLeft > 0;
   // Whether this deployment can actually deliver mail. A fact about the server, not the account, so
   // asking costs nothing and gives nothing away. Null = unknown (production hides the endpoint).
   const [delivers, setDelivers] = useState<boolean | null>(null);
@@ -32,16 +58,18 @@ export default function ForgotPasswordPage() {
     void api.mailStatus().then((s) => setDelivers(s ? s.delivers : null));
   }, []);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(e?: React.SyntheticEvent) {
+    e?.preventDefault();
     setError(null);
     if (!email.trim()) {
       setError("Enter the email you sign in with.");
       return;
     }
+    if (waiting) return;
     setSubmitting(true);
     try {
       await api.forgotPassword(email.trim());
+      setLastSend({ email: email.trim().toLowerCase(), at: Date.now() });
       setSent(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -83,6 +111,25 @@ export default function ForgotPasswordPage() {
           >
             I have the code
           </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            disabled={waiting || submitting}
+            onClick={(e) => void onSubmit(e)}
+          >
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {waiting ? `Resend in ${secondsLeft}s` : "Resend email"}
+          </Button>
+          {waiting && (
+            <p className="text-xs text-fg/40">
+              Didn&apos;t get it? Check your spam folder while you wait.
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setSent(false)}
@@ -110,9 +157,9 @@ export default function ForgotPasswordPage() {
             autoComplete="email" placeholder="you@company.com" autoFocus />
         </Field>
 
-        <Button type="submit" size="lg" disabled={submitting}>
+        <Button type="submit" size="lg" disabled={submitting || waiting}>
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          {submitting ? "Sending…" : "Send me a code"}
+          {submitting ? "Sending…" : waiting ? `Resend in ${secondsLeft}s` : "Send me a code"}
         </Button>
       </form>
 

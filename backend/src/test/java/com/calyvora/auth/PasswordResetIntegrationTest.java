@@ -29,6 +29,14 @@ class PasswordResetIntegrationTest extends IntegrationTestBase {
     @Autowired
     private com.calyvora.identity.UserRepository users;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    /** Step past the resend cooldown without sleeping through it. */
+    private void cooldownElapsed() {
+        jdbc.update("update password_reset_codes set created_at = created_at - interval '1 minute'");
+    }
+
     private void onboard() throws Exception {
         onboardOwner("Reset Co", EMAIL, OLD_PASSWORD);
         email().clear();   // drop the verification mail so lastResetCode() is unambiguous
@@ -120,6 +128,7 @@ class PasswordResetIntegrationTest extends IntegrationTestBase {
         onboard();
         forgot(EMAIL);
         String first = email().lastResetCode();
+        cooldownElapsed();
         forgot(EMAIL);
         String second = email().lastResetCode();
         assertThat(second).isNotEqualTo(first);
@@ -150,12 +159,25 @@ class PasswordResetIntegrationTest extends IntegrationTestBase {
 
     @Test
     @DisplayName("one address cannot be mail-bombed through this endpoint")
-    void requests_are_throttled() throws Exception {
+    void requests_within_the_cooldown_send_nothing() throws Exception {
         onboard();
-        for (int i = 0; i < PasswordResetService.MAX_REQUESTS_PER_HOUR + 3; i++) {
+        for (int i = 0; i < 20; i++) {
             forgot(EMAIL);   // every one answers 202; the caller learns nothing
         }
-        assertThat(email().resetCodes()).hasSize(PasswordResetService.MAX_REQUESTS_PER_HOUR);
+        // Twenty clicks inside the window is one mail — not one per click, and not zero either.
+        assertThat(email().resetCodes()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("but asking again after the cooldown is never refused")
+    void requests_after_the_cooldown_always_send() throws Exception {
+        onboard();
+        // Well past the old cap of five an hour; the point of the change is that there is no cap.
+        for (int i = 0; i < 8; i++) {
+            forgot(EMAIL);
+            cooldownElapsed();
+        }
+        assertThat(email().resetCodes()).hasSize(8);
     }
 
     @Test
