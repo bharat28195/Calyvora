@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { PayrollRun } from "@/lib/types";
+import type { PayrollJob, PayrollRun } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -18,10 +18,39 @@ export default function PayrollRunPage() {
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
+  // How long the current run has been going, so a big company sees a clock rather than a spinner
+  // that might as well be hung.
+  const [elapsed, setElapsed] = useState(0);
 
+  // Start the run in the background and poll for it. The old single GET held the request open for
+  // the whole computation; at a thousand people that is seconds, and past what a host will wait.
   useEffect(() => {
-    setRun(null); setPublished(false);
-    api.payrollRun(month).then(setRun).catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load"));
+    let cancelled = false;
+    let timer: number | undefined;
+    setRun(null); setPublished(false); setError(null); setElapsed(0);
+    const startedAt = Date.now();
+    const tick = window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+
+    const settle = (job: PayrollJob) => {
+      if (cancelled) return;
+      if (job.status === "DONE" && job.result) {
+        setRun(job.result);
+      } else if (job.status === "FAILED") {
+        setError(job.error ?? "The payroll run failed.");
+      } else {
+        timer = window.setTimeout(() => api.payrollJob(job.jobId).then(settle).catch(fail), 1000);
+      }
+    };
+    const fail = (e: unknown) => {
+      if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load");
+    };
+    api.startPayrollRun(month).then(settle).catch(fail);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(tick);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [month]);
 
   // Whether to show the statutory columns at all. Driven by the run's own numbers rather than by a
@@ -44,7 +73,12 @@ export default function PayrollRunPage() {
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
       {run === null ? (
-        <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
+        !error && (
+          <div className="mt-16 flex flex-col items-center gap-2 text-sm text-fg/50">
+            <Loader2 className="h-6 w-6 animate-spin text-violet" />
+            <p>Computing pay for {month}…{elapsed >= 3 && ` ${elapsed}s`}</p>
+          </div>
+        )
       ) : (
         <>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

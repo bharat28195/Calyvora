@@ -1441,6 +1441,17 @@ export interface PayrollRunRow {
   /** Paid by the company on top — outside both `gross` and `net`. */
   employerContribution: number;
 }
+/** A payroll run in flight or finished. `result` only for DONE, `error` only for FAILED. */
+export interface PayrollJob {
+  jobId: string;
+  month: string;
+  status: "RUNNING" | "DONE" | "FAILED";
+  startedAt: string;
+  finishedAt: string | null;
+  result: PayrollRun | null;
+  error: string | null;
+}
+
 export interface PayrollRun {
   month: string;
   currency: string;

@@ -36,6 +36,7 @@ import {
   type PriceListVersion,
   type EmployeeFinance,
   type PayrollRun,
+  type PayrollJob,
   type Department,
   type Employee,
   type EmployeeOption,
@@ -1047,6 +1048,22 @@ export const api = {
   payrollRun(month?: string): Promise<PayrollRun> {
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";
     return LIVE ? http<PayrollRun>(`/payroll/run${qs}`) : mockBackend.payrollRun(accessToken, month);
+  },
+  // The run as a job: start it, then poll until it is DONE. The inline form above blocks for as
+  // long as the run takes, which at a thousand people is longer than a request should live.
+  startPayrollRun(month?: string): Promise<PayrollJob> {
+    const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+    return LIVE
+      ? http<PayrollJob>(`/payroll/runs${qs}`, { method: "POST" })
+      : mockBackend.payrollRun(accessToken, month).then((result) => ({
+          jobId: "mock", month: result.month, status: "DONE" as const,
+          startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), result, error: null,
+        }));
+  },
+  payrollJob(jobId: string): Promise<PayrollJob> {
+    return LIVE
+      ? http<PayrollJob>(`/payroll/runs/${jobId}`)
+      : Promise.reject(new ApiError({ status: 404, code: "NOT_FOUND", message: "Payroll run not found" } as ApiErrorBody));
   },
   bankFilePreview(month?: string, format?: string): Promise<BankFilePreview> {
     const qs = new URLSearchParams();
