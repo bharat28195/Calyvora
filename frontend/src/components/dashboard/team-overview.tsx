@@ -11,7 +11,14 @@ import { Card, CardTitle } from "@/components/ui/card";
  * Owner/Admin team overview (founder feedback B1–B5): headcount, present vs on-leave today, who's out
  * and why, and a month leave calendar. Attendance is derived from approved leave for now.
  */
-export function TeamOverviewSection() {
+/**
+ * Headline counts for the people the viewer is responsible for. For a whole-company role that is
+ * the company and the tiles open the People pages; for a lead it is their downline and the tiles
+ * open My team, because the People pages would refuse them.
+ */
+export function TeamOverviewSection({ wholeCompany = true }: { wholeCompany?: boolean }) {
+  const peopleHref = wholeCompany ? "/people" : "/team";
+  const attendanceHref = wholeCompany ? "/people/attendance" : "/team/attendance";
   const [data, setData] = useState<TeamOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,17 +28,17 @@ export function TeamOverviewSection() {
 
   return (
     <section className="mt-8">
-      <h2 className="mb-4 text-lg font-semibold">Team overview</h2>
+      <h2 className="mb-4 text-lg font-semibold">{wholeCompany ? "Team overview" : "Your team today"}</h2>
 
       {/* Each tile opens the attendance day sheet, where the count can be drilled into by person. */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Tile icon={<Users className="h-5 w-5 text-violet" />} label="Total employees" value={data?.headcount}
-          loading={loading} href="/people" />
+        <Tile icon={<Users className="h-5 w-5 text-violet" />} label={wholeCompany ? "Total employees" : "People reporting to you"} value={data?.headcount}
+          loading={loading} href={peopleHref} />
         <Tile icon={<UserCheck className="h-5 w-5 text-emerald-400" />} label="Present today" value={data?.presentToday}
-          loading={loading} href="/people/attendance"
+          loading={loading} href={attendanceHref}
           hint={data && data.unmarkedToday > 0 ? `${data.unmarkedToday} not marked yet` : undefined} />
         <Tile icon={<CalendarOff className="h-5 w-5 text-amber-400" />} label="On leave today" value={data?.onLeaveToday}
-          loading={loading} href="/people/attendance" hint="See who" />
+          loading={loading} href={attendanceHref} hint="See who" />
       </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-2">

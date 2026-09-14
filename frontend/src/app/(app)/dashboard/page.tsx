@@ -21,13 +21,18 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [balance, setBalance] = useState<LeaveBalance | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Whether anyone reports to this person. The team overview follows the tree, not the role
+  // (PD-32): a MEMBER with one report gets it, an ADMIN gets it because they see everyone.
+  const [leadsTeam, setLeadsTeam] = useState(false);
 
   useEffect(() => {
     api.dashboardSummary().then(setSummary).catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load dashboard"));
     api.leaveBalance().then(setBalance).catch(() => {});
+    api.myTeamStanding().then((s) => setLeadsTeam(s.leadsTeam)).catch(() => {});
   }, []);
 
   const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
+  const seesTeam = isAdmin || me?.user.role === "HR" || leadsTeam;
   const leaveLeft = balance ? balance.remainingDays : null;
 
   return (
@@ -52,7 +57,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {isAdmin && <TeamOverviewSection />}
+      {seesTeam && <TeamOverviewSection wholeCompany={isAdmin || me?.user.role === "HR"} />}
 
       <div className="mt-2 grid gap-6 lg:grid-cols-3">
         {/* Time Today — the live clock + check-in/out */}

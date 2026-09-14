@@ -4,7 +4,6 @@ import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.CurrentUser;
 import com.calyvora.dashboard.dto.DashboardSummaryResponse;
 import com.calyvora.dashboard.dto.TeamOverviewResponse;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,10 +25,13 @@ public class DashboardController {
         return dashboardService.summary(principal.role());
     }
 
-    /** Owner/Admin team overview: headcount, present vs on-leave today, reasons, month leave calendar. */
+    /**
+     * Team overview: headcount, present vs on-leave today, reasons, month leave calendar — for the
+     * people the caller may see (PD-32). The whole company for Owner/Admin/HR, their own downline
+     * for anyone with reports, and 403 for someone with neither.
+     */
     @GetMapping("/team")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'HR')")
-    public TeamOverviewResponse team() {
-        return teamOverviewService.overview();
+    public TeamOverviewResponse team(@CurrentUser AuthPrincipal principal) {
+        return teamOverviewService.overview(principal);
     }
 }

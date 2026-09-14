@@ -9,7 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Owner/Admin team overview (founder feedback B): derived attendance + RBAC. Uses the demo seed.
+ * Team overview (founder feedback B): derived attendance, scoped by the reporting tree (PD-32).
+ * Uses the demo seed.
  */
 class TeamOverviewIntegrationTest extends IntegrationTestBase {
 
@@ -32,9 +33,40 @@ class TeamOverviewIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void member_is_forbidden() throws Exception {
-        Session member = demo("priya.nair@northwind.demo");   // MEMBER role
-        mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + member.accessToken()))
+    void hr_sees_the_whole_company() throws Exception {
+        Session hr = demo("leo.martins@northwind.demo");
+        mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + hr.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.headcount").value(7));
+    }
+
+    @Test
+    void a_lead_sees_their_own_downline_and_nothing_else() throws Exception {
+        // Tom manages Sara, and only Sara. His overview is a team of one, whatever his role says.
+        Session tom = demo("tom.becker@northwind.demo");
+        boolean weekend = java.time.LocalDate.now().getDayOfWeek().getValue() >= 6;
+        mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + tom.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.headcount").value(1))
+                .andExpect(jsonPath("$.presentToday").value(weekend ? 0 : 1))
+                // Sara has a request pending; any leave shown belongs to the downline, never to Ava
+                // or Marcus, whose absences are none of Tom's business.
+                .andExpect(jsonPath("$.monthLeaves[?(@.employeeName != 'Sara Okoro')]").isEmpty());
+    }
+
+    @Test
+    void a_member_with_reports_gets_the_panel_because_of_the_tree() throws Exception {
+        // Priya is a plain MEMBER and Dev reports to her. That line, not her role, is the grant.
+        Session priya = demo("priya.nair@northwind.demo");
+        mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + priya.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.headcount").value(1));
+    }
+
+    @Test
+    void someone_with_no_reports_is_forbidden() throws Exception {
+        Session dev = demo("dev.sharma@northwind.demo");   // the intern: MEMBER, nobody under them
+        mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + dev.accessToken()))
                 .andExpect(status().isForbidden());
     }
 }
