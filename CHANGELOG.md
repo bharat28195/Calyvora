@@ -4,6 +4,17 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-14 — Every log line names its tenant, and slow endpoints can be read off a table
+Before this a warning in the log — a payroll that took nine seconds, a reset code that did not send —
+could not be tied to a customer. Now every line carries `[correlationId|companyId|userId]`, any
+request over a second gets its own WARN with the matched route, and the platform owner can read
+count, mean, p95, max and 5xx per route from `GET /api/v1/platform/ops/endpoints`. In-process
+numbers, reset on restart; the Prometheus that would keep them does not exist on this tier yet.
+
+### 2026-09-14 — A lead's dashboard shows their own team
+The team overview was Owner/Admin/HR only. It now follows the reporting tree (PD-32): the company
+for those roles, the caller's downline for anyone with reports, hidden for anyone with neither.
+
 ### 2026-09-14 — Forgotten-password mail every 30 seconds, not five times an hour
 The cap of five requests per account per hour locked out exactly the person it was meant to help:
 whoever's first mail went to spam clicked again, and after the fifth click was silently ignored for
