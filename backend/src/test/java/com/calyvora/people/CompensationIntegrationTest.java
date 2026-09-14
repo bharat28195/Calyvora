@@ -32,7 +32,7 @@ class CompensationIntegrationTest extends IntegrationTestBase {
         String id = employeeId(owner, "ava.chen@northwind.demo");
         JsonNode comp = getJson("/api/v1/people/employees/" + id + "/compensation", owner);
 
-        assertThat(comp.get("currentAnnual").asDouble()).isEqualTo(220000.0);
+        assertThat(comp.get("currentAnnual").asDouble()).isEqualTo(6000000.0);
         assertThat(comp.get("history")).hasSize(2);
         // Newest first: the review hike, with a positive hike %.
         assertThat(comp.get("history").get(0).get("changeType").asText()).isEqualTo("HIKE");
@@ -47,7 +47,7 @@ class CompensationIntegrationTest extends IntegrationTestBase {
         JsonNode slip = getJson("/api/v1/people/employees/" + id + "/payslip", owner);
 
         double gross = slip.get("gross").asDouble();
-        assertThat(gross).isCloseTo(220000.0 / 12, org.assertj.core.data.Offset.offset(0.5));
+        assertThat(gross).isCloseTo(6000000.0 / 12, org.assertj.core.data.Offset.offset(0.5));
         assertThat(slip.get("earnings")).hasSize(3);
         assertThat(slip.get("net").asDouble()).isLessThan(gross);
     }

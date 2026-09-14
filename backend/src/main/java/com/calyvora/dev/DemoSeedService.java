@@ -91,6 +91,7 @@ public class DemoSeedService {
     private final SpaceService spaceService;
     private final PageService pageService;
     private final com.calyvora.people.CompensationRepository compensationRepository;
+    private final com.calyvora.people.LeaveRequestRepository leaveRequestRepository;
     private final com.calyvora.people.GoalRepository goalRepository;
     private final com.calyvora.client.ClientService clientService;
     private final com.calyvora.document.DocumentService documentService;
@@ -118,6 +119,7 @@ public class DemoSeedService {
                            TaskService taskService, TicketService ticketService,
                            SpaceService spaceService, PageService pageService,
                            com.calyvora.people.CompensationRepository compensationRepository,
+                           com.calyvora.people.LeaveRequestRepository leaveRequestRepository,
                            com.calyvora.people.GoalRepository goalRepository,
                            com.calyvora.client.ClientService clientService,
                            com.calyvora.document.DocumentService documentService,
@@ -151,6 +153,7 @@ public class DemoSeedService {
         this.holidayRepository = holidayRepository;
         this.expenseService = expenseService;
         this.compensationRepository = compensationRepository;
+        this.leaveRequestRepository = leaveRequestRepository;
         this.goalRepository = goalRepository;
         this.clientService = clientService;
         this.documentService = documentService;
@@ -253,6 +256,16 @@ public class DemoSeedService {
 
             // The third reporting level and the designation ladder (PD-32).
             topUpOrgDepth(companyId);
+
+            // Rupee salaries for a tenant seeded with the old dollar figures, and one request for
+            // Tom to approve if nothing is waiting on anyone.
+            AuthPrincipal principal = new AuthPrincipal(owner.getId(), companyId, "OWNER", OWNER_EMAIL);
+            emp = employeesByEmail();
+            rescaleForeignSalaries(emp, principal);
+            if (leaveRequestRepository.countByCompanyIdAndStatus(companyId,
+                    com.calyvora.people.LeaveStatus.PENDING) == 0) {
+                seedPendingLeave(emp, "sara.okoro@northwind.demo");
+            }
         } finally {
             TenantContext.clear();
         }
@@ -447,12 +460,10 @@ public class DemoSeedService {
         seedFinance(emp);
 
         // Compensation history (initial salary + a review hike) so salary/hikes/payslips look real.
-        seedComp(emp, OWNER_EMAIL, 220000, owner);
-        seedComp(emp, marcus.getEmail(), 180000, owner);
-        seedComp(emp, priya.getEmail(), 145000, owner);
-        seedComp(emp, leo.getEmail(), 120000, owner);
-        seedComp(emp, sara.getEmail(), 92000, owner);
-        seedComp(emp, tom.getEmail(), 135000, owner);
+        seedSalaries(emp, owner);
+
+        // One request waiting on Tom, so a manager login has something to approve (PD-32).
+        seedPendingLeave(emp, sara.getEmail());
 
         // A few goals so Performance/Goals looks real.
         seedGoal(emp, marcus.getEmail(), "Complete the RLS rollout across all tenant tables", 80, owner);
@@ -908,6 +919,18 @@ public class DemoSeedService {
         finance(emp, "sara.okoro@northwind.demo", "State Bank of India", "38240015566", "SBIN0011513",
                 "NOT_ELIGIBLE", null, null, null,
                 "DLMPO3456D", "1996-01-28", "Chidi Okoro");
+        // Everyone on the payroll has somewhere for the money to go. A bank file with two of seven
+        // people flagged "no account" shows the flagging exactly once; every demo after that it
+        // just looks like the data is broken.
+        finance(emp, "marcus.reed@northwind.demo", "Kotak Mahindra Bank", "1811234567", "KKBK0000958",
+                "ENABLED", "GJVAT35530670000010108", "101794989964", "2021-03-15",
+                "ERTPR7890E", "1985-06-30", "Diane Reed");
+        finance(emp, "priya.nair@northwind.demo", "HDFC Bank", "50100398877123", "HDFC0000240",
+                "ENABLED", "GJVAT35530670000010109", "101794989965", "2022-06-01",
+                "FGHPN2345F", "1993-03-17", "Lakshmi Nair");
+        finance(emp, INTERN_EMAIL, "ICICI Bank", "002401998877", "ICIC0000024",
+                "NOT_ELIGIBLE", null, null, null,
+                "GHJPS6789G", "2003-08-09", "Meena Sharma");
     }
 
     private void finance(Map<String, EmployeeResponse> emp, String email, String bank, String account,
@@ -951,17 +974,81 @@ public class DemoSeedService {
                 null, skills, rating));
     }
 
+    /**
+     * Annual pay in rupees, at Ahmedabad rates for each rung.
+     *
+     * <p>These used to be dollar figures stored against a company that pays in INR, so the first
+     * payslip anyone opened showed the CEO on eighteen thousand a month. Nobody in Indian HR reads
+     * past that. The bands match the ones the scale seeder uses, so the two demo tenants agree.
+     */
+    private static final Map<String, Long> ANNUAL_INR = Map.of(
+            OWNER_EMAIL, 6_000_000L,
+            "marcus.reed@northwind.demo", 2_800_000L,
+            "tom.becker@northwind.demo", 2_000_000L,
+            "priya.nair@northwind.demo", 1_800_000L,
+            "leo.martins@northwind.demo", 1_500_000L,
+            "sara.okoro@northwind.demo", 720_000L,
+            INTERN_EMAIL, 300_000L);
+
+    private void seedSalaries(Map<String, EmployeeResponse> emp, AuthPrincipal owner) {
+        ANNUAL_INR.forEach((email, annual) -> {
+            if (emp.containsKey(email)) {
+                seedComp(emp, email, annual, owner);
+            }
+        });
+    }
+
     private void seedComp(Map<String, EmployeeResponse> emp, String email, long currentAnnual, AuthPrincipal owner) {
         UUID employeeId = UUID.fromString(emp.get(email).id());
         long initial = Math.round(currentAnnual / 1.11);   // ~11% review hike a year ago
         compensationRepository.save(new com.calyvora.people.CompensationRecord(
                 UUID.randomUUID(), owner.companyId(), employeeId, LocalDate.now().minusYears(2),
-                java.math.BigDecimal.valueOf(initial), "USD",
+                java.math.BigDecimal.valueOf(initial), "INR",
                 com.calyvora.people.CompensationChangeType.INITIAL, "Starting salary", owner.userId()));
         compensationRepository.save(new com.calyvora.people.CompensationRecord(
                 UUID.randomUUID(), owner.companyId(), employeeId, LocalDate.now().minusYears(1),
-                java.math.BigDecimal.valueOf(currentAnnual), "USD",
+                java.math.BigDecimal.valueOf(currentAnnual), "INR",
                 com.calyvora.people.CompensationChangeType.HIKE, "Annual review raise", owner.userId()));
+    }
+
+    /**
+     * Replace the old dollar figures on a tenant that was seeded before the bands were fixed. Only
+     * rows in a currency other than INR go — a salary someone set by hand while testing is in INR
+     * and is left exactly as it is. Someone with no salary at all (the intern) gets one.
+     */
+    private void rescaleForeignSalaries(Map<String, EmployeeResponse> emp, AuthPrincipal owner) {
+        ANNUAL_INR.forEach((email, annual) -> {
+            EmployeeResponse e = emp.get(email);
+            if (e == null) {
+                return;
+            }
+            List<com.calyvora.people.CompensationRecord> rows = compensationRepository
+                    .findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(UUID.fromString(e.id()));
+            boolean foreign = rows.stream().anyMatch(r -> !"INR".equals(r.getCurrency()));
+            if (foreign) {
+                compensationRepository.deleteAll(rows);
+            }
+            if (foreign || rows.isEmpty()) {
+                seedComp(emp, email, annual, owner);
+            }
+        });
+    }
+
+    /**
+     * A time-off request sitting in PENDING, next week, from someone who reports to Tom. Without
+     * it the manager login opens "My team" to an empty approvals list, and the one thing a manager
+     * does in an HR tool cannot be shown.
+     */
+    private void seedPendingLeave(Map<String, EmployeeResponse> emp, String email) {
+        EmployeeResponse e = emp.get(email);
+        if (e == null) {
+            return;
+        }
+        LocalDate start = LocalDate.now().plusWeeks(1).with(java.time.DayOfWeek.THURSDAY);
+        leaveRequestRepository.save(new com.calyvora.people.LeaveRequest(
+                UUID.randomUUID(), TenantContext.getCompanyId(), UUID.fromString(e.id()),
+                com.calyvora.people.LeaveType.VACATION, start, start.plusDays(1), 2,
+                "Cousin's wedding in Surat"));
     }
 
     private void seedGoal(Map<String, EmployeeResponse> emp, String email, String title, int progress, AuthPrincipal owner) {

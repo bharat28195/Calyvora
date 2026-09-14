@@ -27,11 +27,11 @@ class PayrollBillingIntegrationTest extends IntegrationTestBase {
         // Default template = 5 components (Basic, HRA, Special, PF, Income tax).
         assertThat(getJson("/api/v1/payroll/payslip-template", owner).size()).isEqualTo(5);
 
-        // Priya earns 145000/yr → 12083.33/mo. Net should be gross minus PF(12% of basic)+tax(10% of gross).
+        // Priya earns 18,00,000/yr → 1,50,000/mo. Net should be gross minus PF(12% of basic)+tax(10% of gross).
         String priyaEmp = firstEmployeeNamed(owner, "Priya Nair");
         JsonNode slip = getJson("/api/v1/people/employees/" + priyaEmp + "/payslip", owner);
-        assertThat(slip.get("gross").asDouble()).isEqualTo(12083.33);
-        assertThat(slip.get("net").asDouble()).isEqualTo(10150.00);
+        assertThat(slip.get("gross").asDouble()).isEqualTo(150000.00);
+        assertThat(slip.get("net").asDouble()).isEqualTo(126000.00);
         assertThat(slip.get("earnings").size()).isEqualTo(3);
         assertThat(slip.get("deductions").size()).isEqualTo(2);
     }
