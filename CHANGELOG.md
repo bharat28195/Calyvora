@@ -4,6 +4,20 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-14 — Forgotten-password mail every 30 seconds, not five times an hour
+The cap of five requests per account per hour locked out exactly the person it was meant to help:
+whoever's first mail went to spam clicked again, and after the fifth click was silently ignored for
+an hour. Replaced by a 30-second gap between mails to the same address, with no ceiling. The page
+shows a "Resend in Ns" countdown so a click inside the window is never mistaken for a delivery. A
+provider rejection is now logged instead of discarded. (PD-36)
+
+### 2026-09-14 — Northwind pays in rupees, and every queue has something in it
+The demo salaries were dollar figures against a company that pays in INR. Rescaled to the bands the
+scale seeder already uses; the intern, who had no salary, gets one. Marcus, Priya and Dev have bank
+and statutory records, so the bank file no longer flags two of seven people every time. One time-off
+request sits pending on Tom so a manager login has something to act on. A tenant seeded before this
+picks all three up on its next seed call. (PD-37)
+
 ### 2026-09-10 — The application can now be tested as a role that Row-Level Security applies to
 The test database connects as a Postgres **superuser**, and a superuser bypasses RLS entirely. Every
 policy written in V12 has therefore been inert under test since the day it was written.

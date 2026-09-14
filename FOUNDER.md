@@ -1240,6 +1240,42 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   customer it would leave the admin unable to claim expenses at all. That is a policy decision with
   real consequences, and it belongs to the founder rather than to a bug fix.
 
+### PD-36 · 2026-09-14 · Forgotten-password mail: a gap, not a cap
+- **Context:** the founder could not get a reset code while rehearsing the demo. Mail was fine. The
+  endpoint allowed five requests per account per hour and dropped the rest without a word.
+- **Why a limit exists at all.** The endpoint is public. Anyone can type anyone's address into it.
+  With no limit, a script pointed at one inbox makes Orbit the sender of thousands of "your code is"
+  mails from `noreply@calyvora.in` — and that domain carries every tenant's payslips and invitations.
+  Resend suspends abused domains, bills per message, and the victim's provider blacklists the sender.
+  The limit protects the company's ability to send mail, not the person asking.
+- **Why the old one was wrong.** A cap of five an hour bites exactly the person the feature is for:
+  the first mail lands in spam, they click again, and after the fifth click they are silently locked
+  out for an hour. "Verified addresses only" was considered and does not help — the people worth
+  bombing are precisely the ones with accounts.
+- **Decision: one mail per address every 30 seconds, no ceiling.** A human never hits it; a script
+  drops from thousands an hour to two a minute. The page shows a countdown on the resend button so a
+  click inside the window is never mistaken for a delivery. The backend still says nothing about it,
+  for the same reason it never says "no such account".
+- **What was also missing:** the send result was thrown away, so a provider rejection was invisible
+  to everyone. It is logged now.
+
+### PD-37 · 2026-09-14 · Demo data has to survive someone who knows the domain
+- **Context:** a live QA pass found nothing broken and three things that would lose a sale anyway.
+  Northwind's salaries were dollar figures stored against a company that pays in rupees, so the CEO
+  drew ₹18,333 a month on the first payslip anyone opened. Two of seven people had no bank account,
+  so every bank file showed holes. No request was ever pending on a manager, so the manager login had
+  nothing to approve.
+- **Rule:** the demo tenants are the product to the person watching. A number an Indian HR head would
+  laugh at is a defect, whatever the tests say. Seed data is held to the same standard as a screen:
+  realistic bands (the ones Scaleworks already used), complete records, and one live item in every
+  queue that a role is meant to work.
+- **The top-up path matters as much as the fresh seed.** The deployed tenant was seeded long ago and
+  is never re-created, so every seed change also has to bring an existing tenant up to date — and
+  only fill gaps, never overwrite something set by hand.
+- **Left for later, on purpose:** managers get no team overview on their dashboard because the
+  endpoint is role-gated to Owner/Admin/HR. Under PD-32 the tree should grant it. Product work, not a
+  seed fix.
+
 ---
 
 ## 4. Architecture Decision Log
