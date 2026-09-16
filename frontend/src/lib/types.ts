@@ -23,6 +23,8 @@ export interface Me {
     status: CompanyStatus;
     currency: string;
     timezone: string;
+    /** Minutes of inactivity before this company signs people out; null means never. */
+    sessionIdleMinutes: number | null;
   };
 }
 
@@ -34,6 +36,8 @@ export interface CompanySettings {
   legalName: string | null;
   address: string | null;
   logoUrl: string | null;
+  /** Minutes of inactivity before a session ends; null means never. */
+  sessionIdleMinutes: number | null;
 }
 
 export interface Member {

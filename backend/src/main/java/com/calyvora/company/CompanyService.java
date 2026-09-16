@@ -72,6 +72,17 @@ public class CompanyService {
         if (request.legalName() != null) settings.setLegalName(blankToNull(request.legalName()));
         if (request.address() != null) settings.setAddress(blankToNull(request.address()));
         if (request.logoUrl() != null) settings.setLogoUrl(blankToNull(request.logoUrl()));
+
+        // Zero is how the form says "never sign anyone out"; null is how it says "I was not editing
+        // this". They have to be different values or the policy could never be turned back off.
+        if (request.sessionIdleMinutes() != null) {
+            int minutes = request.sessionIdleMinutes();
+            if (minutes != 0 && minutes < 5) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                        "An idle timeout under five minutes would sign people out mid-form. Use 0 to turn it off.");
+            }
+            settings.setSessionIdleMinutes(minutes == 0 ? null : minutes);
+        }
         return CompanySettingsResponse.of(settings);
     }
 

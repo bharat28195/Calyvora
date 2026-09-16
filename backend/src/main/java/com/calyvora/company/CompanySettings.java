@@ -39,6 +39,17 @@ public class CompanySettings {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    /**
+     * Sign someone out after this many minutes with no activity. Null means never, which is the
+     * default and what every company had before this existed.
+     *
+     * <p>A company setting rather than a deployment one because the answer is a policy, not a
+     * technical limit: a payroll screen open on a shared desk in an office wants fifteen minutes,
+     * and a five-person startup on their own laptops wants never to be asked again.
+     */
+    @Column(name = "session_idle_minutes")
+    private Integer sessionIdleMinutes;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -106,6 +117,9 @@ public class CompanySettings {
     public void setLogoUrl(String logoUrl) {
         this.logoUrl = logoUrl;
     }
+
+    public Integer getSessionIdleMinutes() { return sessionIdleMinutes; }
+    public void setSessionIdleMinutes(Integer sessionIdleMinutes) { this.sessionIdleMinutes = sessionIdleMinutes; }
 
     public Instant getUpdatedAt() {
         return updatedAt;

@@ -23,12 +23,29 @@ const LANGUAGE_LABEL: Record<(typeof LOCALES)[number], string> = {
   en: "English (US)", "en-GB": "English (UK)", fr: "Français", de: "Deutsch", es: "Español", hi: "हिन्दी",
 };
 
+/**
+ * How long a session may sit untouched. Nothing under fifteen minutes: shorter windows read as
+ * security and behave as an interruption, and the people who ask for five minutes are the ones who
+ * then ask why the app keeps logging them out.
+ */
+const IDLE_CHOICES: [string, string][] = [
+  ["15", "15 minutes"],
+  ["30", "30 minutes"],
+  ["60", "1 hour"],
+  ["240", "4 hours"],
+  ["480", "8 hours"],
+  ["1440", "1 day"],
+];
+
 export default function SettingsPage() {
   const { me, setMe } = useSession();
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [timezone, setTimezone] = useState("UTC");
   const [locale, setLocale] = useState<(typeof LOCALES)[number]>("en");
   const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>("INR");
+  // "" is the "never" option. Kept as a string because it is a <select> value, and 0 on the wire is
+  // what tells the server to clear the policy rather than leave it alone.
+  const [idleMinutes, setIdleMinutes] = useState<string>("");
   const [legalName, setLegalName] = useState("");
   const [address, setAddress] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -42,6 +59,7 @@ export default function SettingsPage() {
       setTimezone(s.timezone);
       setLocale((LOCALES as readonly string[]).includes(s.locale) ? (s.locale as (typeof LOCALES)[number]) : "en");
       setCurrency((CURRENCIES as readonly string[]).includes(s.currency) ? (s.currency as (typeof CURRENCIES)[number]) : "INR");
+      setIdleMinutes(s.sessionIdleMinutes == null ? "" : String(s.sessionIdleMinutes));
       setLegalName(s.legalName ?? "");
       setAddress(s.address ?? "");
       setLogoUrl(s.logoUrl ?? "");
@@ -59,11 +77,26 @@ export default function SettingsPage() {
     }
     setBusy(true);
     try {
-      const updated = await api.updateSettings({ timezone, locale, currency, legalName, address, logoUrl });
+      const updated = await api.updateSettings({
+        timezone, locale, currency, legalName, address, logoUrl,
+        sessionIdleMinutes: idleMinutes === "" ? 0 : Number(idleMinutes),
+      });
       setSettings(updated);
       setSaved(true);
       // Reflect currency/timezone across the app immediately (money + timestamps read from the session).
-      if (me) setMe({ ...me, company: { ...me.company, currency: updated.currency, timezone: updated.timezone } });
+      if (me) {
+        setMe({
+          ...me,
+          company: {
+            ...me.company,
+            currency: updated.currency,
+            timezone: updated.timezone,
+            // The idle watcher reads this, so a changed policy takes effect on this tab at once
+            // rather than at the next sign-in.
+            sessionIdleMinutes: updated.sessionIdleMinutes,
+          },
+        });
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save settings");
     } finally {
@@ -126,6 +159,27 @@ export default function SettingsPage() {
             <Field label="Address" htmlFor="address" className="mt-4">
               <Input id="address" value={address} placeholder="Registered office address"
                 onChange={(e) => setAddress(e.target.value)} />
+            </Field>
+          </div>
+
+          <div className="rounded-lg border border-fg/10 bg-fg/[0.02] p-4">
+            <p className="text-sm font-medium">Security</p>
+            <p className="mt-0.5 text-xs text-fg/50">
+              Applies to everyone in the company. A warning appears a minute before, with the chance to stay.
+            </p>
+            <Field
+              label="Sign out after inactivity"
+              htmlFor="idleMinutes"
+              hint="Enforced on the server, so closing the laptop ends the session too."
+              className="mt-4"
+            >
+              <select id="idleMinutes" value={idleMinutes} onChange={(e) => setIdleMinutes(e.target.value)}
+                className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
+                <option value="" className="bg-surface">Never</option>
+                {IDLE_CHOICES.map(([value, label]) => (
+                  <option key={value} value={value} className="bg-surface">{label}</option>
+                ))}
+              </select>
             </Field>
           </div>
 

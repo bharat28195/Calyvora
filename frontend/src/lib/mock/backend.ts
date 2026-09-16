@@ -360,6 +360,7 @@ function toMe(db: DB, user: User): Me {
     company: {
       id: company.id, name: company.name, slug: company.slug, status: company.status,
       currency: db.settings.find((s) => s.companyId === company.id)?.currency ?? "INR",
+      sessionIdleMinutes: db.settings.find((s) => s.companyId === company.id)?.sessionIdleMinutes ?? null,
       timezone: db.settings.find((s) => s.companyId === company.id)?.timezone ?? "UTC",
     },
   };
@@ -422,7 +423,7 @@ export const mockBackend = {
     };
     db.companies.push(company);
     db.users.push(user);
-    db.settings.push({ companyId: company.id, timezone: "Asia/Kolkata", locale: "en", currency: "INR", legalName: null, address: null, logoUrl: null });
+    db.settings.push({ companyId: company.id, timezone: "Asia/Kolkata", locale: "en", currency: "INR", legalName: null, address: null, logoUrl: null, sessionIdleMinutes: null });
     db.tokens.push(token);
     pushMail(db, email, "Verify your Calyvora email", `/verify-email?token=${token.token}`);
     save(db);

@@ -10,6 +10,7 @@ import {
   CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
+import { IdleTimeout } from "@/components/layout/idle-timeout";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
@@ -252,6 +253,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+    <IdleTimeout />
     {user.role !== "OWNER" && <SubscriptionGate />}
     <div className="min-h-screen md:flex">
       {/* Left sidebar (md+) */}

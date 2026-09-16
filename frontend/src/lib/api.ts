@@ -135,6 +135,44 @@ export type DemoCredentials = { companyName: string; email: string; password: st
 
 // Access token lives in memory only (Sprint1 §10) — never localStorage.
 let accessToken: string | null = null;
+
+/**
+ * The in-flight silent refresh, if there is one.
+ *
+ * <p>An access token lives fifteen minutes and is held in memory only; the refresh cookie is how a
+ * session outlives it. Nothing renewed it: after fifteen minutes every call 401'd and the screens
+ * simply started failing, with the person still apparently signed in. Worse, ten calls hitting that
+ * wall together would each present the same refresh cookie, and rotation treats a second
+ * presentation as theft and burns the family — so the naive fix logs everyone out. One promise,
+ * shared: the first 401 refreshes, the rest wait for it.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
+/** Called when the session cannot be renewed, so the app can stop pretending someone is signed in. */
+let onSessionLost: (() => void) | null = null;
+export function setSessionLostHandler(fn: (() => void) | null) {
+  onSessionLost = fn;
+}
+
+async function renewSession(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const result = await http<LoginResult>("/auth/refresh", { method: "POST", skipAuthRetry: true });
+        auth.set(result.accessToken);
+        return true;
+      } catch {
+        auth.set(null);
+        onSessionLost?.();
+        return false;
+      } finally {
+        // Cleared inside the same promise so a later call cannot attach to a settled one.
+        setTimeout(() => { refreshInFlight = null; }, 0);
+      }
+    })();
+  }
+  return refreshInFlight;
+}
 export const auth = {
   get: () => accessToken,
   set: (t: string | null) => {
@@ -185,7 +223,11 @@ function shouldRetry(attempt: number): boolean {
   return attempt < WAKE_BACKOFF_MS.length;
 }
 
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
+/** {@code skipAuthRetry} marks the refresh call itself — retrying a 401 there would loop. */
+type HttpInit = RequestInit & { skipAuthRetry?: boolean };
+
+async function http<T>(path: string, init?: HttpInit): Promise<T> {
+  let renewed = false;
   // Whether this call is the one doing the waiting, and whether it is still entitled to retry.
   let leading = false;
   let mayRetry = true;
@@ -215,8 +257,9 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       let res: Response;
       try {
+        const { skipAuthRetry: _skip, ...fetchInit } = init ?? {};
         res = await fetch(`${BASE}${path}`, {
-          ...init,
+          ...fetchInit,
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
@@ -233,6 +276,14 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
       if (res.status === 204) return undefined as T;
       const body = await res.json().catch(() => null);
       if (res.ok) return body as T;
+
+      // An expired access token is not an error to show anybody: renew it once and send the same
+      // request again. Only once — a second 401 after a fresh token means the session is genuinely
+      // over, and looping would turn that into an infinite one.
+      if (res.status === 401 && !renewed && !init?.skipAuthRetry && accessToken !== null) {
+        renewed = true;
+        if (await renewSession()) continue;
+      }
 
       if (retryable(res.status, body === null) && (await backOff(attempt))) continue;
       throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
@@ -625,7 +676,7 @@ export const api = {
   getSettings(): Promise<CompanySettings> {
     return LIVE ? http<CompanySettings>("/company/settings") : mockBackend.getSettings(accessToken);
   },
-  updateSettings(patch: { timezone: string; locale: string; currency: string; legalName?: string; address?: string; logoUrl?: string }): Promise<CompanySettings> {
+  updateSettings(patch: { timezone: string; locale: string; currency: string; legalName?: string; address?: string; logoUrl?: string; sessionIdleMinutes?: number }): Promise<CompanySettings> {
     return LIVE
       ? http<CompanySettings>("/company/settings", { method: "PATCH", body: JSON.stringify(patch) })
       : mockBackend.updateSettings(accessToken, patch);

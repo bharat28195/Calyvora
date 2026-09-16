@@ -15,6 +15,9 @@ import { Alert } from "@/components/ui/alert";
 function LoginInner() {
   const params = useSearchParams();
   const next = params.get("next") || "/dashboard";
+  // Being returned here without explanation reads as a bug or a stolen session. Saying why costs
+  // one line and turns it into something the person expected.
+  const timedOut = params.get("reason") === "idle";
 
   const [values, setValues] = useState<LoginInput>({ email: "", password: "" });
   const [errors, setErrors] = useState<Partial<Record<keyof LoginInput, string>>>({});
@@ -52,6 +55,9 @@ function LoginInner() {
       <CardDescription>Log in to your Calyvora workspace.</CardDescription>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4" noValidate>
+        {timedOut && !formError && (
+          <Alert tone="info">You were signed out because the session was idle. Sign in to pick up where you left off.</Alert>
+        )}
         {formError && <Alert tone="error">{formError}</Alert>}
 
         <Field label="Email" htmlFor="email" error={errors.email}>

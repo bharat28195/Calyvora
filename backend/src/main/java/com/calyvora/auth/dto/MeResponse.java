@@ -12,7 +12,7 @@ public record MeResponse(UserView user, CompanyView company) {
     }
 
     public record CompanyView(String id, String name, String slug, String status,
-                              String currency, String timezone) {
+                              String currency, String timezone, Integer sessionIdleMinutes) {
     }
 
     /** Currency/timezone come from settings so the whole app can localize from {@code /me}. */
@@ -23,6 +23,7 @@ public record MeResponse(UserView user, CompanyView company) {
                 new UserView(user.getId().toString(), user.getEmail(), user.getFirstName(),
                         user.getLastName(), user.getRole().name(), user.getStatus().name()),
                 new CompanyView(company.getId().toString(), company.getName(), company.getSlug(),
-                        company.getStatus().name(), currency, timezone));
+                        company.getStatus().name(), currency, timezone,
+                        settings == null ? null : settings.getSessionIdleMinutes()));
     }
 }

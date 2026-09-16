@@ -99,4 +99,16 @@ public class RefreshToken {
     public Instant getRevokedAt() {
         return revokedAt;
     }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    /**
+     * Age a token so a test can reach the far side of an idle window without waiting for it.
+     * Nothing in the application moves an expiry after issue — it is set once, by the issuer.
+     */
+    void setExpiresAtForTest(Instant expiresAt) {
+        this.expiresAt = expiresAt;
+    }
 }

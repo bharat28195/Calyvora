@@ -1,6 +1,9 @@
 package com.calyvora.auth;
 
 import com.calyvora.common.config.AppProperties;
+import com.calyvora.company.CompanySettings;
+import com.calyvora.company.CompanySettingsRepository;
+import com.calyvora.identity.UserRepository;
 import com.calyvora.common.error.UnauthorizedException;
 import com.calyvora.common.util.TokenGenerator;
 import org.slf4j.Logger;
@@ -24,11 +27,17 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository repository;
     private final RefreshTokenRevoker revoker;
+    private final UserRepository userRepository;
+    private final CompanySettingsRepository settingsRepository;
     private final Duration ttl;
 
-    public RefreshTokenService(RefreshTokenRepository repository, RefreshTokenRevoker revoker, AppProperties props) {
+    public RefreshTokenService(RefreshTokenRepository repository, RefreshTokenRevoker revoker,
+                               UserRepository userRepository, CompanySettingsRepository settingsRepository,
+                               AppProperties props) {
         this.repository = repository;
         this.revoker = revoker;
+        this.userRepository = userRepository;
+        this.settingsRepository = settingsRepository;
         this.ttl = props.security().refresh().ttl();
     }
 
@@ -46,9 +55,35 @@ public class RefreshTokenService {
         String raw = TokenGenerator.rawToken();
         RefreshToken token = new RefreshToken(
                 UUID.randomUUID(), userId, TokenGenerator.sha256(raw), familyId,
-                Instant.now().plus(ttl), truncate(userAgent));
+                Instant.now().plus(lifetimeFor(userId)), truncate(userAgent));
         repository.save(token);
         return new IssuedToken(raw, token);
+    }
+
+    /**
+     * How long this token may live: the configured refresh lifetime, or the company's idle window
+     * if that is shorter.
+     *
+     * <p>This is what makes the idle timeout real rather than a countdown drawn in the browser.
+     * The client rotates this token while somebody is using the app, so a token that has not been
+     * rotated is a session nobody has touched — and once it passes the idle window it simply does
+     * not verify any more. Closing the tab, killing the script, or editing the countdown in dev
+     * tools changes nothing: the cookie in hand is already dead.
+     *
+     * <p>Falls back to the full lifetime whenever the company has no idle policy, which is the
+     * default. A missing settings row means the same thing.
+     */
+    private Duration lifetimeFor(UUID userId) {
+        Integer idleMinutes = userRepository.findById(userId)
+                .map(user -> settingsRepository.findById(user.getCompanyId())
+                        .map(CompanySettings::getSessionIdleMinutes)
+                        .orElse(null))
+                .orElse(null);
+        if (idleMinutes == null) {
+            return ttl;
+        }
+        Duration idle = Duration.ofMinutes(idleMinutes);
+        return idle.compareTo(ttl) < 0 ? idle : ttl;
     }
 
     /**
