@@ -99,6 +99,7 @@ public class ScaleSeedService {
     private final com.calyvora.people.HolidayRepository holidayRepository;
     private final PasswordEncoder passwordEncoder;
     private final ScaleModuleSeeder moduleSeeder;
+    private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public ScaleSeedService(CompanyRepository companyRepository, UserRepository userRepository,
@@ -110,8 +111,10 @@ public class ScaleSeedService {
                             com.calyvora.people.HolidayRepository holidayRepository,
                             PasswordEncoder passwordEncoder,
                             ScaleModuleSeeder moduleSeeder,
+                            com.calyvora.company.CompanySettingsRepository companySettingsRepository,
                             org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.moduleSeeder = moduleSeeder;
+        this.companySettingsRepository = companySettingsRepository;
         this.compensationRepository = compensationRepository;
         this.employeeFinanceRepository = employeeFinanceRepository;
         this.designationRepository = designationRepository;
@@ -182,6 +185,18 @@ public class ScaleSeedService {
 
         TenantContext.setCompanyId(companyId);
         try {
+            // This tenant had no settings row at all, so it inherited every fallback: UTC for the
+            // clock — which puts an Indian check-in five and a half hours out — and a blank payslip
+            // header. A company with a thousand people and no address on its payslips is not a
+            // scale test, it is an unfinished one.
+            com.calyvora.company.CompanySettings settings =
+                    new com.calyvora.company.CompanySettings(companyId);
+            settings.setTimezone("Asia/Kolkata");
+            settings.setCurrency("INR");
+            settings.setLegalName("Scaleworks Industries Private Limited");
+            settings.setAddress("Unit 12, Titanium Park, Prahlad Nagar, Ahmedabad, Gujarat, 380015.");
+            companySettingsRepository.save(settings);
+
             List<Department> departments = new ArrayList<>();
             for (String name : TEAMS) {
                 departments.add(new Department(UUID.randomUUID(), companyId, name));

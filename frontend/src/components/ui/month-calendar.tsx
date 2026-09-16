@@ -127,7 +127,11 @@ export function MonthCalendar({
                 </div>
             )}
 
-            <div className="grid grid-cols-7 gap-1">
+            {/* Capped, not stretched. Across a wide screen a seven-column grid makes each day a
+                letterbox — wider than it is tall, with the bars stranded in the middle of it. A
+                calendar reads as one when a day is roughly a portrait card, so the grid stops
+                growing and centres itself. */}
+            <div className={cn("mx-auto grid grid-cols-7 gap-1.5", compact ? "max-w-full" : "max-w-[640px]")}>
                 {WEEKDAYS.map((d, i) => (
                     <div
                         key={i}
@@ -159,8 +163,8 @@ export function MonthCalendar({
                             aria-current={isToday ? "date" : undefined}
                             aria-pressed={onSelect ? isSelected : undefined}
                             className={cn(
-                                "flex flex-col items-center rounded-lg border border-transparent px-1 pt-1.5 text-center transition-colors",
-                                compact ? "h-11 gap-1" : "h-[62px] gap-1.5",
+                                "flex flex-col items-center rounded-lg border border-transparent px-1 pt-1.5 pb-1.5 text-center transition-colors",
+                                compact ? "h-11 gap-1" : "h-[78px] gap-1",
                                 inMonth ? day?.tint ?? "bg-fg/[0.03]" : "opacity-30",
                                 clickable && "hover:border-fg/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet",
                                 // Today is outlined, the selection is filled. Two different questions
@@ -178,17 +182,22 @@ export function MonthCalendar({
                                 {Number(date.slice(-2))}
                             </span>
 
-                            {compact
-                                ? null
-                                : (day?.bars ?? []).slice(0, 3).map((bar, i) => (
-                                    <span
-                                        key={i}
-                                        className={cn("h-[3px] w-full rounded-full", bar.color)}
-                                        // The bar carries the meaning; without this a screen reader
-                                        // gets a day number and nothing else.
-                                        aria-hidden="true"
-                                    />
-                                ))}
+                            {/* Bars sit on the floor of the cell, the way a phone calendar stacks
+                                events under the date — mt-auto pushes them down however tall the
+                                cell is, so a day with one bar and a day with three still line up. */}
+                            {!compact && (
+                                <span className="mt-auto flex w-full flex-col gap-[3px]">
+                                    {(day?.bars ?? []).slice(0, 3).map((bar, i) => (
+                                        <span
+                                            key={i}
+                                            className={cn("h-[3px] w-full rounded-full", bar.color)}
+                                            // The bar carries the meaning; without this a screen
+                                            // reader gets a day number and nothing else.
+                                            aria-hidden="true"
+                                        />
+                                    ))}
+                                </span>
+                            )}
                         </button>
                     );
                 })}

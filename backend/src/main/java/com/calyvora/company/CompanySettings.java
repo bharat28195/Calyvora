@@ -19,8 +19,18 @@ public class CompanySettings {
     @Column(name = "company_id")
     private UUID companyId;
 
+    /**
+     * The clock this company runs on: what "today" means, and the wall time a check-in is stamped
+     * with.
+     *
+     * <p>Defaulted to UTC while the currency beside it defaulted to INR, which is a company that
+     * exists nowhere. The consequence was not abstract — an India-based tenant checking in at 21:52
+     * had "In at 16:22" written against their name, correct for UTC and wrong for them, and their
+     * whole attendance record was shifted by five and a half hours. The two defaults now describe
+     * the same company; anyone elsewhere sets it in Settings, as they already had to.
+     */
     @Column(nullable = false, length = 64)
-    private String timezone = "UTC";
+    private String timezone = "Asia/Kolkata";
 
     @Column(nullable = false, length = 16)
     private String locale = "en";

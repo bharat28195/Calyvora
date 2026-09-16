@@ -231,6 +231,13 @@ public class DemoSeedService {
             // Payslip branding — only if the company hasn't set its own.
             companySettingsRepository.findById(companyId).ifPresent(settings -> {
                 boolean changed = false;
+                // A tenant seeded before the default was fixed is still on UTC, which shows up as
+                // every check-in being hours out. Only UTC is touched: a zone somebody chose is a
+                // choice, and this is meant to repair an accident.
+                if ("UTC".equals(settings.getTimezone())) {
+                    settings.setTimezone("Asia/Kolkata");
+                    changed = true;
+                }
                 if (isBlank(settings.getLegalName())) {
                     settings.setLegalName("Northwind Robotics Private Limited");
                     changed = true;
@@ -857,6 +864,7 @@ public class DemoSeedService {
         // Branded out of the box, so a demo payslip looks like a real document rather than a form
         // with the fields left blank.
         CompanySettings settings = new CompanySettings(company.getId());
+        settings.setTimezone("Asia/Kolkata");
         settings.setLegalName("Northwind Robotics Private Limited");
         settings.setAddress("704-705, Sankalp Square 3A, Beside Taj Skyline Hotel, "
                 + "PRL Colony, Thaltej, Ahmedabad, Gujarat, 380059.");

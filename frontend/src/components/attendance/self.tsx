@@ -7,6 +7,7 @@ import type { AttendanceEntry, AttendanceMonth, AttendanceStatus } from "@/lib/t
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { currentTimezone } from "@/lib/format";
 import { DayHeading, MonthCalendar } from "@/components/ui/month-calendar";
 import { cn } from "@/lib/utils";
 
@@ -33,9 +34,18 @@ export function hhmm(t: string): string {
   return t.slice(0, 5);
 }
 
-/** "HH:mm" for a live Date (used to show elapsed working time before check-out). */
+/**
+ * "HH:mm" for a live Date, in the company's timezone.
+ *
+ * <p>Not the browser's. The server stamps a check-in using the company timezone, so a clock reading
+ * the laptop's zone disagreed with the time that was actually recorded — a company left on the
+ * default UTC showed "09:53 PM" ticking above "In at 16:22", which reads as the check-in being
+ * broken rather than as two different clocks. One zone, chosen by the company, everywhere.
+ */
 function nowHHmm(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return d.toLocaleTimeString("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: currentTimezone(),
+  });
 }
 
 /** Minutes between two "HH:mm[:ss]" times, or null if either is missing. */
@@ -103,8 +113,18 @@ export function MyDay() {
   const clockedIn = !!entry?.checkIn;
   const clockedOut = !!entry?.checkOut;
   const worked = fmtDuration(minutesBetween(entry?.checkIn ?? null, entry?.checkOut ?? (clockedIn ? nowHHmm(now) : null)));
-  const dateLabel = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-  const timeLabel = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const zone = currentTimezone();
+  const dateLabel = now.toLocaleDateString(undefined, {
+    weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: zone,
+  });
+  const timeLabel = now.toLocaleTimeString(undefined, {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: zone,
+  });
+  // Named only when it is not the zone the person's own machine is on. Someone sitting in the
+  // office never needs telling; someone whose company is set to UTC, or who is travelling, does —
+  // and that is exactly when the number looks wrong.
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const zoneLabel = zone && zone !== browserZone ? zone.replace(/_/g, " ") : null;
 
   return (
     <Card className="mt-8">
@@ -114,7 +134,10 @@ export function MyDay() {
             <CardTitle>Time Today</CardTitle>
             {entry?.status && <StatusChip status={entry.status} derived={entry.derived} />}
           </div>
-          <p className="mt-1 text-xs text-fg/40">{dateLabel}</p>
+          <p className="mt-1 text-xs text-fg/40">
+            {dateLabel}
+            {zoneLabel && <span className="ml-1.5 text-fg/30">· {zoneLabel}</span>}
+          </p>
           <p className="mt-2 font-mono text-4xl font-semibold tabular-nums tracking-tight">{timeLabel}</p>
           <p className="mt-2 text-sm text-fg/60">
             {clockedIn ? (
