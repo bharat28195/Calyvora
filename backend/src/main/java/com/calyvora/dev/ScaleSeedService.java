@@ -98,6 +98,7 @@ public class ScaleSeedService {
     private final com.calyvora.people.DesignationRepository designationRepository;
     private final com.calyvora.people.HolidayRepository holidayRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ScaleModuleSeeder moduleSeeder;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public ScaleSeedService(CompanyRepository companyRepository, UserRepository userRepository,
@@ -108,7 +109,9 @@ public class ScaleSeedService {
                             com.calyvora.people.DesignationRepository designationRepository,
                             com.calyvora.people.HolidayRepository holidayRepository,
                             PasswordEncoder passwordEncoder,
+                            ScaleModuleSeeder moduleSeeder,
                             org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.moduleSeeder = moduleSeeder;
         this.compensationRepository = compensationRepository;
         this.employeeFinanceRepository = employeeFinanceRepository;
         this.designationRepository = designationRepository;
@@ -260,6 +263,11 @@ public class ScaleSeedService {
             seedCompensation(companyId, employees, adminId);
             seedFinance(companyId, employees);
             seedHolidays(companyId);
+
+            // Everything that is not People. Without it this tenant is a convincing directory and
+            // eighteen empty screens, which reads as the product lacking the features rather than
+            // the tenant lacking the data.
+            moduleSeeder.seed(companyId, employees, departments, adminId);
 
             int maxDownline = rest / Math.max(leads, 1) * leadsPerHead + leadsPerHead;
             long millis = System.currentTimeMillis() - started;
