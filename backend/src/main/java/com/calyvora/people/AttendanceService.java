@@ -209,6 +209,64 @@ public class AttendanceService {
         return out;
     }
 
+    /**
+     * A month shaped for a calendar: how many people were present, on leave, absent or unmarked on
+     * each day, plus whether the day was a holiday and what it was called.
+     *
+     * <p>Built on {@link #monthForEveryone}, so a day in this grid and the same day on the day
+     * sheet cannot disagree — they resolve through the same {@code resolve()}. The alternative, a
+     * query per day, is thirty round trips to draw one screen.
+     *
+     * @param only the employees to count, or null for everyone in the company
+     */
+    @Transactional(readOnly = true)
+    public com.calyvora.people.dto.AttendanceMonthSummaryResponse monthSummary(YearMonth month,
+                                                                               java.util.Set<UUID> only) {
+        UUID companyId = TenantContext.getCompanyId();
+        Map<UUID, AttendanceMonthResponse> everyone = monthForEveryone(month, only);
+
+        Map<LocalDate, Holiday> holidays = new HashMap<>();
+        for (Holiday h : holidayRepository.findByCompanyIdAndDateBetweenOrderByDateAsc(
+                companyId, month.atDay(1), month.atEndOfMonth())) {
+            holidays.putIfAbsent(h.getDate(), h);
+        }
+
+        // date -> counts, walked once per person rather than once per day: the per-person months are
+        // already in hand and re-scanning them thirty times would be the same work thirty times over.
+        Map<LocalDate, long[]> tally = new java.util.TreeMap<>();
+        for (LocalDate d = month.atDay(1); !d.isAfter(month.atEndOfMonth()); d = d.plusDays(1)) {
+            tally.put(d, new long[5]);   // present, onLeave, absent, unmarked, weekOff
+        }
+        for (AttendanceMonthResponse person : everyone.values()) {
+            for (AttendanceEntryResponse entry : person.days()) {
+                long[] row = tally.get(LocalDate.parse(entry.date()));
+                if (row == null) {
+                    continue;
+                }
+                if (entry.status() == null) {
+                    row[3]++;
+                    continue;
+                }
+                AttendanceStatus s = AttendanceStatus.valueOf(entry.status());
+                if (s.isWorking()) row[0]++;
+                else if (s == AttendanceStatus.ON_LEAVE) row[1]++;
+                else if (s == AttendanceStatus.ABSENT) row[2]++;
+                else row[4]++;   // holiday or week-off: not a working day for that person
+            }
+        }
+
+        List<com.calyvora.people.dto.AttendanceMonthSummaryResponse.Day> days = new ArrayList<>();
+        for (var e : tally.entrySet()) {
+            Holiday h = holidays.get(e.getKey());
+            long[] row = e.getValue();
+            days.add(new com.calyvora.people.dto.AttendanceMonthSummaryResponse.Day(
+                    e.getKey().toString(), row[0], row[1], row[2], row[3], row[4],
+                    h != null, h == null ? null : h.getName()));
+        }
+        return new com.calyvora.people.dto.AttendanceMonthSummaryResponse(
+                month.toString(), everyone.size(), days);
+    }
+
     @Transactional(readOnly = true)
     public AttendanceMonthResponse month(UUID employeeId, YearMonth month) {
         UUID companyId = TenantContext.getCompanyId();

@@ -403,6 +403,23 @@ export interface AttendanceMonth {
   expectedDays: number;
   attendanceRate: number | null;
 }
+/** A month of attendance for a group, one row per day — what a calendar grid needs. */
+export interface AttendanceMonthSummary {
+  month: string;
+  headcount: number;
+  days: AttendanceDaySummary[];
+}
+export interface AttendanceDaySummary {
+  date: string;
+  present: number;
+  onLeave: number;
+  absent: number;
+  unmarked: number;
+  weekOff: number;
+  holiday: boolean;
+  holidayName: string | null;
+}
+
 export interface MarkAttendanceInput {
   employeeId: string;
   date?: string;

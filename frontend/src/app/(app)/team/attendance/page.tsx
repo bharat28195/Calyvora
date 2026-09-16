@@ -7,6 +7,7 @@ import type { TeamSummary } from "@/lib/types";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { AttendanceMonthGrid } from "@/components/attendance/month-grid";
 import { NoTeam, ScopeToggle, TeamHeader, useTeamStanding } from "@/components/team/team-bits";
 
 /** The last twelve months, newest first — far enough back to settle an argument about a payslip. */
@@ -33,6 +34,10 @@ export default function TeamAttendancePage() {
   const [month, setMonth] = useState(months[0]);
   const [summary, setSummary] = useState<TeamSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The day the grid has highlighted. Nothing hangs off it here — the table below is a month — but
+  // picking a day is how anyone reads a calendar, and leaving it dead would be worse than not
+  // drawing one.
+  const [day, setDay] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setSummary(null);
@@ -66,7 +71,15 @@ export default function TeamAttendancePage() {
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
-      <div className="mt-8 overflow-x-auto">
+      {/* The shape of the month first: which days your people were out, in one look. The table
+          under it is the same month counted per person. */}
+      <Card className="mt-8">
+        <AttendanceMonthGrid month={month} onMonthChange={setMonth} selected={day} onSelect={setDay} />
+      </Card>
+
+      <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-fg/40">Per person</h2>
+
+      <div className="mt-3 overflow-x-auto">
         {summary === null ? (
           <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
         ) : summary.members.length === 0 ? (

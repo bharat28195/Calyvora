@@ -6,6 +6,7 @@ import { Users, UserCheck, CalendarOff, Palmtree } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TeamOverview } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
+import { MonthCalendar } from "@/components/ui/month-calendar";
 
 /**
  * Owner/Admin team overview (founder feedback B1–B5): headcount, present vs on-leave today, who's out
@@ -89,62 +90,37 @@ function Tile({
   return href ? <Link href={href}>{card}</Link> : card;
 }
 
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
-
+/**
+ * Who is off this month, on the same grid as every other calendar in Orbit.
+ *
+ * <p>It used to draw its own: Sunday-first, dots rather than bars, its own idea of what "today"
+ * looks like — so the dashboard and the attendance page disagreed about the shape of a month while
+ * showing overlapping facts. One violet bar per day somebody is away; a taller bar would be a lie
+ * about a card this size, which is why this one is compact and tinted instead.
+ */
 function LeaveCalendar({ leaves }: { leaves: TeamOverview["monthLeaves"] }) {
-  const { cells, monthLabel, todayKey } = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth(); // 0-based
-    const firstDow = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const key = (d: number) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const month = new Date().toLocaleDateString("sv").slice(0, 7);
 
-    // count how many people are on leave each day
-    const counts: Record<number, number> = {};
-    for (const l of leaves) {
-      for (let d = 1; d <= daysInMonth; d++) {
-        const k = key(d);
-        if (l.startDate <= k && l.endDate >= k) counts[d] = (counts[d] ?? 0) + 1;
-      }
+  const days = useMemo(() => {
+    const counts = new Map<string, number>();
+    const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+    for (let i = 1; i <= last; i++) {
+      const date = `${month}-${String(i).padStart(2, "0")}`;
+      const n = leaves.filter((l) => l.startDate <= date && l.endDate >= date).length;
+      if (n > 0) counts.set(date, n);
     }
-    const arr: ({ day: number; count: number; k: string } | null)[] = [];
-    for (let i = 0; i < firstDow; i++) arr.push(null);
-    for (let d = 1; d <= daysInMonth; d++) arr.push({ day: d, count: counts[d] ?? 0, k: key(d) });
-    return {
-      cells: arr,
-      monthLabel: now.toLocaleString(undefined, { month: "long", year: "numeric" }),
-      todayKey: key(now.getDate()),
-    };
-  }, [leaves]);
+    return [...counts].map(([date, n]) => ({
+      date,
+      bars: [{ color: "bg-violet", label: "On leave" }],
+      tint: "bg-violet/10",
+      title: `${date} · ${n} on leave`,
+    }));
+  }, [leaves, month]);
 
   return (
     <div className="mt-3">
-      <p className="mb-2 text-sm font-medium text-fg/70">{monthLabel}</p>
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {WEEKDAYS.map((w, i) => (
-          <div key={i} className="pb-1 text-[10px] font-medium uppercase text-fg/30">{w}</div>
-        ))}
-        {cells.map((c, i) =>
-          c === null ? (
-            <div key={i} />
-          ) : (
-            <div
-              key={i}
-              title={c.count > 0 ? `${c.count} on leave` : undefined}
-              className={
-                "relative flex h-9 flex-col items-center justify-center rounded-md text-xs " +
-                (c.count > 0 ? "bg-amber-400/10 text-fg" : "text-fg/50") +
-                (c.k === todayKey ? " ring-1 ring-violet" : "")
-              }
-            >
-              {c.day}
-              {c.count > 0 && <span className="mt-0.5 h-1 w-1 rounded-full bg-amber-400" />}
-            </div>
-          ),
-        )}
-      </div>
-      <p className="mt-2 text-xs text-fg/40">Amber = someone on leave · ring = today</p>
+      <MonthCalendar month={month} days={days} compact />
+      <p className="mt-3 text-xs text-fg/40">Tinted = someone on leave · outlined = today</p>
     </div>
   );
 }

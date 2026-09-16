@@ -7,6 +7,7 @@ import type { AttendanceEntry, AttendanceMonth, AttendanceStatus } from "@/lib/t
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { DayHeading, MonthCalendar } from "@/components/ui/month-calendar";
 import { cn } from "@/lib/utils";
 
 /*
@@ -15,14 +16,14 @@ import { cn } from "@/lib/utils";
  */
 
 /** Colour + label per status. */
-export const STATUS: Record<AttendanceStatus, { label: string; chip: string; dot: string }> = {
-  PRESENT: { label: "Present", chip: "bg-emerald-500/15 text-emerald-400", dot: "bg-emerald-500" },
-  WORK_FROM_HOME: { label: "WFH", chip: "bg-sky-500/15 text-sky-400", dot: "bg-sky-500" },
-  HALF_DAY: { label: "Half day", chip: "bg-amber-500/15 text-amber-400", dot: "bg-amber-500" },
-  ABSENT: { label: "Absent", chip: "bg-red-500/15 text-red-400", dot: "bg-red-500" },
-  ON_LEAVE: { label: "On leave", chip: "bg-violet/15 text-violet", dot: "bg-violet" },
-  HOLIDAY: { label: "Holiday", chip: "bg-fg/10 text-fg/50", dot: "bg-fg/30" },
-  WEEK_OFF: { label: "Week off", chip: "bg-fg/10 text-fg/40", dot: "bg-fg/20" },
+export const STATUS: Record<AttendanceStatus, { label: string; chip: string; dot: string; bar: string }> = {
+  PRESENT: { label: "Present", chip: "bg-emerald-500/15 text-emerald-400", dot: "bg-emerald-500", bar: "bg-emerald-500" },
+  WORK_FROM_HOME: { label: "WFH", chip: "bg-sky-500/15 text-sky-400", dot: "bg-sky-500", bar: "bg-sky-500" },
+  HALF_DAY: { label: "Half day", chip: "bg-amber-500/15 text-amber-400", dot: "bg-amber-500", bar: "bg-amber-500" },
+  ABSENT: { label: "Absent", chip: "bg-red-500/15 text-red-400", dot: "bg-red-500", bar: "bg-red-500" },
+  ON_LEAVE: { label: "On leave", chip: "bg-violet/15 text-violet", dot: "bg-violet", bar: "bg-violet" },
+  HOLIDAY: { label: "Holiday", chip: "bg-fg/10 text-fg/50", dot: "bg-fg/30", bar: "bg-amber-400/60" },
+  WEEK_OFF: { label: "Week off", chip: "bg-fg/10 text-fg/40", dot: "bg-fg/20", bar: "bg-fg/20" },
 };
 
 /** The statuses an admin marks by hand; leave comes from the leave flow, week-offs resolve themselves. */
@@ -162,19 +163,31 @@ export function MyMonth() {
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load your month"));
   }, [month]);
 
-  // Pad the grid so day 1 lands under its weekday.
-  const leading = useMemo(() => {
-    if (!data) return 0;
-    const first = new Date(`${data.month}-01T00:00:00`).getDay();
-    return (first + 6) % 7;   // Monday-first
-  }, [data]);
+  // The day whose detail is shown under the grid. Today when it is in view, so the page opens on
+  // something rather than on an empty panel.
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => {
+    const today = new Date().toLocaleDateString("sv");
+    setSelected(today.startsWith(month) ? today : `${month}-01`);
+  }, [month]);
+
+  const cells = useMemo(
+    () =>
+      (data?.days ?? []).map((d) => ({
+        date: d.date,
+        bars: d.status ? [{ color: STATUS[d.status].bar, label: STATUS[d.status].label }] : [],
+        tint: d.status === "HOLIDAY" ? "bg-amber-400/10" : undefined,
+        title: `${d.date} · ${d.status ? STATUS[d.status].label : "not marked"}${d.note ? ` · ${d.note}` : ""}`,
+      })),
+    [data],
+  );
+
+  const day = data?.days.find((d) => d.date === selected) ?? null;
 
   return (
     <div className="mt-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">My month</h2>
-        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
-          className="h-9 rounded-lg border border-fg/15 bg-fg/5 px-2 text-sm text-fg" />
       </div>
 
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}
@@ -208,22 +221,42 @@ export function MyMonth() {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-7 gap-1.5 text-center">
-            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-              <span key={i} className="text-xs text-fg/30">{d}</span>
-            ))}
-            {Array.from({ length: leading }).map((_, i) => <span key={`pad-${i}`} />)}
-            {data.days.map((d) => (
-              <div
-                key={d.date}
-                title={`${d.date}${d.status ? ` · ${STATUS[d.status].label}` : " · not marked"}${d.note ? ` · ${d.note}` : ""}`}
-                className="flex flex-col items-center gap-1 rounded-md py-1.5 hover:bg-fg/5"
-              >
-                <span className="text-xs text-fg/50">{Number(d.date.slice(-2))}</span>
-                <span className={`h-1.5 w-1.5 rounded-full ${d.status ? STATUS[d.status].dot : "bg-fg/10"}`} />
-              </div>
-            ))}
-          </div>
+          <MonthCalendar
+            className="mt-5"
+            month={month}
+            onMonthChange={setMonth}
+            days={cells}
+            selected={selected}
+            onSelect={setSelected}
+            legend={legendFor(data.days)}
+          />
+
+          {/* The selected day, under the grid rather than in a popover — the same place a phone
+              calendar puts it, and it survives switching days without anything opening or closing. */}
+          {selected && (
+            <div className="mt-6 border-t border-fg/10 pt-4">
+              <DayHeading date={selected}>
+                {day?.status ? <StatusChip status={day.status} derived={day.derived} /> : null}
+              </DayHeading>
+              {day && (day.checkIn || day.checkOut) ? (
+                <div className="mt-3 flex items-center gap-3 text-sm">
+                  <span className="h-8 w-1 shrink-0 rounded-full bg-violet" />
+                  <div>
+                    <p className="font-medium">Sign-in / out</p>
+                    <p className="text-fg/50">
+                      {day.checkIn ? hhmm(day.checkIn) : "—"} &ndash; {day.checkOut ? hhmm(day.checkOut) : "—"}
+                      <span className="ml-2 text-fg/40">{fmtDuration(minutesBetween(day.checkIn, day.checkOut))}</span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-fg/40">
+                  {day?.status ? `${STATUS[day.status].label} — no clock-in recorded.` : "Nothing recorded for this day."}
+                </p>
+              )}
+              {day?.note && <p className="mt-2 text-sm text-fg/60">{day.note}</p>}
+            </div>
+          )}
         </Card>
 
         <DailyLog days={data.days} />
@@ -231,6 +264,13 @@ export function MyMonth() {
       )}
     </div>
   );
+}
+
+/** Only the statuses this month actually has: a legend of seven for a month with three is noise. */
+function legendFor(days: AttendanceEntry[]) {
+  const seen = new Set<AttendanceStatus>();
+  for (const d of days) if (d.status) seen.add(d.status);
+  return [...seen].map((s) => ({ color: STATUS[s].bar, label: STATUS[s].label }));
 }
 
 /**

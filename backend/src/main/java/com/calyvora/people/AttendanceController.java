@@ -29,8 +29,10 @@ import java.util.UUID;
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
+    private final OrgScope orgScope;
 
-    public AttendanceController(AttendanceService attendanceService) {
+    public AttendanceController(AttendanceService attendanceService, OrgScope orgScope) {
+        this.orgScope = orgScope;
         this.attendanceService = attendanceService;
     }
 
@@ -69,6 +71,29 @@ public class AttendanceController {
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
     public AttendanceDayResponse day(@RequestParam(required = false) String date) {
         return attendanceService.day(date == null || date.isBlank() ? LocalDate.now() : LocalDate.parse(date));
+    }
+
+    /**
+     * The month behind a calendar grid: one row per day, counts only.
+     *
+     * <p>Scoped by the reporting tree (PD-32), like the team overview: the whole company for the
+     * roles that see everyone, their own downline for a lead. Not restricted to Owner/Admin — the
+     * lead looking at their team's month is the person most likely to want it.
+     */
+    @GetMapping("/month-summary")
+    public com.calyvora.people.dto.AttendanceMonthSummaryResponse monthSummary(
+            @RequestParam(required = false) String month,
+            @CurrentUser AuthPrincipal principal) {
+        java.util.Set<UUID> scope = null;
+        if (!orgScope.seesWholeCompany(principal)) {
+            scope = orgScope.downline(principal, false);
+            if (scope.isEmpty()) {
+                throw new com.calyvora.common.error.ApiException(
+                        com.calyvora.common.error.ErrorCode.FORBIDDEN,
+                        "You do not have permission to perform this action");
+            }
+        }
+        return attendanceService.monthSummary(parseMonth(month), scope);
     }
 
     @PostMapping("/mark")

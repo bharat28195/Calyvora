@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { DayHeading, MonthCalendar } from "@/components/ui/month-calendar";
 
 /** The company holiday calendar. Everyone reads it; Owner/Admin edits it. */
 export default function HolidaysPage() {
@@ -21,6 +22,13 @@ export default function HolidaysPage() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", date: "", optional: false, note: "" });
+  // The month the grid shows. Kept inside the selected year so the two controls cannot disagree.
+  const [month, setMonth] = useState(() => new Date().toLocaleDateString("sv").slice(0, 7));
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMonth((m) => `${year}-${m.slice(5, 7)}`);
+  }, [year]);
 
   const load = useCallback(() => {
     setHolidays(null);
@@ -53,6 +61,20 @@ export default function HolidaysPage() {
     const list = holidays ?? [];
     return { upcoming: list.filter((h) => h.daysAway >= 0), past: list.filter((h) => h.daysAway < 0) };
   }, [holidays]);
+
+  // A holiday is a day, so it belongs on a calendar. The list underneath stays: it is the one that
+  // answers "what is the next one and how far away", which a grid cannot.
+  const cells = useMemo(
+    () =>
+      (holidays ?? []).map((h) => ({
+        date: h.date,
+        bars: [{ color: h.optional ? "bg-amber-400/60" : "bg-amber-400", label: h.optional ? "Optional" : "Holiday" }],
+        tint: h.optional ? "bg-amber-400/5" : "bg-amber-400/10",
+        title: `${h.name}${h.optional ? " (optional)" : ""}`,
+      })),
+    [holidays],
+  );
+  const onSelected = (holidays ?? []).filter((h) => h.date === selected);
 
   return (
     <div>
@@ -110,6 +132,38 @@ export default function HolidaysPage() {
         </Card>
       ) : (
         <>
+          <Card className="mt-8">
+            <MonthCalendar
+              month={month}
+              onMonthChange={setMonth}
+              days={cells}
+              selected={selected}
+              onSelect={setSelected}
+              legend={[
+                { color: "bg-amber-400", label: "Holiday" },
+                ...((holidays ?? []).some((h) => h.optional) ? [{ color: "bg-amber-400/60", label: "Optional" }] : []),
+              ]}
+            />
+            {selected && (
+              <div className="mt-6 border-t border-fg/10 pt-4">
+                <DayHeading date={selected} />
+                {onSelected.length === 0 ? (
+                  <p className="mt-3 text-sm text-fg/40">A normal working day.</p>
+                ) : (
+                  onSelected.map((h) => (
+                    <div key={h.id} className="mt-3 flex items-center gap-3 text-sm">
+                      <span className="h-8 w-1 shrink-0 rounded-full bg-amber-400" />
+                      <div>
+                        <p className="font-medium">{h.name}</p>
+                        <p className="text-fg/50">{h.optional ? "Optional — the office stays open" : "Office closed"}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </Card>
+
           <HolidayList title="Upcoming" items={upcoming} isAdmin={isAdmin} onDeleted={load} />
           <HolidayList title="Earlier this year" items={past} isAdmin={isAdmin} onDeleted={load} muted />
         </>

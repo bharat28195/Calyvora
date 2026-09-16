@@ -8,6 +8,8 @@ import type { AttendanceDay, AttendanceEntry, AttendanceStatus } from "@/lib/typ
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { MARKABLE, STATUS, StatusChip, MyDay, MyMonth, hhmm } from "@/components/attendance/self";
+import { AttendanceMonthGrid } from "@/components/attendance/month-grid";
+import { DayHeading } from "@/components/ui/month-calendar";
 
 export default function AttendancePage() {
   const { me } = useSession();
@@ -31,6 +33,10 @@ export default function AttendancePage() {
 
 /* ---------------- team day sheet (admin) ---------------- */
 
+function monthName(date: string): string {
+  return new Date(date + "T00:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
 /** The tile you can click to drill into. */
 type Filter = "IN" | "ON_LEAVE" | "ABSENT" | "UNMARKED";
 const FILTER_LABEL: Record<Filter, string> = {
@@ -38,7 +44,10 @@ const FILTER_LABEL: Record<Filter, string> = {
 };
 
 function TeamDaySheet() {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => new Date().toLocaleDateString("sv"));
+  // The month the grid is showing, held separately: paging through months to look around should
+  // not move the day whose sheet is open until a day in one of them is actually picked.
+  const [month, setMonth] = useState(() => new Date().toLocaleDateString("sv").slice(0, 7));
   const [sheet, setSheet] = useState<AttendanceDay | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
@@ -61,6 +70,8 @@ function TeamDaySheet() {
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load the day"));
   }, [date]);
   useEffect(() => load(), [load]);
+  // Stepping off the end of a month with the arrows pages the grid along with it.
+  useEffect(() => setMonth(date.slice(0, 7)), [date]);
 
   async function mark(employeeId: string, status: AttendanceStatus) {
     setSaving(employeeId);
@@ -78,16 +89,28 @@ function TeamDaySheet() {
 
   return (
     <div className="mt-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Team day sheet</h2>
+      <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Team attendance</h2>
+
+      {/* The grid answers "which day", which is the question people arrive with — the Tuesday half
+          the team was out. The sheet under it answers "who". */}
+      <Card className="mt-3">
+        <AttendanceMonthGrid
+          month={month}
+          onMonthChange={setMonth}
+          selected={date}
+          onSelect={(d) => { setDate(d); setFilter(null); }}
+        />
+      </Card>
+
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <DayHeading date={date}>
+          <span className="text-xs text-fg/40">{monthName(date)}</span>
+        </DayHeading>
         <div className="flex items-center gap-1">
           <button onClick={() => setDate(shiftDay(date, -1))} aria-label="Previous day"
             className="rounded-md p-1.5 text-fg/50 hover:bg-fg/5 hover:text-fg">
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <input type="date" value={date} max={new Date().toISOString().slice(0, 10)}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-9 rounded-lg border border-fg/15 bg-fg/5 px-2 text-sm text-fg" />
           <button onClick={() => setDate(shiftDay(date, 1))} aria-label="Next day" disabled={future}
             className="rounded-md p-1.5 text-fg/50 hover:bg-fg/5 hover:text-fg disabled:opacity-30">
             <ChevronRight className="h-4 w-4" />

@@ -62,6 +62,7 @@ import {
   type AttendanceDay,
   type AttendanceEntry,
   type AttendanceMonth,
+  type AttendanceMonthSummary,
   type Regularization,
   type RegularizationInput,
   type MarkAttendanceInput,
@@ -1324,6 +1325,14 @@ export const api = {
   myAttendance(month?: string): Promise<AttendanceMonth> {
     const qs = month ? `?month=${month}` : "";
     return LIVE ? http<AttendanceMonth>(`/people/attendance/me${qs}`) : mockBackend.myAttendance(accessToken, month);
+  },
+  // The month behind a calendar grid: counts per day, scoped by the reporting tree. The day sheet
+  // answers who; asking it thirty times to colour a grid would move the whole company per month.
+  attendanceMonthSummary(month?: string): Promise<AttendanceMonthSummary> {
+    const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+    return LIVE
+      ? http<AttendanceMonthSummary>(`/people/attendance/month-summary${qs}`)
+      : Promise.resolve({ month: month ?? "", headcount: 0, days: [] });
   },
   attendanceDay(date?: string): Promise<AttendanceDay> {
     const qs = date ? `?date=${date}` : "";

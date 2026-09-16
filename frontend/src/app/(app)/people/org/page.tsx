@@ -295,7 +295,7 @@ function OrgTree({
         {/* w-max, not just min-w-full: in a horizontal scroller justify-center on a child wider
             than its container clips the left overflow, and those cards can never be scrolled to. */}
         <div className="flex w-max min-w-full justify-center gap-6 pt-1">
-          {shown.map((e) => (
+          {shown.map((e, i) => (
             <OrgNode
               key={e.id}
               employee={e}
@@ -305,6 +305,8 @@ function OrgTree({
               onToggle={toggle}
               meId={me?.id}
               matches={matches}
+              // More than one root means more than one top of the org, so they are branches too.
+              branch={shown.length > 1 ? BRANCHES[i % BRANCHES.length] : undefined}
             />
           ))}
         </div>
@@ -313,22 +315,43 @@ function OrgTree({
   );
 }
 
-/** Stable per-department colour, so a branch reads as one team at a glance. */
-const DEPT_TINTS = [
-  "border-t-sky-400/70",
-  "border-t-emerald-400/70",
-  "border-t-amber-400/70",
-  "border-t-violet/70",
-  "border-t-rose-400/70",
-  "border-t-teal-400/70",
+/**
+ * One colour per branch, inherited all the way down it.
+ *
+ * <p>Colour used to come from the department, which sounds right and reads wrong: a lead's team
+ * usually spans two or three departments, so opening one person scattered four colours across
+ * their reports and told you nothing about who worked for whom. Tying the colour to the branch
+ * instead means a subtree is one colour — the thing you are actually tracing when you follow a
+ * line down a chart — and two branches never look alike side by side.
+ *
+ * <p>A node keeps its parent's colour and hands the same one to its own reports. New colours are
+ * only minted where the chart forks at the top.
+ */
+interface Branch {
+  /** Card top edge. */
+  border: string;
+  /** Avatar circle and the "N reports" footer. */
+  soft: string;
+  text: string;
+  /** The connector lines under the card, so a whole branch is traceable by colour. */
+  line: string;
+}
+
+const BRANCHES: Branch[] = [
+  { border: "border-t-sky-400", soft: "bg-sky-400/15", text: "text-sky-400", line: "bg-sky-400/40" },
+  { border: "border-t-emerald-400", soft: "bg-emerald-400/15", text: "text-emerald-400", line: "bg-emerald-400/40" },
+  { border: "border-t-amber-400", soft: "bg-amber-400/15", text: "text-amber-400", line: "bg-amber-400/40" },
+  { border: "border-t-violet", soft: "bg-violet/15", text: "text-violet", line: "bg-violet/40" },
+  { border: "border-t-rose-400", soft: "bg-rose-400/15", text: "text-rose-400", line: "bg-rose-400/40" },
+  { border: "border-t-teal-400", soft: "bg-teal-400/15", text: "text-teal-400", line: "bg-teal-400/40" },
+  { border: "border-t-fuchsia-400", soft: "bg-fuchsia-400/15", text: "text-fuchsia-400", line: "bg-fuchsia-400/40" },
+  { border: "border-t-cyan-400", soft: "bg-cyan-400/15", text: "text-cyan-400", line: "bg-cyan-400/40" },
 ];
 
-function tintFor(departmentId: string | null) {
-  if (!departmentId) return "border-t-fg/20";
-  let h = 0;
-  for (let i = 0; i < departmentId.length; i++) h = (h * 31 + departmentId.charCodeAt(i)) >>> 0;
-  return DEPT_TINTS[h % DEPT_TINTS.length];
-}
+/** The top of the chart belongs to no branch — everything below it does. */
+const ROOT_BRANCH: Branch = {
+  border: "border-t-fg/30", soft: "bg-fg/10", text: "text-fg/60", line: "bg-fg/15",
+};
 
 /**
  * One person, drawn as a card with their branch hanging beneath them.
@@ -349,6 +372,7 @@ function OrgNode({
   onToggle,
   meId,
   matches,
+  branch,
 }: {
   employee: Employee;
   childrenOf: Map<string | null, Employee[]>;
@@ -357,6 +381,8 @@ function OrgNode({
   onToggle: (id: string) => void;
   meId?: string;
   matches: Set<string> | null;
+  /** Inherited from the parent. Undefined at the top, where each child starts a colour instead. */
+  branch?: Branch;
 }) {
   const reports = childrenOf.get(employee.id) ?? [];
   const hasReports = reports.length > 0;
@@ -364,19 +390,23 @@ function OrgNode({
   const isMe = employee.id === meId;
   const isMatch = matches?.has(employee.id) ?? false;
   const department = deptName(employee.departmentId);
+  const colour = branch ?? ROOT_BRANCH;
+  // A node with no branch of its own is a top: its reports each start one. Everyone else hands
+  // their own colour down unchanged, which is what makes a subtree read as one team.
+  const childBranch = (i: number) => branch ?? BRANCHES[i % BRANCHES.length];
 
   return (
     <div className="flex flex-col items-center">
       <div
         className={cn(
           "w-[232px] shrink-0 rounded-lg border border-fg/10 border-t-[3px] bg-surface p-3 shadow-sm transition-colors",
-          tintFor(employee.departmentId),
+          colour.border,
           isMe && "ring-2 ring-violet",
           isMatch && !isMe && "ring-2 ring-amber-400/70",
         )}
       >
         <div className="flex items-start gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet/20 text-xs font-semibold text-violet">
+          <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold", colour.soft, colour.text)}>
             {employee.firstName[0]}{employee.lastName[0]}
           </span>
           <div className="min-w-0 flex-1">
@@ -400,7 +430,10 @@ function OrgNode({
             onClick={() => onToggle(employee.id)}
             aria-expanded={isOpen}
             aria-label={`${isOpen ? "Collapse" : "Expand"} the team under ${employee.firstName} ${employee.lastName}`}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-fg/5 py-1 text-[11px] text-fg/60 hover:bg-fg/10 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+            className={cn(
+              "mt-2 flex w-full items-center justify-center gap-1.5 rounded-md py-1 text-[11px] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet",
+              colour.soft, colour.text,
+            )}
           >
             <span className="tabular-nums">{reports.length}</span>
             <span>{reports.length === 1 ? "report" : "reports"}</span>
@@ -411,22 +444,24 @@ function OrgNode({
 
       {isOpen && (
         <>
-          {/* Stem out of the bottom of this card. */}
-          <div className="h-5 w-px bg-fg/15" />
+          {/* Stem out of the bottom of this card, in this node's own colour. */}
+          <div className={cn("h-5 w-px", colour.line)} />
           <div className="flex items-start">
             {reports.map((r, i) => (
               <div key={r.id} className="relative flex flex-col items-center px-3">
                 {/* The rule joining the siblings. One child needs none; the outermost two are clipped
-                    to half so the line begins and ends under a card. */}
+                    to half so the line begins and ends under a card. It stays the parent's colour —
+                    it belongs to the parent, while the stem below it belongs to the child. */}
                 {reports.length > 1 && (
                   <div
                     className={cn(
-                      "absolute top-0 h-px bg-fg/15",
+                      "absolute top-0 h-px",
+                      colour.line,
                       i === 0 ? "left-1/2 right-0" : i === reports.length - 1 ? "left-0 right-1/2" : "left-0 right-0",
                     )}
                   />
                 )}
-                <div className="h-5 w-px bg-fg/15" />
+                <div className={cn("h-5 w-px", childBranch(i).line)} />
                 <OrgNode
                   employee={r}
                   childrenOf={childrenOf}
@@ -435,6 +470,7 @@ function OrgNode({
                   onToggle={onToggle}
                   meId={meId}
                   matches={matches}
+                  branch={childBranch(i)}
                 />
               </div>
             ))}
