@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, setSessionLostHandler } from "@/lib/api";
 import { setLocaleConfig } from "@/lib/format";
 import type { Me } from "@/lib/types";
 
@@ -11,6 +11,8 @@ type Status = "loading" | "authenticated" | "unauthenticated";
 interface SessionValue {
   me: Me | null;
   status: Status;
+  /** Why the session ended, when it ended on its own. Carried to the login screen. */
+  endedReason: "expired" | null;
   setMe: (me: Me) => void;
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
@@ -26,6 +28,7 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [me, setMeState] = useState<Me | null>(null);
   const [status, setStatus] = useState<Status>("loading");
+  const [endedReason, setEndedReason] = useState<"expired" | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +51,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     void load();
   }, [load]);
 
+  /**
+   * The transport gives up on a session when a refresh fails, and until this was wired to it
+   * nobody was listening: the call threw a 401, the screen showed an error, and the app went on
+   * looking signed in around it. A session can end without anyone being idle — the window lapsed
+   * in another tab, an admin disabled the account, the password was changed somewhere else — and
+   * every one of those should land on the login screen rather than on a broken page.
+   */
+  useEffect(() => {
+    setSessionLostHandler(() => {
+      setMeState(null);
+      setEndedReason("expired");
+      setStatus("unauthenticated");
+    });
+    return () => setSessionLostHandler(null);
+  }, []);
+
   // Keep the app-wide money/time formatters in sync with the company's chosen currency + timezone.
   useEffect(() => {
     if (me?.company) {
@@ -58,13 +77,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const value: SessionValue = {
     me,
     status,
+    endedReason,
     setMe: (m) => {
       setMeState(m);
+      setEndedReason(null);
       setStatus("authenticated");
     },
     logout: async () => {
       await api.logout();
       setMeState(null);
+      // Signing out on purpose is not a session that ended on you; the login screen should say
+      // nothing about it.
+      setEndedReason(null);
       setStatus("unauthenticated");
     },
     refetch: load,
@@ -85,8 +109,10 @@ export function useRequireAuth() {
   const router = useRouter();
   useEffect(() => {
     if (session.status === "unauthenticated") {
-      router.replace("/login");
+      // Say why, when there is a why. Arriving at a login screen with no explanation reads as a
+      // bug, or worse, as somebody else having taken the account.
+      router.replace(session.endedReason ? `/login?reason=${session.endedReason}` : "/login");
     }
-  }, [session.status, router]);
+  }, [session.status, session.endedReason, router]);
   return session;
 }
