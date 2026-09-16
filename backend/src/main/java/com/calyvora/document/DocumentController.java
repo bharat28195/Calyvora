@@ -59,6 +59,43 @@ public class DocumentController {
         return letterheadService.update(payload);
     }
 
+    /**
+     * Upload the company's own letterpad, to print letters on as-is.
+     *
+     * <p>Owner/Admin only, and deliberately narrower than the rest of this controller: the
+     * stationery every letter the company issues goes out on is not something anyone who can write
+     * a letter should be able to replace.
+     */
+    @PostMapping("/letterhead/background")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    public LetterheadResponse uploadLetterpad(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return letterheadService.uploadBackground(file);
+    }
+
+    @DeleteMapping("/letterhead/background")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    public LetterheadResponse removeLetterpad() {
+        return letterheadService.removeBackground();
+    }
+
+    /**
+     * The uploaded letterpad itself. Readable by anyone who may read a letter, because every letter
+     * is printed on it; the tenant binding is what keeps it to this company.
+     */
+    @GetMapping("/letterhead/background")
+    public org.springframework.http.ResponseEntity<byte[]> letterpadImage() {
+        return letterheadService.background()
+                .map(image -> org.springframework.http.ResponseEntity.ok()
+                        .contentType(org.springframework.http.MediaType.parseMediaType(image.contentType()))
+                        // Private: it is one company's stationery, and a shared cache must not hand
+                        // it to another. Revalidated by the version in the URL the client asks for.
+                        .cacheControl(org.springframework.http.CacheControl
+                                .maxAge(java.time.Duration.ofDays(30)).cachePrivate())
+                        .body(image.bytes()))
+                .orElseGet(() -> org.springframework.http.ResponseEntity.notFound().build());
+    }
+
     // ---- templates ----
 
     @GetMapping("/templates")

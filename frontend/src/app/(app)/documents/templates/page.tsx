@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Plus, Trash2, Save, FileSignature, Lock, Braces, ChevronDown, Eye } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, FileSignature, FileUp, Lock, Braces, ChevronDown, Eye } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { DocumentKind, DocumentTemplate, Letterhead, MergeField } from "@/lib/types";
 import { KIND_LABELS, renderTemplate, placeholdersIn } from "@/lib/documents";
 import { FormatToolbar } from "@/components/documents/format-toolbar";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
@@ -77,8 +77,23 @@ export default function TemplatesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
           <p className="mt-1 text-fg/50">The letters your company can issue. Edit them to sound like you.</p>
         </div>
-        <Button onClick={create}><Plus className="h-4 w-4" /> New template</Button>
+        <div className="flex items-center gap-2">
+          {/* The stationery every one of these prints on. Reachable from here because this is the
+              screen somebody is on when they realise the letters are not on their letterpad. */}
+          <LinkButton variant="secondary" href="/documents/letterhead">
+            <FileUp className="h-4 w-4" /> Letterpad
+          </LinkButton>
+          <Button onClick={create}><Plus className="h-4 w-4" /> New template</Button>
+        </div>
       </div>
+
+      {letterhead && !letterhead.hasBackground && (
+        <p className="mt-3 text-xs text-fg/40">
+          Have company stationery already?{" "}
+          <Link href="/documents/letterhead" className="text-violet hover:underline">Upload your letterpad</Link>
+          {" "}and every letter prints straight onto it.
+        </p>
+      )}
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 

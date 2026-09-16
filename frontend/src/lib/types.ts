@@ -474,9 +474,16 @@ export interface Letterhead {
   showDivider: boolean;
   signatureName: string | null;
   signatureTitle: string | null;
+  /** A letterpad image has been uploaded. The bytes are fetched separately, never inlined here. */
+  hasBackground: boolean;
+  /** Print letters on that image rather than on the composed header and footer. */
+  useBackground: boolean;
+  backgroundName: string | null;
   updatedAt: string;
 }
-export type LetterheadInput = Partial<Omit<Letterhead, "updatedAt">>;
+export type LetterheadInput = Partial<
+  Omit<Letterhead, "updatedAt" | "hasBackground" | "backgroundName">
+>;
 export interface MergeField {
   key: string;
   label: string;

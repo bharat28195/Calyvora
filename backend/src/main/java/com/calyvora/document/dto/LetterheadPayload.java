@@ -37,7 +37,10 @@ public record LetterheadPayload(
         String signatureName,
 
         @Size(max = 120, message = "Signature title cannot be longer than 120 characters")
-        String signatureTitle
+        String signatureTitle,
+
+        /** Print on the uploaded letterpad. Null leaves the choice alone, like every field here. */
+        Boolean useBackground
 ) {
     public LetterheadPayload {
         logoUrl = trim(logoUrl);

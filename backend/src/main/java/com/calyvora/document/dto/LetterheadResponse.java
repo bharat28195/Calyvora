@@ -16,12 +16,18 @@ public record LetterheadResponse(
         boolean showDivider,
         String signatureName,
         String signatureTitle,
+        /** Whether a letterpad has been uploaded — the bytes are fetched separately. */
+        boolean hasBackground,
+        boolean useBackground,
+        String backgroundName,
         String updatedAt
 ) {
     public static LetterheadResponse of(Letterhead l, String companyName) {
         String heading = l.getHeading() == null || l.getHeading().isBlank() ? companyName : l.getHeading();
         return new LetterheadResponse(l.getLogoUrl(), heading, l.getAddressLines(), l.getFooterText(),
                 l.getBrandColor(), l.getFontFamily(), l.isShowDivider(),
-                l.getSignatureName(), l.getSignatureTitle(), l.getUpdatedAt().toString());
+                l.getSignatureName(), l.getSignatureTitle(),
+                l.getBackgroundName() != null, l.isUseBackground(), l.getBackgroundName(),
+                l.getUpdatedAt().toString());
     }
 }

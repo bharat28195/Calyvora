@@ -1441,6 +1441,36 @@ export const api = {
       ? http<Letterhead>("/documents/letterhead", { method: "PATCH", body: JSON.stringify(input) })
       : liveOnly("The letterpad");
   },
+  /**
+   * Upload the company's own letterpad.
+   *
+   * <p>Not through `http`: that helper sets a JSON content type, and a multipart body needs the
+   * browser to set its own with the boundary it generated. Everything else it does — the bearer
+   * token, the waking-backend retry — does not apply to a one-off upload.
+   */
+  async uploadLetterpad(file: File): Promise<Letterhead> {
+    if (!LIVE) return liveOnly("The letterpad");
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/documents/letterhead/background`, {
+      method: "POST",
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    return body as Letterhead;
+  },
+  removeLetterpad(): Promise<Letterhead> {
+    return LIVE
+      ? http<Letterhead>("/documents/letterhead/background", { method: "DELETE" })
+      : liveOnly("The letterpad");
+  },
+  /** Where the uploaded letterpad is served. Versioned so a replacement is not read from cache. */
+  letterpadImageUrl(version: string): string {
+    return `${BASE}/documents/letterhead/background?v=${encodeURIComponent(version)}`;
+  },
 
   exits(): Promise<ExitView[]> {
     return LIVE ? http<ExitView[]>("/people/exits") : liveOnly("Exits");

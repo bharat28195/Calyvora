@@ -115,6 +115,9 @@ export const DEFAULT_LETTERHEAD: Letterhead = {
   showDivider: true,
   signatureName: null,
   signatureTitle: null,
+  hasBackground: false,
+  useBackground: false,
+  backgroundName: null,
   updatedAt: "",
 };
 

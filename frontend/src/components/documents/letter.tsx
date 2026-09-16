@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { api } from "@/lib/api";
 import { EMPTY, LETTERHEAD_FONTS } from "@/lib/documents";
 import type { Letterhead } from "@/lib/types";
 
@@ -27,14 +28,33 @@ export function LetterSheet({
   const font = LETTERHEAD_FONTS[letterhead?.fontFamily ?? "SERIF"].stack;
   const accent = letterhead?.brandColor ?? "#7c5cff";
 
+  // The company's own stationery, printed as-is. When it is on, the composed header and footer are
+  // suppressed: the uploaded image already carries the logo, the address and the strip along the
+  // bottom, and drawing ours on top of theirs is how you get two addresses on one letter.
+  const printed = letterhead?.useBackground && letterhead.hasBackground;
+  const paper = printed
+    ? {
+        backgroundImage: `url(${api.letterpadImageUrl(letterhead.updatedAt)})`,
+        backgroundSize: "100% 100%",
+        backgroundRepeat: "no-repeat",
+        // A4 proportions, so the body sits where it will sit on paper rather than wherever the
+        // screen happens to end.
+        aspectRatio: "1 / 1.414",
+      }
+    : undefined;
+
   return (
     <div
-      className={`letter-sheet rounded-xl border border-fg/10 bg-white px-8 py-10 text-[15px] leading-relaxed text-neutral-800 shadow-sm sm:px-12 sm:py-14 ${className}`}
-      style={letterhead ? { fontFamily: font } : undefined}
+      className={`letter-sheet rounded-xl border border-fg/10 bg-white text-[15px] leading-relaxed text-neutral-800 shadow-sm ${
+        printed
+          ? "px-14 py-20 sm:px-20 sm:py-28"
+          : "px-8 py-10 sm:px-12 sm:py-14"
+      } ${className}`}
+      style={{ ...(letterhead ? { fontFamily: font } : {}), ...paper }}
     >
-      {letterhead && <Letterpad letterhead={letterhead} accent={accent} />}
+      {letterhead && !printed && <Letterpad letterhead={letterhead} accent={accent} />}
       <div dangerouslySetInnerHTML={{ __html: html }} />
-      {letterhead && <Footer letterhead={letterhead} accent={accent} />}
+      {letterhead && !printed && <Footer letterhead={letterhead} accent={accent} />}
     </div>
   );
 }

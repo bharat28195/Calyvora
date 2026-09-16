@@ -54,6 +54,27 @@ public class Letterhead {
     @Column(name = "signature_title", length = 120)
     private String signatureTitle;
 
+    /**
+     * The company's own letterpad, uploaded rather than composed.
+     *
+     * <p>{@code LAZY} because it is up to two megabytes and almost nothing that loads a letterhead
+     * wants the bytes — the editor wants the settings, the renderer wants a URL. Fetching it on
+     * every letter preview would put a megabyte through the entity manager to draw a form.
+     */
+    @jakarta.persistence.Basic(fetch = jakarta.persistence.FetchType.LAZY)
+    @Column(name = "background_image")
+    private byte[] backgroundImage;
+
+    @Column(name = "background_type", length = 64)
+    private String backgroundType;
+
+    @Column(name = "background_name", length = 255)
+    private String backgroundName;
+
+    /** Kept apart from "an image exists", so a plain internal memo does not mean deleting it. */
+    @Column(name = "use_background", nullable = false)
+    private boolean useBackground;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
@@ -71,6 +92,22 @@ public class Letterhead {
     }
 
     public UUID getCompanyId() { return companyId; }
+    public byte[] getBackgroundImage() { return backgroundImage; }
+    public String getBackgroundType() { return backgroundType; }
+    public String getBackgroundName() { return backgroundName; }
+    public boolean isUseBackground() { return useBackground; }
+    public void setUseBackground(boolean useBackground) { this.useBackground = useBackground; }
+
+    /** Attach an uploaded letterpad, or clear it with nulls. Clearing also switches it off. */
+    public void setBackground(byte[] image, String contentType, String name) {
+        this.backgroundImage = image;
+        this.backgroundType = contentType;
+        this.backgroundName = name;
+        if (image == null) {
+            this.useBackground = false;
+        }
+        this.updatedAt = Instant.now();
+    }
     public String getLogoUrl() { return logoUrl; }
     public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
     public String getHeading() { return heading; }

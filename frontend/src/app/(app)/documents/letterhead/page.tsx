@@ -11,6 +11,7 @@ import { Field } from "@/components/ui/field";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { LetterSheet } from "@/components/documents/letter";
+import { LetterpadUpload } from "@/components/documents/letterpad-upload";
 
 const FONTS = Object.keys(LETTERHEAD_FONTS) as LetterheadFont[];
 const textareaCls =
@@ -110,6 +111,13 @@ export default function LetterheadPage() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[24rem_1fr]">
         <div className="flex flex-col gap-4">
+          {/* First, because for most companies it is the whole answer: they have stationery and
+              want letters on it, not a second design built field by field. */}
+          <LetterpadUpload
+            letterhead={draft}
+            onChange={(next) => { setSaved(next); setDraft(next); setError(null); }}
+          />
+
           <Card>
             <CardTitle>The heading</CardTitle>
             <div className="mt-4 flex flex-col gap-3">

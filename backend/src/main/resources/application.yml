@@ -30,6 +30,13 @@ spring:
       max-lifetime: 600000
       idle-timeout: 300000
       pool-name: calyvora-pool
+  servlet:
+    multipart:
+      # The letterpad upload is the only one, and it is capped at 2 MB in the service. Set a little
+      # above it so an oversized file is refused with the service's sentence rather than Tomcat's.
+      max-file-size: 3MB
+      max-request-size: 3MB
+
   jpa:
     hibernate:
       ddl-auto: validate          # Flyway owns the schema; JPA only validates
