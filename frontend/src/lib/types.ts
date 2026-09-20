@@ -292,6 +292,88 @@ export interface ExpenseClaim {
   reimbursedAt: string | null;
   createdAt: string;
 }
+// --- income tax (India) -----------------------------------------------------------------------
+
+export type TaxRegime = "OLD" | "NEW";
+
+/** One section of the declaration form, with the statutory ceiling so the form can show it. */
+export interface TaxDeductionOption {
+  key: string;
+  section: string;
+  label: string;
+  /** null where the Act sets no ceiling — 80E, for instance. */
+  cap: number | null;
+  allowedInNewRegime: boolean;
+}
+
+export interface TaxDeclaration {
+  financialYear: string;
+  regime: TaxRegime;
+  status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
+  submittedAt: string | null;
+  /** Section key to the amount claimed, uncapped — what the employee typed. */
+  declared: Record<string, number>;
+  /** Whether HR still accepts changes for this year. */
+  windowOpen: boolean;
+  options: TaxDeductionOption[];
+}
+
+export interface TaxBandRow {
+  from: number;
+  to: number | null;
+  ratePercent: number;
+  taxable: number;
+  tax: number;
+}
+
+export interface TaxDeductionRow {
+  key: string;
+  section: string;
+  label: string;
+  declared: number;
+  allowed: number;
+}
+
+export interface TaxRegimeComparison {
+  oldRegimeTax: number;
+  newRegimeTax: number;
+  cheaper: TaxRegime;
+  saving: number;
+}
+
+export interface TaxComputation {
+  financialYear: string;
+  regime: TaxRegime;
+  currency: string;
+  grossSalary: number;
+  standardDeduction: number;
+  deductions: TaxDeductionRow[];
+  totalDeductions: number;
+  taxableIncome: number;
+  bands: TaxBandRow[];
+  taxOnIncome: number;
+  rebate: number;
+  surcharge: number;
+  cess: number;
+  totalTax: number;
+  monthlyTds: number;
+  monthsElapsed: number;
+  deductedSoFar: number;
+  remainingTax: number;
+  /** What the next pay run should withhold — what is left, over the months that are left. */
+  projectedNextMonth: number;
+  comparison: TaxRegimeComparison;
+}
+
+export interface TaxDeclarationRow {
+  employeeId: string;
+  employeeName: string;
+  regime: TaxRegime;
+  status: string;
+  totalDeclared: number;
+  annualTax: number;
+}
+
 export interface ExpenseSummary {
   claims: ExpenseClaim[];
   /** Where to continue from; null at the end. The totals below are for the whole set, not the page. */

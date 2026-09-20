@@ -119,6 +119,12 @@ const NAV: NavItem[] = [
       { href: "/finance/pay", label: "My pay" },
       { href: "/finance/mine", label: "My finances" },
       { href: "/finance/expenses", label: "Expenses" },
+      // Everyone declares their own tax and picks their own regime — which one is cheaper depends
+      // on the individual, so this cannot be an HR-only screen.
+      { href: "/finance/tax", label: "Tax declaration" },
+    ],
+    hrChildren: [
+      { href: "/finance/tax/manage", label: "Manage tax" },
     ],
   },
   // One Performance section for everybody, with two extra panes for HR rather than a second

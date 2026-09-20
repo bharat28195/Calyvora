@@ -80,6 +80,10 @@ import {
   type PfSettings,
   type LeavePolicy,
   type CursorPage,
+  type TaxComputation,
+  type TaxDeclaration,
+  type TaxDeclarationRow,
+  type TaxRegime,
   type LeaveRequest,
   type LeaveTypeBalance,
   type LoginResult,
@@ -1331,6 +1335,46 @@ export const api = {
   },
   deletePostComment(commentId: string): Promise<void> {
     return LIVE ? http<void>(`/feed/comments/${commentId}`, { method: "DELETE" }) : mockBackend.deletePostComment(accessToken, commentId);
+  },
+
+  // --- income tax ---
+  /**
+   * The employee's own declaration. Their business, so no role gates it.
+   *
+   * <p>Live only. The mock backend has no salary history to tax, and a tax screen that invents
+   * numbers is worse than one that says it needs the real backend.
+   */
+  taxDeclaration(year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/me/declaration${year ? `?year=${year}` : ""}`)
+      : liveOnly("Income tax");
+  },
+  saveTaxDeclaration(input: { regime?: TaxRegime; declared?: Record<string, number> }, year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/me/declaration${year ? `?year=${year}` : ""}`,
+          { method: "PUT", body: JSON.stringify(input) })
+      : liveOnly("Income tax");
+  },
+  submitTaxDeclaration(year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/me/declaration/submit${year ? `?year=${year}` : ""}`, { method: "POST" })
+      : liveOnly("Income tax");
+  },
+  /** The working: slabs, rebate, surcharge, cess, and what the next payslip withholds. */
+  taxComputation(year?: string): Promise<TaxComputation> {
+    return LIVE
+      ? http<TaxComputation>(`/tax/me/computation${year ? `?year=${year}` : ""}`)
+      : liveOnly("Income tax");
+  },
+  taxDeclarations(year?: string): Promise<TaxDeclarationRow[]> {
+    return LIVE
+      ? http<TaxDeclarationRow[]>(`/tax/declarations${year ? `?year=${year}` : ""}`)
+      : liveOnly("Income tax");
+  },
+  setTaxWindow(open: boolean): Promise<{ open: boolean }> {
+    return LIVE
+      ? http<{ open: boolean }>("/tax/window", { method: "POST", body: JSON.stringify({ open }) })
+      : liveOnly("Income tax");
   },
 
   // --- expense claims ---
