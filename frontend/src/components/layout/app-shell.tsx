@@ -118,7 +118,7 @@ const NAV: NavItem[] = [
     children: [
       { href: "/finance/pay", label: "My pay" },
       { href: "/finance/mine", label: "My finances" },
-      { href: "/me/expenses", label: "Expenses" },
+      { href: "/finance/expenses", label: "Expenses" },
     ],
   },
   // One Performance section for everybody, with two extra panes for HR rather than a second

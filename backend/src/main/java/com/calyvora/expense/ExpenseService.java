@@ -332,7 +332,7 @@ public class ExpenseService {
                 notificationService.send(companyId, employee.getUserId(), principal.userId(),
                         NotificationType.ANNOUNCEMENT, title,
                         claim.getTitle() + " · " + claim.getCurrency() + " " + claim.getAmount(),
-                        "/me/expenses", "EXPENSE_CLAIM", claim.getId()));
+                        "/finance/expenses", "EXPENSE_CLAIM", claim.getId()));
     }
 
     private Employee self(UUID companyId, AuthPrincipal principal) {

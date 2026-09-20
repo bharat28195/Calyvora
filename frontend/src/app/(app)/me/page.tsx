@@ -70,7 +70,7 @@ export default function MePage() {
         <Card>
           <CardTitle>Quick links</CardTitle>
           <div className="mt-3 flex flex-col divide-y divide-fg/5">
-            <QuickLink href="/me/expenses" icon={<Receipt className="h-4 w-4 text-sky-400" />}
+            <QuickLink href="/finance/expenses" icon={<Receipt className="h-4 w-4 text-sky-400" />}
               label="Claim an expense" hint="Travel, meals, anything you paid for" />
             <QuickLink href="/me/leave" icon={<Palmtree className="h-4 w-4 text-amber-400" />}
               label="Request time off" hint="Your balance and past requests" />

@@ -156,7 +156,7 @@ public class AssistantService {
             out.add(new Source("module", "My pay", "/me/payslip"));
         }
         if (q.contains("expense") || q.contains("claim") || q.contains("reimburse")) {
-            out.add(new Source("module", "Expenses", "/me/expenses"));
+            out.add(new Source("module", "Expenses", "/finance/expenses"));
         }
         if (q.contains("helpdesk") || q.contains("ticket") || q.contains("complaint")) {
             out.add(new Source("module", "Helpdesk", "/helpdesk"));

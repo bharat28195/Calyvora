@@ -1006,7 +1006,7 @@ export const mockBackend = {
     const claimant = db.employees.find((e) => e.id === claim.employeeId);
     const label = action === "reimburse" ? "reimbursed" : action === "approve" ? "approved" : "declined";
     notify(claimant?.userId, user.id, "ANNOUNCEMENT", `Your expense claim was ${label}`,
-      `${claim.title} · ${claim.currency} ${claim.amount}`, "/me/expenses", "EXPENSE_CLAIM", claim.id);
+      `${claim.title} · ${claim.currency} ${claim.amount}`, "/finance/expenses", "EXPENSE_CLAIM", claim.id);
     return claim;
   },
 
