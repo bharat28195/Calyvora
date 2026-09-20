@@ -1276,9 +1276,61 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   endpoint is role-gated to Owner/Admin/HR. Under PD-32 the tree should grant it. Product work, not a
   seed fix.
 
+### PD-38 · 2026-09-20 · Measure before you build the thing the backlog named
+- **Context:** the backlog said the fix for the two slowest screens was a closure table for the org
+  tree, and that was written down confidently enough to be built without checking. Reading the code
+  first showed the tree was never the problem. The team summary issued about six queries — a
+  respectable number — and every one of them read the whole company: the employee table three times
+  over, then the company's entire month of attendance, its whole leave history and all of its expense
+  claims, filtered down to a hundred people in memory. Team performance was a plain N+1 wearing a
+  list, six round trips per review.
+- **Rule:** a performance item is a hypothesis until something is measured. The closure table would
+  have been real work, would have added an index to maintain on every manager change, and would have
+  moved neither number — a thousand-person company is two thousand UUIDs, so walking the tree was
+  never the cost.
+- **What the budget test taught us, which is the more useful half.** The existing query budgets count
+  SQL statements, and by that measure the team summary looked thrifty: six statements reading twenty
+  thousand rows. The defect was invisible to the instrument pointed at it. The new budget asserts
+  **entities loaded**, because that was the quantity that was actually wrong. Pick the metric that
+  would have caught the defect, not the one already there.
+- **Both new budgets were checked by watching them fail.** The first draft passed against the old
+  code — the number was generous enough to admit the defect it existed to catch. A budget nobody has
+  seen fail is not evidence. (Same lesson as the vacuously-passing seed test, learned again.)
+- **Don't compute what you are about to throw away:** the review list loaded every employee's salary
+  and then stripped it a line later for any caller who was not HR. Work done purely to discard, on
+  the most sensitive table on the screen.
+
+### PD-39 · 2026-09-20 · An evadable limit that hurts nobody beats an unevadable one that does
+- **Context:** there was no rate limiting anywhere. A customer integration with a retry loop and no
+  backoff, or somebody working through a password list, could issue requests as fast as the network
+  allowed, and each one borrowed from a connection pool of ten. The first symptom is the whole
+  platform timing out for every other tenant.
+- **Rule:** two tiers, because the two surfaces fail differently. The unauthenticated surface is
+  where guessing happens and nobody legitimately logs in twenty times a minute, so it is held tight
+  and keyed by address. Everything behind a token is a real customer doing real work, held loose and
+  keyed by **user id** — so an office behind one corporate NAT is not one caller.
+- **Two limits accepted with open eyes, and written into the code rather than a ticket.**
+  `X-Forwarded-For` is caller-controlled and therefore spoofable, so a determined evader gets a fresh
+  allowance per request. Using it anyway is right: without it every request arrives from the load
+  balancer's address, all our customers are one caller, and the first person to fat-finger their
+  password locks out the platform. Likewise the buckets are per process, so a second instance doubles
+  the effective limit — a shared counter is a round trip on every request and another thing that can
+  be down, and is the right trade only once there is a second instance.
+- **What is deliberately exempt:** session refresh, because a browser with several tabs renews once
+  per tab on waking and a 429 there logs someone out of a product they were using correctly — it has
+  reuse detection, which is a better defence than a counter. And health, because the keep-alive
+  pinger arrives from the same edge as everybody else.
+- **A test-infrastructure lesson worth more than the feature.** Switching the limiter off for the
+  suite via `@SpringBootTest(properties = ...)` on the base class looked right and was silently
+  fragile: a subclass that re-declares `@SpringBootTest` replaces those properties wholesale, which
+  one test does on purpose, so it got the limiter back and failed for reasons unrelated to what it
+  tests. `@TestPropertySource` is inherited and merged, so a subclass has to mean it. Found by
+  running the suite, not by reasoning about it.
+
 ---
 
 ## 4. Architecture Decision Log
+
 
 > Summaries here; binding detail in [docs/06](docs/06-architecture-principles.md) and (once
 > established in Phase 1) formal ADRs under `docs/adr/`. Newest first.

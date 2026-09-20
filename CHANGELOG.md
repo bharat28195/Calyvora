@@ -4,6 +4,25 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-20 — A ceiling on how fast one caller may ask for things
+There was no rate limiting anywhere: one integration retrying without backoff could exhaust a
+connection pool of ten and time the platform out for every other tenant. Now two tiers — the
+unauthenticated surface (login, register, reset, trial requests) at 20/min keyed by address, and
+everything behind a token at 600/min keyed by user id, so an office behind one NAT is not one caller.
+A token bucket, so a page opening six endpoints at once is still normal. Session refresh and health
+are exempt on purpose. 429s carry `Retry-After`, and the remaining allowance is on every response.
+Per process, and dependent on `X-Forwarded-For` — both trade-offs are argued in the code. (PD-39)
+
+### 2026-09-20 — The team screens read the team, not the company
+The two slowest pages in the product, measured on the 1,000-person Scaleworks tenant: team
+performance at 4.3s and the team summary at 1.1s. Neither was the reporting tree the backlog blamed.
+The summary issued six reasonable-looking queries that each read the whole company — the employee
+table three times, then its entire month of attendance, all leave and all expense claims — and
+filtered to a hundred people in memory. Team performance fetched the employee, manager, cycle, goals,
+salary and user row once **per review**. Both are scoped and batched now, and salary is only read for
+callers allowed to see it. Pinned by two budgets, one of which counts entities loaded rather than
+statements, because the statement counter could not see this defect at all. (PD-38)
+
 ### 2026-09-14 — Every log line names its tenant, and slow endpoints can be read off a table
 Before this a warning in the log — a payroll that took nine seconds, a reset code that did not send —
 could not be tied to a customer. Now every line carries `[correlationId|companyId|userId]`, any
