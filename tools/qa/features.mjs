@@ -107,8 +107,10 @@ await feature("Leave — request then approve", async () => {
     // while leave was working perfectly and rejecting an invalid type exactly as it should.
     type: "VACATION", startDate: "2026-12-22", endDate: "2026-12-23", reason: `QA ${stamp}`,
   }, memberTok), "member requests");
-  const inbox = must(await call("GET", "/api/v1/people/leave"), "approver inbox");
-  if (!inbox.find((l) => l.id === req.id)) throw new Error("request not visible to the approver");
+  // The approver queue is a cursor page: { items, nextCursor }. Asking for PENDING as well, since
+  // that is what the screen asks for and it keeps this from depending on how deep the queue is.
+  const inbox = must(await call("GET", "/api/v1/people/leave?status=PENDING"), "approver inbox");
+  if (!inbox.items.find((l) => l.id === req.id)) throw new Error("request not visible to the approver");
   const done = must(await call("POST", `/api/v1/people/leave/${req.id}/approve`, {}), "approve");
   if (done.status !== "APPROVED") throw new Error(`status is ${done.status}`);
   return `requested by member, approved by owner (${req.days} days)`;
