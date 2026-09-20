@@ -167,6 +167,80 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("expense totals are for the whole set, not for the page they arrive with")
+    void the_totals_survive_paging() throws Exception {
+        Session admin = seedScale();
+        try {
+            JsonNode whole = getJson("/api/v1/expenses?size=200", admin);
+            // A single-row page, so the reported totals cannot coincide with the page's own sum
+            // unless the company has at most one claim of that status. Comparing two large pages
+            // would pass by luck whenever every pending claim happened to land on the first.
+            JsonNode onePage = getJson("/api/v1/expenses?size=1", admin);
+
+            assertThat(whole.get("claims").size())
+                    .as("the fixture needs more claims than one small page, or this proves nothing")
+                    .isGreaterThan(5);
+            assertThat(onePage.get("claims").size()).isEqualTo(1);
+            assertThat(onePage.get("nextCursor").isNull()).isFalse();
+
+            // What the page would report if the totals were accumulated over its own rows.
+            java.math.BigDecimal pendingOnPage = java.math.BigDecimal.ZERO;
+            for (JsonNode row : onePage.get("claims")) {
+                if ("SUBMITTED".equals(row.get("status").asText())) {
+                    pendingOnPage = pendingOnPage.add(row.get("amount").decimalValue());
+                }
+            }
+            assertThat(onePage.get("pendingAmount").decimalValue())
+                    .as("the total must be the company's, not this one row's")
+                    .isGreaterThan(pendingOnPage);
+
+            // The whole point of summing these in the database. Accumulating them while walking the
+            // rows was correct only while the rows were everything; on a page it would quietly
+            // redefine "outstanding across the company" as "outstanding among these five" — a wrong
+            // number on a finance screen, and wrong in a way nobody notices until they reconcile.
+            for (String total : List.of("pendingAmount", "awaitingReimbursement", "reimbursedThisYear")) {
+                assertThat(onePage.get(total).decimalValue())
+                        .as("%s must not shrink to the page", total)
+                        .isEqualByComparingTo(whole.get(total).decimalValue());
+            }
+            assertThat(whole.get("pendingAmount").decimalValue())
+                    .as("the seeder leaves claims awaiting approval, so this must not be zero")
+                    .isGreaterThan(java.math.BigDecimal.ZERO);
+        } finally {
+            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    @DisplayName("the helpdesk queue pages, and its status filter is applied in the database")
+    void the_ticket_queue_pages() throws Exception {
+        Session admin = seedScale();
+        try {
+            List<String> all = new ArrayList<>();
+            String cursor = null;
+            for (int guard = 0; guard <= 200; guard++) {
+                JsonNode page = getJson("/api/v1/helpdesk/tickets?size=4"
+                        + (cursor == null ? "" : "&cursor=" + cursor), admin);
+                for (JsonNode row : page.get("items")) {
+                    all.add(row.get("id").asText());
+                }
+                if (page.get("nextCursor").isNull()) break;
+                cursor = page.get("nextCursor").asText();
+            }
+            assertThat(all).hasSizeGreaterThan(4);
+            assertThat(new HashSet<>(all)).as("no ticket twice").hasSameSizeAs(all);
+
+            JsonNode open = getJson("/api/v1/helpdesk/tickets?status=OPEN&size=200", admin);
+            for (JsonNode row : open.get("items")) {
+                assertThat(row.get("status").asText()).isEqualTo("OPEN");
+            }
+            assertThat(open.get("items").size()).isPositive().isLessThan(all.size());
+        } finally {
+            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+        }
+    }
+
+    @Test
     @DisplayName("a cursor we never issued is refused, rather than quietly restarting from the top")
     void a_bad_cursor_is_an_error() throws Exception {
         Session owner = onboardOwner("Cursorco", "admin@cursorco.test", "Passw0rd!x");

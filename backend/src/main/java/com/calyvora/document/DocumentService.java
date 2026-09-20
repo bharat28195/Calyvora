@@ -4,7 +4,9 @@ import com.calyvora.common.error.ApiException;
 import com.calyvora.common.error.ErrorCode;
 import com.calyvora.common.error.NotFoundException;
 import com.calyvora.common.security.AuthPrincipal;
+import com.calyvora.common.dto.CursorPage;
 import com.calyvora.common.security.TenantContext;
+import com.calyvora.common.web.Cursors;
 import com.calyvora.company.CompanyRepository;
 import com.calyvora.document.dto.DocumentResponse;
 import com.calyvora.document.dto.GenerateRequest;
@@ -17,6 +19,8 @@ import com.calyvora.people.CompensationRepository;
 import com.calyvora.people.DepartmentRepository;
 import com.calyvora.people.Employee;
 import com.calyvora.people.EmployeeRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -185,16 +189,60 @@ public class DocumentService {
                 });
     }
 
+    /**
+     * Issued documents, newest first, one page at a time.
+     *
+     * <p>Every letter the company has ever generated is a permanent record, so this list only ever
+     * grows — an offer, a joining letter and a relieving letter per person, plus an appraisal letter
+     * each year. It had no ceiling, and the names on it were two queries per distinct employee.
+     */
     @Transactional(readOnly = true)
-    public List<DocumentResponse> listDocuments(UUID employeeId) {
+    public CursorPage<DocumentResponse> listDocuments(UUID employeeId, String cursor, Integer size) {
         UUID companyId = TenantContext.getCompanyId();
+        int limit = Cursors.limit(size);
+        Cursors.Position from = Cursors.decode(cursor);
+        Pageable window = PageRequest.of(0, limit + 1);
+
         List<GeneratedDocument> docs = employeeId == null
-                ? documentRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
-                : documentRepository.findByEmployeeIdOrderByCreatedAtDesc(employeeId);
-        Map<UUID, String> names = new HashMap<>();
-        return docs.stream()
-                .map(d -> DocumentResponse.of(d, nameOfEmployee(d.getEmployeeId(), companyId, names), null))
-                .toList();
+                ? documentRepository.pageForCompany(companyId, from.createdAt(), from.id(), window)
+                : documentRepository.pageForEmployee(companyId, employeeId, from.createdAt(), from.id(), window);
+
+        Map<UUID, String> names = namesForPage(companyId,
+                docs.stream().map(GeneratedDocument::getEmployeeId).filter(java.util.Objects::nonNull).toList());
+        return Cursors.of(docs, limit,
+                d -> DocumentResponse.of(d, d.getEmployeeId() == null ? null : names.get(d.getEmployeeId()), null),
+                GeneratedDocument::getCreatedAt, GeneratedDocument::getId);
+    }
+
+    /**
+     * Display names for the employees on one page, in two reads rather than two per person.
+     *
+     * <p>The per-row helper below memoises within a single call, which bounded the damage but paid
+     * it fresh on every load and scaled with the size of the list rather than the page.
+     */
+    private Map<UUID, String> namesForPage(UUID companyId, java.util.Collection<UUID> employeeIds) {
+        if (employeeIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Employee> employees = employeeRepository
+                .findByCompanyIdAndIdIn(companyId, new java.util.LinkedHashSet<>(employeeIds));
+        java.util.Set<UUID> userIds = employees.stream()
+                .map(Employee::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        Map<UUID, String> byUser = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                com.calyvora.identity.User::getId,
+                                u -> (u.getFirstName() + " " + u.getLastName()).trim(), (a, b) -> a));
+        Map<UUID, String> byEmployee = new HashMap<>();
+        for (Employee e : employees) {
+            if (e.getUserId() != null && byUser.containsKey(e.getUserId())) {
+                byEmployee.put(e.getId(), byUser.get(e.getUserId()));
+            }
+        }
+        return byEmployee;
     }
 
     @Transactional(readOnly = true)

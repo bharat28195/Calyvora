@@ -5,7 +5,9 @@ import com.calyvora.common.error.ErrorCode;
 import com.calyvora.common.error.ForbiddenException;
 import com.calyvora.common.error.NotFoundException;
 import com.calyvora.common.security.AuthPrincipal;
+import com.calyvora.common.dto.CursorPage;
 import com.calyvora.common.security.TenantContext;
+import com.calyvora.common.web.Cursors;
 import com.calyvora.helpdesk.dto.CommentPayload;
 import com.calyvora.helpdesk.dto.CommentResponse;
 import com.calyvora.helpdesk.dto.RaiseTicketRequest;
@@ -16,10 +18,12 @@ import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
 import com.calyvora.notification.NotificationService;
 import com.calyvora.notification.NotificationType;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,14 +77,32 @@ public class HelpdeskService {
 
     // ---- HR queue ----
 
+    /**
+     * The agent queue, newest first, one page at a time.
+     *
+     * <p>This read had no ceiling: every ticket the company had ever raised, which grows forever and
+     * is mostly closed. The status filter existed but was applied to the rows after they arrived, so
+     * asking for the open ones still read the whole history to find them — and under paging that is
+     * not merely slower, it is wrong: a page of the fifty newest tickets can be entirely closed, and
+     * the screen would show an empty queue with the open ones stranded on a later page.
+     */
     @Transactional(readOnly = true)
-    public List<TicketResponse> queue(String status) {
+    public CursorPage<TicketResponse> queue(String status, String cursor, Integer size) {
         UUID companyId = TenantContext.getCompanyId();
+        int limit = Cursors.limit(size);
+        Cursors.Position from = Cursors.decode(cursor);
+        Collection<TicketStatus> statuses = status == null || status.isBlank()
+                ? java.util.EnumSet.allOf(TicketStatus.class)
+                : java.util.EnumSet.of(parseStatus(status));
+
+        // One extra row, which is how the page knows whether to offer a cursor without counting the
+        // whole table to find out.
+        List<HelpdeskTicket> rows = ticketRepository.pageForCompany(
+                companyId, statuses, from.createdAt(), from.id(), PageRequest.of(0, limit + 1));
+
         Map<UUID, String> names = names(companyId);
-        TicketStatus filter = status == null || status.isBlank() ? null : parseStatus(status);
-        return ticketRepository.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
-                .filter(t -> filter == null || t.getStatus() == filter)
-                .map(t -> toResponse(t, names)).toList();
+        return Cursors.of(rows, limit, t -> toResponse(t, names),
+                HelpdeskTicket::getCreatedAt, HelpdeskTicket::getId);
     }
 
     // ---- one ticket + thread ----

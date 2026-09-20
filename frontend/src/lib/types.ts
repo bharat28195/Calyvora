@@ -294,6 +294,8 @@ export interface ExpenseClaim {
 }
 export interface ExpenseSummary {
   claims: ExpenseClaim[];
+  /** Where to continue from; null at the end. The totals below are for the whole set, not the page. */
+  nextCursor: string | null;
   pendingAmount: number;
   awaitingReimbursement: number;
   reimbursedThisYear: number;

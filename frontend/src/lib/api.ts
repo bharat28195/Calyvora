@@ -335,6 +335,28 @@ function infrastructureError(status: number): ApiErrorBody {
   return { timestamp: "", status, code: "INFRASTRUCTURE", message };
 }
 
+/** What every paged list accepts: where to continue from, and how much to take. */
+export interface PageOpts {
+  cursor?: string | null;
+  size?: number;
+}
+
+/**
+ * The query string for a paged list, including whatever filter the caller passed.
+ *
+ * <p>Filters go in here rather than being applied to the answer. These lists are newest-first and
+ * paged, so filtering after the fact is a different question: a page of recent rows can be entirely
+ * the wrong status, and the screen would look empty while the matches sat further down.
+ */
+function pageQuery(opts: object): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(opts)) {
+    if (value !== undefined && value !== null && value !== "") qs.set(key, String(value));
+  }
+  const query = qs.toString();
+  return query ? `?${query}` : "";
+}
+
 export const api = {
   // --- auth / registration ---
   /**
@@ -624,9 +646,9 @@ export const api = {
   myTickets(): Promise<HelpdeskTicket[]> {
     return LIVE ? http<HelpdeskTicket[]>("/helpdesk/tickets/mine") : mockBackend.myTickets(accessToken);
   },
-  helpdeskQueue(status?: string): Promise<HelpdeskTicket[]> {
-    const qs = status ? `?status=${status}` : "";
-    return LIVE ? http<HelpdeskTicket[]>(`/helpdesk/tickets${qs}`) : mockBackend.helpdeskQueue(accessToken, status);
+  helpdeskQueue(opts: PageOpts & { status?: string } = {}): Promise<CursorPage<HelpdeskTicket>> {
+    if (!LIVE) return mockBackend.helpdeskQueue(accessToken, opts.status);
+    return http<CursorPage<HelpdeskTicket>>(`/helpdesk/tickets${pageQuery(opts)}`);
   },
   helpdeskTicket(id: string): Promise<HelpdeskTicket> {
     return LIVE ? http<HelpdeskTicket>(`/helpdesk/tickets/${id}`) : mockBackend.helpdeskTicket(accessToken, id);
@@ -1312,11 +1334,21 @@ export const api = {
   },
 
   // --- expense claims ---
-  myExpenses(): Promise<ExpenseSummary> {
-    return LIVE ? http<ExpenseSummary>("/expenses/me") : mockBackend.myExpenses(accessToken);
+  myExpenses(opts: PageOpts & { status?: string } = {}): Promise<ExpenseSummary> {
+    if (!LIVE) return mockBackend.myExpenses(accessToken);
+    return http<ExpenseSummary>(`/expenses/me${pageQuery(opts)}`);
   },
-  allExpenses(): Promise<ExpenseSummary> {
-    return LIVE ? http<ExpenseSummary>("/expenses") : mockBackend.allExpenses(accessToken);
+  /**
+   * The approver's queue. `status` is filtered on the server, not here: the list is newest-first and
+   * paged, so a page of recent claims can be entirely settled and filtering the arrived page would
+   * show an empty queue with the ones awaiting approval stranded further down.
+   *
+   * <p>The totals on the response are for the whole set rather than the page, which is why they
+   * survive paging at all — see the repository's aggregate queries.
+   */
+  allExpenses(opts: PageOpts & { status?: string } = {}): Promise<ExpenseSummary> {
+    if (!LIVE) return mockBackend.allExpenses(accessToken, opts.status);
+    return http<ExpenseSummary>(`/expenses${pageQuery(opts)}`);
   },
   submitExpense(input: ExpenseInput): Promise<ExpenseClaim> {
     return LIVE ? http<ExpenseClaim>("/expenses", { method: "POST", body: JSON.stringify(input) }) : mockBackend.submitExpense(accessToken, input);
@@ -1438,9 +1470,9 @@ export const api = {
   generateDoc(input: GenerateDocInput): Promise<GeneratedDoc> {
     return LIVE ? http<GeneratedDoc>("/documents", { method: "POST", body: JSON.stringify(input) }) : mockBackend.generateDoc(accessToken, input);
   },
-  documents(employeeId?: string): Promise<GeneratedDoc[]> {
-    const qs = employeeId ? `?employeeId=${employeeId}` : "";
-    return LIVE ? http<GeneratedDoc[]>(`/documents${qs}`) : mockBackend.documents(accessToken, employeeId);
+  documents(opts: PageOpts & { employeeId?: string } = {}): Promise<CursorPage<GeneratedDoc>> {
+    if (!LIVE) return mockBackend.documents(accessToken, opts.employeeId);
+    return http<CursorPage<GeneratedDoc>>(`/documents${pageQuery(opts)}`);
   },
   document(id: string): Promise<GeneratedDoc> {
     return LIVE ? http<GeneratedDoc>(`/documents/${id}`) : mockBackend.document(accessToken, id);

@@ -9,6 +9,8 @@ import java.util.List;
  */
 public record ExpenseSummaryResponse(
         List<ExpenseResponse> claims,
+        /** Where to continue from; null at the end of the list. See {@code CursorPage}. */
+        String nextCursor,
         BigDecimal pendingAmount,
         BigDecimal awaitingReimbursement,
         BigDecimal reimbursedThisYear,

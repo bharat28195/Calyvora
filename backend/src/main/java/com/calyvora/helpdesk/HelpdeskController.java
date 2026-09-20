@@ -68,8 +68,11 @@ public class HelpdeskController {
 
     @GetMapping("/tickets")
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
-    public List<TicketResponse> queue(@RequestParam(required = false) String status) {
-        return service.queue(status);
+    public com.calyvora.common.dto.CursorPage<TicketResponse> queue(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        return service.queue(status, cursor, size);
     }
 
     @PatchMapping("/tickets/{id}")

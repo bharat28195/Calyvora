@@ -104,7 +104,7 @@ class DocumentIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isForbidden());
 
         Session other = onboardOwner("Other Co", "owner@other.com", PW);
-        assertThat(getJson("/api/v1/documents", other).size()).isZero();  // none of Northwind's letters
+        assertThat(getJson("/api/v1/documents", other).get("items").size()).isZero();  // none of Northwind's letters
     }
 
     @Test

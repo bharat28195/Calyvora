@@ -149,8 +149,11 @@ public class DocumentController {
     }
 
     @GetMapping
-    public List<DocumentResponse> documents(@RequestParam(required = false) UUID employeeId) {
-        return documentService.listDocuments(employeeId);
+    public com.calyvora.common.dto.CursorPage<DocumentResponse> documents(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        return documentService.listDocuments(employeeId, cursor, size);
     }
 
     @GetMapping("/{documentId}")

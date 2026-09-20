@@ -36,7 +36,7 @@ class ScaleModuleSeedTest extends IntegrationTestBase {
             new Listing("/api/v1/expenses", "claims"),
             new Listing("/api/v1/work/projects", null),
             new Listing("/api/v1/knowledge/spaces", null),
-            new Listing("/api/v1/helpdesk/tickets", null),
+            new Listing("/api/v1/helpdesk/tickets", "items"),
             new Listing("/api/v1/feed", null),
             new Listing("/api/v1/performance/cycles", null),
             new Listing("/api/v1/recruit/jobs", null),
@@ -73,7 +73,7 @@ class ScaleModuleSeedTest extends IntegrationTestBase {
                     .as("leave waiting for a decision").isPositive();
             assertThat(countWhere(rowsOf(getJson("/api/v1/expenses", admin), "claims"), "SUBMITTED"))
                     .as("expenses waiting for a decision").isPositive();
-            assertThat(countWhere(rowsOf(getJson("/api/v1/helpdesk/tickets", admin), null), "OPEN"))
+            assertThat(countWhere(rowsOf(getJson("/api/v1/helpdesk/tickets", admin), "items"), "OPEN"))
                     .as("tickets waiting to be picked up").isPositive();
         } finally {
             // Never leave an invented thousand-person company behind, even on a failure.

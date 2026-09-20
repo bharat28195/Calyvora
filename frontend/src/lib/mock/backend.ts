@@ -935,12 +935,17 @@ export const mockBackend = {
     const me = employeeForUser(db, user);
     return summarizeExpenses(db, (mockExpenses[user.companyId] ?? []).filter((c) => c.employeeId === me.id));
   },
-  async allExpenses(accessToken: string | null): Promise<ExpenseSummary> {
+  async allExpenses(accessToken: string | null, status?: string): Promise<ExpenseSummary> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
     requireAdmin(user);
-    return summarizeExpenses(db, mockExpenses[user.companyId] ?? []);
+    // Filtered here as the server filters it, so the mock answers the same question. Not paged: the
+    // mock holds a handful of rows, and inventing cursors for them would only be a way for the mock
+    // and the real thing to disagree. summarizeExpenses supplies nextCursor: null.
+    const all = mockExpenses[user.companyId] ?? [];
+    const wanted = status && status.toUpperCase() !== "ALL" ? status.toUpperCase() : null;
+    return summarizeExpenses(db, wanted ? all.filter((c) => c.status === wanted) : all, all);
   },
   async submitExpense(accessToken: string | null, input: ExpenseInput): Promise<ExpenseClaim> {
     await delay();
@@ -1307,13 +1312,13 @@ export const mockBackend = {
     mockDocs[user.companyId] = [doc, ...(mockDocs[user.companyId] ?? [])];
     return doc;
   },
-  async documents(accessToken: string | null, employeeId?: string): Promise<GeneratedDoc[]> {
+  async documents(accessToken: string | null, employeeId?: string): Promise<CursorPage<GeneratedDoc>> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
     requireAdmin(user);
     const all = mockDocs[user.companyId] ?? [];
-    return employeeId ? all.filter((d) => d.employeeId === employeeId) : all.slice();
+    return { items: employeeId ? all.filter((d) => d.employeeId === employeeId) : all.slice(), nextCursor: null };
   },
   async document(accessToken: string | null, id: string): Promise<GeneratedDoc> {
     await delay();
@@ -1658,12 +1663,15 @@ export const mockBackend = {
     const user = requireSession(db, accessToken);
     return (mockTickets[user.companyId] ?? []).filter((t) => t.raisedById === user.id);
   },
-  async helpdeskQueue(accessToken: string | null, status?: string): Promise<HelpdeskTicket[]> {
+  async helpdeskQueue(accessToken: string | null, status?: string): Promise<CursorPage<HelpdeskTicket>> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
     requireAdmin(user);
-    return (mockTickets[user.companyId] ?? []).filter((t) => !status || t.status === status);
+    return {
+      items: (mockTickets[user.companyId] ?? []).filter((t) => !status || t.status === status),
+      nextCursor: null,
+    };
   },
   async helpdeskTicket(accessToken: string | null, id: string): Promise<HelpdeskTicket> {
     await delay();
@@ -3757,10 +3765,16 @@ function renderPost(db: DB, p: MockPost, viewer: User): Post {
 // --- expenses (mock, in-memory; resets on reload) ---------------------------
 const mockExpenses: Record<string, ExpenseClaim[]> = {};
 
-function summarizeExpenses(db: DB, claims: ExpenseClaim[]): ExpenseSummary {
+/**
+ * @param claims the rows to show
+ * @param totalsFrom the rows the money figures are computed over — every claim, not just the shown
+ *   ones. The server sums these in the database precisely so that filtering or paging the list does
+ *   not change them, and the mock has to agree or the demo shows different totals from the product.
+ */
+function summarizeExpenses(db: DB, claims: ExpenseClaim[], totalsFrom: ExpenseClaim[] = claims): ExpenseSummary {
   const year = new Date().getFullYear();
   let pending = 0, awaiting = 0, reimbursed = 0;
-  for (const c of claims) {
+  for (const c of totalsFrom) {
     if (c.status === "SUBMITTED") pending += c.amount;
     else if (c.status === "APPROVED") awaiting += c.amount;
     else if (c.status === "REIMBURSED" && c.reimbursedAt && new Date(c.reimbursedAt).getFullYear() === year) {
@@ -3769,6 +3783,7 @@ function summarizeExpenses(db: DB, claims: ExpenseClaim[]): ExpenseSummary {
   }
   return {
     claims: claims.slice(),
+    nextCursor: null,
     pendingAmount: pending,
     awaitingReimbursement: awaiting,
     reimbursedThisYear: reimbursed,

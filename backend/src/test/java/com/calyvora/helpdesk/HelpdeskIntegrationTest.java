@@ -22,7 +22,8 @@ class HelpdeskIntegrationTest extends IntegrationTestBase {
     void the_demo_seeds_tickets_across_statuses() throws Exception {
         seedDemo();
         Session hr = login("leo.martins@northwind.demo", PW);   // HR agent
-        JsonNode queue = getJson("/api/v1/helpdesk/tickets", hr);
+        // The agent queue is a cursor page now, so the rows are under "items".
+        JsonNode queue = getJson("/api/v1/helpdesk/tickets", hr).get("items");
         assertThat(queue.size()).isGreaterThanOrEqualTo(3);
     }
 

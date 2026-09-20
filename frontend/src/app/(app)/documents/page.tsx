@@ -13,13 +13,30 @@ import { Alert } from "@/components/ui/alert";
 /** Every letter this company has issued (feedback D2). Newest first. */
 export default function DocumentsPage() {
   const [docs, setDocs] = useState<GeneratedDoc[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.documents()
-      .then(setDocs)
+      .then((page) => { setDocs(page.items); setCursor(page.nextCursor); })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load documents"));
   }, []);
+
+  // Every letter the company has ever issued is a permanent record, so this list only grows.
+  async function loadMore() {
+    if (!cursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.documents({ cursor });
+      setDocs((current) => [...(current ?? []), ...page.items]);
+      setCursor(page.nextCursor);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load more documents");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div>
@@ -67,6 +84,12 @@ export default function DocumentsPage() {
               </Card>
             </Link>
           ))}
+          {cursor && (
+            <Button variant="secondary" size="sm" className="self-start" disabled={loadingMore}
+              onClick={() => void loadMore()}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </Button>
+          )}
         </div>
       )}
     </div>

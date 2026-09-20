@@ -16,8 +16,11 @@ export function EmployeeDocuments({ employeeId }: { employeeId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.documents(employeeId)
-      .then(setDocs)
+    // No "load more" here on purpose: this is one person's file — an offer, a joining letter, the
+    // odd appraisal — and a default page covers it many times over. The company-wide list, which
+    // actually grows, has one.
+    api.documents({ employeeId })
+      .then((page) => setDocs(page.items))
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load documents"));
   }, [employeeId]);
 

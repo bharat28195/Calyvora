@@ -5,6 +5,7 @@ import com.calyvora.common.error.ErrorCode;
 import com.calyvora.common.error.ForbiddenException;
 import com.calyvora.common.error.NotFoundException;
 import com.calyvora.common.security.AuthPrincipal;
+import com.calyvora.common.web.Cursors;
 import com.calyvora.common.security.TenantContext;
 import com.calyvora.expense.dto.ExpensePayload;
 import com.calyvora.expense.dto.ExpenseResponse;
@@ -16,12 +17,15 @@ import com.calyvora.notification.NotificationType;
 import com.calyvora.people.Employee;
 import com.calyvora.people.EmployeeRepository;
 import com.calyvora.people.EmployeeService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,11 +63,19 @@ public class ExpenseService {
     // ---- mine ----
 
     @Transactional
-    public ExpenseSummaryResponse mine(AuthPrincipal principal) {
+    public ExpenseSummaryResponse mine(AuthPrincipal principal, String status, String cursor, Integer size) {
         UUID companyId = TenantContext.getCompanyId();
         Employee me = self(companyId, principal);
-        List<ExpenseClaim> claims = claimRepository.findByEmployeeIdOrderByCreatedAtDesc(me.getId());
-        return summarize(claims, nameCache(companyId));
+        int limit = Cursors.limit(size);
+        Cursors.Position from = Cursors.decode(cursor);
+
+        List<ExpenseClaim> claims = claimRepository.pageForEmployee(companyId, me.getId(),
+                statusFilter(status), from.createdAt(), from.id(), PageRequest.of(0, limit + 1));
+        // One person's own name, rather than the company's. This used to build a map of every
+        // employee — with a user lookup each — to label a list on which every row is the same person.
+        Map<UUID, String> names = Map.of(me.getId(), nameOf(companyId, me));
+        Totals totals = totalsForEmployee(companyId, me.getId());
+        return summarize(claims, names, limit, totals);
     }
 
     @Transactional
@@ -136,10 +148,103 @@ public class ExpenseService {
 
     // ---- approving (Owner/Admin) ----
 
+    /**
+     * The approver's queue, newest first, one page at a time.
+     *
+     * <p>Read every claim the company had ever filed, which grows forever and is mostly settled. The
+     * status filter lived on the screen, which under paging is not a smaller version of filtering
+     * here but a different answer: a page of the newest fifty claims can be entirely reimbursed, and
+     * the screen would show nothing awaiting approval while claims waited on a later page.
+     */
     @Transactional(readOnly = true)
-    public ExpenseSummaryResponse all() {
+    public ExpenseSummaryResponse all(String status, String cursor, Integer size) {
         UUID companyId = TenantContext.getCompanyId();
-        return summarize(claimRepository.findByCompanyIdOrderByCreatedAtDesc(companyId), nameCache(companyId));
+        int limit = Cursors.limit(size);
+        Cursors.Position from = Cursors.decode(cursor);
+
+        List<ExpenseClaim> claims = claimRepository.pageForCompany(companyId, statusFilter(status),
+                from.createdAt(), from.id(), PageRequest.of(0, limit + 1));
+        Map<UUID, String> names = namesForPage(companyId,
+                claims.stream().map(ExpenseClaim::getEmployeeId).toList());
+        return summarize(claims, names, limit, totalsForCompany(companyId));
+    }
+
+    /** The three money figures on the summary, whoever they are for. */
+    private record Totals(java.math.BigDecimal pending, java.math.BigDecimal awaiting,
+                          java.math.BigDecimal reimbursedThisYear) {
+    }
+
+    private Totals totalsForCompany(UUID companyId) {
+        Instant[] year = thisYear();
+        return new Totals(
+                claimRepository.sumForCompany(companyId, ExpenseStatus.SUBMITTED),
+                claimRepository.sumForCompany(companyId, ExpenseStatus.APPROVED),
+                claimRepository.sumReimbursedForCompany(companyId, ExpenseStatus.REIMBURSED, year[0], year[1]));
+    }
+
+    private Totals totalsForEmployee(UUID companyId, UUID employeeId) {
+        Instant[] year = thisYear();
+        return new Totals(
+                claimRepository.sumForEmployee(companyId, employeeId, ExpenseStatus.SUBMITTED),
+                claimRepository.sumForEmployee(companyId, employeeId, ExpenseStatus.APPROVED),
+                claimRepository.sumReimbursedForEmployee(companyId, employeeId, ExpenseStatus.REIMBURSED,
+                        year[0], year[1]));
+    }
+
+    /**
+     * This calendar year, as an instant range.
+     *
+     * <p>Deliberately the server's own zone, which is what the row-by-row version it replaces used.
+     * Reckoning the year in the company's timezone would be more defensible, but it would also move
+     * money between years for claims settled in the first or last hours of one, and that is a change
+     * to a reported figure rather than a refactor. Worth doing on purpose, not as a side effect.
+     */
+    private static Instant[] thisYear() {
+        ZoneId zone = ZoneId.systemDefault();
+        int year = LocalDate.now(zone).getYear();
+        return new Instant[]{
+                LocalDate.of(year, 1, 1).atStartOfDay(zone).toInstant(),
+                LocalDate.of(year + 1, 1, 1).atStartOfDay(zone).toInstant()};
+    }
+
+    /**
+     * Which statuses the caller asked for; everything when they did not ask.
+     *
+     * <p>An unrecognised status is refused rather than ignored, because silently returning everything
+     * for a typo is how rejected claims end up in a queue labelled "awaiting approval".
+     */
+    private Collection<ExpenseStatus> statusFilter(String status) {
+        if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status.trim())) {
+            return java.util.EnumSet.allOf(ExpenseStatus.class);
+        }
+        java.util.Set<ExpenseStatus> wanted = new java.util.LinkedHashSet<>();
+        for (String part : status.split(",")) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            try {
+                wanted.add(ExpenseStatus.valueOf(trimmed.toUpperCase()));
+            } catch (IllegalArgumentException ex) {
+                throw new com.calyvora.common.error.ApiException(
+                        com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
+                        "'" + trimmed + "' is not an expense status.");
+            }
+        }
+        return wanted.isEmpty() ? java.util.EnumSet.allOf(ExpenseStatus.class) : wanted;
+    }
+
+    /** Display names for the employees on one page, in two reads rather than the whole company. */
+    private Map<UUID, String> namesForPage(UUID companyId, Collection<UUID> employeeIds) {
+        if (employeeIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> names = new HashMap<>();
+        for (Employee e : employeeRepository.findByCompanyIdAndIdIn(companyId,
+                new java.util.LinkedHashSet<>(employeeIds))) {
+            names.put(e.getId(), nameOf(companyId, e));
+        }
+        return names;
     }
 
     @Transactional
@@ -180,30 +285,31 @@ public class ExpenseService {
 
     // ---- helpers ----
 
-    private ExpenseSummaryResponse summarize(List<ExpenseClaim> claims, Map<UUID, String> names) {
-        BigDecimal pending = BigDecimal.ZERO;
-        BigDecimal awaiting = BigDecimal.ZERO;
-        BigDecimal reimbursed = BigDecimal.ZERO;
-        int year = LocalDate.now().getYear();
-
-        for (ExpenseClaim c : claims) {
-            switch (c.getStatus()) {
-                case SUBMITTED -> pending = pending.add(c.getAmount());
-                case APPROVED -> awaiting = awaiting.add(c.getAmount());
-                case REIMBURSED -> {
-                    if (c.getReimbursedAt() != null
-                            && c.getReimbursedAt().atZone(ZoneId.systemDefault()).getYear() == year) {
-                        reimbursed = reimbursed.add(c.getAmount());
-                    }
-                }
-                default -> { /* rejected claims count towards nothing */ }
-            }
+    /**
+     * One page of claims plus the totals, which are for the whole set rather than the page.
+     *
+     * <p>The totals used to be accumulated while walking the list, which was correct only because the
+     * list was everything. They are aggregates now — see the repository — so that paging the claims
+     * does not quietly redefine "outstanding across the company" as "outstanding on this page".
+     */
+    private ExpenseSummaryResponse summarize(List<ExpenseClaim> fetched, Map<UUID, String> names,
+                                             int limit, Totals totals) {
+        boolean more = fetched.size() > limit;
+        List<ExpenseClaim> claims = more ? fetched.subList(0, limit) : fetched;
+        String nextCursor = null;
+        if (more && !claims.isEmpty()) {
+            ExpenseClaim last = claims.get(claims.size() - 1);
+            nextCursor = Cursors.encode(last.getCreatedAt(), last.getId());
         }
+
+        // The currency comes off the page as it always came off the list. Every claim in a company
+        // carries the same one in practice, so this is the company's currency by another name.
         String currency = claims.isEmpty() ? "INR" : claims.get(0).getCurrency();
         List<ExpenseResponse> rows = claims.stream()
                 .map(c -> ExpenseResponse.of(c, names.get(c.getEmployeeId())))
                 .toList();
-        return new ExpenseSummaryResponse(rows, pending, awaiting, reimbursed, currency);
+        return new ExpenseSummaryResponse(rows, nextCursor,
+                totals.pending(), totals.awaiting(), totals.reimbursedThisYear(), currency);
     }
 
     /** Who decides this person's claims: their manager, else every Owner/Admin (mirrors leave). */

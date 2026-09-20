@@ -21,15 +21,37 @@ export default function HelpdeskPage() {
   const [tab, setTab] = useState<"queue" | "mine">(isAgent ? "queue" : "mine");
   const [status, setStatus] = useState<TicketStatus | "">("");
   const [tickets, setTickets] = useState<HelpdeskTicket[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [raising, setRaising] = useState(false);
 
+  // The agent queue is paged and its status filter is applied by the server; "my tickets" is a short
+  // list of one person's own and has no cursor, so it reports null and the button never appears.
   const load = useCallback(() => {
     setTickets(null);
-    const p = tab === "queue" && isAgent ? api.helpdeskQueue(status || undefined) : api.myTickets();
-    p.then(setTickets).catch((e) => { setTickets([]); setError(e instanceof ApiError ? e.message : "Failed to load"); });
+    setCursor(null);
+    const p = tab === "queue" && isAgent
+      ? api.helpdeskQueue({ status: status || undefined })
+      : api.myTickets().then((items) => ({ items, nextCursor: null }));
+    p.then((page) => { setTickets(page.items); setCursor(page.nextCursor); })
+      .catch((e) => { setTickets([]); setError(e instanceof ApiError ? e.message : "Failed to load"); });
   }, [tab, status, isAgent]);
   useEffect(() => { load(); }, [load]);
+
+  async function loadMore() {
+    if (!cursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.helpdeskQueue({ status: status || undefined, cursor });
+      setTickets((current) => [...(current ?? []), ...page.items]);
+      setCursor(page.nextCursor);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load more");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div>
@@ -88,6 +110,12 @@ export default function HelpdeskPage() {
               </Card>
             </Link>
           ))}
+          {cursor && (
+            <Button variant="secondary" size="sm" className="self-start" disabled={loadingMore}
+              onClick={() => void loadMore()}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </Button>
+          )}
         </div>
       )}
     </div>

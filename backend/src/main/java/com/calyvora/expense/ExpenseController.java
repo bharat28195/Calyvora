@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -38,8 +39,11 @@ public class ExpenseController {
     // ---- mine ----
 
     @GetMapping("/me")
-    public ExpenseSummaryResponse mine(@CurrentUser AuthPrincipal principal) {
-        return expenseService.mine(principal);
+    public ExpenseSummaryResponse mine(@CurrentUser AuthPrincipal principal,
+                                       @RequestParam(required = false) String status,
+                                       @RequestParam(required = false) String cursor,
+                                       @RequestParam(required = false) Integer size) {
+        return expenseService.mine(principal, status, cursor, size);
     }
 
     @PostMapping
@@ -65,8 +69,10 @@ public class ExpenseController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
-    public ExpenseSummaryResponse all() {
-        return expenseService.all();
+    public ExpenseSummaryResponse all(@RequestParam(required = false) String status,
+                                      @RequestParam(required = false) String cursor,
+                                      @RequestParam(required = false) Integer size) {
+        return expenseService.all(status, cursor, size);
     }
 
     // No @PreAuthorize on approve/reject, and that is the change rather than an omission. A role can
