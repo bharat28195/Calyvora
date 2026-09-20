@@ -1359,9 +1359,45 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   statement. Aggregates in the database, and a test that pages one row at a time so the reported
   total cannot coincide with the page's own sum.
 
+### PD-41 · 2026-09-21 · Income tax: the law in a pure function, and the screen that shows its working
+- **Context:** the product paid Indian salaries, deducted PF and filed a bank file, but withheld no
+  income tax at all. Payroll that does not deduct TDS is not payroll — the employer is liable for it
+  whether or not the software remembered.
+- **Rule: the arithmetic never touches a database.** `IncomeTaxCalculator` is a pure function of
+  (gross, regime, declarations), like `PfCalculator` before it, because the number ends up deducted
+  from somebody's pay every month and reported in a quarterly return. It has to be checkable by
+  writing down a salary and an expected tax, and those checks have to run in milliseconds so there
+  can be twenty of them rather than three.
+- **Caps belong where the tax is computed, not on the form.** A limit enforced only in the browser is
+  not a limit: a ₹5,00,000 claim under 80C arriving over the API would cut somebody's tax by ₹70,000
+  they owe — with interest — when the return is assessed. The `TaxDeduction` enum carries each
+  ceiling and whether the section survives into the new regime, so switching regime silently stops
+  granting what it disallows and nobody has to remember to clear a form.
+- **Claims are stored uncapped and trimmed at computation.** That lets the screen say "you claimed
+  ₹5,00,000, ₹1,50,000 is allowable" rather than swallowing the difference, and lets a ceiling raised
+  by a future Finance Act reprice declarations already on file.
+- **Two tests failed, and the law was right.** They asserted that take-home never falls as salary
+  rises, across the ₹12 lakh rebate cliff and the ₹50 lakh surcharge threshold. Marginal relief caps
+  the *tax* at the income earned above the line, but the 4% cess is charged on top of the relieved
+  figure — so the effective marginal rate there is exactly 104% and take-home does dip slightly until
+  breakeven near ₹12.77 lakh. Checking the order of operations against published sources settled it:
+  the code was correct and the tests encoded a stronger guarantee than the Act provides. They now pin
+  104%, and a published worked example (₹12,25,000 taxable → ₹26,000) is asserted as an outside
+  opinion rather than another number of our own.
+- **Marginal relief is not optional anywhere it appears.** Without it, a rupee over ₹12,00,000 costs
+  about ₹61,000 and a rupee over ₹50,00,000 about ₹1,40,000 — wrong in the most visible way possible,
+  for precisely the employees who examine their payslips most closely.
+- **A financial year is its own type.** In February 2027 the financial year is still 2026-27, and
+  using the calendar year would file three months of everybody's tax under the wrong one. The
+  off-by-one is invisible, so it is written once.
+- **The comparison is the product.** Both regimes are priced on the employee's own numbers on every
+  computation. Neither wins in general, April is the only month somebody can act on it, and without
+  this the choice is made with a spreadsheet or not at all.
+
 ---
 
 ## 4. Architecture Decision Log
+
 
 
 

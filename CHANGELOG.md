@@ -4,6 +4,31 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-21 — Income tax: declare it, choose a regime, and see the working
+The product paid Indian salaries and deducted PF but withheld no income tax at all. It now computes
+it for both regimes at FY 2026-27 rates — slabs, the 87A rebate, surcharge, 4% cess and marginal
+relief in both the places it applies. Employees declare their own deductions (80C, 80D, 80CCD(1B) and
+(2), 80E, 80G, 80TTA, 24(b) home loan interest, HRA and LTA exemptions, professional tax) and pick
+their own regime; both are priced side by side on their own numbers, because neither wins in general
+and April is the only month anyone can act on it. A computation screen shows the sequence rather than
+the total — slab by slab, then rebate, surcharge and cess — and what the next pay run will withhold,
+spreading what is left over the pay runs that are left. HR gets a roster of who has declared and a
+window switch that is enforced on the server, so figures cannot move under a return already filed.
+Caps are applied where the tax is computed, never in the form. 31 tests. (PD-41)
+
+### 2026-09-21 — Attendance percentage counts the month, not the days with records
+Reported from the demo: three check-ins in September showed "3 / 3 days" and 100%. Unmarked working
+days were skipped entirely, so the rate was worked days over days that happened to have a row — which
+is always all of them. The denominator is now every elapsed working day of the month, weekends and
+holidays excluded, so three days out of fourteen reads 21%. Today is left out while it has no record,
+and a "Not recorded" chip explains the gap. Pay is untouched: payroll counts its own working days and
+deliberately never treats an unmarked day as loss of pay.
+
+### 2026-09-21 — Expenses opens inside Finance
+Finance › Expenses pointed at `/me/expenses`, and the shell picks the open section by path prefix, so
+clicking it switched the whole sidebar to "Me". The route moved to `/finance/expenses`; the old path
+stays as a redirect because notification rows store the link they were written with.
+
 ### 2026-09-21 — Expenses, helpdesk and documents page the way leave does
 The last three lists that grew forever. All read every row the company had ever created and filtered
 by status on the screen, which paging turns from an inefficiency into a wrong answer. Expenses needed
