@@ -7,6 +7,8 @@ import com.calyvora.common.error.NotFoundException;
 import com.calyvora.common.security.AuthPrincipal;
 import com.calyvora.common.security.TenantContext;
 import com.calyvora.identity.Role;
+import com.calyvora.common.dto.CursorPage;
+import com.calyvora.common.web.Cursors;
 import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
 import com.calyvora.notification.NotificationService;
@@ -15,6 +17,8 @@ import com.calyvora.people.dto.CreateLeaveRequest;
 import com.calyvora.people.dto.LeaveBalanceResponse;
 import com.calyvora.people.dto.LeaveRequestResponse;
 import com.calyvora.people.dto.LeaveTypeBalanceResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +27,13 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -139,18 +146,102 @@ public class LeaveService {
      * been scoped to the caller's reports ({@code RegularizationService.pending}), so the same manager
      * could approve a missed punch but not a day off. This is that same scoping, applied to leave.
      */
+    /**
+     * The approver's queue, newest first, one page at a time.
+     *
+     * <p>This read used to be unbounded and quadratic at once. It loaded every leave request the
+     * company had ever filed — which grows forever, and at a thousand people is tens of thousands of
+     * rows within a couple of years — and then, for a manager, called {@code isMyReport} on each one.
+     * Every one of those calls loaded and walked the whole reporting tree. A manager looking at a
+     * queue of five hundred requests walked the company tree five hundred times to draw one screen.
+     *
+     * <p>Now the scope is resolved once, the filtering happens in the database rather than in memory
+     * after the fact, and the caller gets a page. The names are fetched in one read too: they used to
+     * be a query per distinct employee, memoised within the request but paid fresh on every load.
+     */
     @Transactional(readOnly = true)
-    public List<LeaveRequestResponse> listForApprover(AuthPrincipal principal) {
+    public CursorPage<LeaveRequestResponse> listForApprover(AuthPrincipal principal, String status,
+                                                            String cursor, Integer size) {
         UUID companyId = TenantContext.getCompanyId();
-        Map<UUID, String> names = new HashMap<>();
-        List<LeaveRequest> all = leaveRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
-        List<LeaveRequest> visible = seesEveryone(principal)
-                ? all
-                : all.stream().filter(r -> isMyReport(companyId, r.getEmployeeId(), principal.userId())).toList();
-        return visible.stream()
-                .map(r -> LeaveRequestResponse.of(r,
-                        names.computeIfAbsent(r.getEmployeeId(), this::nameOfEmployeeId)))
-                .toList();
+        int limit = Cursors.limit(size);
+        Cursors.Position from = Cursors.decode(cursor);
+        Collection<LeaveStatus> statuses = statusFilter(status);
+        // One extra row, which is how the page knows whether to offer a cursor without counting the
+        // whole table to find out.
+        Pageable window = PageRequest.of(0, limit + 1);
+
+        List<LeaveRequest> rows;
+        if (seesEveryone(principal)) {
+            rows = leaveRepository.pageForCompany(companyId, statuses, from.createdAt(), from.id(), window);
+        } else {
+            Set<UUID> roster = orgScope.downline(principal, false);
+            if (roster.isEmpty()) {
+                // Nobody reports to them, so there is nothing to approve. An empty IN list is both
+                // meaningless to the database and a round trip to learn what we already know.
+                return CursorPage.empty();
+            }
+            rows = leaveRepository.pageForRoster(companyId, roster, statuses, from.createdAt(), from.id(), window);
+        }
+
+        Map<UUID, String> names = namesFor(rows.stream().map(LeaveRequest::getEmployeeId).toList());
+        return Cursors.of(rows, limit,
+                r -> LeaveRequestResponse.of(r, names.getOrDefault(r.getEmployeeId(), "Unknown")),
+                LeaveRequest::getCreatedAt, LeaveRequest::getId);
+    }
+
+    /**
+     * Which statuses the caller asked for; everything when they did not ask.
+     *
+     * <p>This exists because the approvals screen only ever renders PENDING. It used to fetch the
+     * company's entire leave history and discard everything already decided — which is most of it,
+     * and more of it every month. Filtering in the database is both the smaller read and the only way
+     * the paging can be right: a client that pages through everything and keeps the pending rows
+     * shows an empty queue whenever the first page happens to be all decided.
+     *
+     * <p>An unrecognised status is refused rather than ignored. Silently returning everything for
+     * {@code ?status=PENDNIG} is how a screen ends up quietly showing approved leave in an approvals
+     * queue.
+     */
+    private Collection<LeaveStatus> statusFilter(String status) {
+        if (status == null || status.isBlank()) {
+            return java.util.EnumSet.allOf(LeaveStatus.class);
+        }
+        java.util.Set<LeaveStatus> wanted = new LinkedHashSet<>();
+        for (String part : status.split(",")) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            try {
+                wanted.add(LeaveStatus.valueOf(trimmed.toUpperCase()));
+            } catch (IllegalArgumentException ex) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                        "'" + trimmed + "' is not a leave status.");
+            }
+        }
+        return wanted.isEmpty() ? java.util.EnumSet.allOf(LeaveStatus.class) : wanted;
+    }
+
+    /** Display names for a page of rows, in two reads rather than two per row. */
+    private Map<UUID, String> namesFor(Collection<UUID> employeeIds) {
+        if (employeeIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Employee> employees = employeeRepository.findAllById(new LinkedHashSet<>(employeeIds));
+        Set<UUID> userIds = employees.stream()
+                .map(Employee::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        Map<UUID, String> byUser = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(User::getId, User::fullName, (a, b) -> a));
+        Map<UUID, String> byEmployee = new HashMap<>();
+        for (Employee e : employees) {
+            byEmployee.put(e.getId(),
+                    e.getUserId() == null ? "Unknown" : byUser.getOrDefault(e.getUserId(), "Unknown"));
+        }
+        return byEmployee;
     }
 
     @Transactional

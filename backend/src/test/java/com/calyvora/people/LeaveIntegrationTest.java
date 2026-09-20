@@ -61,7 +61,8 @@ class LeaveIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.pendingDays").value(5));
 
         // appears in the admin inbox
-        JsonNode inbox = getJson("/api/v1/people/leave", owner);
+        // The approver queue is a cursor page now, so the rows are under "items".
+        JsonNode inbox = getJson("/api/v1/people/leave", owner).get("items");
         assertThat(inbox.size()).isEqualTo(1);
 
         // admin approves
@@ -125,7 +126,7 @@ class LeaveIntegrationTest extends IntegrationTestBase {
         String reqA = requestLeave(ownerA, "VACATION", year + "-07-01", year + "-07-03");
 
         // B's inbox is empty and B cannot approve A's request
-        JsonNode bInbox = getJson("/api/v1/people/leave", ownerB);
+        JsonNode bInbox = getJson("/api/v1/people/leave", ownerB).get("items");
         assertThat(bInbox.size()).isZero();
         mockMvc.perform(post("/api/v1/people/leave/" + reqA + "/approve")
                         .header("Authorization", "Bearer " + ownerB.accessToken()))

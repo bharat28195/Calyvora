@@ -75,6 +75,7 @@ import {
   type Employee,
   type Invitation,
   type LeaveBalance,
+  type CursorPage,
   type LeaveRequest,
   type LoginResult,
   type OnboardingTask,
@@ -2478,12 +2479,21 @@ export const mockBackend = {
     }
     return { allowanceDays: 25, usedDays: used, remainingDays: Math.max(0, 25 - used), pendingDays: pending };
   },
-  async allLeave(accessToken: string | null): Promise<LeaveRequest[]> {
+  async allLeave(accessToken: string | null, status?: string): Promise<CursorPage<LeaveRequest>> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
     requireAdmin(user);
-    return db.leave.filter((l) => l.companyId === user.companyId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((l) => toLeave(db, l));
+    // Not actually paged: the mock's dataset is a handful of rows, so there is never a second page
+    // and inventing cursors for it would only be a way for the mock and the real thing to disagree.
+    // The shape matches, which is what callers depend on.
+    const wanted = status ? status.split(",").map((s) => s.trim().toUpperCase()) : null;
+    const items = db.leave
+      .filter((l) => l.companyId === user.companyId)
+      .filter((l) => wanted === null || wanted.includes(l.status))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((l) => toLeave(db, l));
+    return { items, nextCursor: null };
   },
   async decideLeave(accessToken: string | null, id: string, decision: "APPROVED" | "REJECTED"): Promise<LeaveRequest> {
     await delay();

@@ -32,7 +32,7 @@ class ScaleModuleSeedTest extends IntegrationTestBase {
     private record Listing(String path, String field) {}
 
     private static final List<Listing> MUST_NOT_BE_EMPTY = List.of(
-            new Listing("/api/v1/people/leave", null),
+            new Listing("/api/v1/people/leave", "items"),
             new Listing("/api/v1/expenses", "claims"),
             new Listing("/api/v1/work/projects", null),
             new Listing("/api/v1/knowledge/spaces", null),
@@ -69,7 +69,7 @@ class ScaleModuleSeedTest extends IntegrationTestBase {
             // A queue with nothing waiting cannot be demonstrated, so the seeder leaves work in each
             // one deliberately. These are the screens somebody is asked to *act* on, and they are the
             // ones an empty tenant fails at most visibly.
-            assertThat(countWhere(rowsOf(getJson("/api/v1/people/leave", admin), null), "PENDING"))
+            assertThat(countWhere(rowsOf(getJson("/api/v1/people/leave", admin), "items"), "PENDING"))
                     .as("leave waiting for a decision").isPositive();
             assertThat(countWhere(rowsOf(getJson("/api/v1/expenses", admin), "claims"), "SUBMITTED"))
                     .as("expenses waiting for a decision").isPositive();

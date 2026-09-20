@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -71,8 +72,12 @@ public class LeaveController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
-    public List<LeaveRequestResponse> all(@CurrentUser AuthPrincipal principal) {
-        return leaveService.listForApprover(principal);
+    public com.calyvora.common.dto.CursorPage<LeaveRequestResponse> all(
+            @CurrentUser AuthPrincipal principal,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        return leaveService.listForApprover(principal, status, cursor, size);
     }
 
     @PostMapping("/{id}/approve")

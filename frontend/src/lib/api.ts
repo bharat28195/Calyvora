@@ -79,6 +79,7 @@ import {
   type LeaveBalance,
   type PfSettings,
   type LeavePolicy,
+  type CursorPage,
   type LeaveRequest,
   type LeaveTypeBalance,
   type LoginResult,
@@ -917,8 +918,22 @@ export const api = {
   decideCompOff(id: string, action: "approve" | "reject"): Promise<CompOffCredit> {
     return http<CompOffCredit>(`/people/comp-off/${id}/${action}`, { method: "POST" });
   },
-  allLeave(): Promise<LeaveRequest[]> {
-    return LIVE ? http<LeaveRequest[]>("/people/leave") : mockBackend.allLeave(accessToken);
+  /**
+   * The approver's queue, one page at a time.
+   *
+   * <p>`status` is filtered on the server rather than here. The screen only shows what is still
+   * waiting for a decision, and filtering a page after it arrives means an empty queue whenever the
+   * newest fifty requests all happen to be decided already — with the pending ones sitting on page
+   * three, unreachable and invisible.
+   */
+  allLeave(opts: { status?: string; cursor?: string | null; size?: number } = {}): Promise<CursorPage<LeaveRequest>> {
+    if (!LIVE) return mockBackend.allLeave(accessToken, opts.status);
+    const qs = new URLSearchParams();
+    if (opts.status) qs.set("status", opts.status);
+    if (opts.cursor) qs.set("cursor", opts.cursor);
+    if (opts.size) qs.set("size", String(opts.size));
+    const query = qs.toString();
+    return http<CursorPage<LeaveRequest>>(`/people/leave${query ? `?${query}` : ""}`);
   },
   approveLeave(id: string): Promise<LeaveRequest> {
     return LIVE ? http<LeaveRequest>(`/people/leave/${id}/approve`, { method: "POST" }) : mockBackend.decideLeave(accessToken, id, "APPROVED");

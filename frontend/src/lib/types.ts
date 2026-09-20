@@ -980,6 +980,17 @@ export interface LeaveRequest {
   createdAt: string;
 }
 
+/**
+ * A slice of a list that grows forever, and where to continue from.
+ *
+ * <p>Mirrors the backend's CursorPage. A null `nextCursor` means the end — a full page is not a
+ * reliable signal, since the last page can be exactly full.
+ */
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
 export interface LeaveBalance {
   allowanceDays: number;
   usedDays: number;

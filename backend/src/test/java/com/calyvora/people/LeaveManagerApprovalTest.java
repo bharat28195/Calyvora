@@ -100,11 +100,11 @@ class LeaveManagerApprovalTest extends IntegrationTestBase {
     void manager_sees_only_their_own_reports_requests() throws Exception {
         Fixture f = twoTeams();
 
-        JsonNode inboxA = getJson("/api/v1/people/leave", f.managerA());
+        JsonNode inboxA = getJson("/api/v1/people/leave", f.managerA()).get("items");
         assertThat(inboxA).hasSize(1);
         assertThat(inboxA.get(0).get("id").asText()).isEqualTo(f.leaveA());
 
-        JsonNode inboxB = getJson("/api/v1/people/leave", f.managerB());
+        JsonNode inboxB = getJson("/api/v1/people/leave", f.managerB()).get("items");
         assertThat(inboxB).hasSize(1);
         assertThat(inboxB.get(0).get("id").asText()).isEqualTo(f.leaveB());
     }
@@ -148,7 +148,7 @@ class LeaveManagerApprovalTest extends IntegrationTestBase {
         Fixture f = twoTeams();
         Session hr = addUser(f.owner(), "hr@acme.com", "HR", "Hema");
 
-        JsonNode inbox = getJson("/api/v1/people/leave", hr);
+        JsonNode inbox = getJson("/api/v1/people/leave", hr).get("items");
         assertThat(inbox).hasSize(2);
 
         // HR has no reports of their own; scoping by reports would give them an empty inbox, which is
@@ -166,7 +166,7 @@ class LeaveManagerApprovalTest extends IntegrationTestBase {
         Fixture f = twoTeams();
         Session lone = addUser(f.owner(), "mgr.c@acme.com", "MANAGER", "Chitra");
 
-        assertThat(getJson("/api/v1/people/leave", lone)).isEmpty();
+        assertThat(getJson("/api/v1/people/leave", lone).get("items")).isEmpty();
     }
 
     @Test

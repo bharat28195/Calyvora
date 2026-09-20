@@ -48,12 +48,19 @@ export default function TimeOffPage() {
 }
 
 function Approvals() {
-  const [inbox, setInbox] = useState<LeaveRequest[]>([]);
+  const [pending, setPending] = useState<LeaveRequest[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // PENDING is asked of the server, not filtered out of the answer. The queue is newest-first and
+  // grows forever, so a page of the most recent requests can easily be entirely decided already —
+  // filtering here would show "nothing waiting" while the pending ones sat on a later page.
   const load = useCallback(async () => {
     try {
-      setInbox(await api.allLeave());
+      const page = await api.allLeave({ status: "PENDING" });
+      setPending(page.items);
+      setCursor(page.nextCursor);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load requests");
     }
@@ -63,16 +70,30 @@ function Approvals() {
     void load();
   }, [load]);
 
+  async function loadMore() {
+    if (!cursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.allLeave({ status: "PENDING", cursor });
+      setPending((current) => [...current, ...page.items]);
+      setCursor(page.nextCursor);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load more requests");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   async function decide(id: string, action: "approve" | "reject") {
     try {
       await (action === "approve" ? api.approveLeave(id) : api.rejectLeave(id));
+      // Back to the first page: the decided request leaves the queue, and keeping the rest of a
+      // stale list on screen around the gap is more confusing than simply reloading it.
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to update request");
     }
   }
-
-  const pending = inbox.filter((r) => r.status === "PENDING");
 
   return (
     <div className="mt-10">
@@ -101,6 +122,12 @@ function Approvals() {
               </div>
             </Card>
           ))
+        )}
+        {cursor && (
+          <Button variant="secondary" size="sm" className="self-start" disabled={loadingMore}
+            onClick={() => void loadMore()}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
         )}
       </div>
     </div>
