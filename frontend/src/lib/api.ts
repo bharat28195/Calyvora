@@ -321,6 +321,10 @@ async function http<T>(path: string, init?: HttpInit): Promise<T> {
  * service, not per client, and it fires on the FIRST request after idleness rather than after many —
  * so the honest message is that the server is starting up. Retrying is still the wrong response (see
  * `retryable`, which excludes 429): the wake limiter wants quiet, not persistence.
+ *
+ * <p>The app issues its own 429s now as well (`RateLimitFilter`), and those are genuinely "you are
+ * going too fast". The two never get confused, because this function is only reached when the body
+ * would not parse as JSON: ours carries a message saying what happened, and the host's does not.
  */
 function infrastructureError(status: number): ApiErrorBody {
   const message =

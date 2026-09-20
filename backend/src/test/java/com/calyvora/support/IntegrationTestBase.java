@@ -32,6 +32,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // a large change that tests the console rather than the feature each one is about. The production
 // default is asserted directly, and hard, in TrialRequestFlowTest.
 @SpringBootTest(properties = "calyvora.security.registration.open=true")
+// The rate limiter is off across the suite: every test logs in, often many times, always from the
+// same address, so a limit sized for a stranger guessing passwords would fail tests that are
+// behaving correctly. RateLimitIntegrationTest switches it back on and is the one place it is
+// exercised.
+//
+// This is a @TestPropertySource rather than another entry in @SpringBootTest above, and deliberately
+// so: a subclass that re-declares @SpringBootTest replaces the properties there wholesale — which
+// TrialRequestFlowTest does on purpose — and would silently switch the limiter back on and fail for
+// reasons that have nothing to do with what it is testing. @TestPropertySource is inherited and
+// merged instead, so a subclass has to mean it.
+@org.springframework.test.context.TestPropertySource(properties = "calyvora.rate-limit.enabled=false")
 @AutoConfigureMockMvc
 @AutoConfigureEmbeddedDatabase(provider = ZONKY, refresh = AFTER_EACH_TEST_METHOD)
 @Import({RecordingEmailService.class, RlsRoleConfig.class})

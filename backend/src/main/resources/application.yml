@@ -86,6 +86,16 @@ server:
 calyvora:
   ops:
     slow-request-ms: 1000   # one WARN line per request slower than this (SlowRequestFilter)
+  rate-limit:
+    # A ceiling on how fast one caller may ask for things (RateLimitFilter). Per process: the product
+    # runs as one instance, so this is also the global limit today.
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    # The unauthenticated surface, keyed by address: logging in, registering, password resets. Nobody
+    # legitimately logs in twenty times a minute, so this is held tight.
+    auth-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:20}
+    # Everything behind a token, keyed by user. Set where a person cannot reach it but a retry loop
+    # with no backoff will: a busy screen opens a handful of endpoints at once, not ten a second.
+    api-per-minute: ${RATE_LIMIT_API_PER_MINUTE:600}
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   mail:
