@@ -4,6 +4,16 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-21 — Expenses, helpdesk and documents page the way leave does
+The last three lists that grew forever. All read every row the company had ever created and filtered
+by status on the screen, which paging turns from an inefficiency into a wrong answer. Expenses needed
+more than a cursor: its money totals were accumulated while walking the list, so paging would have
+redefined "outstanding across the company" as "outstanding on this page" — they are aggregate queries
+now, and the test pages one row at a time so the total cannot coincide with the page's own sum. Two
+N+1s fell out on the way: `/expenses/me` built a name map of the whole company to label one person's
+claims, and documents did two queries per distinct employee. V54 indexes the six new query shapes.
+(PD-40)
+
 ### 2026-09-20 — The approvals queue is a page, and it asks for what it shows
 `GET /people/leave` read every leave request the company had ever filed — a list that grows forever —
 and the screen then discarded everything already decided, because all it renders is what is pending.

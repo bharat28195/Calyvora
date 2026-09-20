@@ -1350,8 +1350,14 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   anywhere says why.
 - **The backlog's "~20 unbounded endpoints" was wrong, in the useful direction.** Counting them
   honestly, most are config tables of a few dozen rows, the feed and notifications are already
-  capped, and attendance is date-windowed. The real list is the admin queues — leave, expenses,
-  helpdesk, documents. Leave is done; the other three are the same shape.
+  capped, and attendance is date-windowed. The real list was four admin queues — leave, expenses,
+  helpdesk, documents — and all four are now converted.
+- **Totals are the part that does not survive paging by itself.** The expense summary accumulated its
+  three money figures while walking the claims, which was right only because the claims were
+  everything. Paging the list silently redefines "outstanding across the company" as "outstanding on
+  this page" — a wrong number on a finance screen, unnoticed until someone reconciles against a bank
+  statement. Aggregates in the database, and a test that pages one row at a time so the reported
+  total cannot coincide with the page's own sum.
 
 ---
 
