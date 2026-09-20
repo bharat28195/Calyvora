@@ -92,37 +92,50 @@ public class TeamService {
     @Transactional(readOnly = true)
     public TeamSummaryResponse summary(AuthPrincipal principal, boolean directOnly, YearMonth month) {
         UUID companyId = TenantContext.getCompanyId();
-        Set<UUID> direct = orgScope.downline(principal, true);
-        Set<UUID> everyone = orgScope.downline(principal, false);
-        Set<UUID> roster = directOnly ? direct : everyone;
+        OrgScope.Downline downline = orgScope.downlineBoth(principal);
+        Set<UUID> direct = downline.direct();
+        Set<UUID> everyone = downline.all();
+        Set<UUID> roster = downline.forScope(directOnly);
 
-        List<Employee> all = employeeRepository.findByCompanyId(companyId);
-        List<Employee> members = all.stream().filter(e -> roster.contains(e.getId())).toList();
+        // Nobody reports to this caller. Every query below is scoped by the roster, and an empty IN
+        // list is both meaningless to the database and a waste of six round trips to draw no rows.
+        if (roster.isEmpty()) {
+            return new TeamSummaryResponse(month.toString(), direct.size(), everyone.size(),
+                    0, 0, 0, 0, List.of());
+        }
 
-        // Managers of the listed people include the viewer, who is not on the roster, so names are
-        // resolved from the whole company rather than from the roster alone.
-        Map<UUID, String> everyName = names(all);
+        List<Employee> members = employeeRepository.findByCompanyIdAndIdIn(companyId, roster);
+
+        // Managers of the listed people include the viewer, who is not on the roster, so their name is
+        // resolved alongside the roster's rather than by reading the whole company.
+        Set<UUID> named = new java.util.LinkedHashSet<>(roster);
+        for (Employee e : members) {
+            if (e.getManagerId() != null) {
+                named.add(e.getManagerId());
+            }
+        }
+        Map<UUID, String> everyName = names(employeeRepository.findByCompanyIdAndIdIn(companyId, named));
         Map<UUID, String> departmentNames = departmentRepository.findByCompanyIdOrderByName(companyId).stream()
                 .collect(Collectors.toMap(Department::getId, Department::getName, (a, b) -> a));
 
+        // Every read below is filtered by the roster in the database rather than in memory. Read the
+        // company's month instead and a lead of a hundred pulls the other nine hundred people's
+        // attendance across the wire to throw it away — which is what this page used to do.
         LocalDate today = LocalDate.now();
         Map<UUID, List<AttendanceRecord>> attendance = attendanceRepository
-                .findByCompanyIdAndDateBetween(companyId, month.atDay(1), month.atEndOfMonth()).stream()
-                .filter(r -> roster.contains(r.getEmployeeId()))
+                .findByCompanyIdAndEmployeeIdInAndDateBetween(companyId, roster, month.atDay(1), month.atEndOfMonth())
+                .stream()
                 .collect(Collectors.groupingBy(AttendanceRecord::getEmployeeId));
         Map<UUID, AttendanceStatus> todayStatus = attendanceRepository
-                .findByCompanyIdAndDate(companyId, today).stream()
-                .filter(r -> roster.contains(r.getEmployeeId()))
+                .findByCompanyIdAndEmployeeIdInAndDate(companyId, roster, today).stream()
                 .collect(Collectors.toMap(AttendanceRecord::getEmployeeId, AttendanceRecord::getStatus, (a, b) -> a));
 
-        Map<UUID, Long> pendingLeave = leaveRequestRepository.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
-                .filter(r -> roster.contains(r.getEmployeeId()) && r.getStatus() == LeaveStatus.PENDING)
+        Map<UUID, Long> pendingLeave = leaveRequestRepository
+                .findByCompanyIdAndEmployeeIdInAndStatus(companyId, roster, LeaveStatus.PENDING).stream()
                 .collect(Collectors.groupingBy(LeaveRequest::getEmployeeId, Collectors.counting()));
 
-        List<ExpenseClaim> openClaims = expenseClaimRepository.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
-                .filter(c -> roster.contains(c.getEmployeeId()))
-                .filter(c -> c.getStatus() == ExpenseStatus.SUBMITTED || c.getStatus() == ExpenseStatus.APPROVED)
-                .toList();
+        List<ExpenseClaim> openClaims = expenseClaimRepository.findByCompanyIdAndEmployeeIdInAndStatusIn(
+                companyId, roster, List.of(ExpenseStatus.SUBMITTED, ExpenseStatus.APPROVED));
         Map<UUID, Long> openExpenseCount = openClaims.stream()
                 .collect(Collectors.groupingBy(ExpenseClaim::getEmployeeId, Collectors.counting()));
         Map<UUID, BigDecimal> openExpenseAmount = new HashMap<>();
@@ -134,10 +147,8 @@ public class TeamService {
         // One query for the whole roster, newest first, keeping the first status seen per person —
         // the alternative is a query per report, which is thirty round trips to draw one table.
         Map<UUID, String> latestReview = new HashMap<>();
-        if (!roster.isEmpty()) {
-            for (PerformanceReview r : reviewRepository.findByEmployeeIdInOrderByCreatedAtDesc(roster)) {
-                latestReview.putIfAbsent(r.getEmployeeId(), r.getStatus().name());
-            }
+        for (PerformanceReview r : reviewRepository.findByEmployeeIdInOrderByCreatedAtDesc(roster)) {
+            latestReview.putIfAbsent(r.getEmployeeId(), r.getStatus().name());
         }
 
         List<TeamMemberResponse> rows = new ArrayList<>();
@@ -186,9 +197,11 @@ public class TeamService {
     public List<LeaveRequestResponse> leave(AuthPrincipal principal, boolean directOnly) {
         UUID companyId = TenantContext.getCompanyId();
         Set<UUID> roster = rosterIds(principal, directOnly);
-        Map<UUID, String> names = names(employeeRepository.findByCompanyId(companyId));
-        return leaveRequestRepository.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
-                .filter(r -> roster.contains(r.getEmployeeId()))
+        if (roster.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, String> names = names(employeeRepository.findByCompanyIdAndIdIn(companyId, roster));
+        return leaveRequestRepository.findByCompanyIdAndEmployeeIdInOrderByCreatedAtDesc(companyId, roster).stream()
                 .map(r -> LeaveRequestResponse.of(r, names.getOrDefault(r.getEmployeeId(), "Unknown")))
                 .toList();
     }
@@ -198,9 +211,11 @@ public class TeamService {
     public List<ExpenseResponse> expenses(AuthPrincipal principal, boolean directOnly) {
         UUID companyId = TenantContext.getCompanyId();
         Set<UUID> roster = rosterIds(principal, directOnly);
-        Map<UUID, String> names = names(employeeRepository.findByCompanyId(companyId));
-        return expenseClaimRepository.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
-                .filter(c -> roster.contains(c.getEmployeeId()))
+        if (roster.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, String> names = names(employeeRepository.findByCompanyIdAndIdIn(companyId, roster));
+        return expenseClaimRepository.findByCompanyIdAndEmployeeIdInOrderByCreatedAtDesc(companyId, roster).stream()
                 .map(c -> ExpenseResponse.of(c, names.getOrDefault(c.getEmployeeId(), "Unknown")))
                 .toList();
     }

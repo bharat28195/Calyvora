@@ -3,6 +3,7 @@ package com.calyvora.people;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,14 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, UUID
     List<LeaveRequest> findByEmployeeIdOrderByCreatedAtDesc(UUID employeeId);
 
     List<LeaveRequest> findByCompanyIdOrderByCreatedAtDesc(UUID companyId);
+
+    /** One roster's requests — the team screens, which must not read the company's. */
+    List<LeaveRequest> findByCompanyIdAndEmployeeIdInOrderByCreatedAtDesc(
+            UUID companyId, Collection<UUID> employeeIds);
+
+    /** The pending count per person, without loading anything that is already decided. */
+    List<LeaveRequest> findByCompanyIdAndEmployeeIdInAndStatus(
+            UUID companyId, Collection<UUID> employeeIds, LeaveStatus status);
 
     Optional<LeaveRequest> findByIdAndCompanyId(UUID id, UUID companyId);
 

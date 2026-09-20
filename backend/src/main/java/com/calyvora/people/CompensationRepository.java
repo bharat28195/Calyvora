@@ -18,4 +18,8 @@ public interface CompensationRepository extends JpaRepository<CompensationRecord
      * not on payroll, which is slower than the work it was meant to avoid.
      */
     List<CompensationRecord> findByCompanyIdOrderByEffectiveDateDescCreatedAtDesc(UUID companyId);
+
+    /** One roster's salary rows, newest first — for screens that list pay for a team, not a company. */
+    List<CompensationRecord> findByEmployeeIdInOrderByEffectiveDateDescCreatedAtDesc(
+            java.util.Collection<UUID> employeeIds);
 }

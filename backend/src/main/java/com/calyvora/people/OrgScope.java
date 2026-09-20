@@ -81,8 +81,8 @@ public class OrgScope {
     public Set<UUID> visibleEmployeeIds(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         if (seesWholeCompany(principal)) {
-            return employeeRepository.findByCompanyId(companyId).stream()
-                    .map(Employee::getId)
+            return employeeRepository.findReportingEdges(companyId).stream()
+                    .map(EmployeeRepository.ReportingEdge::getId)
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         }
         Set<UUID> ids = new LinkedHashSet<>();
@@ -115,6 +115,31 @@ public class OrgScope {
         return walk(childrenByManager(), managerEmployeeId, directOnly);
     }
 
+    /**
+     * A caller's direct reports and their whole subtree, from a single load of the tree.
+     *
+     * <p>Every team screen needs both: the subtree is the roster, and "is this person a direct report"
+     * decides the grouping and the sort. Asking {@link #downline} twice reads and walks the company's
+     * tree twice to answer two questions about one walk.
+     */
+    public record Downline(Set<UUID> direct, Set<UUID> all) {
+        public Set<UUID> forScope(boolean directOnly) {
+            return directOnly ? direct : all;
+        }
+    }
+
+    /** {@link Downline} for the caller. */
+    @Transactional(readOnly = true)
+    public Downline downlineBoth(AuthPrincipal principal) {
+        UUID self = selfOf(principal).map(Employee::getId).orElse(null);
+        if (self == null) {
+            return new Downline(Set.of(), Set.of());
+        }
+        Map<UUID, List<UUID>> childrenOf = childrenByManager();
+        return new Downline(new LinkedHashSet<>(childrenOf.getOrDefault(self, List.of())),
+                walk(childrenOf, self, false));
+    }
+
     /** Whether the caller leads anybody at all — what makes the "My team" section appear. */
     @Transactional(readOnly = true)
     public boolean leadsAnyone(AuthPrincipal principal) {
@@ -137,25 +162,25 @@ public class OrgScope {
      */
     @Transactional(readOnly = true)
     public Standing standing(AuthPrincipal principal) {
-        UUID self = selfOf(principal).map(Employee::getId).orElse(null);
-        if (self == null) {
-            return new Standing(0, 0);
-        }
-        Map<UUID, List<UUID>> childrenOf = childrenByManager();
-        return new Standing(childrenOf.getOrDefault(self, List.of()).size(),
-                walk(childrenOf, self, false).size());
+        Downline d = downlineBoth(principal);
+        return new Standing(d.direct().size(), d.all().size());
     }
 
     /**
      * The company's reporting tree as manager → reports.
      *
-     * <p>One query, then walked in memory. The alternative — a recursive CTE — is a native query that
-     * would have to re-state the tenant predicate Row-Level Security already applies to this finder,
-     * and companies here are thousands of rows rather than millions.
+     * <p>One query of two columns, then walked in memory. A thousand-person company is two thousand
+     * UUIDs — tens of kilobytes — so the walk is not the expensive part of any screen that uses it, and
+     * a closure table maintained on every manager change would buy nothing at this size while adding a
+     * way for the tree and its index to disagree. Revisit it if a tenant ever reaches six figures.
+     *
+     * <p>It reads a projection rather than entities deliberately: this used to load every column of
+     * every employee to look at two of them.
      */
     private Map<UUID, List<UUID>> childrenByManager() {
         Map<UUID, List<UUID>> childrenOf = new HashMap<>();
-        for (Employee e : employeeRepository.findByCompanyId(TenantContext.getCompanyId())) {
+        for (EmployeeRepository.ReportingEdge e : employeeRepository
+                .findReportingEdges(TenantContext.getCompanyId())) {
             if (e.getManagerId() != null) {
                 childrenOf.computeIfAbsent(e.getManagerId(), k -> new ArrayList<>()).add(e.getId());
             }

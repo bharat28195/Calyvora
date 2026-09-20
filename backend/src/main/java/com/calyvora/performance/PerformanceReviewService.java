@@ -10,6 +10,8 @@ import com.calyvora.identity.User;
 import com.calyvora.identity.UserRepository;
 import com.calyvora.notification.NotificationService;
 import com.calyvora.notification.NotificationType;
+import com.calyvora.people.CompensationRecord;
+import com.calyvora.people.CompensationRepository;
 import com.calyvora.people.CompensationService;
 import com.calyvora.people.Employee;
 import com.calyvora.people.EmployeeRepository;
@@ -51,6 +53,7 @@ public class PerformanceReviewService {
     private final UserRepository userRepository;
     private final GoalRepository goalRepository;
     private final CompensationService compensationService;
+    private final CompensationRepository compensationRepository;
     private final NotificationService notificationService;
     private final com.calyvora.people.OrgScope orgScope;
 
@@ -58,6 +61,7 @@ public class PerformanceReviewService {
                                     PerformanceReviewRepository reviewRepository,
                                     EmployeeRepository employeeRepository, UserRepository userRepository,
                                     GoalRepository goalRepository, CompensationService compensationService,
+                                    CompensationRepository compensationRepository,
                                     NotificationService notificationService,
                                     com.calyvora.people.OrgScope orgScope) {
         this.orgScope = orgScope;
@@ -67,6 +71,7 @@ public class PerformanceReviewService {
         this.userRepository = userRepository;
         this.goalRepository = goalRepository;
         this.compensationService = compensationService;
+        this.compensationRepository = compensationRepository;
         this.notificationService = notificationService;
     }
 
@@ -154,12 +159,83 @@ public class PerformanceReviewService {
         java.util.Set<UUID> roster = orgScope.downline(principal, false);
         if (roster.isEmpty()) return List.of();
         boolean maySeePay = orgScope.seesWholeCompany(principal);
-        return reviewRepository.findByEmployeeIdInOrderByCreatedAtDesc(roster).stream()
-                .map(this::toResponse)
+        List<PerformanceReview> reviews = reviewRepository.findByEmployeeIdInOrderByCreatedAtDesc(roster);
+        Bulk bulk = Bulk.forReviews(reviews, maySeePay, employeeRepository, userRepository,
+                cycleRepository, goalRepository, compensationRepository);
+        return reviews.stream()
+                .map(r -> toResponse(r, bulk))
                 .map(r -> maySeePay ? r : r.withoutPay())
                 .sorted(java.util.Comparator.comparing(
                         PerformanceReviewResponse::employeeName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+    }
+
+    /**
+     * Everything a list of reviews needs, read once instead of once per review.
+     *
+     * <p>Rendering a review needs the employee, their manager, the cycle, their goals and their pay.
+     * Fetching those inside the per-review mapper is five round trips each, and the team screen maps
+     * every review below the caller — on a downline of a hundred and twenty that was six hundred
+     * queries and four and a bit seconds, which made it the slowest page in the product.
+     *
+     * <p>Pay is the one piece loaded conditionally. A team lead is not shown salary at all —
+     * {@code withoutPay()} strips it immediately after — so reading it for them is work done purely to
+     * discard, on the most sensitive table on the screen.
+     */
+    private record Bulk(java.util.Map<UUID, Employee> employees,
+                        java.util.Map<UUID, String> namesByUserId,
+                        java.util.Map<UUID, ReviewCycle> cycles,
+                        java.util.Map<UUID, List<Goal>> goals,
+                        java.util.Map<UUID, CompensationRecord> currentPay) {
+
+        static Bulk forReviews(List<PerformanceReview> reviews, boolean withPay,
+                               EmployeeRepository employeeRepository,
+                               UserRepository userRepository,
+                               ReviewCycleRepository cycleRepository,
+                               GoalRepository goalRepository,
+                               CompensationRepository compensationRepository) {
+            java.util.Set<UUID> employeeIds = new java.util.LinkedHashSet<>();
+            java.util.Set<UUID> cycleIds = new java.util.LinkedHashSet<>();
+            for (PerformanceReview r : reviews) {
+                if (r.getEmployeeId() != null) employeeIds.add(r.getEmployeeId());
+                if (r.getCycleId() != null) cycleIds.add(r.getCycleId());
+            }
+            // Managers are named on the row too, and a manager is not always themselves under review.
+            java.util.Set<UUID> people = new java.util.LinkedHashSet<>(employeeIds);
+            for (PerformanceReview r : reviews) {
+                if (r.getManagerId() != null) people.add(r.getManagerId());
+            }
+
+            java.util.Map<UUID, Employee> employees = employeeRepository.findAllById(people).stream()
+                    .collect(java.util.stream.Collectors.toMap(Employee::getId, e -> e, (a, b) -> a));
+            java.util.Map<UUID, ReviewCycle> cycles = cycleRepository.findAllById(cycleIds).stream()
+                    .collect(java.util.stream.Collectors.toMap(ReviewCycle::getId, c -> c, (a, b) -> a));
+            java.util.Map<UUID, List<Goal>> goals = employeeIds.isEmpty()
+                    ? java.util.Map.of()
+                    : goalRepository.findByEmployeeIdInOrderByCreatedAtDesc(employeeIds).stream()
+                            .collect(java.util.stream.Collectors.groupingBy(Goal::getEmployeeId));
+
+            // Newest first, so the first row seen per person is their current salary.
+            java.util.Map<UUID, CompensationRecord> pay = new java.util.HashMap<>();
+            if (withPay && !employeeIds.isEmpty()) {
+                for (CompensationRecord c : compensationRepository
+                        .findByEmployeeIdInOrderByEffectiveDateDescCreatedAtDesc(employeeIds)) {
+                    pay.putIfAbsent(c.getEmployeeId(), c);
+                }
+            }
+            // A person's display name lives on their user row, not their employee row, so naming a
+            // list of reviews is a second lookup per person unless they are fetched together.
+            java.util.Set<UUID> userIds = employees.values().stream()
+                    .map(Employee::getUserId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+            java.util.Map<UUID, String> names = userIds.isEmpty()
+                    ? java.util.Map.of()
+                    : userRepository.findAllById(userIds).stream()
+                            .collect(java.util.stream.Collectors.toMap(User::getId, User::fullName, (a, b) -> a));
+
+            return new Bulk(employees, names, cycles, goals, pay);
+        }
     }
 
     // ---------- a single review ----------
@@ -310,32 +386,65 @@ public class PerformanceReviewService {
         return ReviewCycleResponse.of(cycle, total, submitted, approved);
     }
 
+    /** One review on its own — reads what it needs directly. */
     private PerformanceReviewResponse toResponse(PerformanceReview review) {
-        Employee employee = employeeRepository.findById(review.getEmployeeId()).orElse(null);
-        String employeeName = employee == null ? "Employee" : nameOf(employee);
-        String jobTitle = employee == null ? null : employee.getJobTitle();
-        String managerName = review.getManagerId() == null ? null
-                : employeeRepository.findById(review.getManagerId()).map(this::nameOf).orElse(null);
+        return toResponse(review, null);
+    }
 
-        ReviewCycle cycle = cycleRepository.findById(review.getCycleId()).orElse(null);
+    /**
+     * One review, taking what it can from {@code bulk} when it is rendering part of a list.
+     *
+     * <p>A null {@code bulk} is the single-review path and behaves exactly as it did. The two share
+     * this method rather than diverging, so a change to what a review looks like cannot apply to only
+     * one of the two screens that show one.
+     */
+    private PerformanceReviewResponse toResponse(PerformanceReview review, Bulk bulk) {
+        Employee employee = bulk != null
+                ? bulk.employees().get(review.getEmployeeId())
+                : employeeRepository.findById(review.getEmployeeId()).orElse(null);
+        String employeeName = employee == null ? "Employee" : nameOf(employee, bulk);
+        String jobTitle = employee == null ? null : employee.getJobTitle();
+        String managerName;
+        if (review.getManagerId() == null) {
+            managerName = null;
+        } else if (bulk != null) {
+            Employee manager = bulk.employees().get(review.getManagerId());
+            managerName = manager == null ? null : nameOf(manager, bulk);
+        } else {
+            managerName = employeeRepository.findById(review.getManagerId()).map(this::nameOf).orElse(null);
+        }
+
+        ReviewCycle cycle = bulk != null
+                ? bulk.cycles().get(review.getCycleId())
+                : cycleRepository.findById(review.getCycleId()).orElse(null);
         String cycleName = cycle == null ? "" : cycle.getName();
         String periodStart = cycle == null ? null : cycle.getPeriodStart().toString();
         String periodEnd = cycle == null ? null : cycle.getPeriodEnd().toString();
         String cycleStatus = cycle == null ? null : cycle.getStatus().name();
 
         // Goals rollup — what they were working toward this period.
-        List<Goal> goals = goalRepository.findByEmployeeIdOrderByCreatedAtDesc(review.getEmployeeId());
+        List<Goal> goals = bulk != null
+                ? bulk.goals().getOrDefault(review.getEmployeeId(), List.of())
+                : goalRepository.findByEmployeeIdOrderByCreatedAtDesc(review.getEmployeeId());
         int achieved = (int) goals.stream().filter(g -> g.getStatus() == GoalStatus.ACHIEVED).count();
         List<GoalResponse> goalDtos = goals.stream().map(GoalResponse::of).toList();
 
         String currency = "USD";
         BigDecimal currentSalary = null;
-        try {
-            CompensationResponse comp = compensationService.forEmployee(review.getEmployeeId());
-            currency = comp.currency() == null ? "USD" : comp.currency();
-            currentSalary = comp.currentAnnual();
-        } catch (RuntimeException ignored) {
-            // No salary on record yet — leave it null; the review still stands.
+        if (bulk != null) {
+            CompensationRecord current = bulk.currentPay().get(review.getEmployeeId());
+            if (current != null) {
+                currency = current.getCurrency() == null ? "USD" : current.getCurrency();
+                currentSalary = current.getAnnualAmount();
+            }
+        } else {
+            try {
+                CompensationResponse comp = compensationService.forEmployee(review.getEmployeeId());
+                currency = comp.currency() == null ? "USD" : comp.currency();
+                currentSalary = comp.currentAnnual();
+            } catch (RuntimeException ignored) {
+                // No salary on record yet — leave it null; the review still stands.
+            }
         }
 
         return PerformanceReviewResponse.of(review, cycleName, periodStart, periodEnd, cycleStatus,
@@ -418,6 +527,17 @@ public class PerformanceReviewService {
     }
 
     private String nameOf(Employee employee) {
+        return nameOf(employee, null);
+    }
+
+    /** The same name, from the batch when there is one — otherwise a lookup, as on a single review. */
+    private String nameOf(Employee employee, Bulk bulk) {
+        if (employee.getUserId() == null) {
+            return "Employee";
+        }
+        if (bulk != null) {
+            return bulk.namesByUserId().getOrDefault(employee.getUserId(), "Employee");
+        }
         return userRepository.findById(employee.getUserId()).map(User::fullName).orElse("Employee");
     }
 
