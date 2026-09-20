@@ -77,9 +77,22 @@ public class RateLimiter {
         return bucket.take(permitsPerMinute, now);
     }
 
-    /** Forget one caller — used when a rate-limited action succeeds and should not count against them. */
-    public void forget(String key) {
-        buckets.remove(key);
+    /**
+     * Give one token back.
+     *
+     * <p>Used when an attempt turns out to have been legitimate. The strict budget on the auth surface
+     * exists to slow down guessing, and a correct password is not a guess — without this, forty people
+     * arriving at nine o'clock from one office, or a load test signing in twenty-five valid users at
+     * once, are indistinguishable from an attack and get locked out for being right.
+     *
+     * <p>One token rather than clearing the bucket: somebody who holds one valid account would
+     * otherwise be able to reset their own allowance at will and go on guessing at other people's.
+     */
+    public void refund(String key, int permitsPerMinute) {
+        Bucket bucket = buckets.get(key);
+        if (bucket != null) {
+            bucket.refund(permitsPerMinute);
+        }
     }
 
     int tracked() {
@@ -145,6 +158,10 @@ public class RateLimiter {
             // Round up: a Retry-After of zero invites an immediate retry that is certain to fail.
             long waitSeconds = (long) Math.ceil((1 - tokens) / (permitsPerMinute / 60.0));
             return new Decision(false, permitsPerMinute, 0, Math.max(1, waitSeconds));
+        }
+
+        synchronized void refund(int permitsPerMinute) {
+            tokens = Math.min(permitsPerMinute, tokens + 1);
         }
 
         synchronized boolean lastSeenBefore(long cutoff) {

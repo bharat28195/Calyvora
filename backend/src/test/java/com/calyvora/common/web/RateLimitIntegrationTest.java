@@ -142,6 +142,39 @@ class RateLimitIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("signing in correctly, over and over, is never what gets you cut off")
+    void a_correct_password_is_not_a_guess() throws Exception {
+        Session owner = onboardOwner("Ratco3", "admin@ratco3.test", PW);
+        assertThat(owner).isNotNull();
+        limiter.reset();
+
+        // Well past the five-per-minute ceiling. Forty people arriving at nine o'clock from one
+        // office look like this, and so does a load test signing in valid users in a burst — neither
+        // is an attack, and locking them out for being right is the failure this refund prevents.
+        String office = freshAddress();
+        for (int i = 0; i < 15; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .header("X-Forwarded-For", office)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("email", "admin@ratco3.test", "password", PW))))
+                    .andExpect(status().isOk());
+        }
+
+        // The budget is still there for whoever is actually guessing, from that same address.
+        for (int i = 0; i < 6; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                    .header("X-Forwarded-For", office)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json(Map.of("email", "admin@ratco3.test", "password", "wrong" + i))));
+        }
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", office)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("email", "admin@ratco3.test", "password", "wrong-again"))))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     @DisplayName("the remaining allowance is on every response, not only the one that is refused")
     void the_headers_say_what_is_left() throws Exception {
         String ip = freshAddress();

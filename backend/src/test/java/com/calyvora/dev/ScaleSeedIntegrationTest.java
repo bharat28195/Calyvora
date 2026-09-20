@@ -17,14 +17,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * recursive walk in {@code OrgScope} that the app shell performs on every single page load. Seeding
  * 1,000 people into one flat level would look like a scale test and measure nothing.
  *
- * <p>Kept small here (120 people, no attendance) so the suite stays fast; the real run is against the
- * deployed app, where the numbers mean something.
+ * <p>Kept small here (120 people, a week of attendance) so the suite stays fast; the real run is
+ * against the deployed app, where the numbers mean something.
+ *
+ * <p>A week and not two days, which is what this asked for until it failed on a Sunday. The seeder
+ * skips weekends, so a two-day window run on a Saturday or a Sunday lands entirely on them and seeds
+ * nothing — a test that passed five days out of seven and had nothing to do with the change that
+ * happened to be in flight when it did not. Seven days always contains a working day.
  */
 class ScaleSeedIntegrationTest extends IntegrationTestBase {
 
     @Test
     void the_scale_seed_builds_a_four_level_org_and_can_be_removed() throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=120&attendanceDays=2"))
+        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=120&attendanceDays=7"))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode seeded = objectMapper.readTree(r.getResponse().getContentAsString());

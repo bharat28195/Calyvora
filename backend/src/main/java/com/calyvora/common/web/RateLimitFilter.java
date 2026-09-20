@@ -124,6 +124,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         if (decision.allowed()) {
             chain.doFilter(request, response);
+            // A correct password is not a guess. The tight budget on this surface is there to slow
+            // somebody down who is trying credentials, and charging it to the people who got theirs
+            // right means an office arriving at nine o'clock looks exactly like an attack. Only
+            // attempts that failed stay spent.
+            if (authSurface && response.getStatus() < 400) {
+                limiter.refund(key, limit);
+            }
             return;
         }
         reject(request, response, decision, authSurface);

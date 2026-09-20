@@ -115,11 +115,13 @@ class QueryBudgetTest extends IntegrationTestBase {
                 .isLessThan(HEADCOUNT);
         assertThat(team.get("members").size()).isEqualTo(roster);
 
-        // Measured at 187 entities for a team of 58: the roster's employees, their managers, a month
-        // of their attendance, their open leave and expenses. The same call before this was scoped
-        // cost upwards of 700 — the company's employees three times over plus its whole month — so
-        // the budget is set to sit clearly between the two rather than snugly above the good number.
-        long budget = roster * 5L + 60;
+        // The roster's employees, their managers, a month of their attendance, their open leave and
+        // expenses. Measured at 187 for a team of 58 on a day whose two-day attendance window fell on
+        // a weekend, and the seeder skips those; on a midweek run the same call carries two days of
+        // real attendance for each of them on top. The same call before it was scoped cost upwards of
+        // 700, and more midweek for the same reason, so the budget sits clearly between the two
+        // rather than snugly above the good number.
+        long budget = roster * 8L + 80;
         assertThat(loaded)
                 .as("the summary for a team of %d loaded %d entities against a budget of %d — that is "
                         + "company-sized work on a team-sized screen", roster, loaded, budget)
