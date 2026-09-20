@@ -60,6 +60,15 @@ public class CompanySettings {
     @Column(name = "session_idle_minutes")
     private Integer sessionIdleMinutes;
 
+    /**
+     * Whether employees may still change their tax declarations.
+     *
+     * <p>HR opens this in April and closes it before the last payroll of the year, so the figures
+     * cannot move under a run that has already been filed with the department.
+     */
+    @Column(name = "tax_declarations_open", nullable = false)
+    private boolean taxDeclarationsOpen = true;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -130,6 +139,9 @@ public class CompanySettings {
 
     public Integer getSessionIdleMinutes() { return sessionIdleMinutes; }
     public void setSessionIdleMinutes(Integer sessionIdleMinutes) { this.sessionIdleMinutes = sessionIdleMinutes; }
+
+    public boolean isTaxDeclarationsOpen() { return taxDeclarationsOpen; }
+    public void setTaxDeclarationsOpen(boolean taxDeclarationsOpen) { this.taxDeclarationsOpen = taxDeclarationsOpen; }
 
     public Instant getUpdatedAt() {
         return updatedAt;
