@@ -241,6 +241,14 @@ export function MyMonth() {
                     {STATUS[s as AttendanceStatus].label} {n}
                   </span>
                 ))}
+              {/* Days nobody recorded anything on. They count against the rate, so the rate is not
+                  explicable without them: three present days out of fourteen expected is 21%, and
+                  the eleven have to be visible somewhere or the number looks wrong. */}
+              {data.notRecorded > 0 && (
+                <span className="rounded-full bg-fg/10 px-2 py-0.5 text-xs text-fg/60">
+                  Not recorded {data.notRecorded}
+                </span>
+              )}
             </div>
           </div>
 

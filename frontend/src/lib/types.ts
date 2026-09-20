@@ -406,7 +406,10 @@ export interface AttendanceMonth {
   days: AttendanceEntry[];
   counts: Record<string, number>;
   workedDays: number;
+  /** Every working day of the month that has already passed — not just the days with a record. */
   expectedDays: number;
+  /** How many of those expected days have nothing recorded. Explains the gap to worked. */
+  notRecorded: number;
   attendanceRate: number | null;
 }
 /** A month of attendance for a group, one row per day — what a calendar grid needs. */

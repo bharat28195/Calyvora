@@ -313,15 +313,32 @@ public class AttendanceService {
         }
         double worked = 0;
         long expected = 0;
+        long notRecorded = 0;
         LocalDate today = today();
 
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             AttendanceEntryResponse entry = resolve(employee, user, d,
                     Optional.ofNullable(marked.get(d)), leave, prefetch);
             days.add(entry);
+
             if (entry.status() == null) {
+                // A null status out of resolve() means one specific thing: a working day — not a
+                // weekend, not a holiday, not covered by leave — with nothing recorded on it.
+                //
+                // This used to skip out here, so those days reached neither total and the rate was
+                // worked days over *days that happened to have a row*. Somebody who logged in three
+                // times in a month read 3/3 and 100%. The denominator has to be the days they were
+                // expected, or the number measures nothing.
+                //
+                // Today is left out while it is still empty: the day is not over, and counting it as
+                // missed would show everybody a dip each morning that repaired itself on check-in.
+                if (d.isBefore(today)) {
+                    expected++;
+                    notRecorded++;
+                }
                 continue;
             }
+
             AttendanceStatus s = AttendanceStatus.valueOf(entry.status());
             counts.merge(s.name(), 1L, Long::sum);
             // Only days that have already happened and were expected count toward the rate.
@@ -335,7 +352,7 @@ public class AttendanceService {
         String name = user == null ? "Employee" : (user.getFirstName() + " " + user.getLastName()).trim();
         Double rate = expected == 0 ? null : Math.round(worked * 1000.0 / expected) / 10.0;
         return new AttendanceMonthResponse(employee.getId().toString(), name, month.toString(), days, counts,
-                Math.round(worked * 10.0) / 10.0, expected, rate);
+                Math.round(worked * 10.0) / 10.0, expected, notRecorded, rate);
     }
 
     // ---- marking ----

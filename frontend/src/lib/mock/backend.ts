@@ -3904,11 +3904,21 @@ function buildAttendanceMonth(db: DB, employeeId: string, month?: string): Atten
   const counts: Record<string, number> = {};
   let worked = 0;
   let expected = 0;
+  let notRecorded = 0;
   for (let d = 1; d <= length; d++) {
     const date = `${ym}-${String(d).padStart(2, "0")}`;
     const entry = resolveAttendance(db, employeeId, date);
     days.push(entry);
-    if (!entry.status) continue;
+    if (!entry.status) {
+      // A working day with nothing on it. It still counts as expected, or the rate is worked days
+      // over days that happen to have a row — which reads 100% for somebody who came in three times.
+      // Today is left out while empty: the day is not over. Mirrors AttendanceService.buildMonth.
+      if (date < today) {
+        expected++;
+        notRecorded++;
+      }
+      continue;
+    }
     counts[entry.status] = (counts[entry.status] ?? 0) + 1;
     const nonWorkingDay = entry.status === "HOLIDAY" || entry.status === "WEEK_OFF";
     if (!nonWorkingDay && date <= today) {
@@ -3927,6 +3937,7 @@ function buildAttendanceMonth(db: DB, employeeId: string, month?: string): Atten
     counts,
     workedDays: Math.round(worked * 10) / 10,
     expectedDays: expected,
+    notRecorded,
     attendanceRate: expected === 0 ? null : Math.round((worked * 1000) / expected) / 10,
   };
 }
