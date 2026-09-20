@@ -1327,9 +1327,36 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   tests. `@TestPropertySource` is inherited and merged, so a subclass has to mean it. Found by
   running the suite, not by reasoning about it.
 
+### PD-40 · 2026-09-20 · Filtering the page is not a smaller version of filtering the query
+- **Context:** the approvals screen fetched every leave request the company had ever filed and kept
+  the pending ones. Adding paging to that read would have been a silent correctness bug, not just a
+  smaller one: the queue is newest-first, so a page of the fifty most recent requests can easily be
+  entirely decided already, and the screen would have said "nothing waiting" while the pending rows
+  sat on page three — unreachable, invisible, and indistinguishable from an empty queue.
+- **Rule:** whatever the screen actually shows is what the query must select. A filter applied after
+  the rows arrive is only equivalent to one in the database when the read is unbounded — which is the
+  thing being removed. Paginating a list therefore means pushing its filters down first, not after.
+- **The tiebreaker in a cursor is load-bearing.** Sorting by timestamp alone leaves rows created in
+  the same instant in undefined order, and these rows are created in bulk constantly — seeders,
+  imports, approval sweeps. A page boundary inside such a group drops some and repeats others, which
+  reads as data loss. `(createdAt, id)` makes the sequence total. Checked by deleting the tiebreaker
+  and watching two tests fail on dropped rows, rather than by believing the argument.
+- **Cursor, not offset, for queues.** Numbered pages are right for a directory somebody browses.
+  They are wrong for a newest-first queue: rows are inserted above the reader constantly, so page 2
+  repeats the tail of page 1 and skips whatever got pushed past the boundary. And OFFSET reaches row
+  20,000 by counting past 19,999, so deep pages get slower the further in you go.
+- **A malformed cursor is a 400, never a quiet restart.** Silently starting from the top turns a
+  client bug into an endless list: it pages forever, receives the first page every time, and nothing
+  anywhere says why.
+- **The backlog's "~20 unbounded endpoints" was wrong, in the useful direction.** Counting them
+  honestly, most are config tables of a few dozen rows, the feed and notifications are already
+  capped, and attendance is date-windowed. The real list is the admin queues — leave, expenses,
+  helpdesk, documents. Leave is done; the other three are the same shape.
+
 ---
 
 ## 4. Architecture Decision Log
+
 
 
 > Summaries here; binding detail in [docs/06](docs/06-architecture-principles.md) and (once

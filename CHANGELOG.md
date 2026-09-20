@@ -4,6 +4,16 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-20 — The approvals queue is a page, and it asks for what it shows
+`GET /people/leave` read every leave request the company had ever filed — a list that grows forever —
+and the screen then discarded everything already decided, because all it renders is what is pending.
+For a manager it was quadratic on top: `isMyReport` was called per row and each call walked the whole
+reporting tree, so a queue of 500 requests walked the company tree 500 times. The scope is now
+resolved once, `status` is filtered in the database, and the response is a cursor page
+(`{items, nextCursor}`) with a "Load more" on the screen. V53 adds three indexes matching the query
+shapes. `CursorPage` is general; expenses, helpdesk and documents are the same shape and not yet
+converted. (PD-40)
+
 ### 2026-09-20 — A ceiling on how fast one caller may ask for things
 There was no rate limiting anywhere: one integration retrying without backoff could exhaust a
 connection pool of ten and time the platform out for every other tenant. Now two tiers — the
