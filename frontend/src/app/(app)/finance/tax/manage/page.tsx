@@ -5,6 +5,7 @@ import { Loader2, Lock, Unlock } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { TaxDeclaration, TaxDeclarationRow } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { money } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
@@ -112,8 +113,8 @@ export default function ManageTaxPage() {
                         {statusLabel(r.status)}
                       </span>
                     </td>
-                    <td className="py-2 text-right tabular-nums text-fg/70">{inr(r.totalDeclared)}</td>
-                    <td className="py-2 text-right tabular-nums font-medium">{inr(r.annualTax)}</td>
+                    <td className="py-2 text-right tabular-nums text-fg/70">{money(r.totalDeclared)}</td>
+                    <td className="py-2 text-right tabular-nums font-medium">{money(r.annualTax)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -135,10 +136,4 @@ function statusChip(status: string): string {
   if (status === "SUBMITTED") return "bg-emerald-500/15 text-emerald-400";
   if (status === "DRAFT") return "bg-amber-500/15 text-amber-400";
   return "bg-fg/10 text-fg/50";
-}
-
-function inr(value: number, currency = "INR"): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency", currency, maximumFractionDigits: 0,
-  }).format(value);
 }

@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { TaxComputation } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { money } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
@@ -53,36 +54,36 @@ export default function TaxComputationPage() {
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <Tile label="Tax for the year" value={inr(data.totalTax, data.currency)} tone="text-violet" />
-        <Tile label="Deducted so far" value={inr(data.deductedSoFar, data.currency)}
+        <Tile label="Tax for the year" value={money(data.totalTax, data.currency)} tone="text-violet" />
+        <Tile label="Deducted so far" value={money(data.deductedSoFar, data.currency)}
           hint={`${data.monthsElapsed} month${data.monthsElapsed === 1 ? "" : "s"} of the year gone`} />
-        <Tile label="Next month" value={inr(data.projectedNextMonth, data.currency)}
+        <Tile label="Next month" value={money(data.projectedNextMonth, data.currency)}
           tone="text-sky-400"
           hint={monthsLeft > 0
-            ? `${inr(data.remainingTax, data.currency)} left, over ${monthsLeft} pay run${monthsLeft === 1 ? "" : "s"}`
+            ? `${money(data.remainingTax, data.currency)} left, over ${monthsLeft} pay run${monthsLeft === 1 ? "" : "s"}`
             : "the year is complete"} />
       </div>
 
       <Card className="mt-6">
         <CardTitle>From salary to taxable income</CardTitle>
         <div className="mt-4 flex flex-col gap-1 text-sm">
-          <Row label="Gross salary" value={inr(data.grossSalary, data.currency)} />
-          <Row label="Standard deduction" value={`− ${inr(data.standardDeduction, data.currency)}`}
+          <Row label="Gross salary" value={money(data.grossSalary, data.currency)} />
+          <Row label="Standard deduction" value={`− ${money(data.standardDeduction, data.currency)}`}
             hint={data.regime === "NEW" ? "₹75,000 under the new regime" : "₹50,000 under the old regime"} />
           {data.deductions.map((d) => (
             <Row
               key={d.key}
               label={`${d.section} — ${d.label}`}
-              value={`− ${inr(d.allowed, data.currency)}`}
+              value={`− ${money(d.allowed, data.currency)}`}
               // When a claim is trimmed, say so here rather than silently showing the smaller number.
               hint={d.declared > d.allowed
-                ? `you claimed ${inr(d.declared, data.currency)}; ${inr(d.allowed, data.currency)} is allowable`
+                ? `you claimed ${money(d.declared, data.currency)}; ${money(d.allowed, data.currency)} is allowable`
                 : undefined}
               muted={d.allowed === 0}
             />
           ))}
           <div className="mt-2 border-t border-fg/10 pt-2">
-            <Row label="Taxable income" value={inr(data.taxableIncome, data.currency)} strong />
+            <Row label="Taxable income" value={money(data.taxableIncome, data.currency)} strong />
           </div>
         </div>
       </Card>
@@ -106,11 +107,11 @@ export default function TaxComputationPage() {
               {data.bands.map((b, i) => (
                 <tr key={i} className="border-t border-fg/5">
                   <td className="py-2 text-fg/70">
-                    {inr(b.from, data.currency)} – {b.to === null ? "above" : inr(b.to, data.currency)}
+                    {money(b.from, data.currency)} – {b.to === null ? "above" : money(b.to, data.currency)}
                   </td>
                   <td className="py-2 text-right tabular-nums text-fg/70">{b.ratePercent}%</td>
-                  <td className="py-2 text-right tabular-nums text-fg/70">{inr(b.taxable, data.currency)}</td>
-                  <td className="py-2 text-right tabular-nums font-medium">{inr(b.tax, data.currency)}</td>
+                  <td className="py-2 text-right tabular-nums text-fg/70">{money(b.taxable, data.currency)}</td>
+                  <td className="py-2 text-right tabular-nums font-medium">{money(b.tax, data.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -118,21 +119,21 @@ export default function TaxComputationPage() {
         </div>
 
         <div className="mt-5 flex flex-col gap-1 border-t border-fg/10 pt-4 text-sm">
-          <Row label="Tax on income" value={inr(data.taxOnIncome, data.currency)} />
+          <Row label="Tax on income" value={money(data.taxOnIncome, data.currency)} />
           {data.rebate > 0 && (
-            <Row label="Rebate under section 87A" value={`− ${inr(data.rebate, data.currency)}`}
+            <Row label="Rebate under section 87A" value={`− ${money(data.rebate, data.currency)}`}
               hint={data.regime === "NEW"
                 ? "up to ₹60,000, which is what makes ₹12 lakh tax-free"
                 : "up to ₹12,500 where taxable income is ₹5 lakh or less"} />
           )}
           {data.surcharge > 0 && (
-            <Row label="Surcharge" value={inr(data.surcharge, data.currency)}
+            <Row label="Surcharge" value={money(data.surcharge, data.currency)}
               hint="charged on the tax itself, for higher incomes" />
           )}
-          <Row label="Health and education cess (4%)" value={inr(data.cess, data.currency)} />
+          <Row label="Health and education cess (4%)" value={money(data.cess, data.currency)} />
           <div className="mt-2 border-t border-fg/10 pt-2">
-            <Row label="Total tax for the year" value={inr(data.totalTax, data.currency)} strong />
-            <Row label="Spread over twelve months" value={inr(data.monthlyTds, data.currency)} muted />
+            <Row label="Total tax for the year" value={money(data.totalTax, data.currency)} strong />
+            <Row label="Spread over twelve months" value={money(data.monthlyTds, data.currency)} muted />
           </div>
         </div>
       </Card>
@@ -143,14 +144,14 @@ export default function TaxComputationPage() {
           The same salary and the same declarations, taxed under the other set of rules.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Tile label="Old regime" value={inr(data.comparison.oldRegimeTax, data.currency)} />
-          <Tile label="New regime" value={inr(data.comparison.newRegimeTax, data.currency)} />
+          <Tile label="Old regime" value={money(data.comparison.oldRegimeTax, data.currency)} />
+          <Tile label="New regime" value={money(data.comparison.newRegimeTax, data.currency)} />
         </div>
         <p className="mt-4 text-sm text-fg/70">
           {data.comparison.saving === 0
             ? "Both regimes cost you the same this year."
             : <>The <strong>{data.comparison.cheaper === "NEW" ? "new" : "old"} regime</strong> is cheaper
-              for you by {inr(data.comparison.saving, data.currency)}
+              for you by {money(data.comparison.saving, data.currency)}
               {data.comparison.cheaper === data.regime ? " — which is the one you are on." : "."}</>}
         </p>
         {data.comparison.cheaper !== data.regime && data.comparison.saving > 0 && (
@@ -193,11 +194,4 @@ function Row({ label, value, hint, strong, muted }: {
       <span className={`tabular-nums ${strong ? "text-base font-semibold" : ""}`}>{value}</span>
     </div>
   );
-}
-
-/** Indian digit grouping: ₹12,25,000, not ₹1,225,000. */
-function inr(value: number, currency = "INR"): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency", currency, maximumFractionDigits: 0,
-  }).format(value);
 }

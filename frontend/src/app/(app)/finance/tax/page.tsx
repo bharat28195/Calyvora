@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import type { TaxComputation, TaxDeclaration, TaxRegime } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { money } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
@@ -141,7 +142,7 @@ export default function TaxDeclarationPage() {
                   </p>
                   <p className="text-xs text-fg/50">
                     {o.label}
-                    {o.cap !== null && <> · limit {inr(o.cap)}</>}
+                    {o.cap !== null && <> · limit {money(o.cap)}</>}
                   </p>
                 </div>
                 <Input
@@ -214,7 +215,7 @@ function RegimePicker({ regime, computation, currency, disabled, onChange }: {
               {chosen && <span className="rounded-full bg-violet/15 px-2 py-0.5 text-xs text-violet">Chosen</span>}
               {!chosen && cheaper && (
                 <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-400">
-                  Saves {inr(comparison!.saving, currency)}
+                  Saves {money(comparison!.saving, currency)}
                 </span>
               )}
             </div>
@@ -224,7 +225,7 @@ function RegimePicker({ regime, computation, currency, disabled, onChange }: {
                 : "Steeper slabs, ₹50,000 standard deduction — but 80C, 80D, home loan interest and the rest all count."}
             </p>
             <p className="mt-3 text-xl font-semibold tabular-nums">
-              {cost[r] === null ? "—" : inr(cost[r]!, currency)}
+              {cost[r] === null ? "—" : money(cost[r]!, currency)}
               <span className="ml-1 text-sm font-normal text-fg/40">tax this year</span>
             </p>
           </button>
@@ -238,11 +239,4 @@ function statusLabel(status: TaxDeclaration["status"]): string {
   if (status === "SUBMITTED") return "declared";
   if (status === "DRAFT") return "draft — not submitted yet";
   return "not started";
-}
-
-/** Indian digit grouping: ₹12,25,000, not ₹1,225,000. */
-export function inr(value: number, currency = "INR"): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency", currency, maximumFractionDigits: 0,
-  }).format(value);
 }
