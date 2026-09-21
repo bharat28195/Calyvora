@@ -31,6 +31,17 @@ public enum Feature {
     PAYROLL("Payroll", "Salaries, payslips, payroll runs and the bank file", true, "/api/v1/payroll/"),
     STATUTORY_PAYROLL("Statutory payroll (PF)",
             "Provident Fund computed on payslips. Off until the numbers have been checked.", false, null),
+    /**
+     * Deliberately separate from PF rather than folded into it.
+     *
+     * <p>Both are statutory, but a company can run one through us and not the other — plenty hand
+     * TDS to their auditor — and switching PF on must not start withholding income tax from
+     * everybody's pay as a side effect. Off by default for the same reason PF is: the first time a
+     * deduction appears on a payslip, somebody should have decided that it should.
+     */
+    INCOME_TAX("Income tax (TDS)",
+            "Income tax withheld on payslips, from each employee's declaration. Off until checked.",
+            false, "/api/v1/tax/"),
     RECRUITMENT("Recruitment", "Job openings, candidate pipeline, offers and hiring", true, "/api/v1/recruit/"),
     PERFORMANCE("Performance", "Review cycles, self and manager reviews, hikes", true, "/api/v1/performance/"),
     WORK("Work", "Projects, tasks, sprints and tickets", true, "/api/v1/work/"),

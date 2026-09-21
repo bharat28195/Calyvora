@@ -254,6 +254,60 @@ public class TaxService {
         return rows;
     }
 
+    /**
+     * Monthly TDS for a set of employees, for a payroll run.
+     *
+     * <p>Everything the run needs in two queries rather than two per employee: the declarations for
+     * the year and their items, both keyed up front. A thousand-person run asking per person is two
+     * thousand round trips to work out a deduction.
+     *
+     * <p>Spread evenly — the year's tax over twelve — rather than using the "what is left over the
+     * months that remain" figure the screen shows. A payslip is for a particular month and may be
+     * re-run for a month long past, so it cannot depend on today's date; an even twelfth is also
+     * what makes a payslip reproducible, which matters when it is the document an employee takes to
+     * a bank.
+     *
+     * @param annualSalary employee id to annual gross; employees absent from it get nothing
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, BigDecimal> monthlyTdsFor(UUID companyId, FinancialYear fy,
+                                               Map<UUID, BigDecimal> annualSalary) {
+        if (annualSalary.isEmpty()) {
+            return Map.of();
+        }
+        List<TaxDeclaration> declarations = declarationRepository
+                .findByCompanyIdAndFinancialYear(companyId, fy.label());
+        Map<UUID, TaxDeclaration> byEmployee = new HashMap<>();
+        for (TaxDeclaration d : declarations) {
+            byEmployee.put(d.getEmployeeId(), d);
+        }
+        Map<UUID, Map<TaxDeduction, BigDecimal>> itemsByDeclaration = new HashMap<>();
+        if (!declarations.isEmpty()) {
+            for (TaxDeclarationItem item : itemRepository.findByDeclarationIdIn(
+                    declarations.stream().map(TaxDeclaration::getId).toList())) {
+                itemsByDeclaration
+                        .computeIfAbsent(item.getDeclarationId(), k -> new EnumMap<>(TaxDeduction.class))
+                        .put(item.getDeduction(), item.getAmount());
+            }
+        }
+
+        Map<UUID, BigDecimal> out = new HashMap<>();
+        for (Map.Entry<UUID, BigDecimal> e : annualSalary.entrySet()) {
+            TaxDeclaration d = byEmployee.get(e.getKey());
+            // No declaration is not "no tax" — it is the statutory default regime with nothing
+            // claimed, which is usually the higher bill. Treating silence as exempt would under-
+            // withhold from precisely the people who never got round to filling the form in.
+            TaxRegime regime = d == null ? TaxRegime.DEFAULT : d.getRegime();
+            Map<TaxDeduction, BigDecimal> declared = d == null
+                    ? Map.of()
+                    : itemsByDeclaration.getOrDefault(d.getId(), Map.of());
+            IncomeTaxCalculator.Result result = IncomeTaxCalculator.compute(
+                    new IncomeTaxCalculator.Input(e.getValue(), regime, declared));
+            out.put(e.getKey(), result.monthlyTds());
+        }
+        return out;
+    }
+
     // ---- HR -----------------------------------------------------------------------------------
 
     /**

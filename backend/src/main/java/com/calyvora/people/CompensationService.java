@@ -41,6 +41,7 @@ public class CompensationService {
     private final DepartmentRepository departmentRepository;
     private final com.calyvora.feature.FeatureService featureService;
     private final com.calyvora.payroll.PfSettingsService pfSettingsService;
+    private final com.calyvora.tax.TaxService taxService;
     private final EmployeeFinanceRepository employeeFinanceRepository;
 
     public CompensationService(CompensationRepository compensationRepository,
@@ -53,7 +54,9 @@ public class CompensationService {
                                DepartmentRepository departmentRepository,
                                com.calyvora.feature.FeatureService featureService,
                                com.calyvora.payroll.PfSettingsService pfSettingsService,
-                               EmployeeFinanceRepository employeeFinanceRepository) {
+                               EmployeeFinanceRepository employeeFinanceRepository,
+                               com.calyvora.tax.TaxService taxService) {
+        this.taxService = taxService;
         this.employeeFinanceRepository = employeeFinanceRepository;
         this.financeService = financeService;
         this.departmentRepository = departmentRepository;
@@ -208,9 +211,24 @@ public class CompensationService {
         for (Department d : departmentRepository.findByCompanyIdOrderByName(runCompanyId)) {
             departmentNames.put(d.getId(), d.getName());
         }
+        // Income tax for everybody in the run, in two queries rather than two per person. Only
+        // fetched when the feature is on: a company that hands TDS to its auditor should not pay for
+        // the reads, and a run that does not withhold must not depend on declarations existing.
+        boolean incomeTaxOn = featureService.isEnabled(runCompanyId, Feature.INCOME_TAX);
+        java.util.Map<UUID, java.math.BigDecimal> tdsByEmployee = java.util.Map.of();
+        if (incomeTaxOn) {
+            java.util.Map<UUID, java.math.BigDecimal> annual = new java.util.HashMap<>();
+            for (java.util.Map.Entry<UUID, CompensationRecord> e : currentSalary.entrySet()) {
+                annual.put(e.getKey(), e.getValue().getAnnualAmount());
+            }
+            tdsByEmployee = taxService.monthlyTdsFor(runCompanyId,
+                    com.calyvora.tax.FinancialYear.of(ym.atDay(1)), annual);
+        }
+
         RunContext ctx = new RunContext(currency,
                 payslipTemplateService.components(runCompanyId),
                 featureService.isEnabled(runCompanyId, Feature.STATUTORY_PAYROLL),
+                incomeTaxOn, tdsByEmployee,
                 pfSettingsService.effective(runCompanyId),
                 employeesById, usersById, currentSalary, financeByEmployee,
                 runCompanyName,
@@ -301,6 +319,10 @@ public class CompensationService {
     private record RunContext(String currency,
                               List<PayslipComponent> template,
                               boolean statutoryEnabled,
+                              /** Whether income tax is withheld here at all — off until switched on. */
+                              boolean incomeTaxEnabled,
+                              /** Employee id to the month's TDS, worked out once for the whole run. */
+                              java.util.Map<UUID, java.math.BigDecimal> monthlyTds,
                               com.calyvora.payroll.PfSettings pfSettings,
                               java.util.Map<UUID, Employee> employees,
                               java.util.Map<UUID, com.calyvora.identity.User> users,
@@ -390,6 +412,32 @@ public class CompensationService {
             statutory = new PayslipResponse.Statutory(pf.pfWages(), pf.employee(), pf.employerEps(),
                     pf.employerEpf(), pf.adminCharges(), pf.edli(), pf.employerTotal());
         }
+        // --- Income tax (TDS), when the company withholds it here -------------------------------
+        //
+        // An even twelfth of the year's tax rather than "what is left over the months that remain".
+        // A payslip is for a particular month and may be re-run for one long past, so it cannot
+        // depend on today's date — and an even twelfth is what makes the document reproducible,
+        // which matters when it is what an employee takes to a bank.
+        //
+        // Somebody who never filled the form in is taxed under the statutory default with nothing
+        // claimed, which is usually the higher bill. Treating silence as exempt would under-withhold
+        // from exactly the people who did not get round to declaring.
+        boolean incomeTaxOn = ctx != null ? ctx.incomeTaxEnabled()
+                : featureService.isEnabled(companyId, Feature.INCOME_TAX);
+        if (incomeTaxOn) {
+            BigDecimal tds = ctx != null
+                    ? ctx.monthlyTds().getOrDefault(employeeId, BigDecimal.ZERO)
+                    : taxService.monthlyTdsFor(companyId,
+                            com.calyvora.tax.FinancialYear.of(ym.atDay(1)),
+                            java.util.Map.of(employeeId, current.getAnnualAmount()))
+                            .getOrDefault(employeeId, BigDecimal.ZERO);
+            if (tds.signum() > 0) {
+                deductions.add(new PayslipResponse.Line("Income tax (TDS)", tds));
+                totalDed = totalDed.add(tds);
+                net = net.subtract(tds);
+            }
+        }
+
         if (lopDays > 0 && workingDays > 0) {
             BigDecimal perDay = gross.divide(BigDecimal.valueOf(workingDays), 2, RoundingMode.HALF_UP);
             BigDecimal lop = perDay.multiply(BigDecimal.valueOf(lopDays)).setScale(2, RoundingMode.HALF_UP);
