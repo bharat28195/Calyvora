@@ -38,10 +38,16 @@ public enum Feature {
      * TDS to their auditor — and switching PF on must not start withholding income tax from
      * everybody's pay as a side effect. Off by default for the same reason PF is: the first time a
      * deduction appears on a payslip, somebody should have decided that it should.
+     *
+     * <p><b>No path, deliberately.</b> This gates the deduction, not the screens. Giving it
+     * {@code /api/v1/tax/} put the whole module behind a flag that is off by default, so nobody
+     * could so much as open their declaration — and an employee's own tax declaration is their
+     * business whether or not their employer withholds through us. The full suite caught it; the
+     * tax tests passed alone because they were written before the flag existed.
      */
     INCOME_TAX("Income tax (TDS)",
             "Income tax withheld on payslips, from each employee's declaration. Off until checked.",
-            false, "/api/v1/tax/"),
+            false, null),
     RECRUITMENT("Recruitment", "Job openings, candidate pipeline, offers and hiring", true, "/api/v1/recruit/"),
     PERFORMANCE("Performance", "Review cycles, self and manager reviews, hikes", true, "/api/v1/performance/"),
     WORK("Work", "Projects, tasks, sprints and tickets", true, "/api/v1/work/"),
