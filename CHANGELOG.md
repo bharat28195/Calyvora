@@ -4,6 +4,16 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-21 — TDS comes off the payslip
+The tax was computed and shown but never withheld, which left the employer carrying the liability.
+It is now a payslip deduction, gated on a new `INCOME_TAX` feature that is **off by default** and
+separate from `STATUTORY_PAYROLL` — a company can run PF through us and hand TDS to its auditor, and
+switching one on must not start withholding from everybody's pay as a side effect. An even twelfth of
+the year's bill rather than the "what is left over the months that remain" figure, so a payslip re-run
+for a past month reproduces exactly. An employee who never declared is taxed under the statutory
+default with nothing claimed, because treating silence as nil would under-withhold from precisely the
+people who did not get round to it. (PD-41)
+
 ### 2026-09-21 — Income tax: declare it, choose a regime, and see the working
 The product paid Indian salaries and deducted PF but withheld no income tax at all. It now computes
 it for both regimes at FY 2026-27 rates — slabs, the 87A rebate, surcharge, 4% cess and marginal

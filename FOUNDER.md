@@ -1393,6 +1393,17 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **The comparison is the product.** Both regimes are priced on the employee's own numbers on every
   computation. Neither wins in general, April is the only month somebody can act on it, and without
   this the choice is made with a spreadsheet or not at all.
+- **Withholding it is a separate switch, off by default.** `INCOME_TAX` is its own feature rather
+  than part of `STATUTORY_PAYROLL`: a company can run PF through us and hand TDS to its auditor, and
+  enabling one must never start deducting the other from everybody's pay. The first assertion in the
+  payslip test is the one that changes nothing — a deduction appearing unbidden on every payslip is
+  noticed by the whole company at once and trusted by none of them afterwards.
+- **A payslip must reproduce.** TDS is an even twelfth of the year's tax, not the "what is left over
+  the months that remain" figure the screen shows, because a payslip is for a particular month, may
+  be re-run for one long past, and is a document people take to banks.
+- **Silence is not an exemption.** Somebody who never declared is taxed under the default regime with
+  nothing claimed — usually the higher bill. Treating a missing form as nil would under-withhold from
+  exactly the people who did not get round to filling it in, and the employer carries that.
 
 ---
 
