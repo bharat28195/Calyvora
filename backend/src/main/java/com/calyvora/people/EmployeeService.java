@@ -313,6 +313,7 @@ public class EmployeeService {
             employee.setEmploymentStatus(EmploymentStatus.valueOf(request.employmentStatus()));
         }
         if (request.workLocation() != null) employee.setWorkLocation(blankToNull(request.workLocation()));
+        if (request.timezone() != null) employee.setTimezone(Timezones.validOrNull(request.timezone()));
         if (request.phone() != null) employee.setPhone(blankToNull(request.phone()));
         if (request.startDate() != null) {
             employee.setStartDate(request.startDate().isBlank() ? null : LocalDate.parse(request.startDate()));
@@ -350,6 +351,7 @@ public class EmployeeService {
         Employee employee = getOrCreate(companyId, userId);
         if (request.phone() != null) employee.setPhone(blankToNull(request.phone()));
         if (request.workLocation() != null) employee.setWorkLocation(blankToNull(request.workLocation()));
+        if (request.timezone() != null) employee.setTimezone(Timezones.validOrNull(request.timezone()));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
         return EmployeeResponse.of(user, employee);

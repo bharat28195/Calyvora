@@ -21,6 +21,8 @@ public record EmployeeResponse(
         String departmentId,
         String managerId,
         String workLocation,
+        /** Their own IANA zone, or null for "same as the company". */
+        String timezone,
         String phone,
         String startDate,
         String endDate,
@@ -43,6 +45,7 @@ public record EmployeeResponse(
                 e.getDepartmentId() == null ? null : e.getDepartmentId().toString(),
                 e.getManagerId() == null ? null : e.getManagerId().toString(),
                 e.getWorkLocation(),
+                e.getTimezone(),
                 e.getPhone(),
                 e.getStartDate() == null ? null : e.getStartDate().toString(),
                 e.getEndDate() == null ? null : e.getEndDate().toString(),
@@ -58,7 +61,7 @@ public record EmployeeResponse(
     public EmployeeResponse withoutRating() {
         return rating == null ? this : new EmployeeResponse(id, userId, firstName, lastName, email, role,
                 employeeNo, jobTitle, designationId, employmentType, employmentStatus, departmentId, managerId,
-                workLocation, phone, startDate, endDate, skills, null);
+                workLocation, timezone, phone, startDate, endDate, skills, null);
     }
 
     /** Split the denormalized comma-separated skills column into a list (empty when unset). */

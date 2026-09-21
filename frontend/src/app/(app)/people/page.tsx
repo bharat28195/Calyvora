@@ -21,6 +21,20 @@ const TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"] as const;
 const STATUSES = ["ONBOARDING", "ACTIVE", "TERMINATED"] as const;
 const typeLabel = (t: string | null) => (t ? t.replace(/_/g, " ").toLowerCase() : "—");
 
+/**
+ * Every zone the browser knows, so the list is the same one the server validates against. Falls
+ * back to a short hand-written list on the rare runtime that lacks the API, rather than an empty
+ * dropdown that makes the field look broken.
+ */
+const TIMEZONES: string[] = (() => {
+  try {
+    const all = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone");
+    if (all && all.length > 0) return all;
+  } catch { /* fall through */ }
+  return ["Asia/Kolkata", "Asia/Dubai", "Asia/Singapore", "Europe/London", "Europe/Berlin",
+    "America/New_York", "America/Los_Angeles", "Australia/Sydney"];
+})();
+
 export default function PeoplePage() {
   const { me } = useSession();
   const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
@@ -344,6 +358,7 @@ function EditEmployeeDialog({
     employmentType: employee.employmentType ?? "",
     employmentStatus: employee.employmentStatus,
     workLocation: employee.workLocation ?? "",
+    timezone: employee.timezone ?? "",
     phone: employee.phone ?? "",
     startDate: employee.startDate ?? "",
     endDate: employee.endDate ?? "",
@@ -377,6 +392,7 @@ function EditEmployeeDialog({
           employmentType: (form.employmentType || null) as Employee["employmentType"],
           employmentStatus: form.employmentStatus,
           workLocation: form.workLocation,
+          timezone: form.timezone,
           phone: form.phone,
           startDate: form.startDate,
           endDate: form.endDate,
@@ -386,7 +402,7 @@ function EditEmployeeDialog({
           managerId: form.managerId,
         });
       } else {
-        await api.updateMyProfile({ phone: form.phone, workLocation: form.workLocation });
+        await api.updateMyProfile({ phone: form.phone, workLocation: form.workLocation, timezone: form.timezone });
       }
       onSaved();
     } catch (err) {
@@ -485,6 +501,17 @@ function EditEmployeeDialog({
             <Input id="workLocation" value={form.workLocation} onChange={set("workLocation")} />
           </Field>
         </div>
+
+        {/* Where the person actually is. Attendance stamps a check-in on this clock, so a designer
+            in Berlin at a Bengaluru company sees 09:00 for a nine o'clock arrival rather than 12:30.
+            Blank means "same as the company", which is almost everybody. */}
+        <Field label="Timezone" htmlFor="timezone">
+          <select id="timezone" value={form.timezone} onChange={set("timezone")}
+            className="h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
+            <option value="" className="bg-surface">Same as the company</option>
+            {TIMEZONES.map((z) => <option key={z} value={z} className="bg-surface">{z.replace(/_/g, " ")}</option>)}
+          </select>
+        </Field>
 
         <div className="mt-2 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>

@@ -911,7 +911,7 @@ public class DemoSeedService {
             return;
         }
         employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
-                null, null, designationId, null, null, null, null, null, null, null, null, null, null));
+                null, null, designationId, null, null, null, null, null, null, null, null, null, null, null));
     }
 
     private void seedFinance(Map<String, EmployeeResponse> emp) {
@@ -978,7 +978,7 @@ public class DemoSeedService {
                          java.util.List<String> skills, Integer rating) {
         EmployeeResponse e = emp.get(email);
         employeeService.update(UUID.fromString(e.id()), new UpdateEmployeeRequest(
-                employeeNo, title, null, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, startDate,
+                employeeNo, title, null, "FULL_TIME", "ACTIVE", managerId, departmentId, "Remote", null, null, startDate,
                 null, skills, rating));
     }
 

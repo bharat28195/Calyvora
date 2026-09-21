@@ -848,7 +848,7 @@ export const api = {
       ? http<Employee>(`/people/employees/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
       : mockBackend.updateEmployee(accessToken, id, patch);
   },
-  updateMyProfile(patch: { phone?: string; workLocation?: string }): Promise<Employee> {
+  updateMyProfile(patch: { phone?: string; workLocation?: string; timezone?: string }): Promise<Employee> {
     return LIVE
       ? http<Employee>("/people/me", { method: "PATCH", body: JSON.stringify(patch) })
       : mockBackend.updateMyProfile(accessToken, patch);

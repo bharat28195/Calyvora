@@ -61,6 +61,16 @@ public class Employee {
     @Column(name = "work_location", length = 120)
     private String workLocation;
 
+    /**
+     * Where this person is, as an IANA zone id — or null for "same as the company".
+     *
+     * <p>Attendance stamps a punch in this zone. Null is the common case and is deliberate: it keeps
+     * the company's zone as the one source of truth for everybody who has not said otherwise, rather
+     * than a copy per row that drifts when the company's setting changes.
+     */
+    @Column(length = 64)
+    private String timezone;
+
     @Column(length = 40)
     private String phone;
 
@@ -178,6 +188,14 @@ public class Employee {
 
     public String getWorkLocation() {
         return workLocation;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 
     public void setWorkLocation(String workLocation) {

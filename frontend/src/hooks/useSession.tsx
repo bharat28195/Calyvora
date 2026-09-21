@@ -67,10 +67,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => setSessionLostHandler(null);
   }, []);
 
-  // Keep the app-wide money/time formatters in sync with the company's chosen currency + timezone.
+  // Keep the app-wide money/time formatters in sync with the company's currency and, for time, with
+  // whichever zone this person is actually in — their own if set, else the company's. This is what
+  // the attendance clock reads, and it has to match what the server stamps on a punch.
   useEffect(() => {
     if (me?.company) {
-      setLocaleConfig({ currency: me.company.currency, timezone: me.company.timezone });
+      setLocaleConfig({ currency: me.company.currency, timezone: me.timezone ?? me.company.timezone });
     }
   }, [me]);
 

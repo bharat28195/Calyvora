@@ -67,32 +67,31 @@ public class AttendanceService {
     }
 
     /**
-     * "Now" as the company experiences it. Attendance is the one place where the server's own clock is
-     * the wrong clock: on a UTC host, an Indian employee clocking in at 04:15 IST was recorded at 22:45
-     * on the <em>previous</em> day, putting the punch on the wrong date and the wrong payslip.
+     * "Now" as this person experiences it. Attendance is the one place where the server's own clock
+     * is the wrong clock: on a UTC host, an Indian employee clocking in at 04:15 IST was recorded at
+     * 22:45 on the <em>previous</em> day, putting the punch on the wrong date and the wrong payslip.
+     *
+     * <p>Per employee, not per company. A Bengaluru company with a designer in Berlin was recording
+     * her 09:00 arrival as 12:30, and every "late" on her month was the clock's doing rather than
+     * hers. The chain — her zone, else the company's, else the default — lives in {@link Timezones}
+     * so that the /me response, which the screens set their clocks from, resolves it identically.
+     *
+     * <p>This used to fall back to UTC for a company with no settings row. That is a company that
+     * never opened its settings page, and it should behave exactly like one that saved the defaults.
      */
-    private java.time.ZoneId zone() {
-        return companySettingsRepository.findById(TenantContext.getCompanyId())
-                .map(com.calyvora.company.CompanySettings::getTimezone)
-                .filter(tz -> tz != null && !tz.isBlank())
-                .map(tz -> {
-                    try {
-                        return java.time.ZoneId.of(tz);
-                    } catch (RuntimeException badZone) {
-                        return java.time.ZoneOffset.UTC;
-                    }
-                })
-                .orElse(java.time.ZoneOffset.UTC);
+    private java.time.ZoneId zoneFor(Employee employee) {
+        return Timezones.resolve(employee,
+                companySettingsRepository.findById(TenantContext.getCompanyId()).orElse(null));
     }
 
-    /** Today's date in the company's timezone. */
-    private LocalDate today() {
-        return LocalDate.now(zone());
+    /** Today's date where this person is. */
+    private LocalDate today(Employee employee) {
+        return LocalDate.now(zoneFor(employee));
     }
 
-    /** The current wall-clock time in the company's timezone, to the minute. */
-    private LocalTime nowTime() {
-        return LocalTime.now(zone()).withSecond(0).withNano(0);
+    /** The current wall-clock time where this person is, to the minute. */
+    private LocalTime nowTime(Employee employee) {
+        return LocalTime.now(zoneFor(employee)).withSecond(0).withNano(0);
     }
 
     // ---- team day sheet ----
@@ -314,7 +313,7 @@ public class AttendanceService {
         double worked = 0;
         long expected = 0;
         long notRecorded = 0;
-        LocalDate today = today();
+        LocalDate today = today(employee);
 
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             AttendanceEntryResponse entry = resolve(employee, user, d,
@@ -364,8 +363,8 @@ public class AttendanceService {
         Employee employee = employeeRepository
                 .findByIdAndCompanyId(UUID.fromString(req.employeeId()), companyId)
                 .orElseThrow(() -> new NotFoundException("Employee not found"));
-        LocalDate date = req.date() == null || req.date().isBlank() ? today() : LocalDate.parse(req.date());
-        if (date.isAfter(today())) {
+        LocalDate date = req.date() == null || req.date().isBlank() ? today(employee) : LocalDate.parse(req.date());
+        if (date.isAfter(today(employee))) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Attendance can't be marked for a future date");
         }
 
@@ -388,12 +387,12 @@ public class AttendanceService {
     public AttendanceEntryResponse checkIn(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
-        LocalDate today = today();
+        LocalDate today = today(employee);
         AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .orElseGet(() -> attendanceRepository.save(new AttendanceRecord(UUID.randomUUID(), companyId,
                         employee.getId(), today, AttendanceStatus.PRESENT, null)));
         if (record.getCheckIn() == null) {
-            record.setCheckIn(nowTime());
+            record.setCheckIn(nowTime(employee));
             // Someone clocking in is present, unless an admin deliberately marked the day otherwise.
             if (record.getStatus() == AttendanceStatus.ABSENT) {
                 record.setStatus(AttendanceStatus.PRESENT);
@@ -408,10 +407,10 @@ public class AttendanceService {
     public AttendanceEntryResponse checkOut(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
-        LocalDate today = today();
+        LocalDate today = today(employee);
         AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_ERROR, "Check in first"));
-        record.setCheckOut(nowTime());
+        record.setCheckOut(nowTime(employee));
         validateTimes(record);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
         return of(employee, user, today, record, false, null);
@@ -422,7 +421,7 @@ public class AttendanceService {
     public AttendanceEntryResponse clearToday(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
-        LocalDate today = today();
+        LocalDate today = today(employee);
         attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .ifPresent(attendanceRepository::delete);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
@@ -436,7 +435,7 @@ public class AttendanceService {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
-        LocalDate today = today();
+        LocalDate today = today(employee);
         return resolve(employee, user, today,
                 attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today),
                 approvedLeaveFor(employee.getId(), today, today));

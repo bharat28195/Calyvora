@@ -43,6 +43,7 @@ public class AuthService {
     private final CompanyRepository companyRepository;
     private final CompanySettingsRepository companySettingsRepository;
     private final UserRepository userRepository;
+    private final com.calyvora.people.EmployeeRepository employeeRepository;
     private final EmailVerificationTokenRepository verificationTokenRepository;
     private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
@@ -60,8 +61,10 @@ public class AuthService {
                        JwtService jwtService,
                        EmailService emailService,
                        AppProperties props,
-                       com.calyvora.people.EmployeeService employeeService) {
+                       com.calyvora.people.EmployeeService employeeService,
+                       com.calyvora.people.EmployeeRepository employeeRepository) {
         this.employeeService = employeeService;
+        this.employeeRepository = employeeRepository;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
         this.userRepository = userRepository;
@@ -219,7 +222,7 @@ public class AuthService {
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new NotFoundException("Company not found"));
         CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
-        return MeResponse.of(user, company, settings);
+        return MeResponse.of(user, company, settings, employeeRepository.findByUserId(userId).orElse(null));
     }
 
     /** Login/refresh result: the access token, the raw refresh token (→ cookie), and the body. */
@@ -235,7 +238,8 @@ public class AuthService {
                 user.getRole().name(), user.getEmail());
         String accessToken = jwtService.createAccessToken(principal);
         CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
-        LoginResponse body = new LoginResponse(accessToken, MeResponse.of(user, company, settings));
+        LoginResponse body = new LoginResponse(accessToken, MeResponse.of(user, company, settings,
+                employeeRepository.findByUserId(user.getId()).orElse(null)));
         return new LoginResult(accessToken, issued.rawToken(), body);
     }
 

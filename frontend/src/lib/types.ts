@@ -26,6 +26,12 @@ export interface Me {
     /** Minutes of inactivity before this company signs people out; null means never. */
     sessionIdleMinutes: number | null;
   };
+  /**
+   * The zone this person's clocks run on: their own if they set one, else the company's. Resolved
+   * by the same server code that stamps attendance, so the clock on screen and the punch cannot
+   * disagree. Set the app-wide formatters from this, not from company.timezone.
+   */
+  timezone: string;
 }
 
 export interface CompanySettings {
@@ -99,6 +105,8 @@ export interface Employee {
   departmentId: string | null;
   managerId: string | null;
   workLocation: string | null;
+  /** Their own IANA zone, or null for "same as the company". */
+  timezone: string | null;
   phone: string | null;
   startDate: string | null;
   endDate: string | null;

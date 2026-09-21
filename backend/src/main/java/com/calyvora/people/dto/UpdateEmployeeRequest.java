@@ -20,6 +20,7 @@ public record UpdateEmployeeRequest(
         String managerId,
         String departmentId,
         @Size(max = 120) String workLocation,
+        @Size(max = 64) String timezone,
         @Size(max = 40) String phone,
         @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "date must be YYYY-MM-DD")
         String startDate,

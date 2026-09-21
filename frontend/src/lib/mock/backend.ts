@@ -143,6 +143,7 @@ interface EmployeeRow {
   departmentId: string | null;
   managerId: string | null;
   workLocation: string | null;
+  timezone?: string | null;
   phone: string | null;
   startDate: string | null;
   endDate?: string | null;
@@ -362,8 +363,12 @@ function toMe(db: DB, user: User): Me {
       id: company.id, name: company.name, slug: company.slug, status: company.status,
       currency: db.settings.find((s) => s.companyId === company.id)?.currency ?? "INR",
       sessionIdleMinutes: db.settings.find((s) => s.companyId === company.id)?.sessionIdleMinutes ?? null,
-      timezone: db.settings.find((s) => s.companyId === company.id)?.timezone ?? "UTC",
+      // Same default as the server: "UTC" was the value for "nobody has chosen yet", not a choice.
+      timezone: db.settings.find((s) => s.companyId === company.id)?.timezone ?? "Asia/Kolkata",
     },
+    timezone: db.employees.find((e) => e.userId === user.id)?.timezone
+      ?? db.settings.find((s) => s.companyId === company.id)?.timezone
+      ?? "Asia/Kolkata",
   };
 }
 
@@ -2306,7 +2311,7 @@ export const mockBackend = {
     return toEmployee(db, db.users.find((u) => u.id === row.userId)!);
   },
 
-  async updateMyProfile(accessToken: string | null, patch: { phone?: string; workLocation?: string }): Promise<Employee> {
+  async updateMyProfile(accessToken: string | null, patch: { phone?: string; workLocation?: string; timezone?: string }): Promise<Employee> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
@@ -2314,6 +2319,7 @@ export const mockBackend = {
     const row = db.employees.find((e) => e.userId === user.id)!;
     if (patch.phone !== undefined) row.phone = patch.phone || null;
     if (patch.workLocation !== undefined) row.workLocation = patch.workLocation || null;
+    if (patch.timezone !== undefined) row.timezone = patch.timezone || null;
     save(db);
     return toEmployee(db, user);
   },
@@ -3070,6 +3076,7 @@ function ensureProfiles(db: DB, companyId: string, users: User[]): void {
         departmentId: null,
         managerId: null,
         workLocation: null,
+        timezone: null,
         phone: null,
         startDate: null,
       });
@@ -3095,6 +3102,7 @@ function toEmployee(db: DB, user: User): Employee {
     departmentId: row.departmentId,
     managerId: row.managerId,
     workLocation: row.workLocation,
+    timezone: row.timezone ?? null,
     phone: row.phone,
     startDate: row.startDate,
     endDate: row.endDate ?? null,
@@ -3318,7 +3326,7 @@ function toDepartment(db: DB, d: DeptRow): Department {
 function applyPatch(row: EmployeeRow, patch: Partial<Employee>): void {
   const fields: (keyof EmployeeRow & keyof Employee)[] = [
     "employeeNo", "jobTitle", "employmentType", "employmentStatus",
-    "workLocation", "phone", "startDate", "managerId", "departmentId",
+    "workLocation", "timezone", "phone", "startDate", "managerId", "departmentId",
     "endDate", "skills", "rating",
   ];
   for (const f of fields) {
