@@ -1444,6 +1444,17 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   build, and unit tests over `lib/`. Not one of them opens a screen. A page that compiles, passes
   types and throws on mount is green by all four. That is the argument for 3.6, and this defect is
   the first concrete instance of it rather than a hypothetical.
+- **Closed the same day, and it paid immediately.** Twenty-three Playwright specs against the mock
+  backend, 41 seconds, now in CI. On its first full run it found `/finance/tax` returning its
+  spinner whenever data was null — so a failed first load span forever with the error message set
+  and never rendered, on live as much as in mock. Nothing static could have seen it.
+- **Run it against the mock, not the real stack.** The mock is kept faithful to the API deliberately,
+  and it needs no Postgres, no Java and no four-minute cold start. A suite that takes 41 seconds runs;
+  one that takes twenty minutes gets skipped. What genuinely turns on server behaviour is already
+  covered by the Java integration tests across thirty modules and six roles.
+- **Assert shallowly.** A heading with something in it, a status under 400, a clean console. Pinning
+  copy would make every improved sentence a failing test, and what this hunts is blank pages and
+  stack traces.
 
 ---
 

@@ -4,6 +4,15 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-22 — End-to-end tests, and a page that never stopped spinning
+Backlog 3.6. Twenty-three Playwright specs now sign in and actually render: every screen in the admin
+nav, the auth guards, sign-out, the `/register` and `/me/expenses` redirects that exist only because
+old links are out in the world, and the empty states a new company sees for its first week. It found
+a real defect on its first full run — `/finance/tax` set an error but returned its spinner whenever
+data was null, so a failed first load span forever with the message never rendered, on live as well
+as in mock mode. Runs against the mock backend in 41 seconds, so it runs rather than gets skipped;
+CI gained a job for it. (PD-43)
+
 ### 2026-09-21 — Attendance runs on the employee's clock, and never on UTC by choice
 Attendance screens showed UTC. Two causes: a company with no settings row fell back to `"UTC"` in
 both `/me` and `AttendanceService` — the value for "nobody has chosen yet", not anyone's timezone —
