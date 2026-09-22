@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -37,11 +38,14 @@ public class PlatformController {
     private final com.calyvora.trial.TrialRequestService trialRequests;
     private final FeatureService featureService;
     private final PlanService planService;
+    private final TenantDataService tenantData;
 
     public PlatformController(PlatformService service,
                               com.calyvora.trial.TrialRequestService trialRequests,
                               FeatureService featureService,
-                              PlanService planService) {
+                              PlanService planService,
+                              TenantDataService tenantData) {
+        this.tenantData = tenantData;
         this.service = service;
         this.trialRequests = trialRequests;
         this.featureService = featureService;
@@ -196,5 +200,31 @@ public class PlatformController {
     @PostMapping("/trial-requests/{id}/decline")
     public com.calyvora.trial.dto.TrialRequestResponse declineTrial(@PathVariable UUID id) {
         return trialRequests.decline(id);
+    }
+
+    // ---- getting a customer's data out, and getting a customer out --------------------------
+
+    /**
+     * Everything this company owns, as JSON.
+     *
+     * <p>A GET so it can be opened, saved or piped without a tool. What comes back is large — a
+     * thousand-person tenant is megabytes — and that is the honest shape of the answer.
+     */
+    @GetMapping("/companies/{id}/export")
+    public Map<String, Object> exportCompany(@PathVariable UUID id) {
+        return tenantData.export(id);
+    }
+
+    /**
+     * Delete a company and everything belonging to it. Not reversible, no grace period.
+     *
+     * <p>The body must carry the company's name. A console listing every customer is one mis-click
+     * from ending one of them, and typing the name is the only protection that survives a tired
+     * operator at the end of a long day.
+     */
+    @DeleteMapping("/companies/{id}")
+    public Map<String, Object> deleteCompany(@PathVariable UUID id,
+                                             @RequestBody(required = false) Map<String, String> body) {
+        return tenantData.delete(id, body == null ? null : body.get("confirmName"));
     }
 }

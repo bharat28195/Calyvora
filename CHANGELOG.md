@@ -4,6 +4,19 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-22 — A customer can be got out, and their data with them
+Backlog 4.5. The product could provision a customer and could not remove one: of 48 tables carrying a
+`company_id`, two cascaded, so `delete from companies` failed on the first foreign key it met. V58
+sweeps the catalogue and makes every one of them cascade — and a test reads `pg_class` and asserts
+that any table with a `company_id` has such a key, so a table added later fails the suite rather than
+a future erasure request. `GET /platform/companies/{id}/export` returns everything the company owns
+as JSON, driven from the catalogue rather than from JPA entities (which would miss anything the ORM
+does not model) and excluding refresh tokens, which are credentials rather than records.
+`DELETE /platform/companies/{id}` removes the tenant in one statement and requires the company's name
+typed back — there is no undo and no grace period. An agency that still has customer companies is
+refused: `companies.agency_id` is `ON DELETE SET NULL`, because a reseller's customers are tenants in
+their own right. Vendor-only; a company deleting its own workspace is a separate feature. (PD-45)
+
 ### 2026-09-22 — `company_settings` is isolated by the database again
 Backlog 4.4. V30 switched Row-Level Security off on this table because the platform owner provisions a
 settings row while bound to a different tenant, leaving isolation to "the service always keys by the

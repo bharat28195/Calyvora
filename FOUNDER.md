@@ -1497,9 +1497,44 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   console reads and writes every company's row, so there is no single tenant such a query belongs to.
   `company_settings` was never like that — every access is on behalf of exactly one company.
 
+### PD-45 · 2026-09-22 · A list of tables is the wrong instrument for an erasure request
+- **Context:** the product could provision a customer and could not remove one. Forty-eight tables
+  carry a `company_id`; two cascaded, so `delete from companies` failed on the first foreign key it
+  met. Deleting a customer was something only a hand-written list of tables could have done.
+- **Rule: the catalogue, not a list.** A list in code is a thing to forget. The day somebody adds a
+  table and forgets it, an erasure request leaves that table's personal data behind, **reports
+  success**, and nothing anywhere disagrees — the worst possible shape for this particular failure.
+  V58 makes every `company_id` key cascade, and a test reads `pg_class` and asserts that any table
+  with a `company_id` has one. A future table that forgets fails the suite rather than a future GDPR
+  request.
+- **The migration is a catalogue sweep, not forty-six ALTERs.** The constraints were created across
+  thirty migrations with names Postgres chose. Transcribing them would have been a fresh chance to
+  mistype one; a sweep cannot miss a table that exists or invent one that does not.
+- **One reference must not cascade, and it is the dangerous one.** `companies.agency_id` points at
+  another company — a reseller. Its customers are tenants in their own right, with their own staff
+  and payroll. Cascading there would turn "remove this reseller" into "remove every company that
+  reseller ever signed": the single most destructive thing this schema could be asked to do by
+  accident. It is `ON DELETE SET NULL`, and deleting an agency that still has customers is refused
+  outright so the operator decides knowingly.
+- **Export is driven from the catalogue for the same reason.** Enumerating JPA entities would export
+  what the application models, which is not what the customer has — a table written by a migration
+  and read only by a report is still their data, and the ORM would never mention it.
+- **Refresh tokens are credentials, not records.** They are excluded from the export: a file that
+  contained them would hand the recipient a working session for every signed-in employee.
+- **The destructive act cannot be a single gesture.** Deletion requires typing the company's name
+  back. A console listing every customer is one mis-click from ending one of them, and a confirmation
+  that can be satisfied by the same motion that caused the mistake protects nobody. There is no undo
+  and no grace period, which is precisely why.
+- **Count before, not after.** The row counts go into the log line before the delete runs, because
+  afterwards there is nothing left to count — that line is the only remaining evidence the data
+  existed.
+- **Both are the vendor's tools.** A company deleting its own workspace is a different feature, with
+  a grace period and a way back, and should be designed as one rather than fall out of this.
+
 ---
 
 ## 4. Architecture Decision Log
+
 
 
 
