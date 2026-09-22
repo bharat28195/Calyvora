@@ -58,12 +58,16 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
     private final String ownerPassword;
     private final boolean usingDefaultPassword;
 
+    private final com.calyvora.common.security.TenantBinder tenantBinder;
+
     public PlatformOwnerBootstrap(CompanyRepository companyRepository,
                                   CompanySettingsRepository settingsRepository,
                                   UserRepository userRepository,
                                   PasswordEncoder passwordEncoder,
                                   @Value("${calyvora.platform.owner-email:bharat28195@calyvora.in}") String ownerEmail,
-                                  @Value("${calyvora.platform.owner-password:}") String configuredPassword) {
+                                  @Value("${calyvora.platform.owner-password:}") String configuredPassword,
+                                  com.calyvora.common.security.TenantBinder tenantBinder) {
+        this.tenantBinder = tenantBinder;
         this.companyRepository = companyRepository;
         this.settingsRepository = settingsRepository;
         this.userRepository = userRepository;
@@ -75,7 +79,24 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        ensurePlatformOwner();
+        // Through the proxy, not on `this`. @Transactional below only applies when Spring is in the
+        // call path, so a plain self-call ran the whole bootstrap outside a transaction — which went
+        // unnoticed for as long as nothing in it needed one. V57 made it need one: naming a tenant
+        // to insert the settings row ends in a flush, and a flush without a transaction throws.
+        //
+        // The latent half of the same bug is worth naming: with no transaction, a failure partway
+        // through left the platform company created and its owner missing, and the next start would
+        // reuse the company and never create the account.
+        self.ensurePlatformOwner();
+    }
+
+    // Looked up lazily: injecting a bean into itself at construction is a cycle.
+    private PlatformOwnerBootstrap self;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    void setSelf(PlatformOwnerBootstrap self) {
+        this.self = self;
     }
 
     /**
@@ -101,7 +122,9 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
                     uniqueSlug(PLATFORM_COMPANY), CompanyStatus.ACTIVE);
             created.setPlatform(true);
             Company saved = companyRepository.save(created);
-            settingsRepository.save(new CompanySettings(saved.getId()));
+            // Named tenant: this runs at startup with nothing bound, and V57 refuses the insert
+            // otherwise. The platform's own company is a tenant like any other here.
+            tenantBinder.callAs(saved.getId(), () -> settingsRepository.save(new CompanySettings(saved.getId())));
             return saved;
         });
 

@@ -102,9 +102,13 @@ class SessionIdleTimeoutTest extends IntegrationTestBase {
         setIdleMinutes(owner, 15);
         setIdleMinutes(owner, 0);
 
-        assertThat(settingsRepository.findById(java.util.UUID.fromString(
-                getJson("/api/v1/auth/me", owner).get("company").get("id").asText()))
-                .orElseThrow().getSessionIdleMinutes()).isNull();
+        // Read through /me rather than the repository. Since V57 the settings table is under
+        // Row-Level Security, and a repository call from the test thread has no tenant bound — it
+        // would find nothing and report the policy cleared whether or not it was. /me is also how
+        // the app itself learns this, which makes it the more honest assertion.
+        assertThat(getJson("/api/v1/auth/me", owner).get("company").get("sessionIdleMinutes").isNull())
+                .as("clearing the policy leaves no idle window on the company")
+                .isTrue();
 
         refreshOnce(owner.refreshToken());
         assertThat(Duration.between(Instant.now(), newestToken().getExpiresAt()))

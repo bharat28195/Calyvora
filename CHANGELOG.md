@@ -4,6 +4,17 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-22 — `company_settings` is isolated by the database again
+Backlog 4.4. V30 switched Row-Level Security off on this table because the platform owner provisions a
+settings row while bound to a different tenant, leaving isolation to "the service always keys by the
+caller's own company id" — a promise every future line of code has to keep, for a row that now holds
+the legal name, address, logo, session idle timeout and tax-declaration window. V57 restores the
+policy and names the tenant instead, via the `TenantBinder` that `PlatformService` was already using
+on the same code path. Four call sites needed it: registration, login, refresh and the platform
+bootstrap, each on a path where nothing is bound. Asserted at the database rather than the API —
+bound to one tenant the table holds one row, unbound it holds none. `subscriptions` stays exempt;
+that one really is platform-managed. (PD-44)
+
 ### 2026-09-22 — End-to-end tests, and a page that never stopped spinning
 Backlog 3.6. Twenty-three Playwright specs now sign in and actually render: every screen in the admin
 nav, the auth guards, sign-out, the `/register` and `/me/expenses` redirects that exist only because

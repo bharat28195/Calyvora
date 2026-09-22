@@ -102,6 +102,8 @@ public class ScaleSeedService {
     private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
+    private final com.calyvora.common.security.TenantBinder tenantBinder;
+
     public ScaleSeedService(CompanyRepository companyRepository, UserRepository userRepository,
                             EmployeeRepository employeeRepository, DepartmentRepository departmentRepository,
                             AttendanceRepository attendanceRepository,
@@ -112,7 +114,9 @@ public class ScaleSeedService {
                             PasswordEncoder passwordEncoder,
                             ScaleModuleSeeder moduleSeeder,
                             com.calyvora.company.CompanySettingsRepository companySettingsRepository,
-                            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                            org.springframework.jdbc.core.JdbcTemplate jdbc,
+                            com.calyvora.common.security.TenantBinder tenantBinder) {
+        this.tenantBinder = tenantBinder;
         this.moduleSeeder = moduleSeeder;
         this.companySettingsRepository = companySettingsRepository;
         this.compensationRepository = compensationRepository;

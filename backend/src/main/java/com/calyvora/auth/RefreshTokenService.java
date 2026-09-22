@@ -31,9 +31,13 @@ public class RefreshTokenService {
     private final CompanySettingsRepository settingsRepository;
     private final Duration ttl;
 
+    private final com.calyvora.common.security.TenantBinder tenantBinder;
+
     public RefreshTokenService(RefreshTokenRepository repository, RefreshTokenRevoker revoker,
                                UserRepository userRepository, CompanySettingsRepository settingsRepository,
-                               AppProperties props) {
+                               AppProperties props,
+                               com.calyvora.common.security.TenantBinder tenantBinder) {
+        this.tenantBinder = tenantBinder;
         this.repository = repository;
         this.revoker = revoker;
         this.userRepository = userRepository;
@@ -74,10 +78,14 @@ public class RefreshTokenService {
      * default. A missing settings row means the same thing.
      */
     private Duration lifetimeFor(UUID userId) {
+        // Refresh presents a cookie and no token, so nothing is bound. Without naming the tenant,
+        // RLS hands back no settings row and every company silently reverts to the default lifetime
+        // — the idle timeout would stop being enforced, and nothing would look wrong.
         Integer idleMinutes = userRepository.findById(userId)
-                .map(user -> settingsRepository.findById(user.getCompanyId())
-                        .map(CompanySettings::getSessionIdleMinutes)
-                        .orElse(null))
+                .map(user -> tenantBinder.callAs(user.getCompanyId(), () ->
+                        settingsRepository.findById(user.getCompanyId())
+                                .map(CompanySettings::getSessionIdleMinutes)
+                                .orElse(null)))
                 .orElse(null);
         if (idleMinutes == null) {
             return ttl;

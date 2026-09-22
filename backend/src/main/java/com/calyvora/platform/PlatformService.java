@@ -60,11 +60,15 @@ public class PlatformService {
     private final com.calyvora.billing.PricingService pricingService;
     private final com.calyvora.people.EmployeeService employeeService;
 
+    private final com.calyvora.common.security.TenantBinder tenantBinder;
+
     public PlatformService(CompanyRepository companyRepository, CompanySettingsRepository settingsRepository,
                            UserRepository userRepository, SubscriptionRepository subscriptionRepository,
                            SeatRequestRepository seatRequestRepository, PasswordEncoder passwordEncoder,
                            com.calyvora.billing.PricingService pricingService,
-                           com.calyvora.people.EmployeeService employeeService) {
+                           com.calyvora.people.EmployeeService employeeService,
+                           com.calyvora.common.security.TenantBinder tenantBinder) {
+        this.tenantBinder = tenantBinder;
         this.employeeService = employeeService;
         this.pricingService = pricingService;
         this.companyRepository = companyRepository;
@@ -130,7 +134,9 @@ public class PlatformService {
         // record five and a half hours out on day one.
         settings.setTimezone("USD".equals(currency) ? "America/New_York" : "Asia/Kolkata");
         settings.setCurrency(currency);
-        settingsRepository.save(settings);
+        // Bound to the company being provisioned rather than the platform's own. This is the write
+        // V30 could not make, and the reason it switched this table's RLS off (V57 puts it back).
+        tenantBinder.callAs(company.getId(), () -> settingsRepository.save(settings));
 
         User admin = new User(UUID.randomUUID(), company.getId(), email,
                 req.adminFirstName().trim(), req.adminLastName().trim(), Role.ADMIN, UserStatus.ACTIVE);
@@ -177,7 +183,7 @@ public class PlatformService {
         CompanySettings settings = new CompanySettings(workspace.getId());
         settings.setTimezone("Asia/Kolkata");
         settings.setCurrency("INR");
-        settingsRepository.save(settings);
+        tenantBinder.callAs(workspace.getId(), () -> settingsRepository.save(settings));
 
         User owner = new User(UUID.randomUUID(), workspace.getId(), email,
                 req.ownerFirstName().trim(), req.ownerLastName().trim(), Role.AGENCY_OWNER, UserStatus.ACTIVE);

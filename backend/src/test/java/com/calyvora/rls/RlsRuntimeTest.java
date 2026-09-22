@@ -3,6 +3,8 @@ package com.calyvora.rls;
 import com.calyvora.support.IntegrationTestBase;
 import com.calyvora.support.RlsRoleConfig;
 import com.fasterxml.jackson.databind.JsonNode;
+
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -125,5 +127,50 @@ class RlsRuntimeTest extends IntegrationTestBase {
 
         JsonNode directory = getJson("/api/v1/people/employees", ava);
         assertThat(directory.size()).isEqualTo(7);
+    }
+
+    /**
+     * company_settings is isolated by the database again (V57).
+     *
+     * <p>V30 switched its policy off because the platform owner provisions a settings row while
+     * bound to a different tenant, and left the isolation to the application — "the service always
+     * keys reads by the caller's own company id", which is a promise every future line of code has
+     * to keep. Asserted at the database rather than through the API on purpose: an API-level check
+     * would pass on the application's own filtering and prove nothing about the layer beneath it.
+     */
+    @Test
+    void a_tenant_cannot_read_another_tenants_settings() throws Exception {
+        Session acme = onboardOwner("Settings Acme", "owner@set-acme.test", PW);
+        onboardOwner("Settings Umbrella", "owner@set-umbrella.test", PW);
+
+        UUID acmeCompany = UUID.fromString(
+                getJson("/api/v1/auth/me", acme).get("company").get("id").asText());
+
+        // Bound to Acme, the whole visible table is Acme's one row — not two.
+        try (java.sql.Connection c = dataSource.getConnection();
+             java.sql.Statement st = c.createStatement()) {
+            // set_config(..., false) rather than SET LOCAL: this connection is in autocommit, and
+            // SET LOCAL outside a transaction is silently a no-op — the first version of this test
+            // therefore read zero rows and looked like proof when it was measuring nothing. This is
+            // also the exact call TenantAwareDataSource makes on borrow.
+            st.execute("select set_config('calyvora.company_id', '" + acmeCompany + "', false)");
+            try (java.sql.ResultSet rs = st.executeQuery("select count(*) from company_settings")) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1))
+                        .as("bound to one tenant, the settings table holds exactly that tenant's row")
+                        .isEqualTo(1);
+            }
+        }
+
+        // And with no tenant bound at all, nothing is readable — the failure mode that has no
+        // symptom, and the one the application-layer promise could never have covered.
+        try (java.sql.Connection c = dataSource.getConnection();
+             java.sql.Statement st = c.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("select count(*) from company_settings")) {
+            assertThat(rs.next()).isTrue();
+            assertThat(rs.getInt(1))
+                    .as("an unbound connection sees no settings at all")
+                    .isZero();
+        }
     }
 }

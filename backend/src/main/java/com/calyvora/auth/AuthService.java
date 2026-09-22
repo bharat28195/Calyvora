@@ -52,6 +52,8 @@ public class AuthService {
     private final AppProperties props;
     private final com.calyvora.people.EmployeeService employeeService;
 
+    private final com.calyvora.common.security.TenantBinder tenantBinder;
+
     public AuthService(CompanyRepository companyRepository,
                        CompanySettingsRepository companySettingsRepository,
                        UserRepository userRepository,
@@ -62,7 +64,9 @@ public class AuthService {
                        EmailService emailService,
                        AppProperties props,
                        com.calyvora.people.EmployeeService employeeService,
-                       com.calyvora.people.EmployeeRepository employeeRepository) {
+                       com.calyvora.people.EmployeeRepository employeeRepository,
+                       com.calyvora.common.security.TenantBinder tenantBinder) {
+        this.tenantBinder = tenantBinder;
         this.employeeService = employeeService;
         this.employeeRepository = employeeRepository;
         this.companyRepository = companyRepository;
@@ -109,7 +113,10 @@ public class AuthService {
                 uniqueSlug(request.companyName()),
                 verificationRequired ? CompanyStatus.PENDING : CompanyStatus.ACTIVE);
         companyRepository.save(company);
-        companySettingsRepository.save(new CompanySettings(company.getId()));
+        // Bound to the company being created. Registration is a public endpoint, so no tenant is
+        // bound on the way in, and with V57 the settings insert is refused without one.
+        tenantBinder.callAs(company.getId(), () ->
+                companySettingsRepository.save(new CompanySettings(company.getId())));
 
         User admin = new User(UUID.randomUUID(), company.getId(), email,
                 request.firstName().trim(), request.lastName().trim(), Role.ADMIN,
@@ -234,12 +241,17 @@ public class AuthService {
     private LoginResult issueSession(User user, RefreshTokenService.IssuedToken issued) {
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new NotFoundException("Company not found"));
+        // Login carries no token yet, so TenantFilter has bound nothing. Every read below is for
+        // this user's own company and has to say so, or RLS returns nothing and the session starts
+        // with the product's defaults instead of the customer's currency and timezone.
         AuthPrincipal principal = new AuthPrincipal(user.getId(), user.getCompanyId(),
                 user.getRole().name(), user.getEmail());
         String accessToken = jwtService.createAccessToken(principal);
-        CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
-        LoginResponse body = new LoginResponse(accessToken, MeResponse.of(user, company, settings,
-                employeeRepository.findByUserId(user.getId()).orElse(null)));
+        LoginResponse body = tenantBinder.callAs(user.getCompanyId(), () -> {
+            CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
+            return new LoginResponse(accessToken, MeResponse.of(user, company, settings,
+                    employeeRepository.findByUserId(user.getId()).orElse(null)));
+        });
         return new LoginResult(accessToken, issued.rawToken(), body);
     }
 

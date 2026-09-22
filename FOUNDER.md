@@ -1456,9 +1456,51 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   copy would make every improved sentence a failing test, and what this hunts is blank pages and
   stack traces.
 
+### PD-44 · 2026-09-22 · An application-layer promise is not isolation
+- **Context:** V30 switched Row-Level Security off on `company_settings` because the platform owner
+  provisions a new company's settings row while bound to a different tenant, and the policy refused
+  the insert. Its reasoning was that the row is "benign per-company config" and that "the service
+  always keys reads/writes by the caller's own company id".
+- **Rule:** both halves of that age badly, and predictably. The row is no longer benign — it carries
+  the legal name, address, logo, session idle timeout, and now whether tax declarations are open —
+  and "the service always keys by company id" is a promise every future line of code has to keep.
+  One forgotten predicate is a cross-tenant read of every customer's settings, and nothing fails.
+  RLS exists precisely so nobody has to keep that promise.
+- **The obstacle had a better answer by the time we looked again.** `TenantBinder` names the tenant a
+  write belongs to. `PlatformService` was already using it on the very same code path, with a comment
+  observing that V30 met this problem and answered it by switching RLS off. V57 is the other half of
+  that observation.
+- **Restoring a policy is not a migration, it is a survey.** Turning it back on broke the context
+  outright, then four separate call sites, each on a path where no tenant is bound: registration and
+  login (public endpoints, nothing bound yet), refresh (a cookie, no token), the platform bootstrap
+  and the demo seeder. Every one of them would have failed silently in production and passed in a
+  test suite connected as superuser. They failed loudly here only because `IntegrationTestBase`
+  already runs every test under a role RLS applies to.
+- **It exposed a latent bug nobody was looking for.** `PlatformOwnerBootstrap.run()` called its own
+  `@Transactional` method on `this`, so Spring's proxy was never in the path and the bootstrap had
+  never run in a transaction at all. Harmless until something in it needed one — and quietly not
+  harmless before that: a failure partway through left the platform company created and its owner
+  missing, and the next start would reuse the company and never create the account.
+- **Seeders are the exception that proves the shape.** They deliberately run without one enclosing
+  transaction, so `TenantBinder` — which ends in a flush — cannot be used there at all. They bind
+  through `TenantContext` instead, which works precisely because each repository call borrows its own
+  connection and picks the binding up at borrow time. Two mechanisms, and which one applies is
+  decided by whether a transaction is open.
+- **Assert isolation at the database, not the API.** The new test reads `company_settings` on a raw
+  connection: bound to one tenant it sees one row, unbound it sees none. An API-level assertion would
+  have passed on the application's own filtering and proved nothing about the layer underneath — the
+  exact confusion V30 institutionalised.
+- **The first version of that test measured nothing.** It used `SET LOCAL`, which outside a
+  transaction is silently a no-op, so it read zero rows and looked like proof. `set_config(..., false)`
+  — what `TenantAwareDataSource` itself calls — is the honest form.
+- **`subscriptions` stays exempt, deliberately.** That table genuinely is platform-managed: the owner
+  console reads and writes every company's row, so there is no single tenant such a query belongs to.
+  `company_settings` was never like that — every access is on behalf of exactly one company.
+
 ---
 
 ## 4. Architecture Decision Log
+
 
 
 

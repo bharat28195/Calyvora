@@ -111,6 +111,8 @@ public class DemoSeedService {
     private final com.calyvora.people.EmployeeFinanceService employeeFinanceService;
     private final com.calyvora.people.DesignationService designationService;
 
+    private final com.calyvora.common.security.TenantBinder tenantBinder;
+
     public DemoSeedService(CompanyRepository companyRepository,
                            CompanySettingsRepository companySettingsRepository,
                            UserRepository userRepository, PasswordEncoder passwordEncoder,
@@ -136,7 +138,9 @@ public class DemoSeedService {
                            com.calyvora.helpdesk.HelpdeskService helpdeskService,
                            com.calyvora.people.RegularizationService regularizationService,
                            com.calyvora.people.EmployeeFinanceService employeeFinanceService,
-                           com.calyvora.people.DesignationService designationService) {
+                           com.calyvora.people.DesignationService designationService,
+                           com.calyvora.common.security.TenantBinder tenantBinder) {
+        this.tenantBinder = tenantBinder;
         this.designationService = designationService;
         this.employeeFinanceService = employeeFinanceService;
         this.helpdeskService = helpdeskService;
@@ -860,6 +864,12 @@ public class DemoSeedService {
     private Company provisionCompany() {
         Company company = new Company(UUID.randomUUID(), COMPANY, uniqueSlug(COMPANY), CompanyStatus.ACTIVE);
         companyRepository.save(company);
+        // Bound here rather than by the caller afterwards: the settings insert below is the first
+        // write to a tenant-isolated table, and with V57 it needs the tenant already named. This
+        // seeder runs without one enclosing transaction on purpose, so each repository call borrows
+        // its own connection and picks the binding up at borrow time — TenantBinder, which ends in a
+        // flush, cannot be used where there is no transaction to flush into.
+        TenantContext.setCompanyId(company.getId());
 
         // Branded out of the box, so a demo payslip looks like a real document rather than a form
         // with the fields left blank.
