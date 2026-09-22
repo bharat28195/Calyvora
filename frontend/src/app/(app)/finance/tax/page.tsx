@@ -88,8 +88,21 @@ export default function TaxDeclarationPage() {
   // see what they are giving up.
   const fieldsMatter = regime === "OLD";
 
+  // An error before anything loaded has to be shown here. The spinner used to win this race
+  // unconditionally, so a failed first load spun forever with the message set and never rendered —
+  // found by the e2e sweep, which opens this page against a backend that refuses it.
+  //
+  // The heading stays even then: a screen that cannot load should still say which screen it is,
+  // rather than leaving the reader to work it out from the address bar.
   if (data === null) {
-    return <div className="mt-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>;
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Tax declaration</h1>
+        {error !== null
+          ? <Alert tone="error" className="mt-6">{error}</Alert>
+          : <div className="mt-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>}
+      </div>
+    );
   }
 
   return (
