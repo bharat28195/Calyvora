@@ -4,6 +4,17 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-21 — Attendance runs on the employee's clock, and never on UTC by choice
+Attendance screens showed UTC. Two causes: a company with no settings row fell back to `"UTC"` in
+both `/me` and `AttendanceService` — the value for "nobody has chosen yet", not anyone's timezone —
+and there was no per-person zone at all, so a designer in Berlin at a Bengaluru company had her 09:00
+arrival stamped 12:30. Employees now carry an optional IANA zone (V56, editable on their profile and
+by admins; blank means "same as the company"), and one resolver — person, else company, else
+`Asia/Kolkata` — both stamps the punch and fills the new top-level `timezone` on `/me` that the
+screens set their clocks from, so the clock and the saved row cannot disagree. An unknown zone is
+refused by name rather than silently ignored. Punches recorded before this keep their original
+stamps. (PD-42)
+
 ### 2026-09-21 — TDS comes off the payslip
 The tax was computed and shown but never withheld, which left the employer carrying the liability.
 It is now a payslip deduction, gated on a new `INCOME_TAX` feature that is **off by default** and

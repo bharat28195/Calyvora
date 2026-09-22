@@ -1405,9 +1405,50 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   nothing claimed — usually the higher bill. Treating a missing form as nil would under-withhold from
   exactly the people who did not get round to filling it in, and the employer carries that.
 
+### PD-42 · 2026-09-21 · A default is a choice nobody made, so make it the right one
+- **Context:** attendance screens showed UTC. Not because anyone selected it — because both
+  `MeResponse` and `AttendanceService` fell back to `"UTC"` when a company had no settings row. A
+  company with no settings row is one that never opened the settings page, and it should behave
+  exactly like one that saved the defaults. Both fallbacks are now the same `Asia/Kolkata` the column
+  itself defaults to.
+- **Rule:** a fallback value is shipped behaviour for everybody who never configured anything, which
+  on a new tenant is everybody. "UTC" read as a deliberate engineering choice and was really the
+  absence of one.
+- **Time is per person, not per company.** There was no employee timezone at all. A Bengaluru company
+  with a designer in Berlin recorded her 09:00 arrival as 12:30, and every "late" on her month was an
+  artefact of the clock. Employees now carry an optional IANA zone; null means "same as the company",
+  which keeps the company setting as the one source of truth rather than a copy on every row that
+  drifts when the company changes it.
+- **One chain, used by both ends.** `Timezones.resolve` — person, else company, else default — both
+  stamps the punch and fills the `timezone` on `/me` that the screens set their clocks from. Two
+  separate resolutions would eventually disagree, and the symptom would be a clock that says one
+  thing and a saved row that says another, which is unfalsifiable from the user's side.
+- **Refuse what you cannot honour.** An unrecognised zone is a 400 rather than stored-and-ignored.
+  "IST" silently treated as Kolkata gives the person no way to learn their setting did nothing — and
+  IST is also Irish Standard Time.
+- **Pick a test fixture that cannot be confused with rounding.** The tests use Pacific/Kiritimati
+  (UTC+14) rather than Kolkata's +5:30, so a stamp resolved in the wrong zone is fourteen hours out
+  at any hour the suite happens to run.
+- **What this does not fix:** punches already recorded keep the wall-clock time they were stamped
+  with. They are stored as local times, so there is nothing to re-interpret them against.
+
+### PD-43 · 2026-09-22 · The typecheck is not the build
+- **Context:** the tax pages shipped with a named export (`inr`) from a Next App Router page. Pages
+  may export only `default` and the framework's own config fields, so `next build` fails — but
+  `tsc --noEmit` and `next lint` both pass, and those were what had been run. The branch went out
+  green by every gate that had actually been used.
+- **Rule:** the gate for frontend work is `next build`. It is the only check that compiles the route
+  types the framework generates, and it is already in CI — the mistake was pushing ahead of CI rather
+  than a missing check.
+- **The deeper gap is that nothing renders a page.** Every frontend gate is static: types, lint,
+  build, and unit tests over `lib/`. Not one of them opens a screen. A page that compiles, passes
+  types and throws on mount is green by all four. That is the argument for 3.6, and this defect is
+  the first concrete instance of it rather than a hypothetical.
+
 ---
 
 ## 4. Architecture Decision Log
+
 
 
 
