@@ -4,6 +4,21 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-25 — Tenant bindings can be made not to outlive their transaction
+Backlog 4.2. The tenant id was set session-scoped on each borrowed connection — correct while this
+process owns its pool, and unsafe behind a **transaction pooler**, which is how one database serves
+many application instances: it lends a connection for one transaction and then lends it to somebody
+else, and session state is inherited. Under session scope the thing inherited is the tenant id, so
+the next client reads the previous client's rows and succeeds. `calyvora.rls.scope=transaction` binds
+with `is_local=true` instead, so Postgres discards it at commit and nothing is left behind; the
+DataSource hands connections over empty, so a connection can never arrive carrying someone else's
+tenant. The binding is made in `doBegin` rather than at borrow, because Spring marks a transaction
+active only *after* obtaining the connection — an `is_local` set at borrow is silently session-scoped,
+which would have degraded the new mode into the old one while the config claimed otherwise.
+`TenantBinder` is now transaction-local too, for the same reason and because it is safer under either
+mode. **The default stays `session`**: today is one instance with its own pool, and turning this on
+belongs with the decision to put a pooler there. (PD-46)
+
 ### 2026-09-22 — A customer can be got out, and their data with them
 Backlog 4.5. The product could provision a customer and could not remove one: of 48 tables carrying a
 `company_id`, two cascaded, so `delete from companies` failed on the first foreign key it met. V58

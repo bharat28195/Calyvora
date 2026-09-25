@@ -59,9 +59,23 @@ public class TenantBinder {
     }
 
     /** Session-scoped, matching {@code TenantAwareDataSource}; empty means "no tenant", which denies. */
+    /**
+     * Name the tenant for the rest of this transaction.
+     *
+     * <p>{@code is_local = true}, and that is not a detail. This class only ever runs inside an open
+     * transaction — it says so above, and it flushes — so a transaction-local value is the right
+     * scope by construction, and it means an excursion can never permanently alter a pooled
+     * connection's session state even if the restore below were somehow missed.
+     *
+     * <p>It is also the only thing that works when the DataSource binds transaction-locally
+     * (TenantAwareDataSource.Scope.TRANSACTION): a LOCAL setting takes precedence over the session
+     * one for the remainder of the transaction, so a session-scoped set here would be quietly
+     * overridden by the binding made when the connection was borrowed — and every write this class
+     * exists to permit would be refused by the policy.
+     */
     private void bind(UUID companyId) {
         entityManager
-                .createNativeQuery("select set_config('calyvora.company_id', :companyId, false)")
+                .createNativeQuery("select set_config('calyvora.company_id', :companyId, true)")
                 .setParameter("companyId", companyId == null ? "" : companyId.toString())
                 .getSingleResult();
     }

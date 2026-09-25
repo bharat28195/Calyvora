@@ -48,7 +48,17 @@ class OpsIntegrationTest extends IntegrationTestBase {
         assertThat(employees).as("the endpoint that was just called is in the table").isNotNull();
         assertThat(employees.get("count").asLong()).isGreaterThanOrEqualTo(1);
         assertThat(employees.get("p95Ms").asDouble()).isGreaterThan(0);
-        assertThat(employees.get("maxMs").asDouble()).isGreaterThanOrEqualTo(employees.get("p95Ms").asDouble());
+        assertThat(employees.get("maxMs").asDouble()).isGreaterThan(0);
+
+        // Deliberately NOT asserting p95 <= max. The two numbers come from different places: max is
+        // the true observed maximum, while p95 is estimated from Micrometer's histogram buckets and
+        // rounds up to a bucket boundary — so the estimate can legitimately sit above the largest
+        // sample, and does whenever the two fall either side of a boundary. This test asserted the
+        // ordering for two weeks and passed on luck; it failed the first time a run landed 160.3ms
+        // of max against a 165.7ms bucket edge. What is worth pinning is that both are populated.
+        assertThat(employees.get("meanMs").asDouble())
+                .as("the mean is a real average of real samples, so it cannot exceed the maximum")
+                .isLessThanOrEqualTo(employees.get("maxMs").asDouble());
     }
 
     @Test

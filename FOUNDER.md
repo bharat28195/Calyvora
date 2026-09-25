@@ -1531,9 +1531,49 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Both are the vendor's tools.** A company deleting its own workspace is a different feature, with
   a grace period and a way back, and should be designed as one rather than fall out of this.
 
+### PD-46 · 2026-09-25 · The tenant binding has to outlive nothing
+- **Context:** the tenant id is set on a borrowed connection with `set_config(..., false)` — *session*
+  scope, so it stays there until something changes it. That is correct while this process owns its
+  pool: every borrow re-sets it, so nothing leaks. It stops being correct the moment a **transaction
+  pooler** is put in front of Postgres, which is how one database serves many application instances.
+  A transaction pooler lends a physical connection for the length of a transaction and then lends it
+  to somebody else; session state left behind is inherited. Under session scope the thing left behind
+  is the tenant id, and the failure is not an error — it is the next client running the previous
+  client's predicate, reading their rows, and succeeding. That is 4.2, and it is why the backlog said
+  it ships *only* with an isolation test.
+- **Rule:** `Scope.TRANSACTION` binds with `is_local = true`, so Postgres discards the value at commit
+  or rollback. Nothing survives for the next borrower, because nothing is left behind.
+- **The obvious implementation cannot work, and fails silently.** The natural move is to make the
+  borrow-time binding local whenever a transaction is open. It never is: Spring obtains the connection
+  inside `doBegin` and marks the transaction active only afterwards, in `prepareSynchronization`, so
+  `isActualTransactionActive()` is always false at borrow. An `is_local` set there is quietly
+  session-scoped — transaction scope degrades into exactly the behaviour it exists to replace, while
+  the configuration claims otherwise. Found by writing the test first and watching it fail; nothing
+  about the code would have suggested it.
+- **So the binding moved to `doBegin` itself**, immediately after `super.doBegin` has opened the
+  transaction. That is the earliest point at which `is_local` means what it says.
+- **Under transaction scope the DataSource hands connections over empty**, and that is a feature
+  rather than tidiness: whatever the previous borrower left stops there, so a connection can never
+  arrive carrying somebody else's tenant. The cost is a stricter contract — a tenant-scoped read
+  outside a transaction now finds nothing rather than something — which is the correct failure and a
+  change worth making deliberately.
+- **`TenantBinder` had the same bug waiting.** It set the GUC session-scoped; a LOCAL setting takes
+  precedence for the remainder of a transaction, so under transaction scope its binding was silently
+  overridden by the one made at borrow and every write it exists to permit was refused. It is
+  transaction-local now, which is also strictly safer under session scope: an excursion can no longer
+  alter a pooled connection's session state even if the restore were missed.
+- **The default stays SESSION.** Today's deployment is one instance with its own pool and nothing in
+  front of it; switching the default would change how a running system behaves to suit one it does
+  not have. The capability is built and tested, and turning it on belongs with the decision to put a
+  pooler there — which is 3.4's decision, not this one's.
+- **No pooler in the test, deliberately.** What a pooler requires is that nothing survives the
+  transaction, and that is a property of our own connection handling, assertable directly. A test
+  that stood up PgBouncer would be testing PgBouncer.
+
 ---
 
 ## 4. Architecture Decision Log
+
 
 
 
