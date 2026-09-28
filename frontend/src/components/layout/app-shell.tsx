@@ -211,14 +211,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // it costs nothing.
   const [leadsTeam, setLeadsTeam] = useState(false);
 
+  // Wait for the session before asking anything of the server. This ran on mount for a long time,
+  // and React runs child effects before parent ones, so it always fired before SessionProvider had
+  // a token — not a race but an ordering, and both calls 401'd on every single page load. Both
+  // failures were swallowed, which is why nothing ever looked broken. It cost more than it looked:
+  // `features` stayed null, so the nav offered every gated module to every company, and `leadsTeam`
+  // stayed false, so My team, Leave approvals and Exits were invisible to exactly the managers and
+  // members PD-32 built them for. The 401s also woke the transport's refresh retry, which is how a
+  // page load came to present the rotating refresh cookie twice and get itself signed out.
+  const authenticated = session.status === "authenticated";
   useEffect(() => {
+    if (!authenticated) return;
     api.companyFeatures()
       .then((list) => setFeatures(Object.fromEntries(list.map((f) => [f.feature, f.enabled]))))
       .catch(() => setFeatures(null));
     api.myTeamStanding()
       .then((s) => setLeadsTeam(s.leadsTeam))
       .catch(() => setLeadsTeam(false));
-  }, []);
+  }, [authenticated]);
 
   // The platform OWNER (vendor) has no company app — send them to the Platform console.
   const role = session.me?.user.role;

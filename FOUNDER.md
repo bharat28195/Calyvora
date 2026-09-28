@@ -1572,6 +1572,43 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 ---
 
+### PD-47 · 2026-09-28 · A guard with a second door is not a guard
+- **Context:** a sweep of all 58 screens on the live deployment, as four roles. HR, Manager and
+  Member were bounced to `/login` on every single page; Admin passed all 58. At the API level all
+  four accounts logged in and refreshed cleanly, twice over, so it was never about the accounts.
+- **What it was:** every hard page load presented the rotating refresh cookie **twice**, from two
+  paths that did not know about each other. `renewSession` — the transport's 401 retry — has always
+  held a single in-flight promise for exactly this reason, and its comment says so: *"ten calls
+  hitting that wall together would each present the same refresh cookie, and rotation treats a
+  second presentation as theft and burns the family — so the naive fix logs everyone out."* The
+  session bootstrap called `http("/auth/refresh")` directly and never touched that promise. The
+  server did the right thing and revoked the family. Whoever won the race stayed signed in, which is
+  why it read as random.
+- **Rule:** one refresh path. `api.refresh()` and the transport's retry now share `refreshSession`,
+  and the single in-flight promise is the only way to that endpoint.
+- **The trigger was a second bug, and the two are the same story.** `AppShell` asked for company
+  features and team standing in a mount effect. React runs child effects before parent ones, and
+  `AppShell` is a child of `SessionProvider` — so those calls always went out before a token
+  existed. Not a race: an ordering, failing identically on all 232 page loads measured. They 401'd,
+  which woke the transport's renewal, which is where the second refresh came from.
+- **Swallowing the failures is what hid it.** Both calls end in `.catch(() => …)` with a benign
+  fallback, so nothing ever looked wrong — while `features === null` made the nav **show every
+  gated module to every company** whatever their plan, and `leadsTeam === false` made **My team,
+  Leave approvals and Exits invisible to managers and members**, the only people PD-32 built them
+  for. Admin, HR and Owner reach those by role, so the only people who could see the feature were
+  the people who did not need it.
+- **Why nothing caught this.** The unit tests pin the transport path and still pass — they were
+  written about `renewSession` and could not see a caller that bypassed it. The API sweep passes,
+  because every endpoint is correct. The Playwright suite passes, because in mock mode there is no
+  refresh cookie to rotate and no rotation to detect. **It needed a browser, a real server and more
+  than one page load**, which is a gap worth naming: our e2e can prove a screen renders, and cannot
+  prove a session survives.
+- **The regression test fails on the old code**, which is the only reason to trust it: two tests,
+  one asserting a single presentation when bootstrap and transport run together, one asserting the
+  bootstrap's own failure does not retry itself. On the old code the second reports two.
+
+---
+
 ## 4. Architecture Decision Log
 
 

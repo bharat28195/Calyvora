@@ -150,8 +150,14 @@ let accessToken: string | null = null;
  * wall together would each present the same refresh cookie, and rotation treats a second
  * presentation as theft and burns the family — so the naive fix logs everyone out. One promise,
  * shared: the first 401 refreshes, the rest wait for it.
+ *
+ * <p><b>Every refresh in the application goes through this.</b> That was once true of only the
+ * transport's 401 retry, while the session bootstrap called the endpoint directly — and on every
+ * hard page load the two ran together, presented the same cookie, and the second presentation was
+ * read as theft. The family was revoked and the person was signed out for doing nothing but
+ * reloading a page. The guard below was always correct; the bug was a second door past it.
  */
-let refreshInFlight: Promise<boolean> | null = null;
+let refreshInFlight: Promise<LoginResult> | null = null;
 
 /** Called when the session cannot be renewed, so the app can stop pretending someone is signed in. */
 let onSessionLost: (() => void) | null = null;
@@ -159,17 +165,23 @@ export function setSessionLostHandler(fn: (() => void) | null) {
   onSessionLost = fn;
 }
 
-async function renewSession(): Promise<boolean> {
+/**
+ * Renew the session, at most once at a time. Callers that arrive while one is in flight attach to
+ * it rather than presenting the cookie a second time.
+ *
+ * <p>Rejects when the session cannot be renewed; every caller must handle that.
+ */
+function refreshSession(): Promise<LoginResult> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
         const result = await http<LoginResult>("/auth/refresh", { method: "POST", skipAuthRetry: true });
         auth.set(result.accessToken);
-        return true;
-      } catch {
+        return result;
+      } catch (e) {
         auth.set(null);
         onSessionLost?.();
-        return false;
+        throw e;
       } finally {
         // Cleared inside the same promise so a later call cannot attach to a settled one.
         setTimeout(() => { refreshInFlight = null; }, 0);
@@ -177,6 +189,15 @@ async function renewSession(): Promise<boolean> {
     })();
   }
   return refreshInFlight;
+}
+
+async function renewSession(): Promise<boolean> {
+  try {
+    await refreshSession();
+    return true;
+  } catch {
+    return false;
+  }
 }
 export const auth = {
   get: () => accessToken,
@@ -429,12 +450,21 @@ export const api = {
     auth.set(result.accessToken);
     return result;
   },
+  /**
+   * Restore a session on page load.
+   *
+   * <p>Shares {@link refreshSession}'s single in-flight promise with the transport's 401 retry.
+   * Calling the endpoint directly here is what signed people out at random: two concurrent
+   * presentations of one rotating cookie look exactly like a stolen token, and the server is right
+   * to burn the family for it.
+   */
   async refresh(): Promise<LoginResult> {
-    const result = LIVE
-      ? await http<LoginResult>("/auth/refresh", { method: "POST" })
-      : await mockBackend.refresh();
-    auth.set(result.accessToken);
-    return result;
+    if (!LIVE) {
+      const result = await mockBackend.refresh();
+      auth.set(result.accessToken);
+      return result;
+    }
+    return refreshSession();
   },
   /**
    * Build the whole demo: the populated company and the sample companies that fill the owner

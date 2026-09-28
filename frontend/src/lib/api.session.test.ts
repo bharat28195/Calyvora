@@ -124,4 +124,54 @@ describe("api transport: an expired access token", () => {
         await expect(api.api.me()).rejects.toMatchObject({ status: 401 });
         expect(fetchMock.mock.calls.filter((c) => pathOf(c).includes("/auth/refresh"))).toHaveLength(0);
     });
+
+    /**
+     * The session bootstrap, which had its own way to the endpoint.
+     *
+     * <p>The tests above pinned the transport's retry and it held. What they could not see was a
+     * second door: `api.refresh()` — what SessionProvider calls on every page load — went straight
+     * to `/auth/refresh` and never touched the shared promise. On a hard load the two ran together,
+     * because the shell asked for company features before a token existed, that 401'd, and the
+     * transport started renewing while the bootstrap's own refresh was still in the air. Two
+     * presentations of one rotating cookie is indistinguishable from a stolen token, so the server
+     * revoked the family and signed the person out for reloading a page. Found on the live
+     * deployment: three of four accounts were thrown back to the login screen on every navigation.
+     */
+    it("bootstrap and transport share one refresh, so the cookie is presented once", async () => {
+        const api = await loadApi();
+        await signedIn(api);
+
+        let refreshes = 0;
+        fetchMock.mockImplementation((url: string) => {
+            if (String(url).includes("/auth/refresh")) {
+                refreshes++;
+                // A rotating cookie: the second presentation is theft, and the family is burned.
+                return Promise.resolve(refreshes === 1
+                    ? json(200, { accessToken: "second", me: { user: {}, company: {} } })
+                    : expired());
+            }
+            return Promise.resolve(api.auth.get() === "second" ? json(200, { ok: true }) : expired());
+        });
+
+        // Exactly what a page load does: restore the session, while the shell asks for something.
+        const [restored] = await Promise.all([api.api.refresh(), api.api.me()]);
+
+        expect(refreshes).toBe(1);
+        expect(restored.accessToken).toBe("second");
+    });
+
+    it("a failed bootstrap refresh reports the session lost and does not loop", async () => {
+        const api = await loadApi();
+        await signedIn(api);
+
+        const lost = vi.fn();
+        api.setSessionLostHandler(lost);
+        fetchMock.mockResolvedValue(expired());
+
+        await expect(api.api.refresh()).rejects.toMatchObject({ status: 401 });
+
+        expect(lost).toHaveBeenCalledTimes(1);
+        // One presentation only. A refresh that retries itself is the loop that burns the family.
+        expect(fetchMock.mock.calls.filter((c) => pathOf(c).includes("/auth/refresh"))).toHaveLength(1);
+    });
 });

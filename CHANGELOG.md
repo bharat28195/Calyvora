@@ -4,6 +4,25 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-28 — Nobody is signed out for reloading a page any more
+Found by sweeping all 58 screens on the live deployment as four roles: three of the four accounts
+were thrown back to the login screen on **every** page, and the fourth was never affected. It was
+not the accounts. Every hard page load fired `/auth/refresh` **twice**, from two code paths that did
+not know about each other — the transport's 401 retry, which has always shared one in-flight promise
+precisely to avoid this, and `api.refresh()` from the session bootstrap, which went straight to the
+endpoint past that guard. Two presentations of one rotating cookie are indistinguishable from a
+stolen token, so the server revoked the family, as it should. Whoever won the race stayed signed in.
+Every refresh now goes through the shared promise.
+
+What started the second refresh was the app shell asking for company features and team standing on
+mount — React runs child effects before parent ones, so those calls always went out before the
+session had a token, 401'd, and woke the transport's renewal. Both failures were swallowed, which is
+why this looked like nothing for months while costing two real things: `features` stayed `null`, so
+**the nav offered every gated module to every company** regardless of their plan, and `leadsTeam`
+stayed `false`, so **My team, Leave approvals and Exits were invisible to the managers and members
+PD-32 built them for** — visible only to Admin/HR/Owner, who reach them by role anyway. Both calls
+now wait for the session. (PD-47)
+
 ### 2026-09-25 — Tenant bindings can be made not to outlive their transaction
 Backlog 4.2. The tenant id was set session-scoped on each borrowed connection — correct while this
 process owns its pool, and unsafe behind a **transaction pooler**, which is how one database serves
