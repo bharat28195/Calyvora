@@ -150,12 +150,33 @@ public class DispatchingEmailService implements EmailService {
         return sender;
     }
 
-    /** No-op outside the {@code embedded} profile, where no {@link DevMailbox} bean exists. */
+    /**
+     * Capture a link in the dev mailbox — but only when nothing real is being delivered.
+     *
+     * <p>The mailbox exists so a deployment with no mail provider can still surface verification and
+     * invite links, and password-reset <em>codes</em>. That is a credential store by another name:
+     * the {@code /api/v1/dev/mailbox} endpoint is public, so whatever lands here can be read by
+     * anyone who can reach the server. That is acceptable only when it is the <b>sole</b> copy —
+     * i.e. when the transport is {@link EmailSettings.Provider#CONSOLE} and no mail actually left.
+     *
+     * <p>The moment a real provider delivers, the recipient already has the message, and a second
+     * readable copy on a public URL is pure downside: request a reset for any account, read the code
+     * here, take the account. So when the resolved provider delivers, nothing is recorded. This is a
+     * runtime guard rather than a profile one because the provider is resolved per tenant and can
+     * only be known at send time — a deployment mislabeled as non-prod must still not leak codes.
+     */
     private void record(String to, String subject, String link) {
         DevMailbox box = mailbox.getIfAvailable();
-        if (box != null) {
-            box.record(to, subject, link);
+        if (box == null) {
+            return;
         }
+        EmailSettings settings = resolver.resolve(TenantContext.getCompanyIdOrNull());
+        if (settings.provider() != EmailSettings.Provider.CONSOLE) {
+            // A real provider will deliver this; the recipient does not need a public copy, and an
+            // attacker must not have one.
+            return;
+        }
+        box.record(to, subject, link);
     }
 
     /** Root-cause message — JavaMail buries the useful text (auth refused, connect timeout) in the cause. */

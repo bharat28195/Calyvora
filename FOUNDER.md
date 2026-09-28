@@ -1609,6 +1609,27 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 
 ---
 
+### PD-48 · 2026-09-28 · A profile name is not a security boundary
+- **Found while sweeping the live site:** /api/v1/dev/mailbox answers 200 to anyone, and
+  /api/v1/dev/mail-status reports the deployment delivers via Resend. The env is set to
+  SPRING_PROFILES_ACTIVE=staging, and every dev bean is @Profile("!prod"), so the whole /dev
+  surface — mailbox, seed endpoints, test-email — is live in what is really production.
+- **Why the mailbox is the emergency:** it captures password-reset codes and invite/verification
+  links. When a real provider delivers, the recipient already has the message; a second copy on a
+  public URL is pure downside. Request a reset for any account (including the platform owner), read
+  the code, own the account. No auth required.
+- **Fix, shipped:** the mailbox records nothing when the resolved provider delivers. It is fed only
+  by the console transport — the one case where it is the sole copy of a link that never left. A
+  runtime guard on the resolved provider, not the profile, because the profile was exactly what was
+  wrong: a box mislabeled non-prod must still refuse to leak codes.
+- **Still open, and it is the founder’s call:** the public seed endpoints. POST /api/v1/dev/seed-scale
+  builds a 1,000-person tenant with generated payroll, and it is reachable by anyone right now —
+  the most likely source of the ~120 unexplained payroll statements on the scale tenant. Closing
+  the /dev surface for good means running the prod profile, but the live demo currently depends on
+  public seeding (the "Explore the demo" button). That is the environment decision: one box that is
+  both demo and production cannot be secure. Either split demo from prod, or pre-seed a demo tenant
+  once and run prod with no public seeding.
+
 ## 4. Architecture Decision Log
 
 

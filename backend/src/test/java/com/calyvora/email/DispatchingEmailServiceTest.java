@@ -92,6 +92,26 @@ class DispatchingEmailServiceTest {
     }
 
     @Test
+    void nothing_is_recorded_when_a_real_provider_delivers() {
+        // The dev mailbox is public. When a real provider actually delivers, the recipient already
+        // has the message and a second, readable copy of a reset code or invite link on a public URL
+        // is an account-takeover vector: request a reset for anyone, read the code here, take the
+        // account. So the mailbox is fed only when the console transport is the sole copy.
+        DevMailbox mailbox = new DevMailbox();
+        EmailSettings resend = EmailSettings.resend(
+                "connect@calyvora.in", null, null, "key", "https://api.resend.com/emails");
+        DispatchingEmailService service = new DispatchingEmailService(
+                companyId -> resend, List.of(new ResendOkSender()), provider(mailbox));
+
+        EmailResult result = service.sendPasswordResetCode("victim@example.com", "123456", 15);
+
+        assertThat(result.delivered()).isTrue();
+        assertThat(mailbox.list())
+                .as("a delivered reset code must never be readable from the public mailbox")
+                .isEmpty();
+    }
+
+    @Test
     void the_diagnostic_send_propagates_the_failure() {
         // /dev/test-email exists to show the real error, so this one path must not swallow it.
         DispatchingEmailService service = service(new FailingSender(), null);
@@ -115,6 +135,19 @@ class DispatchingEmailServiceTest {
         @Override
         public EmailSettings.Provider provider() {
             return EmailSettings.Provider.CONSOLE;
+        }
+
+        @Override
+        public void send(EmailSettings settings, String to, String subject, String body, String html) {
+            // delivered
+        }
+    }
+
+    /** Claims RESEND so the resolver's delivering settings route to it. */
+    private static class ResendOkSender implements EmailSender {
+        @Override
+        public EmailSettings.Provider provider() {
+            return EmailSettings.Provider.RESEND;
         }
 
         @Override

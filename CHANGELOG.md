@@ -4,6 +4,21 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-09-28 — The public dev mailbox no longer holds anything worth stealing
+The live deployment runs SPRING_PROFILES_ACTIVE=staging, so every @Profile("!prod") bean is active
+in production — including the dev mailbox at the public /api/v1/dev/mailbox. That mailbox records
+password-reset **codes** and verification/invite links. With a real provider (Resend) delivering,
+that is an unauthenticated account-takeover vector: request a reset for any account, read the code
+from the public URL, take the account. The mailbox now records nothing when the resolved provider
+actually delivers — it is fed only by the console transport, where it is the sole copy of a link
+that never left the box and is the only way to complete a flow locally. A runtime guard, not a
+profile one, because a deployment mislabeled as non-prod must still not leak codes. (PD-48)
+
+This does not close the rest of the /api/v1/dev surface — the seed endpoints are still public on
+the mislabeled deployment, and that is almost certainly the source of the unexplained payroll rows
+on the scale tenant. Closing those means running the prod profile, which is an environment decision
+(the live demo currently depends on public seeding) and is called out for the founder.
+
 ### 2026-09-28 — Nobody is signed out for reloading a page any more
 Found by sweeping all 58 screens on the live deployment as four roles: three of the four accounts
 were thrown back to the login screen on **every** page, and the fourth was never affected. It was
