@@ -3,6 +3,7 @@ package com.calyvora.dev;
 import com.calyvora.email.DispatchingEmailService;
 import com.calyvora.email.EmailSettings;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +34,9 @@ public class DevMailController {
         this.emailService = emailService;
     }
 
+    // Sends a real email through the configured provider. Anonymous access would let anyone send
+    // mail on the deployment's Resend account to any address — restricted to the platform owner.
+    @PreAuthorize("hasRole('OWNER') and @platformAccess.granted()")
     @PostMapping("/test-email")
     public Result testEmail(@RequestParam String to) {
         EmailSettings settings = emailService.currentSettings();

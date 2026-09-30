@@ -4,6 +4,22 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-10-01 — Showcase hardening: dev tools locked down, billing stops rendering blank
+Three fixes from a full functional test of the live deployment as the company owner (30/30 modules
+working).
+
+1. **The dangerous dev endpoints are now vendor-only.** `POST /api/v1/dev/seed-scale` (and its
+   DELETE) and `POST /api/v1/dev/test-email` were public on the live deployment — anyone could
+   invent a 1,000-person tenant in the running database (the likely source of the stray payroll
+   rows on the scale tenant) or send mail on the Resend account to any address. Both now require
+   the platform owner (`hasRole('OWNER') and @platformAccess.granted()`). The demo seeds
+   (`seed-demo`, `seed-platform`, `seed-all`) stay public and idempotent — the showcase needs them.
+2. **Billing no longer renders a blank page** when its API refuses (a non-owner reaching it by
+   direct URL got a floating error with no heading and no page shell). The heading stays; the
+   reason shows beneath it. Same empty-state class as the tax-page spinner.
+3. (Earlier this session: random sign-outs and the invisible nav — see the auth and security
+   entries above.) (PD-49)
+
 ### 2026-09-28 — The public dev mailbox no longer holds anything worth stealing
 The live deployment runs SPRING_PROFILES_ACTIVE=staging, so every @Profile("!prod") bean is active
 in production — including the dev mailbox at the public /api/v1/dev/mailbox. That mailbox records

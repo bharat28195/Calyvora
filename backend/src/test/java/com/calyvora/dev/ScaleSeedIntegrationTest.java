@@ -29,7 +29,8 @@ class ScaleSeedIntegrationTest extends IntegrationTestBase {
 
     @Test
     void the_scale_seed_builds_a_four_level_org_and_can_be_removed() throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=120&attendanceDays=7"))
+        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=120&attendanceDays=7")
+                        .header("Authorization", platformBearer()))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode seeded = objectMapper.readTree(r.getResponse().getContentAsString());
@@ -58,7 +59,8 @@ class ScaleSeedIntegrationTest extends IntegrationTestBase {
         // Removing it takes the tenant with it — a thousand invented people must never be one stray
         // click away from a customer demo.
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .delete("/api/v1/dev/seed-scale"))
+                        .delete("/api/v1/dev/seed-scale")
+                        .header("Authorization", platformBearer()))
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

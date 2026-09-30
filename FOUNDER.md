@@ -1630,6 +1630,22 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   both demo and production cannot be secure. Either split demo from prod, or pre-seed a demo tenant
   once and run prod with no public seeding.
 
+### PD-49 · 2026-10-01 · Demo seeds may be public; the scale tool and the mail send may not
+- **Context:** the live deployment runs the staging profile (see [PD-48]), so the whole
+  /api/v1/dev surface is public. PD-48 closed the credential leak in the mailbox. This closes the
+  two endpoints that let an anonymous caller *change the running system*: seed-scale, which builds
+  a 1,000-person tenant (and is the most likely origin of the unexplained payroll rows), and
+  test-email, which sends real mail on the vendor Resend account to any address a caller names.
+- **Rule:** the two write-the-world dev endpoints require the platform owner. The demo seeds do
+  not, because they only ever add believable demo data, they are idempotent, and the showcase
+  (Explore the demo -> seed-all) depends on reaching them without a login.
+- **Why not just flip to prod:** that removes every dev bean, including the demo seed the showcase
+  needs. The profile split (demo vs production) is still the proper end state and still the
+  founder’s call; this makes the current single deployment safe to show in the meantime.
+- **Cost:** the four integration tests that build the scale tenant as setup now present a
+  platform-owner bearer (one cached helper on IntegrationTestBase). A new test asserts an anonymous
+  test-email is refused with 403.
+
 ## 4. Architecture Decision Log
 
 

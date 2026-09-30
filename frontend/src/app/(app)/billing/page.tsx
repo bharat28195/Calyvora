@@ -32,7 +32,18 @@ export default function BillingPage() {
     finally { setBusy(null); }
   }
 
-  if (error && !data) return <Alert tone="error" className="mt-6">{error}</Alert>;
+  // Keep the heading even when the load fails. Returning a bare Alert here dropped the whole page
+  // shell — no title, no context — so a visitor who reached billing without permission (or hit a
+  // transient error) saw a floating message on an otherwise empty screen and no way to tell where
+  // they were. The heading stays; the reason goes underneath it.
+  if (error && !data) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
+        <Alert tone="error" className="mt-6">{error}</Alert>
+      </div>
+    );
+  }
   if (!data) return <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>;
 
   const monthLabel = (m: string) => new Date(`${m}-01T00:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" });

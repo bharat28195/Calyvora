@@ -50,7 +50,8 @@ class ScaleModuleSeedTest extends IntegrationTestBase {
     @Test
     @DisplayName("the scale tenant has data in every module, not just People")
     void every_module_has_something_in_it() throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=60&attendanceDays=2"))
+        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=60&attendanceDays=2")
+                        .header("Authorization", platformBearer()))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode seeded = objectMapper.readTree(r.getResponse().getContentAsString());
@@ -77,7 +78,7 @@ class ScaleModuleSeedTest extends IntegrationTestBase {
                     .as("tickets waiting to be picked up").isPositive();
         } finally {
             // Never leave an invented thousand-person company behind, even on a failure.
-            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+            mockMvc.perform(delete("/api/v1/dev/seed-scale").header("Authorization", platformBearer())).andExpect(status().isOk());
         }
     }
 

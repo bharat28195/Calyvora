@@ -165,7 +165,7 @@ class QueryBudgetTest extends IntegrationTestBase {
     }
 
     private ScaleTenant seedScale() throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=" + HEADCOUNT + "&attendanceDays=2"))
+        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=" + HEADCOUNT + "&attendanceDays=2").header("Authorization", platformBearer()))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode seeded = objectMapper.readTree(r.getResponse().getContentAsString());

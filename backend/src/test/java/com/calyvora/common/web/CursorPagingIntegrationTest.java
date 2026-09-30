@@ -81,7 +81,7 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
             assertThat(walked).as("paging must not drop or repeat rows").isEqualTo(expected);
             assertThat(new HashSet<>(walked)).hasSameSizeAs(walked);
         } finally {
-            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+            mockMvc.perform(delete("/api/v1/dev/seed-scale").header("Authorization", platformBearer())).andExpect(status().isOk());
         }
     }
 
@@ -96,14 +96,14 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
             // in the same instant, so if the tiebreaker were missing this is where it would show.
             assertThat(byOne).isEqualTo(byFifty);
         } finally {
-            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+            mockMvc.perform(delete("/api/v1/dev/seed-scale").header("Authorization", platformBearer())).andExpect(status().isOk());
         }
     }
 
     @Test
     @DisplayName("a manager's scope holds on every page, not just the first")
     void the_filter_survives_the_cursor() throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=" + HEADCOUNT + "&attendanceDays=2"))
+        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=" + HEADCOUNT + "&attendanceDays=2").header("Authorization", platformBearer()))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode seeded = objectMapper.readTree(r.getResponse().getContentAsString());
@@ -126,7 +126,7 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
             assertThat(everything).containsAll(headsOwn);
             assertThat(new HashSet<>(headsOwn)).hasSameSizeAs(headsOwn);
         } finally {
-            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+            mockMvc.perform(delete("/api/v1/dev/seed-scale").header("Authorization", platformBearer())).andExpect(status().isOk());
         }
     }
 
@@ -151,7 +151,7 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
             assertThat(pending.size()).isLessThan(everything.size());
             assertThat(everything).containsAll(pending);
         } finally {
-            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+            mockMvc.perform(delete("/api/v1/dev/seed-scale").header("Authorization", platformBearer())).andExpect(status().isOk());
         }
     }
 
@@ -207,7 +207,7 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
                     .as("the seeder leaves claims awaiting approval, so this must not be zero")
                     .isGreaterThan(java.math.BigDecimal.ZERO);
         } finally {
-            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+            mockMvc.perform(delete("/api/v1/dev/seed-scale").header("Authorization", platformBearer())).andExpect(status().isOk());
         }
     }
 
@@ -236,7 +236,7 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
             }
             assertThat(open.get("items").size()).isPositive().isLessThan(all.size());
         } finally {
-            mockMvc.perform(delete("/api/v1/dev/seed-scale")).andExpect(status().isOk());
+            mockMvc.perform(delete("/api/v1/dev/seed-scale").header("Authorization", platformBearer())).andExpect(status().isOk());
         }
     }
 
@@ -264,7 +264,7 @@ class CursorPagingIntegrationTest extends IntegrationTestBase {
     }
 
     private Session seedScale() throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=" + HEADCOUNT + "&attendanceDays=2"))
+        MvcResult r = mockMvc.perform(post("/api/v1/dev/seed-scale?employees=" + HEADCOUNT + "&attendanceDays=2").header("Authorization", platformBearer()))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode seeded = objectMapper.readTree(r.getResponse().getContentAsString());

@@ -119,6 +119,22 @@ public abstract class IntegrationTestBase {
         return new Session(access, refresh);
     }
 
+    private String platformBearerCache;
+
+    /**
+     * A bearer header for the platform owner, cached per test.
+     *
+     * <p>The scale-seed and mail-test dev endpoints are restricted to the vendor — an anonymous
+     * caller on the live deployment could otherwise pollute the running tenant or send mail on the
+     * vendor's account — so the tests that build the scale tenant as setup present this.
+     */
+    protected String platformBearer() throws Exception {
+        if (platformBearerCache == null) {
+            platformBearerCache = "Bearer " + login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD).accessToken();
+        }
+        return platformBearerCache;
+    }
+
     protected JsonNode getJson(String path, Session session) throws Exception {
         MvcResult result = mockMvc.perform(get(path).header("Authorization", "Bearer " + session.accessToken()))
                 .andReturn();
