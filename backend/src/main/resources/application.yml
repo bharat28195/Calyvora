@@ -1,0 +1,203 @@
+spring:
+  application:
+    name: calyvora-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    # Prefer a full DB_URL when given (e.g. Neon: include ?sslmode=require). Otherwise assemble it
+    # from components — lets a host wire DB_HOST/DB_PORT/DB_NAME straight from a managed database
+    # with no manual JDBC-URL editing. Local default (all unset) stays localhost:5432/calyvora.
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:calyvora}}
+    username: ${DB_USERNAME:calyvora}
+    password: ${DB_PASSWORD:calyvora_local_dev}
+    hikari:
+      # Stated rather than defaulted. The default is 10, which is a fine number — but an unstated
+      # default is one nobody reviews, and the pool is the first thing that breaks under concurrency:
+      # Tomcat accepts 200 simultaneous requests and they all queue for these connections.
+      #
+      # Bigger is not better. Past roughly cores × 2 the contention simply moves from the application
+      # into the database, and every tenant-bound connection here costs a Postgres backend — which is
+      # also the ceiling on how many app instances can run at once, because session-scoped tenant
+      # binding rules out a transaction-mode pooler (see docs/ARCHITECTURE-SCALE.md §6).
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      # FAIL, rather than hang, when the pool is saturated. Without this a request waits 30s and the
+      # user sees a spinner that never resolves; with it the server says so and the log names the
+      # cause. A visible failure under load is worth far more than an invisible one.
+      connection-timeout: ${DB_POOL_TIMEOUT_MS:10000}
+      # Free-tier instances sleep and managed databases drop idle connections; retiring them before
+      # the database does avoids handing out a dead one on the first request after a quiet period.
+      max-lifetime: 600000
+      idle-timeout: 300000
+      pool-name: calyvora-pool
+  servlet:
+    multipart:
+      # The letterpad upload is the only one, and it is capped at 2 MB in the service. Set a little
+      # above it so an oversized file is refused with the service's sentence rather than Tomcat's.
+      max-file-size: 3MB
+      max-request-size: 3MB
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Flyway owns the schema; JPA only validates
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  mail:
+    # Defaults target Mailpit for local dev (no auth, no TLS). A real provider needs
+    # MAIL_USERNAME/MAIL_PASSWORD plus one of STARTTLS (587) or implicit SSL (465) — e.g. Hostinger:
+    #   MAIL_HOST=smtp.hostinger.com  MAIL_PORT=587  MAIL_SMTP_AUTH=true  MAIL_SMTP_STARTTLS=true
+    # MAIL_USERNAME must be the full mailbox address, and MAIL_FROM must match it — providers reject
+    # a sender that differs from the authenticated mailbox.
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+          ssl:
+            enable: ${MAIL_SMTP_SSL:false}
+          # Never let an unreachable mail host hold a request thread open — registration and invite
+          # both send inline, and the default JavaMail timeout is infinite.
+          connectiontimeout: ${MAIL_TIMEOUT_MS:10000}
+          timeout: ${MAIL_TIMEOUT_MS:10000}
+          writetimeout: ${MAIL_TIMEOUT_MS:10000}
+
+  mvc:
+    # Send an unmatched URL to the exception handler (which answers 404) instead of letting it fall
+    # through to the servlet container's default, where it surfaced as an opaque 500.
+    throw-exception-if-no-handler-found: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-stacktrace: never     # never leak stack traces (Sprint1 §13)
+
+# --- Application-specific config (bound in AppProperties) ---
+calyvora:
+  ops:
+    slow-request-ms: 1000   # one WARN line per request slower than this (SlowRequestFilter)
+  rate-limit:
+    # A ceiling on how fast one caller may ask for things (RateLimitFilter). Per process: the product
+    # runs as one instance, so this is also the global limit today.
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    # The unauthenticated surface, keyed by address: logging in, registering, password resets. Nobody
+    # legitimately logs in twenty times a minute, so this is held tight.
+    auth-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:20}
+    # Everything behind a token, keyed by user. Set where a person cannot reach it but a retry loop
+    # with no backoff will: a busy screen opens a handful of endpoints at once, not ten a second.
+    api-per-minute: ${RATE_LIMIT_API_PER_MINUTE:600}
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  mail:
+    # Which transport sends verification / invitation mail. Leave blank to infer: a Resend API key
+    # means Resend, an SMTP username means SMTP, neither means console (logged, never delivered).
+    # Prefer Resend on a hosted deployment — it sends over HTTPS on 443, whereas outbound SMTP
+    # (25/587/465) is blocked entirely by many hosts, Render's free tier included.
+    provider: ${MAIL_PROVIDER:}
+    # The address Orbit sends as. Not a secret and not deployment-specific, so it belongs here rather
+    # than in a dashboard field somebody has to remember — an unset MAIL_FROM used to mean mail went
+    # out as @calyvora.local, an address that does not exist.
+    #
+    # no-reply is the sending identity because these are machine-generated: a reset code and an
+    # invitation are not the start of a conversation. It does not need to be a real mailbox — Resend
+    # will send as any address at a verified domain.
+    from: ${MAIL_FROM:connect@calyvora.in}
+    # A reply must reach a person. Without this, replying to an unattended address bounces, and the
+    # people most likely to reply are the ones already having trouble.
+    reply-to: ${MAIL_REPLY_TO:connect@calyvora.in}
+    # One-time codes only. A code is the message an attacker most wants to imitate, so it is worth a
+    # sender the reader can learn: if reset codes always arrive from noreply@, one that doesn't is
+    # visibly wrong. Needs no mailbox of its own — a verified domain may send as any address at it,
+    # and Reply-To above still carries a reply to somewhere staffed.
+    otp-from: ${MAIL_OTP_FROM:noreply@calyvora.in}
+    resend:
+      api-key: ${RESEND_API_KEY:}
+      api-url: ${RESEND_API_URL:https://api.resend.com/emails}
+  security:
+    jwt:
+      # RS256 asymmetric signing with key rotation (SD-5). Public keys are served at
+      # /.well-known/jwks.json.
+      #
+      # Two key slots, both env-fed. Leave them unset locally and an EPHEMERAL keypair is generated
+      # at startup (zero-config dev/test) — but a restart then invalidates every outstanding token,
+      # so any shared environment MUST set JWT_KID / JWT_PRIVATE_KEY / JWT_PUBLIC_KEY. PEMs are
+      # PKCS#8 and may be supplied on a single line (the armor is stripped and whitespace ignored),
+      # which is what makes them pasteable into a host's env-var UI.
+      #
+      # To rotate with no downtime: move the current trio into the _PREV slot, put the new keypair
+      # in the primary slot, redeploy — old tokens still verify against _PREV; drop _PREV once every
+      # token signed by it has expired (access-token-ttl).
+      keys:
+        - kid: ${JWT_KID:}
+          private-key-pem: ${JWT_PRIVATE_KEY:}
+          public-key-pem: ${JWT_PUBLIC_KEY:}
+        - kid: ${JWT_KID_PREV:}
+          private-key-pem: ${JWT_PRIVATE_KEY_PREV:}
+          public-key-pem: ${JWT_PUBLIC_KEY_PREV:}
+      active-kid: ${JWT_ACTIVE_KID:${JWT_KID:}}
+      access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
+      issuer: calyvora
+    refresh:
+      ttl: ${REFRESH_TTL:P14D}
+      cookie-name: calyvora_rt
+      cookie-secure: ${REFRESH_COOKIE_SECURE:false}   # true behind HTTPS (prod)
+    verification:
+      ttl: ${VERIFICATION_TTL:P1D}
+      # Off by default: creating a workspace should let you into it immediately (the signup becomes
+      # that company's ADMIN). Set REQUIRE_EMAIL_VERIFICATION=true once outgoing mail is proven, to
+      # make people confirm they own the address before the workspace activates.
+      required: ${REQUIRE_EMAIL_VERIFICATION:false}
+    invitation:
+      ttl: ${INVITATION_TTL:P7D}
+    registration:
+      # Closed by default (PD-21). The marketing site's "free trial" button raises a request that the
+      # platform owner approves; until then no company, no user and nothing to log in to. Set
+      # OPEN_REGISTRATION=true only if you actually want anyone who finds /register to get a live
+      # workspace with no human in the loop.
+      open: ${OPEN_REGISTRATION:false}
+  trial:
+    # Who gets told when someone asks for a trial. Defaults to the shared mailbox rather than the
+    # founder's personal login, so an enquiry reaches an address more than one person can open.
+    # Blank falls back to the platform owner's own login address.
+    notify-email: ${TRIAL_NOTIFY_EMAIL:connect@calyvora.in}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    mail:
+      enabled: false   # don't gate app health on SMTP reachability (Mailpit is optional locally)
+  metrics:
+    distribution:
+      # p95 per endpoint, read back by GET /api/v1/platform/ops/endpoints. Computed in-process;
+      # there is no Prometheus to ship a histogram to yet.
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+logging:
+  level:
+    org.flywaydb: info
+  # Who a line belongs to, on every line: correlation id (echoed to the browser as
+  # X-Correlation-Id), then the tenant and user set by TenantFilter. Empty outside a request.
+  pattern:
+    level: "%5p [%X{correlationId:-}|%X{companyId:-}|%X{userId:-}]"

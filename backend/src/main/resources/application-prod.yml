@@ -1,0 +1,32 @@
+# Production profile — for real customers.
+#
+# Same hardening as `staging`, but this profile DISABLES demo seeding (DevSeedController and
+# DemoSeedService are @Profile("!prod")) and Swagger UI. Use this once you are past testing
+# and no longer want the one-click sample-data endpoints exposed.
+spring:
+  jpa:
+    show-sql: false
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: 2
+
+server:
+  forward-headers-strategy: framework
+
+calyvora:
+  security:
+    refresh:
+      cookie-secure: true
+    require-tenant-isolation: ${REQUIRE_TENANT_ISOLATION:true}
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+logging:
+  level:
+    com.calyvora: info
+    org.flywaydb: info

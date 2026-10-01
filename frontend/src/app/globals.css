@@ -1,0 +1,245 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /*
+   * Light is the default, and deliberately not the OS preference.
+   *
+   * A great many people run their laptop dark for personal use and still expect a work tool to look
+   * like a document — and this one prints payslips and letters. Following prefers-color-scheme meant
+   * someone opening Orbit for the first time saw whichever theme their phone happened to be in, so
+   * the product had no settled first impression. Now it always opens light, and dark is something you
+   * choose. Once chosen it is remembered, and it wins on every device.
+   *
+   * These live on bare :root rather than :root.light so the palette is complete before any class is
+   * applied — with JavaScript off, no class is ever added, and the page must still be readable.
+   * Values are space-separated RGB for Tailwind's <alpha-value>.
+   */
+  --app: 244 246 250; /* #f4f6fa soft off-white canvas */
+  --surface: 255 255 255; /* #ffffff crisp elevated surfaces */
+  --fg: 23 26 38; /* #171a26 near-black slate */
+  --glow-violet: 0.1;
+  --glow-aqua: 0.07;
+}
+
+/* Dark theme — chosen, then remembered. */
+:root.dark {
+  --app: 11 11 18; /* #0b0b12 */
+  --surface: 20 20 31; /* #14141f */
+  --fg: 255 255 255;
+  --glow-violet: 0.18;
+  --glow-aqua: 0.1;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: rgb(var(--app));
+  color: rgb(var(--fg));
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(60rem 40rem at 70% -10%, rgba(124, 92, 255, var(--glow-violet)), transparent 60%),
+    radial-gradient(50rem 40rem at 10% 10%, rgba(34, 211, 238, var(--glow-aqua)), transparent 55%);
+  background-attachment: fixed;
+}
+
+/*
+ * Printing a letter (Documents module) should produce the document, not the app around it.
+ * Everything is hidden and the letter sheet alone is promoted to the page.
+ */
+@media print {
+  body {
+    background: #fff;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .letter-sheet,
+  .letter-sheet * {
+    visibility: visible;
+  }
+  .letter-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  /* A payslip prints as a clean black-on-white document, not the dark-themed app around it. */
+  .payslip-sheet,
+  .payslip-sheet * {
+    visibility: visible;
+    color: #111 !important;
+    border-color: #d1d5db !important;
+    background: transparent !important;
+  }
+  .payslip-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0 8mm;
+    box-shadow: none;
+  }
+  .payslip-print-only {
+    display: block !important;
+  }
+}
+
+/* Shown only on the printed payslip (a header with company/employee), hidden on screen. */
+.payslip-print-only {
+  display: none;
+}
+
+/* Brand gradient text helper */
+.text-gradient {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(90deg, theme(colors.violet), theme(colors.aqua));
+}
+
+/*
+ * ---------------------------------------------------------------------------------------------
+ * Signed-out backdrop — login, register, invite, verify, reset.
+ *
+ * Soft colour only. No lines, no tiles, no icons.
+ *
+ * Four attempts got here, and the failures are the useful part:
+ *   - washes at 4-10% were not subtle, they were *absent*: on a near-white canvas there is no edge
+ *     for the eye to catch, so nothing appeared at all
+ *   - a tiled mandala with HR doodles was visible, and looked like a wallpaper sample
+ *   - flat bands across the foot were clean and anonymous
+ *   - orbit rings with HR tools riding them meant something, but drawn faint at that scale the rings
+ *     read as stray arcs and the ringed icons as stickers scattered on the page
+ *
+ * The pattern in all four: every fix for "too quiet" reached for *shapes*, and shapes behind a form
+ * are either too faint to justify themselves or too busy to sit behind a password box. So this stops
+ * drawing things. It is one large colour field — four wide, overlapping tints, a diffuse horizon at
+ * the foot, and a bloom of the page colour behind the card. Nothing has an outline, so nothing can
+ * look like a sticker, and nothing has a repeat, so nothing can look like graph paper.
+ *
+ * The tints are strong enough to see (the first lesson) because they are the whole design now rather
+ * than a backing for line art. Every value is theme-tokened, so light and dark are tuned separately
+ * instead of one being an accident of the other.
+ * ---------------------------------------------------------------------------------------------
+ */
+:root {
+  /* Read together, not individually: these overlap, so the page tone is roughly their sum. Raising
+     one alone tips the whole field towards that hue. */
+  --auth-violet: 0.3;
+  --auth-aqua: 0.24;
+  --auth-indigo: 0.16;
+  --auth-rose: 0.11;
+  --auth-horizon: 0.16;
+  /* The bloom behind the card, in the page's own colour. Light needs a lot: the card is white on a
+     tinted field and the tints run right up to its edge without it. */
+  --auth-bloom: 244 246 250;
+  --auth-bloom-alpha: 0.82;
+  --auth-texture-alpha: 0.5;
+}
+:root.dark {
+  /* On near-black the same tints are glows rather than washes, and read much further, so the two
+     leading hues come down while the quieter two hold — otherwise the page goes flatly violet. */
+  --auth-violet: 0.26;
+  --auth-aqua: 0.2;
+  --auth-indigo: 0.18;
+  --auth-rose: 0.1;
+  --auth-horizon: 0.2;
+  --auth-bloom: 11 11 18;
+  --auth-bloom-alpha: 0.72;
+  /* Higher on dark: soft-light is the gentler blend, so it needs more to show at all. */
+  --auth-texture-alpha: 0.6;
+}
+
+.auth-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 1 — the field. Four tints, each larger than the viewport and anchored off its edges, so the page
+   shows the middle of a big soft gradient rather than four visible blobs. Two hues would read as the
+   default purple-and-blue SaaS header; the indigo and the rose are what stop it. */
+.auth-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(62rem 46rem at 86% -14%, rgba(124, 92, 255, var(--auth-violet)), transparent 68%),
+    radial-gradient(50rem 38rem at -6% -4%, rgba(34, 211, 238, var(--auth-aqua)), transparent 66%),
+    radial-gradient(56rem 44rem at 4% 104%, rgba(99, 102, 241, var(--auth-indigo)), transparent 66%),
+    radial-gradient(46rem 36rem at 100% 96%, rgba(236, 72, 153, var(--auth-rose)), transparent 64%);
+}
+
+/* 2 — the horizon: one very wide, very shallow tint along the foot of the page, so the field has a
+   floor. Deliberately not the band shape it replaced — a band has an edge, and an edge is a line. */
+.auth-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(140% 46% at 50% 118%, rgba(124, 92, 255, var(--auth-horizon)), transparent 70%);
+}
+
+/* 3 — the bloom. A pool of the page's own colour behind the card, so the form sits in calm rather
+   than on top of the strongest part of the field. This is what lets layer 1 be as strong as it is:
+   without it the tints would have to be dialled back until they vanished again, which is exactly the
+   first failure. */
+.auth-bloom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(38rem 32rem at 50% 46%,
+      rgb(var(--auth-bloom) / var(--auth-bloom-alpha)) 0%,
+      rgb(var(--auth-bloom) / calc(var(--auth-bloom-alpha) * 0.55)) 42%,
+      transparent 72%);
+}
+
+/* 4 — texture. The field above is pure gradient, which is smooth to the point of looking like an
+ * empty div, and on a cheap panel a gradient that wide also bands into visible steps. Two grains fix
+ * both, and they are texture rather than pattern: noise has no motif to recognise and no tile edge to
+ * spot, which is the whole reason it can be used here after four attempts at drawing something failed.
+ *
+ *   - the mottle is coarse and slow, and does the real work: it breaks the gradient into cloud so the
+ *     colour looks mixed rather than computed
+ *   - the grain is fine and fast, and sits on top for tooth, the way paper stock reads up close
+ *
+ * Both are inline SVG turbulence, so they cost no network request, and both blend rather than paint:
+ * overlay on light so the texture rides the colour beneath it, soft-light on dark because overlay on
+ * near-black crushes to noise-on-black speckle instead.
+ */
+.auth-texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--auth-texture-alpha);
+  mix-blend-mode: overlay;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Cfilter id=%27g%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27180%27 height=%27180%27 filter=%27url(%23g)%27/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27700%27 height=%27700%27%3E%3Cfilter id=%27m%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.014%27 numOctaves=%273%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27700%27 height=%27700%27 filter=%27url(%23m)%27/%3E%3C/svg%3E");
+  background-size: 180px 180px, 700px 700px;
+}
+:root.dark .auth-texture {
+  mix-blend-mode: soft-light;
+}
+
+/* The card is white on a near-white canvas. With a backdrop behind it, it needs its own lift or it
+   dissolves into the ground — the shadow is what says "this is the thing to use". */
+.auth-panel > * {
+  box-shadow:
+    0 1px 2px rgba(15, 18, 30, 0.04),
+    0 12px 32px -8px rgba(15, 18, 30, 0.1),
+    0 32px 64px -24px rgba(15, 18, 30, 0.14);
+}
+:root.dark .auth-panel > * {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 16px 40px -12px rgba(0, 0, 0, 0.45);
+}

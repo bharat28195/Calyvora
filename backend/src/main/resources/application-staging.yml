@@ -1,0 +1,35 @@
+# Staging / hosted-test profile.
+#
+# Production-hardened (HTTPS cookies, INFO logging, small connection pool for free-tier
+# Postgres), but INTENTIONALLY not named `prod` — so the one-click demo seeding under
+# /api/v1/dev/** (which is @Profile("!prod")) stays available. This is the profile to run
+# the app under when you host it for testing/UAT. Switch to `prod` for real customers.
+#
+# Everything below reads from environment variables (set them in your host's dashboard).
+# The base application.yml already binds DB_URL / DB_USERNAME / DB_PASSWORD, etc.
+spring:
+  jpa:
+    show-sql: false
+  datasource:
+    hikari:
+      # Free-tier managed Postgres caps connections low — keep the pool small.
+      maximum-pool-size: ${DB_POOL_MAX:5}
+      minimum-idle: 1
+
+server:
+  # Behind a managed platform's TLS-terminating proxy — honour X-Forwarded-* so the app
+  # knows it is on HTTPS (needed for Secure cookies and correct redirect URLs).
+  forward-headers-strategy: framework
+
+calyvora:
+  security:
+    refresh:
+      cookie-secure: true   # served over HTTPS in a hosted environment
+    # Fail fast if the database role can bypass Row-Level Security (superuser / BYPASSRLS),
+    # which would silently break tenant isolation. See TenantIsolationVerifier.
+    require-tenant-isolation: ${REQUIRE_TENANT_ISOLATION:true}
+
+logging:
+  level:
+    com.calyvora: info
+    org.flywaydb: info

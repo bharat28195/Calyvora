@@ -1,0 +1,230 @@
+package com.calyvora.platform;
+
+import com.calyvora.common.security.AuthPrincipal;
+import com.calyvora.common.security.CurrentUser;
+import com.calyvora.feature.Feature;
+import com.calyvora.feature.FeatureService;
+import com.calyvora.feature.PlanService;
+import com.calyvora.feature.dto.FeatureStateResponse;
+import com.calyvora.platform.dto.CompanySummaryResponse;
+import com.calyvora.platform.dto.CreateCompanyRequest;
+import com.calyvora.platform.dto.SeatRequestResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/** Platform-owner (vendor) console — above all companies. OWNER only. Base {@code /api/v1/platform}. */
+@RestController
+@RequestMapping("/api/v1/platform")
+// Role *and* membership of the platform company. The role alone was the only guard until V35, when
+// self-registration turned out to hand OWNER to everyone who signed up — see PlatformAccess.
+@PreAuthorize("hasRole('OWNER') and @platformAccess.granted()")
+public class PlatformController {
+
+    private final PlatformService service;
+    private final com.calyvora.trial.TrialRequestService trialRequests;
+    private final FeatureService featureService;
+    private final PlanService planService;
+    private final TenantDataService tenantData;
+
+    public PlatformController(PlatformService service,
+                              com.calyvora.trial.TrialRequestService trialRequests,
+                              FeatureService featureService,
+                              PlanService planService,
+                              TenantDataService tenantData) {
+        this.tenantData = tenantData;
+        this.service = service;
+        this.trialRequests = trialRequests;
+        this.featureService = featureService;
+        this.planService = planService;
+    }
+
+    @GetMapping("/companies")
+    public List<CompanySummaryResponse> companies(@CurrentUser AuthPrincipal principal) {
+        return service.companies(principal.companyId());
+    }
+
+    /** Every version of the price list, newest first — the current one is flagged. */
+    @GetMapping("/pricing")
+    public List<com.calyvora.platform.dto.PriceListResponse> pricing(
+            @RequestParam(defaultValue = "INR") String currency) {
+        return service.priceLists(currency);
+    }
+
+    /**
+     * Publish a new price list. Takes effect on its start date with no deploy and no restart;
+     * months already invoiced keep the list that was in force then.
+     */
+    @PostMapping("/pricing")
+    @ResponseStatus(HttpStatus.CREATED)
+    public com.calyvora.platform.dto.PriceListResponse publishPricing(
+            @Valid @RequestBody com.calyvora.platform.dto.PublishPriceListRequest request) {
+        return service.publishPriceList(request);
+    }
+
+    @PostMapping("/companies")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CompanySummaryResponse createCompany(@Valid @RequestBody CreateCompanyRequest req) {
+        return service.createCompany(req);
+    }
+
+    /** Every agency, each with its company count and what those companies bill per month. */
+    @GetMapping("/agencies")
+    public List<com.calyvora.platform.dto.AgencySummaryResponse> agencies() {
+        return service.agencies();
+    }
+
+    /**
+     * Set up an agency and the person who runs it. Only the vendor does this — an agency cannot create
+     * another, and there is no self-signup, so the middle tier only ever exists because you sold it.
+     */
+    @PostMapping("/agencies")
+    @ResponseStatus(HttpStatus.CREATED)
+    public com.calyvora.platform.dto.AgencySummaryResponse createAgency(
+            @Valid @RequestBody com.calyvora.platform.dto.CreateAgencyRequest req) {
+        return service.createAgency(req);
+    }
+
+    @PostMapping("/companies/{id}/end")
+    public CompanySummaryResponse endSubscription(@PathVariable UUID id) {
+        return service.endSubscription(id);
+    }
+
+    @PostMapping("/companies/{id}/renew")
+    public CompanySummaryResponse renew(@PathVariable UUID id, @RequestBody Map<String, Integer> body) {
+        return service.renewSubscription(id, body.getOrDefault("months", 12));
+    }
+
+    @PostMapping("/companies/{id}/seats")
+    public CompanySummaryResponse setSeats(@PathVariable UUID id, @RequestBody Map<String, Integer> body) {
+        return service.setSeats(id, body.getOrDefault("seats", 5));
+    }
+
+    /**
+     * Which capabilities are switched on for one customer.
+     *
+     * <p>The vendor's decision, not the customer's, which is why it lives here and the company-side
+     * endpoint is read-only. Statutory payroll is the first of these: it is the first thing in the
+     * product that can print a wrong figure on somebody's payslip, so it is trusted one company at a
+     * time, after their numbers have been checked against a real run.
+     */
+    @GetMapping("/companies/{id}/features")
+    public List<FeatureStateResponse> features(@PathVariable UUID id) {
+        return featureService.statesFor(id).stream().map(FeatureStateResponse::of).toList();
+    }
+
+    /**
+     * Body: {"feature":"RECRUITMENT","enabled":true}.
+     *
+     * <p>Omitting "enabled" entirely CLEARS the override rather than meaning false, so a company can
+     * be put back on whatever its plan says. Without that, "undo this" would be impossible to express
+     * and an owner would have to remember what the plan included.
+     */
+    @PostMapping("/companies/{id}/features")
+    public FeatureStateResponse setFeature(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        Object feature = body.get("feature");
+        if (feature == null) {
+            throw new com.calyvora.common.error.ApiException(
+                    com.calyvora.common.error.ErrorCode.VALIDATION_ERROR, "Which feature?");
+        }
+        Boolean enabled = body.containsKey("enabled") && body.get("enabled") != null
+                ? Boolean.TRUE.equals(body.get("enabled")) : null;
+        return FeatureStateResponse.of(featureService.set(id, Feature.parse(feature.toString()), enabled));
+    }
+
+    /** Put a company on a plan, or take it off one. Body: {"planCode":"GROWTH"} — null to clear. */
+    @PostMapping("/companies/{id}/plan")
+    public List<FeatureStateResponse> setPlan(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        planService.assign(id, body.get("planCode"));
+        return featureService.statesFor(id).stream().map(FeatureStateResponse::of).toList();
+    }
+
+    /** Set the subscription end date directly (edit/reset). Body: {"endsAt":"YYYY-MM-DD"}. */
+    @PostMapping("/companies/{id}/end-date")
+    public CompanySummaryResponse setEndDate(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        String raw = body.get("endsAt");
+        return service.setEndDate(id, raw == null || raw.isBlank() ? null : java.time.LocalDate.parse(raw));
+    }
+
+    /** Set this company's price per employee/seat. Body: {"price": 300}. */
+    @PostMapping("/companies/{id}/price")
+    public CompanySummaryResponse setPrice(@PathVariable UUID id, @RequestBody Map<String, java.math.BigDecimal> body) {
+        return service.setPrice(id, body.get("price"));
+    }
+
+    @GetMapping("/seat-requests")
+    public List<SeatRequestResponse> seatRequests() {
+        return service.pendingSeatRequests();
+    }
+
+    @PostMapping("/seat-requests/{id}/approve")
+    public CompanySummaryResponse approve(@PathVariable UUID id) {
+        return service.approveSeatRequest(id);
+    }
+
+    @PostMapping("/seat-requests/{id}/decline")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void decline(@PathVariable UUID id) {
+        service.declineSeatRequest(id);
+    }
+
+    // ---- trial requests (PD-21) ----
+    // The queue behind the website's "free trial" button. Anyone can join it; only the vendor can see
+    // it, and only approving here turns an enquiry into a workspace someone can sign in to.
+
+    @GetMapping("/trial-requests")
+    public List<com.calyvora.trial.dto.TrialRequestResponse> trialRequests() {
+        return trialRequests.all();
+    }
+
+    @PostMapping("/trial-requests/{id}/approve")
+    public CompanySummaryResponse approveTrial(
+            @PathVariable UUID id,
+            @Valid @RequestBody com.calyvora.trial.dto.ApproveTrialRequest terms) {
+        return trialRequests.approve(id, terms);
+    }
+
+    @PostMapping("/trial-requests/{id}/decline")
+    public com.calyvora.trial.dto.TrialRequestResponse declineTrial(@PathVariable UUID id) {
+        return trialRequests.decline(id);
+    }
+
+    // ---- getting a customer's data out, and getting a customer out --------------------------
+
+    /**
+     * Everything this company owns, as JSON.
+     *
+     * <p>A GET so it can be opened, saved or piped without a tool. What comes back is large — a
+     * thousand-person tenant is megabytes — and that is the honest shape of the answer.
+     */
+    @GetMapping("/companies/{id}/export")
+    public Map<String, Object> exportCompany(@PathVariable UUID id) {
+        return tenantData.export(id);
+    }
+
+    /**
+     * Delete a company and everything belonging to it. Not reversible, no grace period.
+     *
+     * <p>The body must carry the company's name. A console listing every customer is one mis-click
+     * from ending one of them, and typing the name is the only protection that survives a tired
+     * operator at the end of a long day.
+     */
+    @DeleteMapping("/companies/{id}")
+    public Map<String, Object> deleteCompany(@PathVariable UUID id,
+                                             @RequestBody(required = false) Map<String, String> body) {
+        return tenantData.delete(id, body == null ? null : body.get("confirmName"));
+    }
+}

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>About Calyvora — the group behind Orbit and Priority HR Services</title>
+<meta name="description" content="We ran a hiring business, watched every good hire get lost in a spreadsheet, and built the HR platform we needed. Meet the director, and read the straight answers to the questions buyers actually ask us." />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="favicon.ico" sizes="48x48" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#0b0b12" />
+<!-- ?v= is a cache-buster. This site is uploaded by hand to shared hosting, which serves
+     orbit.css with a long cache life; without it a returning visitor gets new HTML against the
+     stylesheet they already have, and the page renders half-styled. Bump the number on any CSS
+     change. -->
+<link rel="stylesheet" href="orbit.css?v=3" />
+<script>
+  // A missing photo falls back to initials instead of a broken-image icon, so the page still looks
+  // finished if a filename hasn't been uploaded yet. Declared in the head deliberately: an img's
+  // onerror fires while the document is still parsing, long before a script at the end would run.
+  function initials(img, letters) {
+    const span = document.createElement("span");
+    span.className = "p-photo p-initials";
+    span.textContent = letters;
+    img.replaceWith(span);
+  }
+</script>
+</head>
+<body>
+<div class="glow a"></div><div class="glow b"></div>
+
+<header id="hdr">
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="index.html">
+        <span class="logo"></span>
+        <span>Orbit<small>by Calyvora</small></span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html#features">Product</a>
+        <a href="index.html#flow">How it works</a>
+        <a href="hr-services.html">HR Services</a>
+        <a href="index.html#pricing">Pricing</a>
+        <a href="about.html">About</a>
+      </div>
+      <div class="nav-cta">
+        <a href="https://orbit.calyvora.in/login" class="btn btn-ghost">Sign in</a>
+        <a href="https://orbit.calyvora.in/request-trial?from=about-nav" class="btn btn-primary">Request a trial →</a>
+      </div>
+      <button class="menu-btn" aria-label="menu">☰</button>
+    </nav>
+  </div>
+</header>
+
+<span id="top"></span>
+
+<!-- ============================================================================================
+     PAGE SHAPE — read this before adding a section.
+
+     Built against how Zoho, Keka and Buffer write theirs.
+
+     Zoho and Keka taught restraint: short intro, a few beliefs, a lot of air. Buffer taught the
+     thing that actually sells this page, which is that TRANSPARENCY BUYS TRUST FASTER THAN
+     CREDENTIALS DO. Buffer publishes its salaries, its revenue and its roadmap, and that openness
+     is why people believe the rest of what it says.
+
+     That is the strategy here, and it is the only honest one available to us. We cannot show a wall
+     of client logos or ten years of history — we do not have them. What we can do is answer the
+     awkward questions in public, on this page, before a buyer has to ask them. A cautious HR buyer
+     evaluating a young vendor is not looking for adjectives. They are looking for evidence that we
+     will tell them the truth when something goes wrong. "Straight answers" is the section that does
+     the selling; everything else supports it.
+
+     Eight blocks, each with one job:
+       1. Hero            who we are in two sentences, with four numbers under it
+       2. Our story       why this exists, told once, as a story
+       3. The group       the org tree — the genuinely distinctive thing on this page
+       4. Why it matters  we are our own first customer, and what that buys you
+       5. What we believe vision and mission, then the four things we hold to
+       6. Leadership      the director, reachable
+       7. Straight answers the questions buyers actually ask, answered without spin
+       8. Contact         with careers as one line, not a section
+
+     Before adding a ninth: is it a new job, or a second telling of one of these?
+
+     And the standing rule: never add client logos, star ratings, press cards or "trusted by N
+     companies" until they are real and the client has agreed in writing to be named. On a page whose
+     whole argument is "we tell you the truth", one invented proof point costs more than it earns.
+     ============================================================================================ -->
+
+<!-- 1. HERO -->
+<section class="page-hero">
+  <div class="wrap">
+    <span class="eyebrow reveal"><span class="dot"></span>About us</span>
+    <h1 class="reveal">We ran the HR problem before we <span class="grad-text">solved</span> it.</h1>
+    <p class="sub reveal">Calyvora is a product company with a hiring business inside it. Priority HR
+      Services places people for real clients. Orbit is the platform we built because doing that
+      properly needed one — and we use it ourselves, every day, before you ever see it.</p>
+    <div class="hero-cta reveal">
+      <a href="#story" class="btn btn-primary">Read the story →</a>
+      <a href="#answers" class="btn btn-ghost">Straight answers</a>
+    </div>
+
+    <!-- The four numbers sit under the headline as evidence for it, not as a separate claim.
+         Rule for anything added here: it must describe what we ARE, not what we will DO for you.
+         "Two hiring practices" is a fact about us. "Filled in two weeks" is a promise, and promises
+         belong in an engagement letter where they can be scoped and negotiated. -->
+    <div class="stats slim reveal">
+      <div class="stat">
+        <div class="s-n">2</div>
+        <div class="s-l">Hiring practices</div>
+      </div>
+      <div class="stat">
+        <div class="s-n">15</div>
+        <div class="s-l">Modules in Orbit</div>
+      </div>
+      <div class="stat">
+        <div class="s-n">1</div>
+        <div class="s-l">Record per employee</div>
+      </div>
+      <div class="stat">
+        <div class="s-n">0</div>
+        <div class="s-l">Spreadsheets between</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. OUR STORY ===============================================================================
+     A story, not a history. It opens on a specific scene rather than a summary, because that is
+     what makes a reader believe the writer was actually there.
+
+     ⚠ EDIT SLOTS. Everything below is true of the business as described to me, but the details that
+     would make it yours — the year you started, the city, the first client, the particular Monday
+     morning this happened on — are yours to add. Two or three concrete specifics will do more for
+     this page than any amount of rewriting. Look for the [square brackets].
+     ============================================================================================ -->
+<section class="pad" id="story">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Our story</span>
+      <h2>It started with a hire we were proud of.</h2>
+    </div>
+
+    <div class="split">
+      <div class="reveal">
+        <p>She was the right person. Screened properly, documents verified, references actually
+          called. We handed her over to the client on a Friday feeling good about it.</p>
+        <p>By the following month she was a row in a spreadsheet. Her attendance lived in one file,
+          her salary in another, and the documents we had already checked were being asked for a
+          second time because nobody could find them. When payroll ran, somebody typed her days into
+          a different system by hand — and got one of them wrong.</p>
+        <p>That is not a story about one hire. That is every hire, at almost every company we placed
+          people into. We were doing careful work at the front, and watching it come apart the moment
+          it left our hands.</p>
+        <p>So we built the part that was missing. Orbit began as the system we needed ourselves:
+          one record per employee, from the offer letter to the final settlement, with attendance
+          feeding payroll directly instead of through somebody's typing. Then clients started asking
+          whether they could use it for the people we <em>hadn't</em> hired for them. That question is
+          why Calyvora exists as a product company today.</p>
+        <p class="reveal" style="color:var(--fg-3);font-size:14px;margin-top:22px">We are still small,
+          still early, and small enough that the person whose name is on this page is the person you
+          will deal with. That is why you can ring a director instead of opening a ticket.</p>
+      </div>
+
+      <div class="flow reveal">
+        <div class="frow"><span>A role opens</span><span class="r">Client</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Sourced, screened, verified</span><span class="r" style="color:#22d3ee">Priority HR</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow"><span>Documents checked once</span><span class="r">PAN · bank · prior employment</span></div>
+        <div class="arrow">↓</div>
+        <div class="frow" style="border-color:rgba(124,92,255,.5)"><span>Day one, already set up</span><span class="r grad-text" style="font-size:17px">Orbit</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. THE GROUP -->
+<section class="pad" id="group">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>The group</span>
+      <h2>One parent. A product and a services business under it.</h2>
+      <p>The services arm is where we learn what HR actually breaks on. The product arm is where we
+        fix it for everyone else.</p>
+    </div>
+
+    <div class="org reveal">
+      <div class="org-parent">
+        <span class="org-tag">Parent company</span>
+        <h3>Calyvora</h3>
+        <p>The product company. Owns the platform, the brand and the roadmap.</p>
+      </div>
+
+      <div class="org-stem" aria-hidden="true"></div>
+
+      <div class="org-children">
+        <div class="org-node product">
+          <span class="org-tag">Product</span>
+          <h3>Orbit</h3>
+          <p>The HR platform. Attendance, leave, payroll, helpdesk and people ops — sold directly, or
+            through agencies running several companies at once.</p>
+          <a href="index.html#features" class="org-link">See the platform →</a>
+        </div>
+        <div class="org-node services">
+          <span class="org-tag">Services</span>
+          <h3>Priority HR Services</h3>
+          <p>The hiring business, and the one with clients today. Blue-collar and white-collar
+            recruitment, with every hire landing inside the client's Orbit workspace.</p>
+          <a href="hr-services.html" class="org-link">See the services →</a>
+        </div>
+      </div>
+    </div>
+
+    <p class="org-note reveal">Priority HR Services operates as part of the Calyvora group. Existing
+      client relationships, contracts and terms are unchanged.</p>
+  </div>
+</section>
+
+<!-- 4. WHY IT MATTERS =========================================================================
+     The sales argument, and the one thing here no competitor can copy. Zoho and Keka are excellent
+     products built by software companies. Neither of them runs a staffing desk, so neither of them
+     finds out on a Tuesday that the joining letter template is wrong.
+
+     Stated as consequences for the buyer, not as a boast about us.
+     ============================================================================================ -->
+<section class="pad" id="why">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Why that matters to you</span>
+      <h2>We are our own first customer.</h2>
+      <p>Most HR software is built by people who have never had to run a payroll cycle with it. Ours
+        is used by the hiring business next door before it reaches you.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal">
+        <h3>Bugs find us first</h3>
+        <p>If a joining letter comes out wrong, it comes out wrong for our own candidate, in front of
+          our own client. We hear about it that morning — not in a support ticket three weeks later.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Built for the awkward month</h3>
+        <p>Not the clean demo month. Someone joins on the 19th, someone else is on unpaid leave, a
+          shift changes mid-cycle. Those cases exist in Orbit because they happened to us.</p>
+      </div>
+      <div class="card reveal">
+        <h3>You can buy either half</h3>
+        <p>Take the software on its own. Take the hiring on its own. Or take both, and a person we
+          place arrives already set up in your workspace on day one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. WHAT WE BELIEVE -->
+<section class="pad" id="believe">
+  <div class="wrap">
+    <div class="vm reveal">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Vision</span>
+        <h2>HR work that nobody has to chase.</h2>
+        <p>An offer, a joining letter, a laptop returned, a final settlement — every one of them is
+          somebody remembering. We want the remembering to be the software's job, so the people can
+          work on the parts that need judgement.</p>
+      </div>
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Mission</span>
+        <h2>Hire them, and run them, in one place.</h2>
+        <ul class="vm-list">
+          <li>Fill the role — on terms agreed before we start</li>
+          <li>Hand over an employee, not a CV: documents verified once</li>
+          <li>Run the month — attendance, leave, payroll — with nothing in between</li>
+          <li>Close it properly when someone leaves</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Numbered because the list is deliberately closed — "these four and no more" is the claim. -->
+    <div class="grid four principles" style="margin-top:26px">
+      <div class="card reveal">
+        <h3>Your data is yours</h3>
+        <p>Each company's data is isolated at the database, not by a filter someone remembered to
+          write. Leaving us never means leaving your records behind.</p>
+      </div>
+      <div class="card reveal">
+        <h3>We own the screening</h3>
+        <p>We would rather carry the risk of a hire not working out than argue about whose fault it
+          was. Where that lands commercially, we agree up front.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Pricing you can read</h3>
+        <p>A rate per employee for the platform, a stated fee per hire for the service — quoted
+          before we start.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Salary stays private</h3>
+        <p>Colleagues can look each other up in the directory. Pay, PAN and bank details are theirs
+          alone — built that way, not configured that way.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. LEADERSHIP -->
+<section class="pad" id="leadership">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Leadership</span>
+      <h2>You will be talking to the director.</h2>
+      <p>Not an account manager, not a queue. The person who decides is the person who answers.</p>
+    </div>
+
+    <!-- ===================================================================================
+         EDIT HERE. One card: photo, name, role, phone, email.
+
+         Photo:  put the file next to this page (in public_html) and use its name in src.
+                 Square images work best — 600×600 or larger. If the file is missing the
+                 card falls back to initials, so a wrong filename is untidy, never broken.
+         Phone:  change BOTH places — the tel: link and the text after it. The link has no
+                 spaces (+918888849330) so a phone dials it; the text has them so a human can
+                 read it. They must always be the same number.
+         Line:   one sentence of real background — where she worked before, how long she has
+                 been doing this — is worth more than the rest of the page to a buyer deciding
+                 whether to trust someone they have never met. This is the single highest-value
+                 edit on the site.
+
+         The role is "Director", full stop. It deliberately does not name a company: the group
+         has a parent and two arms, and a title that picks one of them invites the question of
+         who runs the other. One director, one company, one number to ring.
+         =================================================================================== -->
+    <div class="people one">
+
+      <div class="person reveal">
+        <img class="p-photo" src="renu-rao.jpg" alt="Renu Rao" onerror="initials(this,'RR')" />
+        <h3>Renu Rao</h3>
+        <span class="p-role">Director</span>
+        <p class="p-line">Hiring, client delivery, and the standard the whole group is held to.</p>
+        <div class="p-contact">
+          <a href="tel:+918888849330">+91 88888 49330</a>
+          <a href="mailto:connect@calyvora.in">connect@calyvora.in</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- 7. STRAIGHT ANSWERS =======================================================================
+     This is the section that sells. Buffer's insight, applied: a buyer choosing an unknown vendor
+     is not weighing our adjectives against Zoho's, they are deciding whether we can be trusted.
+     Printing the uncomfortable question — "you're new, what if you disappear?" — and answering it
+     without spin does more for that than any feature list.
+
+     Rules for anything added here:
+       · The question must be one a real buyer has actually asked, worded the way they asked it.
+       · The answer must be able to survive being read back to us in a dispute.
+       · If the honest answer is "no" or "not yet", say that. An answer that dodges is worse than
+         no section at all, because it proves the opposite of what the section is claiming.
+     ============================================================================================ -->
+<section class="pad" id="answers">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow"><span class="dot"></span>Straight answers</span>
+      <h2>The questions people actually ask us.</h2>
+      <p>Including the awkward ones. We would rather you asked them now than found out later.</p>
+    </div>
+
+    <div class="qa reveal">
+      <div class="qa-item">
+        <div class="qa-q">You're new. What if you're not around in two years?</div>
+        <div class="qa-a">Fair question, and we won't pretend it away. Two things: the services
+          business has clients and revenue of its own, so the product is not the only thing keeping
+          the lights on — and your data is exportable on demand, in full, without asking us. If we
+          ever went away you would leave with every record you put in.</div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-q">Why would we pick you over Zoho or Keka?</div>
+        <div class="qa-a">Sometimes you shouldn't. They are good products with far more people behind
+          them. Pick us if you want one company that both finds your people and runs them afterwards,
+          or if you want the person who fixes the problem to be the person who answers the phone.
+          If you need a large vendor with a procurement process to match, say so and we'll tell you.</div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-q">Who actually looks after our data?</div>
+        <div class="qa-a">Each company's records are isolated at the database itself, not by a filter
+          in the application that somebody has to remember to write. Salary, PAN and bank details are
+          restricted from colleagues by design. We will walk your IT person through exactly how, on a
+          call, without hand-waving.</div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-q">What happens if we want to leave?</div>
+        <div class="qa-a">You export your data and go. There is no exit fee, no hostage period, and
+          no "contact your account manager to discuss retention". A product that has to trap you
+          isn't finished.</div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-q">Who do we call when something breaks?</div>
+        <div class="qa-a">A director, on the number printed above. We are small enough that this is
+          a real answer rather than a slogan — and honest enough to say that when we grow, it will
+          have to change.</div>
+      </div>
+
+      <div class="qa-item">
+        <div class="qa-q">Is there anything Orbit doesn't do yet?</div>
+        <div class="qa-a">Yes, and we'll tell you which before you buy rather than after. Ask about
+          anything specific on the call — a straight "not yet, here's when" costs us one deal;
+          discovering it in month two costs us the relationship.</div>
+      </div>
+
+      <div class="qa-item wide">
+        <div class="qa-q">What will it cost?</div>
+        <div class="qa-a">The platform is priced per employee per month, and the published rates are
+          on the <a href="index.html#pricing" style="color:var(--aqua)">pricing page</a> — not hidden
+          behind a form. Hiring is a stated fee per hire, quoted before we start work. Whatever we
+          agree goes in writing before anything begins; nothing on this website is a quotation, and
+          nothing gets invoiced that you haven't already seen.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8. CONTACT -->
+<section class="pad" id="contact">
+  <div class="wrap">
+    <div class="final reveal">
+      <h2>Talk to whichever half you need.</h2>
+      <p>Hiring, the platform, or both — it's the same short conversation, and it reaches a director
+        rather than a queue.</p>
+      <div class="hero-cta" style="justify-content:center">
+        <a href="mailto:connect@calyvora.in?subject=Hiring%20enquiry" class="btn btn-primary">Talk about hiring →</a>
+        <a href="https://orbit.calyvora.in/request-trial?from=about-contact" class="btn btn-ghost">Request an Orbit trial</a>
+      </div>
+    </div>
+    <!-- Careers was a full section. For someone evaluating software that is noise; for someone
+         after a job, one clear line is enough. Demoted rather than deleted. -->
+    <p class="aside-line reveal" id="careers">Looking for work rather than software? We are small,
+      the work is broad, and what you build is in front of real clients quickly. Send a CV and a line
+      about what you want to work on to
+      <a href="mailto:connect@calyvora.in?subject=Working%20at%20Calyvora">connect@calyvora.in</a> —
+      we read everything and reply either way.</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="brand" href="index.html"><span class="logo"></span><span>Orbit<small>by Calyvora</small></span></a>
+        <p class="tagline">The modern HR platform for growing teams. Built with care by Calyvora.</p>
+      </div>
+      <div><h5>Product</h5><a href="index.html#features">Attendance</a><a href="index.html#features">Payroll</a><a href="index.html#features">Helpdesk</a><a href="index.html#pricing">Pricing</a></div>
+      <div><h5>Services</h5><a href="hr-services.html#tracks">Blue-collar hiring</a><a href="hr-services.html#tracks">White-collar hiring</a><a href="hr-services.html#how">How it works</a><a href="hr-services.html#pricing">Hiring fees</a></div>
+      <div><h5>Company</h5><a href="about.html">About us</a><a href="about.html#leadership">Leadership</a><a href="about.html#answers">Straight answers</a><a href="about.html#careers">Careers</a><a href="mailto:connect@calyvora.in">connect@calyvora.in</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></div>
+    </div>
+    <p class="foot-note">Everything on this site is general information about what we do. It is not an
+      offer, a quotation or a commitment, and it does not form part of any contract. Services, fees,
+      timelines and any guarantees are only those set out in the signed agreement for that engagement.
+      Product features and pricing may change.</p>
+    <div class="foot-bottom">
+      <span>© 2026 Calyvora. All rights reserved.</span>
+      <span>Orbit™ is a product of Calyvora. Priority HR Services is part of the Calyvora group.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const hdr=document.getElementById('hdr');
+  addEventListener('scroll',()=>hdr.classList.toggle('scrolled',scrollY>12));
+  const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(i%3*70)+'ms';io.observe(el)});
+</script>
+</body>
+</html>

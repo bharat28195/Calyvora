@@ -1,0 +1,42 @@
+# Calyvora — local development stack (Sprint 1)
+# Brings up Postgres + Mailpit; backend and frontend can run in-container or on the host.
+# Usage:  docker compose -f infra/docker-compose.yml up -d
+#
+# Sprint-1 scope (SD-6): Mailpit is a local SMTP catcher — no email leaves your machine.
+# Open the Mailpit web UI at http://localhost:8025 to read verification / invite emails.
+
+name: calyvora
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: calyvora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: calyvora
+      POSTGRES_USER: calyvora
+      POSTGRES_PASSWORD: calyvora_local_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - calyvora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calyvora -d calyvora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: calyvora-mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "1025:1025"   # SMTP  (backend sends here)
+      - "8025:8025"   # Web UI (read caught emails)
+
+volumes:
+  calyvora_pgdata:
+    name: calyvora_pgdata

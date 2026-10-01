@@ -1,0 +1,1959 @@
+# FOUNDER.md — Calyvora Founder Journal & Decision Log
+
+> **Purpose:** The company's living journal. It records not just *what* we built but *why* we
+> built it, so anyone joining in six months or two years understands the reasoning behind every
+> major decision. Maintained continuously by the founder and the AI co-founder. When this
+> journal and the code disagree, the journal explains the intent; the [/docs constitution](docs/README.md)
+> holds the binding architecture.
+>
+> **Format conventions:** newest entries first within each log. Every decision carries a date
+> (ISO `YYYY-MM-DD`) and a stable ID (`PD-##` product, `ADR-##` architecture) so we can
+> cross-reference. Dates are absolute, never "last week."
+
+**Last updated:** 2026-07-22 · **Product: Orbit (by Calyvora)** · **Branch:** `feature/orbit` · **Stage:** Phase-1 trio ✅ · Work OS depth ✅ · Foundation hardening (RLS + RS256) ✅ · Demo suite (seed/dashboard/⌘K search/AI assistant) ✅ · Theming ✅ · **Founder-feedback buckets A + B + C.1 ✅** (in progress, see [docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)) — 74 backend tests, verified live
+
+---
+
+## 1. Company Vision
+
+### Mission
+Replace the 20–40 disconnected tools a company runs (HR, work, knowledge, CRM, finance,
+service, meetings, analytics, automation) with **one AI-native Enterprise Operating System** —
+one platform, one identity, one data fabric, one AI layer — where every application works
+independently yet integrates natively.
+
+### Long-term vision (10 years)
+"Running your company on Calyvora" should mean what "running on the cloud" means today: the
+default, assumed substrate. The end state is **an organization that thinks** — every system
+shares context, every action is auditable, and a governed AI layer with a complete view of the
+business acts as an always-on operational partner. Third parties build vertical solutions on
+top the way apps are built on iOS. See [docs/01](docs/01-executive-vision.md).
+
+### Product philosophy
+Build **fewer things, more deeply, on an uncompromising Foundation, with AI and security woven
+in from line one, validated by real customers, enforced by machines, and expanded only under
+proven pull.** The 15 engineering principles (API-first, AI-first, multi-tenant, Zero-Trust,
+event-driven, composable, boring-tech-by-default, etc.) live in [docs/02](docs/02-product-philosophy.md),
+each with a *why* and an enforcement mechanism, and a tie-breaker priority order:
+**Security & Isolation → Correctness → UX/DX → Scalability → Cost/Velocity.**
+
+### Core values
+1. **Own it.** Think like a founding partner, not a feature factory.
+2. **No shortcuts that mortgage the platform.** Speed never buys down the Foundation.
+3. **Customer value over feature count.** We win love, referrals, and revenue — not a spec sheet.
+4. **Enforce, don't exhort.** A rule enforced by a machine is a rule; by hope, a wish.
+5. **Honesty in the record.** Decisions are documented with their trade-offs, superseded not deleted.
+6. **Integration is the multiplier, not the substitute** — each app must also be individually excellent.
+
+### Success metrics (north stars)
+- **Primary:** number of customers running **≥3 connected OS-apps** on one login (proves the
+  platform thesis, not just single-app adoption).
+- **Product:** universal-assistant weekly active usage; cross-app action rate (an action in
+  app A triggered from app B or the assistant).
+- **Business:** net revenue retention (land-and-expand is our moat), logo retention, NPS.
+- See detailed SaaS metrics in [§9](#9-startup-metrics) (tracked once live).
+
+---
+
+## 2. Founder Notes
+
+> Running log of the founder's and co-founder's thinking — ideas, observed problems, competitor
+> inspiration, opportunities, and open questions. Newest first.
+
+**2026-07-22 (The product gets a name — "Orbit" — and the founder's feedback becomes the roadmap)**
+- **Named the product: Orbit; Calyvora is the parent company.** The founder decided the OS itself needs
+  its own brand distinct from the company. We shortlisted Orbit / Nexus / Cortex / Meridian and the
+  founder chose **Orbit** — everything revolves around one platform. Wired it as a one-line switch
+  (`frontend/src/lib/brand.ts`) so the whole UI reads "Orbit by Calyvora". This also unlocks the
+  packaging idea below (a named product a client can buy in whole or in part).
+- **Turned 8 pages of handwritten notes into a tracked, living backlog.** The founder handed over
+  detailed product feedback; rather than cherry-pick, we transcribed every item into
+  [docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md) with per-item status, so no idea
+  is lost and any session can resume. Sequenced into buckets A (quick wins), B (role dashboards +
+  attendance), C (People OS depth), D (new modules). **Discipline over speed: capture everything, ship
+  in reviewable slices.**
+- **Shipped A + B + C.1 already, each tested and live.** Fixed the real bug (members dropdown → a
+  searchable picker that scales to ~1k), moved navigation to a left sidebar, made attendance *derived
+  from leave* first (a phased, low-regret call the founder approved) before committing to a full daily
+  attendance model, and built the most-emphasized item — **salary, yearly hikes, and payslips** — as
+  Owner/Admin-only compensation with real hike-% history.
+- **A phasing decision worth remembering (attendance).** The founder asked for present/on-leave and a
+  leave calendar. Rather than model daily attendance up front, we derive it from approved leave now and
+  deferred the full daily-attendance record to Bucket C — the founder explicitly chose "both, phased."
+
+**2026-07-21 (Foundation debt cleared — RLS + RS256 before more features)**
+- **The database now enforces tenant isolation itself (SD-2).** Until today, one tenant not seeing
+  another's data rested entirely on every query remembering its `company_id` filter — one forgotten
+  `where` clause, or one injection, and it's a breach. We added Postgres Row-Level Security on all 11
+  tenant-owned tables (V12): each request binds its tenant to the connection as a session GUC, and the
+  DB refuses to read or write any other tenant's rows. It's *defense in depth* — the app-layer checks
+  stay; RLS is the backstop. Deny-by-default too: a connection with no bound tenant sees nothing.
+- **Named the sharp edge instead of hiding it.** RLS is bypassed by Postgres superusers, and our
+  embedded dev DB connects as one — so I made the test drop to a NOSUPERUSER role via `SET ROLE` (which
+  IS subject to RLS) to prove the policies actually bite, and wrote down loudly that the production DB
+  role must be NOSUPERUSER. Better an honest boundary in the record than a green test that proves nothing.
+
+- **Stopped the RS256 follow-up from slipping again.** Access tokens were still HS256 (a shared secret)
+  since Sprint 1, deferred twice. Before building any more app depth we cut over to **RS256 asymmetric
+  signing**: signers hold the private key, verifiers hold only the public key — there is no longer a
+  shared secret whose leak would let a verifier forge tokens. Fulfils the deferred half of SD-5.
+- **Built rotation in from day one, not as a later retrofit.** Keys carry a `kid`; one key is active for
+  signing while every configured key stays trusted for verification, so we can rotate with zero downtime
+  (publish new → flip active → retire old once its last token expires). Public keys are discoverable at
+  `/.well-known/jwks.json` (RFC 7517) so the frontend or a future gateway verifies tokens without us
+  hand-delivering keys. Decisions logged as SD-5a/SD-23/SD-24.
+- **Kept dev zero-config without shipping a secret.** No keys configured → an ephemeral keypair is
+  generated at boot with a loud warning, rather than committing a dev private key to the repo. 7 new
+  tests (60 total), full suite green. Next foundation item: Postgres RLS (SD-2).
+
+**2026-07-20 (Work OS deepened — first real "depth" investment after the trio)**
+- **From a board to a workspace.** Work OS now has a left-pane workspace — Board · Backlog · Sprints ·
+  Tickets — with real agile sprints (create → start → complete, ≤1 active per project, unfinished work
+  carries back to the backlog) and a lightweight support-tickets type. `com.calyvora.work` grew Flyway
+  V10/V11; 5 new integration tests (58 total), verified live: a "Sprint 1" running with two tasks on the
+  board, one task left in the backlog, and tickets PLT-T1/T2 with a People-employee assignee.
+- **Restraint held where it mattered (SD-22b).** The founder asked for support tickets *inside* Work. I
+  built a thin version but logged it as deliberate debt: tickets' true system of record is **Service OS**
+  (Phase 2), with customers/SLAs Work doesn't model. We took the shortcut knowingly, in writing, rather
+  than quietly letting Work become a CRM — protecting the "one system of record per entity" principle.
+- **The cross-app graph keeps paying off.** Both task assignees and ticket assignees are People
+  employees — the same org graph, now feeding a third surface. No new glue.
+
+**2026-07-20 (Knowledge OS shipped — the Phase-1 trio is complete)**
+- **Third full app on the platform; the depth-first bet (PD-02) is delivered.** Knowledge OS — spaces,
+  a Markdown page tree with drafts/publish, tenant-wide search, and "my pages" — built on the foundation:
+  `com.calyvora.knowledge`, Flyway V8/V9, 6 integration tests (48 total, each with a cross-tenant check).
+  **People / Work / Knowledge now all run on one login, one identity, one data fabric.**
+- **The graph closed into a triangle (PD-06).** A page's **author is a People `Employee`** and a page can
+  **link a Work `Task`** — so a single doc ties a *person* to a *task* to *knowledge* with zero glue.
+  Verified live end-to-end: a "Deploy runbook" page came back authored by "Milton Waddams" and linked to
+  `PLT-1`, and full-text search found it by body. This is the "integrated by construction" moat in one
+  screen — the thing no bundle of point tools can copy.
+- **Leverage compounding again.** Knowledge OS reused the Sprint-1 spine *and read both prior apps*
+  (People for authorship, Work for the task link) without touching either. I added exactly one shared
+  seam — `EmployeeService.ensureEmployeeId` — so authorship provisions a People profile without Knowledge
+  knowing People's internals. Each app keeps making the next cheaper and the platform more valuable.
+- **Restraint holds.** With the trio done, the pull now is *depth* (versioning, richer editor, comments)
+  and the deferred **foundation debt — Postgres RLS (SD-2) and RS256 (SD-5) — which must not keep slipping.**
+  Deliberately *not* starting a fourth app yet.
+
+**2026-07-10 (Work OS shipped — the cross-app thesis is real)**
+- **Second full app on the platform.** Work OS (projects, Kanban task board, My Work) built on the
+  foundation: `com.calyvora.work`, Flyway V6/V7, 5 integration tests (42 total, each with a
+  cross-tenant check). Verified live — a `Platform` project with tasks moving across To do → In
+  progress → Done, priorities, and per-project refs (PLT-1…).
+- **The moat, demonstrated (PD-05):** a Work OS task's **assignee is a People OS `Employee`** — the two
+  apps share one org graph with zero glue. "Bob Stone" assigned in Work shows up in his People profile
+  and in *My Work*. This is "integrated by construction," not an integration project — exactly the thing
+  no single-app competitor can copy cheaply.
+- **Leverage compounding:** People OS reused the Sprint-1 spine; Work OS reused the spine *and* read
+  People OS. Each app makes the next cheaper and more valuable. Restraint still matters — three Phase-1
+  apps, then depth — but the platform bet is paying off on schedule.
+
+**2026-07-10 (People OS shipped — first full app complete)**
+- **People OS is built, tested, and verified live.** All five vertical slices on the foundation:
+  employee directory & profiles (P1), departments + org chart (P2), onboarding checklists (P3),
+  time-off with approvals + balances (P4), and self-service (P5). **18 People OS integration tests**
+  (37 total) pass on real embedded Postgres — every slice includes an adversarial cross-tenant check.
+  Verified end-to-end in the browser against the live backend: directory, org tree (CTO → Engineer),
+  onboarding checklist, and a vacation request approved down to a 20-day remaining balance.
+- **Design note:** `Employee` is a 1:1 auto-provisioned extension of the platform `User`, so identity
+  (auth) and HR data stay cleanly separated and every company member appears in the directory without
+  the auth flow knowing anything about People OS. This is the org graph every future app will read (PD-04).
+- **Proof the platform thesis works:** People OS reused the Sprint-1 spine wholesale — tenancy, JWT,
+  RBAC, error envelope, TenantContext — and added a full business module without touching the
+  foundation. That "integrated by construction" leverage is exactly the moat we're building toward.
+
+**2026-07-10 (Sprint 1 complete — foundation shipped & verified)**
+- **Backend built and proven.** JDK 21 arrived on the dev machine; I bootstrapped Maven (no global
+  install) and implemented the entire Sprint-1 backend on the foundation: auth/registration/verification,
+  JWT + rotating refresh with **reuse detection**, dashboard, company/settings, and the full invitation
+  lifecycle. **19 tests pass on a real embedded Postgres** (no Docker) — including the adversarial
+  **cross-tenant isolation** suite that is the Sprint-1 merge gate (SD-2).
+- **Whole app runs locally, verified in the browser.** With the `embedded` profile the backend boots a
+  throwaway Postgres and prints email links to the console; the frontend (`API_MODE=live`) drove the full
+  golden path against the real API — register → verify → login → dashboard — with a secure httpOnly
+  refresh cookie. Sprint 1's Definition of Done is met end-to-end.
+- **New implementation decisions:** SD-10 (Zonky embedded Postgres, no-Docker), SD-11 (reuse revocation
+  in a REQUIRES_NEW tx so a stolen family is actually burned before the 401), SD-12 (console email +
+  resilient mail). Logged in [DECISIONS.md](DECISIONS.md).
+- **Working agreement:** founder wants the **full app built locally first, no PRs** for now. Resume state
+  lives in [CONTEXT.md](CONTEXT.md).
+- **Next:** Sprint 2 = **People OS**, our beachhead app (PD-02) — the first real business module on the
+  foundation. Plan: [docs/Sprint2-PeopleOS.md](docs/Sprint2-PeopleOS.md).
+
+**2026-07-09 (Sprint 1 build begins)**
+- **Approved to build.** Founder gave the go-ahead to start Sprint 1. Order followed per plan §15:
+  Feature 0 scaffolding + foundation → Feature 1 landing.
+- **Build tool: Gradle → Maven (SD-9, supersedes the Gradle half of SD-7).** Founder directive: the
+  backend is a **Maven** Java project. Reason: team/Spring-Boot tooling familiarity. Trade-off: none
+  material for our needs; Spring Boot's Maven support is first-class. Logged in [DECISIONS.md](DECISIONS.md).
+- **Toolchain reality (co-founder flag):** this workstation has **Node** but **no JDK 21, no Maven,
+  no Docker**. Consequence: the Next.js frontend is built *and verified locally*; the Spring Boot
+  backend + Docker Compose are written to spec but **cannot be compiled/run here** — the verification
+  gate for backend code is **CI (GitHub Actions)** or a local `mvn`/Docker install. I will not claim a
+  backend "works" that I couldn't execute. Recommend installing **Temurin JDK 21 + Docker Desktop**
+  to unlock local backend runs and the Testcontainers integration suite.
+- **Shipped this session:** monorepo (`/backend` Maven+Spring Boot, `/frontend` Next.js, `/infra`
+  compose, CI); backend foundation (TenantContext, error envelope, stateless-JWT SecurityConfig,
+  Flyway V1 baseline, OpenAPI, correlation-id); Feature 1 landing page (verified rendering, no console
+  errors). The pre-existing static `web/` marketing site is kept separate (deploy target for calyvora.in).
+- **Decision — frontend-first (given the toolchain gap):** founder chose to build and verify the
+  *entire* Sprint-1 UI now, deferring the Java backend until a JDK/Docker toolchain exists. To make
+  this real (not mocked screenshots), the frontend runs against an **in-browser mock backend**
+  (`frontend/src/lib/mock/backend.ts`) that mirrors the §7 API contract; `lib/api.ts` flips to the
+  real backend with `NEXT_PUBLIC_API_MODE=live`. Trade-off: backend correctness/tenant-isolation
+  tests are still outstanding — the security-critical half. **Do not treat Sprint 1 as done until the
+  Spring Boot backend is implemented and its adversarial cross-tenant + auth tests pass.**
+- **Frontend milestone reached:** all Sprint-1 screens built and **verified end-to-end in the browser**
+  — the golden path register → verify-email → login → dashboard → invite → accept → (new active member),
+  plus RBAC nav gating, logout, and company settings save. This is the demoable week-1 milestone,
+  delivered on the UI side.
+
+**2026-07-05 (Sprint 1 kickoff)**
+- **Scope honesty (co-founder):** the "Sprint 1" feature list is really the *platform foundation* and
+  is ~2–3 weeks of production-quality work, not 5 days. I recommend measuring success by a **demoable
+  milestone at Feature 6** (register→verify→login→protected dashboard) in week 1, then invite/settings.
+  Flagged so we don't mistake a foundation for a week-sized task or cut corners to fit a calendar.
+- **Deliberate debt (co-founder):** Sprint 1 enforces tenant isolation at the app layer (`TenantContext`)
+  and **defers Postgres RLS to Sprint 2**. This is a conscious, logged trade-off (SD-2) — acceptable for
+  one sprint *only because* adversarial cross-tenant tests are a merge gate. RLS is the real backstop and
+  must not slip past Sprint 2.
+- **Still-open (unchanged, now urgent):** pricing model and the first design partner — both should be
+  progressing in parallel with the build.
+
+**2026-07-05**
+- **New idea (co-founder):** the **transactional outbox + Debezium CDC** on the JVM isn't just
+  plumbing — it's the mechanism that lets *every* future app subscribe to *every* other app's
+  facts with zero coupling. This is the technical heart of "integrated by construction." Worth
+  protecting fiercely; it's easy to erode with a "just this once" direct DB read.
+- **Problem observed:** the biggest *likelihood* risk isn't technical — it's **spreading thin**.
+  The vision lists 14+ apps; the temptation to start five at once is strong and fatal. Guardrail:
+  the Phase-1 scope is exactly three apps (People, Work, Knowledge) and a written "NOT building
+  yet" list.
+- **Competitor inspiration:** Notion (delightful, composable UX), Linear (speed + opinionated
+  defaults), Ramp/Rippling (land-and-expand across functions), ServiceNow (platform/workflow
+  depth). We want Linear's craft with Rippling's cross-function expansion and a genuinely
+  AI-native core none of them have.
+- **Future opportunity:** the org **knowledge graph** could become a standalone durable asset —
+  the institutional memory of a company, queryable and actionable. Possibly the deepest long-term moat.
+- **Open questions (need answers):**
+  1. Beachhead segment precision — digital-native SMB vs lower mid-market first? (Leaning SMB.)
+  2. Which 3–5 **design partners** do we recruit *before* building Phase 1?
+  3. Meeting OS video: build vs. partner in Phase 2 — confirm partner-first. (ADR pending.)
+  4. Pricing model — per-seat vs. per-app suite vs. usage/AI-metered hybrid?
+  5. Vector store graduation threshold (pgvector → dedicated) — define the metric that triggers it.
+
+---
+
+## 3. Product Decisions
+
+> One entry per major product decision. Newest first.
+
+### L-1 · 2026-08-11 · A migration that passes every test can still fail the only database that matters
+- **What happened:** V40 (PD-18) deleted the demo platform owner with a bare
+  `delete from users where email = 'owner@priorityhr.app'`. Green across 264 tests, then the deploy
+  died on `refresh_tokens_user_id_fkey`. The backend never started; Render kept the previous container
+  running, so the app stayed up and the only symptom was that the new owner login didn't work.
+- **Why the tests could not have caught it:** every test database is built from empty by Flyway and
+  then used. A destructive migration therefore always runs against data *it* created. The deployment's
+  database had an account that had been **used** — signed in, so a refresh token pointed at it. There
+  was no test in the suite that migrated *over* pre-existing data, so this class of bug had no way to
+  surface.
+- **Fix:** clear the session artefacts first (right regardless — it revokes the old credential), then
+  delete inside a `do $$ … exception when foreign_key_violation` block that retires the account
+  instead when something still references it. Plus `V40LegacyOwnerRemovalTest`, which cleans to V39,
+  plants realistic rows, and only then applies V40.
+- **The rule to keep:** *any migration that deletes or rewrites existing rows gets a test that plants
+  the data first.* Adding a column does not need one; touching rows a customer created does.
+- **Second lesson, cheaper but real:** a failed deploy on Render is silent from outside — health stays
+  UP because the old container keeps serving. "The site works" is not evidence the deploy landed.
+  Check that something *from the new build* answers.
+
+### PD-20 · 2026-08-10 · The letterpad, and letters that raise themselves
+- **Context:** Documents already had templates, merge fields and a paper-like preview, but every
+  letter came out on blank paper — no logo, no address, no colour, one typeface — so nobody would
+  actually send one to a candidate. And the two moments that produce letters, somebody joining and
+  somebody leaving, were entirely manual: HR had to remember the sequence, find the template, fill
+  it in, and separately remember to chase the laptop back. The ask was to take that load off a human.
+- **Decision, three parts.**
+  1. **A letterpad per company** (`letterheads`, one row keyed by company id): logo, heading, address
+     block, footer strip, brand colour, one of three typefaces, and a rule. Set once; every letter
+     prints on it. Per-template opt-out for memos that carry their own heading.
+  2. **Offer and hire raise their own letters.** "Make an offer" moves the candidate to OFFER and
+     issues the offer letter from the candidate's own details — no employee record required, because
+     the merge engine already takes overrides. "Hire" invites them, marks them HIRED, and issues the
+     joining letter.
+  3. **Exit formalities as a checklist a manager works.** Starting an exit records the last working
+     day, moves the employee to a new `NOTICE` status and raises a ten-item clearance list. Completing
+     it issues the relieving letter and the experience certificate.
+- **Editor: a toolbar over the existing text format, not a WYSIWYG.** Considered storing HTML and
+  editing on the page as in Word — closer to what was asked for. Rejected for now: it means
+  sanitising untrusted HTML before every render, migrating every existing template, and roughly
+  double the build, to buy formatting nobody had asked for beyond bold, headings and lists. What is
+  saved stays plain text a person can read and repair, and `dangerouslySetInnerHTML` never sees
+  anything a user wrote. Revisit if tables in letters turn out to matter.
+- **The constraint that shaped the hire flow:** an employee row needs a `user_id`, and the user does
+  not exist until the invitation is accepted — while acceptance is a public call with no tenant bound,
+  so it cannot write to `employees` under RLS at all. So the agreed job title, start date and
+  department ride on the invitation row and are applied by `EmployeeService.provision` the first time
+  the profile is created, which also seeds the joining checklist. Both ends of that are real
+  constraints, not preference.
+- **Refusing to complete an exit while clearance is open** is the one hard rule. A relieving letter
+  certifies that company property came back and dues were settled; issuing it before that is true is
+  a statement the company cannot stand behind. Overridable with `force=true`, because reality has
+  exceptions — but never by accident.
+- **Who may tick what:** onboarding items belong to the joiner (or an admin); exit items belong to the
+  leaver's **manager**, HR or an admin, and explicitly not to the leaver, who would otherwise be
+  signing off that they returned their own laptop.
+- **Also:** exits are a top-level nav item rather than a child of People, which is HR-only — a manager
+  would never have found a page nested under a section their role cannot open.
+- **Trade-offs / debt:** the letterpad is applied at render time, so an old letter re-renders on
+  today's stationery (the *words* stay frozen, which is what was signed — but a company that rebrands
+  will see its old letters change). Output is browser print / Save-as-PDF; no server-rendered PDF and
+  no "email this letter to the candidate" yet. There is no offboarding equivalent of the checklist
+  templates — the ten items are a constant, not per-company configuration.
+
+### PD-21 · 2026-08-12 · "Start free trial" asks; it does not admit
+- **Context:** the trial button on the marketing site pointed at `/register`, which created a company
+  and an ADMIN who could sign in that second. Nobody sold anything, nobody was told, and nobody
+  approved it — anyone who found the URL had a live workspace. The founder's instruction was plain:
+  nobody gets in until I give permission, and I want an email when someone asks.
+- **Decision:** the public surface stores an **enquiry**, not an account. `POST /api/v1/trial-requests`
+  is open to anyone, takes company, name, email and three optional fields, and creates a row in
+  `trial_requests`. There is no password on the form because there is nothing to set one on. The
+  vendor is emailed, the asker is acknowledged, and the request sits in the platform console until the
+  owner approves it — at which point the workspace is provisioned through
+  `PlatformService.provision`, the same path "New company" already used.
+- **Self-signup is closed by config, not deleted.** `calyvora.security.registration.open` defaults to
+  false and `/auth/register` answers 403 with an explanation. Kept as a flag because it is a
+  commercial decision, not an architectural one — if we ever want open signup back it is one
+  environment variable, and because deleting the endpoint would have turned every old link into a
+  mystery instead of a message. `/register` in the app redirects to `/request-trial` for the same
+  reason: that address was the site's call to action for months.
+- **Why the password is typed by the owner, not emailed.** Approval asks for a starting password,
+  seats and trial length. The customer's email says the workspace is ready and where to sign in; the
+  credential is handed over by the person who sold the trial. Mailing a password would have been less
+  work and worse. The alternative — a set-your-own-password token — needs machinery this codebase
+  does not have yet (there is still no password-reset flow), and inventing it here would have made
+  this change twice the size. **That is the debt to pay next**, and it pays for forgotten passwords
+  too.
+- **One open request per address**, enforced by a partial unique index rather than application logic.
+  Someone who clicks twice because nothing visibly happened gets the same quiet 202, and the vendor's
+  queue stays one row per person. Partial, so a customer turned down in March may ask again in
+  September.
+- **Trade-offs / debt:** the endpoint has no rate limit or captcha, so the queue can be spammed — the
+  duplicate index blunts it but does not stop a script with a thousand addresses. Nothing here is
+  RLS-protected (it cannot be: the caller has no tenant), so the vendor's sales queue is guarded by
+  the platform console's role check alone. Declining sends no email, deliberately: turning someone
+  down is a conversation, not an automated brush-off.
+- **A note on the test suite.** Closing signup broke the way nearly every integration test conjures a
+  tenant. Rather than rewrite ~250 tests to provision through the owner console — which would have
+  made them all tests of the console — `IntegrationTestBase` keeps registration switched on and
+  `TrialRequestFlowTest` re-declares `@SpringBootTest` without the override, so the shipped default is
+  asserted directly. Worth knowing: the suite is not, by default, exercising the production auth
+  posture. One class is.
+
+### PD-22 · 2026-08-13 · Preparing a demo is a deliberate act, not a button on the login screen
+- **Context:** "Explore the live demo" sat on `/login` under the sign-in form. One click seeded a
+  populated company and dropped an anonymous visitor straight into its dashboard as the demo owner.
+  It was a sales affordance placed on the one door real customers use, and it fused two different
+  actions — *build the data* and *become someone* — into a single click.
+- **Decision:** the button is gone. Demo data is now prepared at **`orbit.calyvora.in/demo/seed`**, a
+  page you open on purpose before anyone is watching. It seeds on arrival, then lists every login with
+  a copy button — because what you actually need thirty seconds before a demo is the credentials, not
+  a confirmation message. It signs nobody in; whoever is running the demo chooses the identity to show.
+- **A GET that writes,** deliberately. Seeding is idempotent and purely additive — it only fills gaps,
+  never overwrites or deletes — so a stray prefetch or a double-click can do no harm, and making it
+  POST would mean it could not be reached from the address bar, which is the whole point. Still
+  `@Profile("!prod")`: it must never exist on a deployment holding real customer data.
+- **The owner account moved** to `bharat28195@calyvora.in` / `Bharat@28195#`. **That password is in
+  the source tree, so it is not a secret** — anyone who can read the repo can sign in as the account
+  that sees every customer. It exists so a fresh deployment works immediately; `PLATFORM_OWNER_PASSWORD`
+  must be set on anything holding real data, and the app warns at every startup until it is.
+- **Renaming, not recreating.** Changing the configured owner email on a deployment that already has
+  an owner would have left *two* accounts able to read every customer — the old one still live, still
+  holding its old password, and invisible in a console that lists customer companies. The bootstrap
+  now moves the existing account instead. An UPDATE, not a DELETE-and-create: the owner row is
+  referenced from refresh tokens and a dozen `created_by` columns, which is exactly what broke the
+  V40 deploy (L-1). The password is reset during the move, because an address that just changed has no
+  meaningful old password and there is still no reset flow to recover with.
+- **Tested where it actually runs.** Every other test starts from an empty database, so the bootstrap
+  always takes its "create" branch; the rename only ever executes on the live deployment. That is the
+  precise shape of the V40 incident, so `PlatformOwnerRenameTest` builds the deployment's state
+  first — including a company ADMIN sitting in the platform company, to prove the reconciliation
+  matches on `OWNER` and not merely on "first user found".
+- **Trade-offs / debt:** the seed endpoint is unauthenticated on staging, so anyone who finds the URL
+  can populate demo data there. Acceptable for a demo deployment, unacceptable the day staging holds
+  anything real — at which point the profile must change to `prod` and the endpoint disappears.
+
+### PD-24 · 2026-08-31 · A price list per currency, priced to its market and not converted
+- **Context:** we own `calyvora.net` and want a USD site for customers outside India. The obvious
+  move — show the same product with the rupee price converted — is the wrong one, and the reason is
+  worth writing down. ₹149 is about **$1.70**. Against BambooHR at ~$10/employee, Gusto at $6 plus a
+  $49 base and Rippling at $15+, listing $1.70 puts us roughly six times under the cheapest credible
+  competitor. In B2B software that does not read as a bargain; it reads as *not serious*, invites
+  "what is missing", and attracts the customers who churn hardest. (Researched 2026-08-31; the figures
+  and sources are in [docs/PRICING.md](docs/PRICING.md).)
+- **Decision:** one published price list **per currency**, each priced against its own market. USD is
+  **$6/employee, $5 above 100, a $49 monthly minimum**, same two-months-free annual term. A 20-person
+  US company pays $120/month where BambooHR would charge $200 — clearly cheaper, still credible, and
+  about 3.5× what the same company would pay here, which is ordinary purchasing-power pricing rather
+  than opportunism.
+- **India left at ₹149.** It sits between Zoho Professional (₹120) and Premium (₹180) — the premium end
+  for a brand nobody knows yet, but defensible on breadth, since payroll, recruitment, performance and
+  helpdesk are not in Zoho's ₹60 tier. Early customers get discounted **individually** with an agreed
+  price instead. A published price is far easier to discount from than to raise.
+- **The blocker this exposed, which was the real find:** `PlatformService` hardcoded
+  `settings.setCurrency("INR")` on every company it provisioned, and `Subscription.currency` defaulted
+  to INR with no way to set it. So the console **could not onboard a customer billed in dollars at
+  all**. A .net site that converted would have handed us a customer we could not invoice properly —
+  the website was never the blocker, the billing model was. Currency is now chosen at company creation
+  and in the trial-approval terms, the two moments the answer is actually known; it cannot be inferred
+  later from an address.
+- **Alternatives considered:** region-detected pricing on one site (**rejected** — we cannot collect
+  USD yet, so it would advertise a price we cannot invoice; geo-detection fails visibly on VPNs, bad
+  IP data and CDN caching; and every currency advertised implies a tax jurisdiction, UK VAT and EU OSS
+  included, that we have not decided on). Converting rupees to dollars (**rejected**, above). A single
+  global USD price (**rejected** — it would roughly triple the Indian price overnight).
+- **Trade-offs / debt:** nothing collects payment in either currency; subscriptions are still switched
+  on by hand. A company's currency cannot be changed after creation, deliberately — changing it
+  mid-life would re-price historic months against a list that never applied to them. And a USD company
+  is given `America/New_York` rather than our default, because guessing an Indian timezone for an
+  American customer puts every attendance record five and a half hours out on day one.
+- **A concern recorded rather than resolved:** we have no paying customer yet. The US market is more
+  competitive, expects US-hours support, and mid-market buyers there ask for SOC 2, which we do not
+  have. The recommendation was to aim `.net` at international remote-first SMBs rather than head-on at
+  BambooHR, and not to let it delay landing the first Indian customer.
+- **Final outcome:** _V44 ships both lists; 9 tests in `CurrencyPricingIntegrationTest` hold the
+  independence of the two — publishing a USD change must not move what an Indian customer pays._
+
+### PD-23 · 2026-08-15 · A way back in, and the app moves to `orbit.calyvora.in`
+- **Context:** there was no password reset at all. A forgotten password meant asking an administrator
+  to set a new one, and the platform owner had nobody to ask. Every earlier change that touched
+  credentials — approving a trial, moving the owner account — had to hand passwords over out of band
+  precisely because of this hole. It has been on the debt list since PD-21.
+- **Asked for: OTP to a phone. Built: OTP to email.** Two facts decided it. No account has a phone
+  number — `users` holds email only, and the employee profile that does hold one is behind RLS, so it
+  is unreadable to someone who is not logged in; a phone-only reset would have locked out every
+  existing user including the founder. And Indian transactional SMS needs DLT registration (sender ID
+  and every template registered with a TRAI-approved platform) before a gateway delivers anything,
+  then costs per message. Email is already wired through Resend and free at this volume. The founder
+  chose email once the cost was clear.
+- **A six-digit code, not a link.** It can be read off one device and typed into another, which is
+  what people actually do — and it is exactly what an SMS would carry, so switching channel later
+  needs a sender, not a redesign. No `users.phone` column was added: schema for a feature nobody uses
+  is awkward to unwind (L-1), and it can be added against a real requirement on the day.
+- **The bug the tests caught, which I would otherwise have shipped.** The attempt cap did not work.
+  The obvious implementation increments the counter and then throws to reject the guess — and the
+  throw rolls the increment back. Every wrong guess was therefore the first wrong guess, and a
+  six-digit code, whose entire safety rests on the number of tries being small, was brute-forceable
+  at leisure. Fixed with a `REQUIRES_NEW` recorder, the same shape and the same reasoning as
+  `RefreshTokenRevoker`. **Worth remembering: any counter incremented on a path that then throws is
+  wrong by default.**
+- **What it refuses to do,** each pinned by a test: reveal whether an address has an account (unknown
+  addresses get the same answer, and a wrong code fails with the same words as a missing account);
+  accept a code twice; leave a previous code alive once a new one is asked for; allow more than five
+  requests an hour for one account; accept a weak password (this is a second front door, and the
+  weakest route decides what the password rules actually are); revive a DISABLED account; or leave
+  old sessions valid — resetting revokes every refresh token, because the likeliest reason to reset
+  is that a session is somewhere it should not be.
+- **The app moved to `orbit.calyvora.in`.** Which uncovered the real find: **`app.calyvora.in` never
+  existed.** `FRONTEND_BASE_URL` had pointed at it for weeks, so every invitation, verification and
+  trial-approval link sent in that time went to a hostname returning NXDOMAIN. The app was healthy,
+  every page loaded, the suite was green — and nobody could act on an email. It is the one setting
+  whose breakage is completely invisible from inside the system, and nothing in the app can detect
+  it. **Resolve it after changing it; do not trust it because the site loads.**
+- **Trade-offs / debt:** reset codes go nowhere until `RESEND_API_KEY` is set on Render — the second
+  feature now blocked on that one key, after trial notifications. Throttling is per account, not per
+  IP, so one attacker can still ask about many addresses; a rate limit at the edge is the fix if it
+  ever matters.
+- **Final outcome:** _Shipped with 15 integration tests covering the letterpad's PATCH semantics and
+  tenant isolation, the exit lifecycle including the clearance guard, and the hire flow through to the
+  profile and checklist appearing after acceptance._
+
+### PD-19 · 2026-08-10 · Calyvora is the parent; Priority HR Services is the business inside it
+- **Context:** the revenue today is Priority HR Services — real clients, real placements. The product
+  is newer than the business that pays for it. The site said nothing about how the two relate, so a
+  visitor could not tell whether Orbit and Priority HR Services were one company, a partnership, or a
+  reseller arrangement, and existing service clients had no reason to trust a software brand.
+- **Decision:** present Calyvora as the **parent company** with two arms under it — **Orbit** (the
+  product) and **Priority HR Services** (the services business, and today's clients). Two directors
+  with separate remits: **Khushboo, Director — Calyvora** (the company and the platform) and
+  **Renu Rao, Director — HR Services** (all client delivery and hiring). A new `about.html` states
+  this as an org tree rather than a paragraph, and every page's footer now carries "Priority HR
+  Services is part of the Calyvora group."
+- **Why this way round:** the services business is the credibility and the product is the leverage.
+  Making the product company the parent lets Orbit be sold to companies that will never buy hiring —
+  the whole point of becoming a product company — while the services arm keeps its own name and its
+  own client relationships instead of being absorbed into a brand those clients never bought.
+- **Alternatives considered:** one merged brand (rejected — throws away the name existing clients
+  signed with); Priority HR Services as the parent with Orbit as its tool (rejected — a services
+  company selling software to other services companies is a harder story, and it caps the product);
+  saying nothing about the structure (rejected — that ambiguity is what the page exists to remove).
+- **Open, and a real one:** this is currently a **presentational** group structure. Whether Priority
+  HR Services becomes a legal subsidiary of a Calyvora entity is a registration question with tax and
+  contract consequences that the website cannot settle. The copy is deliberately worded as "part of
+  the Calyvora group" and "operates as part of" rather than naming a shareholding, so nothing on the
+  site has to be retracted if the paperwork lands differently. **Confirm with an accountant before
+  claiming a parent/subsidiary relationship in a contract or an invoice.**
+- **Amended 2026-08-30:** there is now **one director, Renu Rao**. Khushboo is no longer part of the
+  group, so the two-director split above no longer holds — the Calyvora/platform remit sits with the
+  founder. Recorded as an amendment rather than an edit because the original reasoning is still why
+  the group is shaped this way, and a journal that quietly rewrites itself cannot be trusted later.
+  **No site change was needed:** `about.html` names only Renu Rao and describes the role as
+  "Director", full stop, without attaching it to one of the two arms — so the page was already
+  correct on the day the split ended. Worth noting as a design lesson: copy that avoids stating more
+  structure than it needs does not have to be retracted when the structure changes.
+- **Final outcome:** _Shipped — `website/orbit/about.html`, linked from the nav and footer of every
+  page._
+
+### PD-18 · 2026-08-10 · Three tiers: the vendor, the agency, the company — and only the vendor sells
+- **Context:** the site sells "manage every company from one console" to agencies and groups, and the
+  only thing that fitted was the **platform-owner console** — our own view, which reads every tenant
+  on the system and can start and end subscriptions. Giving that to a customer who runs several
+  companies would expose every other customer and let them switch on their own billing.
+- **Decision:** a third tier between the two. The platform owner (`ownerorbit@calyvora.in`, one
+  account, ours) creates an **agency**; the agency creates its own companies and asks for seats; the
+  vendor alone activates billing. A company an agency creates is `PENDING` and therefore **locked**
+  until we activate it — its admin can sign in and see why, and nothing else works. Selling directly
+  to a company is unchanged and stays the common case: those simply have no agency and show as
+  "Direct" in the owner console, so both ways of selling live in one list.
+- **Alternatives considered:** giving agencies the platform console with a filter (rejected — one
+  bug in the filter exposes every customer, and the console can end subscriptions); pooled seats
+  across an agency (rejected — needs a new billing model to buy flexibility nobody has asked for);
+  letting agencies self-sign-up (rejected — we would be approving billing for strangers).
+- **Scope of what an agency can see: company-level summaries only** — headcount, seats, status, end
+  date, cost. No employee, payroll or personal data. This is not a limitation we imposed reluctantly;
+  it is what makes the tier safe to build at all. RLS binds one `company_id` per connection, so the
+  agency console reads only `companies`/`users`/`subscriptions` — the three tables V12 deliberately
+  leaves outside RLS — and a member company's HR data is unreachable *by construction*, because the
+  agency's own tenant binding is its workspace. Deeper drill-down would mean a real cross-tenant read
+  path, and that is a much larger security surface than the feature is worth today.
+- **Shape:** an agency is a `Company` row flagged `is_agency`, its members holding `AGENCY_OWNER` —
+  the same pattern V35 established for the platform company, where the console is granted by
+  *membership*, not by the role alone. Member companies carry a nullable `agency_id`. Reusing that
+  shape avoided a second identity model; the agency owner needs a home company for `users.company_id`
+  and the tenant binding either way.
+- **Also:** the platform owner moved out of the dev-only seeder into `PlatformOwnerBootstrap`, which
+  runs in every profile — the one account that can see every customer should not depend on someone
+  remembering to call a seeding endpoint, nor carry a demo password. `owner@priorityhr.app` is
+  deleted by V40.
+- **Trade-offs / debt:** an agency owner has no way to open one of its companies as that company's
+  admin, which a real agency will eventually want. Company-scoped endpoints without an explicit role
+  gate (the people directory) are reachable by an agency but bound to its own empty workspace, so
+  they return nothing useful — untidy rather than unsafe, and worth tightening.
+- **Final outcome:** _Shipped on `product/hr-platform` with 7 isolation tests: agency A cannot see
+  agency B's companies by list or by id, cannot reach the platform console, cannot activate or end
+  billing, and cannot read a member company's people._
+
+### PD-16 · 2026-08-09 · Commercial rules bind on the server, not in the UI
+- **Context:** a full QA pass over the deployed build (243 checks across 14 modules, all four roles, two
+  tenants) came back with reads and tenant isolation completely clean — and the *commercial* model
+  unenforced. Ending a company's subscription set a flag the frontend chose to respect while the API
+  kept serving that tenant reads, writes and fresh logins; the seat limit was displayed everywhere and
+  consulted nowhere, so a one-seat company could invite without limit.
+- **Decision:** Every commercial term is enforced in the backend. A `SubscriptionLockFilter` rejects a
+  locked tenant with `402 SUBSCRIPTION_INACTIVE` on everything except the surface the lock screen needs
+  (sign in/out, who am I, read my subscription) — **login deliberately still succeeds**, because the
+  product's answer to a lapsed subscription is an explanatory screen, which it cannot show if the
+  credentials themselves start failing. Seats are consumed by active members *and* pending invitations,
+  checked when the invitation is issued. Owner-console values are validated rather than silently
+  clamped.
+- **Alternatives considered:** blocking login outright for a locked tenant (rejected — the customer then
+  sees "wrong password" instead of "your subscription ended", and support pays for it); checking seats
+  only at accept time (rejected — the error arrives for the invitee, who can do nothing about it, long
+  after the admin who could).
+- **Trade-offs / debt:** the lock is evaluated per request against the subscription row — one indexed
+  lookup on a hot path, un-cached for now. Payroll run is still O(employees) serial payslip builds
+  (~10 s for six people) and needs batching before a real customer.
+- **Also fixed in the same pass:** payslips printed **USD** on an INR company because the currency was
+  read from the salary row (which defaults to USD) rather than company settings; `PATCH
+  /company/settings` was a full replace that erased the legal name and address — which print on every
+  payslip — when a client sent only the localisation fields; IFSC/PAN/UAN rejected ordinary input
+  (lower case, spaced digits) instead of normalising it, and the UI showed a bare "Validation failed"
+  while the API had been returning per-field messages all along; attendance stamped punches in server
+  UTC rather than the company timezone, putting an early-morning IST punch on the previous day.
+- **Final outcome:** _Fixed on `product/hr-platform` with regression tests covering each defect._
+  Outstanding and **not** code: `RESEND_API_KEY` is unset on Render, so every invitation and
+  verification email fails silently — invitations still work only because the API hands the join link
+  back to the admin.
+
+### PD-16 · 2026-08-09 · A ₹1,299 floor and two months free on annual — the shape of the offer
+- **Context:** founder wanted pricing low enough for startups but not low enough to go broke, and asked
+  for research against the market.
+- **What the market does:** Keka ₹90–180/employee but with a **₹6,999/month minimum** and a 2% setup
+  fee; Zoho People ₹50–230 but payroll is a separate ₹33 add-on (₹85–180 bundled); greytHR free to 25
+  then a ₹2,495+ base.
+- **What it actually costs us:** the app is multi-tenant, so one backend and one database serve every
+  customer. Render is ~$20/month all in. **Break-even is ~35 employees across all customers — two
+  small companies.** Infrastructure is not the risk; support time and having no floor are.
+- **Decision:** keep ₹149/₹99 but add a **₹1,299 monthly minimum**. A four-person customer at ₹149
+  pays ₹596 and will cost more than that in support. At ₹1,299 we are still 5× under Keka's floor,
+  which is precisely the wedge — a 15-person startup pays us ₹2,235 against their ₹6,999.
+- **Decision:** **annual prepay charges 10 months, not 12.** Cash upfront when it matters most, and a
+  prepaid customer is much less likely to churn — worth more than the two months.
+- **Decision:** quote **excluding GST**. B2B customers reclaim it; quoting inclusive would hand over
+  18% of every rupee for nothing.
+- **Considered, not done:** free tier up to 10 employees without payroll, to counter greytHR's free-25
+  and make payroll the upgrade trigger. Worth revisiting once there are real signups to learn from.
+
+### PD-15 · 2026-08-09 · Pricing is data the owner edits, and price changes are never retroactive
+- **Context:** founder asked whether changing rates would always mean a full deploy, and said to do
+  whatever is best for the product.
+- **Decision:** the price list moves out of code into the database, edited on Platform → Pricing.
+  Changing what you charge is a business decision that happens on a business timescale; making it
+  wait on a build is how prices end up stale because changing them is a chore.
+- **Decision (the important one):** price lists are **versioned by the date they take effect**, and
+  every calculation asks for the list in force for the month it's pricing. A single editable rate
+  would have been far simpler and quietly wrong — it would restate invoices already issued, so a
+  customer querying last month's bill would be shown a number that never existed at the time.
+  Billing that can't be checked isn't billing.
+- **Consequence:** any tier shape works, so a future "₹199 under 25 people" or an enterprise band is a
+  form fill, not a release. The graduated rule (PD-14) is enforced for whatever is configured.
+- **Rejected:** env vars on Render. No history, a restart per change, and still retroactive.
+
+### PD-14 · 2026-08-09 · Volume pricing is graduated, not a flat band
+- **Context:** founder set pricing at ₹149 per employee up to 100 people and ₹99 beyond, and asked
+  for the app to match the website.
+- **Decision:** the cheaper rate applies **only to the employees above 100**, not to everyone once the
+  threshold is crossed.
+- **Why:** a flat band makes revenue fall as a customer grows. 100 employees at ₹149 is ₹14,900; 101
+  at ₹99 would be ₹9,999 — the 101st hire would cost us ₹4,901 a month, and a 101-person customer
+  would pay less in total than a 71-person one. Graduated keeps the bill monotonic (101 = ₹14,999)
+  while still honouring the promise that bigger companies get the better rate.
+- **Also decided:** the quoted rate shown to a customer is the **marginal** one ("you're on ₹99 now"),
+  not a blended average — a blended figure appears on no price list and answers no question they have.
+  And a company the owner has quoted a special rate is flagged `custom_price`, so future changes to
+  the standard list can't silently rewrite what was agreed with an existing customer.
+- **Open question for later:** whether crossing 100 should be sticky (a company that dips to 98 goes
+  back to ₹149 today). Fine at current scale; worth revisiting before a customer notices.
+
+### PD-13 · 2026-08-09 · A workspace is usable the moment it's created — and OWNER means the vendor, only
+- **Context:** founder — "when I create a workspace for anyone they should be able to log in directly
+  without verification, they'll be admin, and the owner page is only for me, to see how many companies
+  there are and what I'm earning."
+- **Decision (activation):** creating a workspace creates an **active company + active ADMIN** and
+  signs them in. Email verification becomes a switch (`REQUIRE_EMAIL_VERIFICATION`, off by default),
+  not a requirement — it can come back on once outgoing mail is proven.
+- **Decision (roles):** `OWNER` is the platform vendor and **nothing else**. A company signup is an
+  `ADMIN`. This was already the intent under PD-10, but registration still handed out `OWNER`.
+- **What that uncovered:** because `/api/v1/platform/**` is guarded on the `OWNER` role and lists
+  every company, **every self-registered user was a platform owner** who could read every customer's
+  headcount, seats and billing. It had never fired only because verification was broken, so nobody
+  could log in after signing up — the bug was holding the door shut on itself. Acting on the founder's
+  request without noticing would have opened it.
+- **Decision (defence in depth):** the console now needs the role **and** membership of the company
+  flagged `is_platform`. A privileged role should never be the only thing standing between one
+  customer and another's data — roles get handed out by code that changes, company identity doesn't.
+- **Lesson:** a bug can mask a worse one. The email outage looked like a availability problem and was
+  also, silently, the only access control on the platform console.
+
+### PD-12 · 2026-08-09 · "My Finances" — separate the pay record from the directory, mask it, split who owns it
+- **Context:** founder shared Keka's My Finances screens and asked for the same: an employee should
+  see how they're paid and what they're enrolled in, and the payslip should carry the company logo
+  and identity instead of a bare table of numbers.
+- **Decision (shape):** a separate `employee_finance` table rather than more columns on `employees`.
+  The directory row is readable by every colleague by design; a bank account and a PAN never should
+  be. Same entity would put them one careless `SELECT` away from each other.
+- **Decision (visibility):** self-or-HR only. A manager can see a report's *rating* but not their bank
+  details — being someone's manager is not a reason to see where their salary lands.
+- **Decision (edit ownership is split):** the employee owns bank details and identity; HR owns
+  PF/ESI/professional tax. Those are employer filings — letting people edit their own enrolment is a
+  compliance problem wearing the costume of a self-service feature. The server rejects it rather than
+  merely hiding the form.
+- **Decision (masking is server-side):** the full account number and PAN never leave the backend, so
+  a screenshot, a bug report or an open devtools tab can't expose them. A changed PAN drops its
+  verified flag, because otherwise the tick survives onto a document nobody has checked.
+- **Consequence:** the payslip becomes a real document (logo, legal name, address, employee number,
+  designation, UAN/PF/PAN, net-in-words in lakh/crore grouping) — which is what makes it credible in
+  a demo, and what an employee actually needs when a bank asks for one.
+
+### PD-11 · 2026-07-27 · Ship a first-deploy path (Render blueprint) + the "Orbit by Calyvora" marketing site
+- **Context:** founder wants to host the app for real testing ("think of it as Keka") — a first-ever
+  deploy, no prior devops — and, separately, a very polished marketing site branded **Orbit by Calyvora**.
+- **Decision (hosting):** one-file **Render.com blueprint** (`render.yaml`) provisions all three parts —
+  managed **Postgres**, the **Spring Boot** backend (Docker), the **Next.js** frontend (native Node) —
+  wired together automatically. Recommended because Render's Postgres role is **NOSUPERUSER** so tenant
+  RLS holds with zero setup. Railway (all-in-one, no sleep) and Hostinger VPS documented as alternatives;
+  Railway needs a one-time non-superuser app-role because its default `postgres` is a superuser.
+- **Decision (test vs. prod profile):** deploy under a new **`staging`** profile — production-hardened
+  (HTTPS/secure cookies, `forward-headers`, small Hikari pool, INFO logs) **but not named `prod`**, so the
+  one-click `/api/v1/dev/**` seeding stays available for UAT. A separate **`prod`** profile turns seeding +
+  Swagger off for real customers.
+- **Decision (safety backstop):** `TenantIsolationVerifier` refuses to boot in `staging`/`prod` if the DB
+  role can bypass RLS (superuser/BYPASSRLS) — a multi-tenant data-leak is worse than a failed boot.
+  Overridable via `REQUIRE_TENANT_ISOLATION=false`.
+- **Also:** datasource now assembles from `DB_HOST/DB_PORT/DB_NAME` when no full `DB_URL` (so a managed DB
+  wires in with no JDBC-URL editing); Next config emits `standalone` + tolerates a scheme-less
+  `BACKEND_ORIGIN`; beginner guide in `docs/DEPLOY.md`.
+- **Decision (marketing site):** a standalone, self-contained `website/orbit/index.html` — dark premium
+  aesthetic on the app's own palette (violet #7c5cff → aqua #22d3ee), feature story mapped to the **real**
+  shipped modules (attendance→payroll LOP, regularization, helpdesk, platform console), per-seat pricing.
+  Kept as a static file (deployable anywhere), distinct from the in-app brand tokens.
+- **Status:** _shipped 2026-07-27_ — backend compiles, frontend production build green (standalone emitted).
+
+### PD-10 · 2026-07-27 · Priority HR becomes a true multi-tenant SaaS with a platform-owner above the companies
+- **Context:** founder feedback dump (8 points), on branch `product/hr-platform`. Decided jointly via a
+  4-question clarification. This reshapes the ownership model of the whole product.
+- **Decision (owner = platform vendor):** **OWNER is the seller (us), a platform super-admin sitting
+  _above_ all companies — not an employee of any company.** Owner has **no "Me" self-service**. Owner
+  gets a **Platform Console**: list every company (headcount, seats used/total, subscription end-date,
+  status), **create a company + its first ADMIN**, control each subscription/seat count, and **end a
+  subscription at any time → that company's app locks** with a "your subscription has ended" popup.
+- **Decision (roles inside a company):** a **fixed role ladder — ADMIN · HR · MANAGER · MEMBER** — with
+  preset permissions (custom roles deferred). Owner creates the first ADMIN; ADMIN creates HR/MANAGER/
+  MEMBER accounts. MEMBER sees only "Me"; HR sees People/Payroll/Leave/Recruit; MANAGER sees their team +
+  approvals; ADMIN sees the whole company (but **not** billing control — see below).
+- **Decision (subscription = Netflix model):** a company subscribes for **N seats at ₹100/employee/mo**.
+  ADMIN can **only see** the end-date (settings + a left-pane indicator) and gets a **notification as it
+  nears expiry** — billing management is **removed from ADMIN**. To grow, ADMIN raises an **in-app
+  "request more seats"** which appears in the owner console; **owner approves → seat limit bumps** (6→12)
+  and it runs on. (Real email is mocked, so the request is an in-app object, not an email.)
+- **Decision (localization):** Settings gets **currency + timezone now** (pick INR/USD… → money formats
+  app-wide; pick a timezone → times render in it) and **language as a stored preference only** (English
+  now; full translation deferred).
+- **Also in scope:** fix **check-in/out** + a **day-wise in/out log** with Keka/Zoho-style visuals; fix
+  **payslip printing**.
+- **Why:** this is what makes the product actually _sellable_ — a vendor provisions and controls tenants,
+  each tenant runs itself, and access is gated by a subscription the vendor owns. It's the SaaS shape the
+  ₹100/emp/mo pricing (PD adjacent) always implied.
+- **Architectural consequence (ADR to follow):** a **platform scope above the tenant** — an account that
+  reads _across_ tenants, which today's row-level security forbids. Building **mock-first** (the product's
+  default demo path has no RLS, so cross-company is trivial) then porting to the live backend.
+- **Status:** _shipped & verified live 2026-07-27_ — all 8 points delivered on `product/hr-platform`:
+  platform-owner console + create-company/end-subscription/seat-approval (V30), roles ADMIN/HR/MANAGER/
+  MEMBER with per-role nav+guards, Netflix-style seats + app-lock + expiry banner + request-seats,
+  check-in/out fix + daily log, currency/timezone app-wide (₹), payslip printing. 158 backend tests
+  green. Demo: `owner@priorityhr.app` + 5 sample companies via `/dev/seed-platform`. Follow-up debt:
+  self-registration still creates an OWNER (should be ADMIN); server-side lock is advisory (frontend
+  overlay) — enforce at a filter later.
+
+### PD-09 · 2026-07-22 · Documents are generated from templates and then frozen
+- **Decision:** the Documents module (founder notes D2/D3) is a **per-company template library** plus
+  **immutable generated letters**. Starter templates (offer · joining · relieving · experience ·
+  promotion) are seeded on a company's first open and then belong to the company — we never overwrite an
+  edited template. A generated letter's body is **rendered once and frozen**; editing the template
+  afterwards cannot change a document that has already been issued.
+- **Why frozen:** an issued letter is a record, not a view. If a template edit rewrote history, no
+  employee could trust a letter we gave them, and we'd have no defensible answer to "what did you
+  actually issue me in March?" The cost is duplicated text; the benefit is that the record is real.
+- **Why a merge engine, not a document editor:** `{{named.substitution}}` with no expressions or logic.
+  The value comes from the data already in People (profile, manager, dates, salary) filling itself in —
+  not from another rich-text editor. A field with no value renders as `—` and the generate screen
+  **names the empty fields before you issue**, so a letter never goes out with visible plumbing in it.
+- **Owner/Admin-only:** these letters carry salary and exit details, so the whole surface is role-gated
+  rather than per-endpoint.
+- **Open:** e-signature, letterhead/branding upload, and DOCX export are deliberately not built yet;
+  print-to-PDF covers the demo and most real use.
+
+### PD-08 · 2026-07-22 · Product named "Orbit"; Calyvora becomes the parent company
+- **Decision:** the Enterprise OS product is branded **Orbit**; **Calyvora** is the parent company. UI
+  reads "Orbit by Calyvora". Implemented as a single switch in `frontend/src/lib/brand.ts`.
+- **Why:** the founder wants a product identity distinct from the company, and a named product a client
+  can license in whole or in part (the modular-packaging idea, BR3 in the feedback backlog).
+- **Alternatives considered:** Nexus, Cortex, Meridian (shortlist offered); founder chose Orbit.
+- **Related open item:** BR3 modular packaging / per-tenant module entitlements — not yet built.
+
+### PD-06 · 2026-07-20 · Knowledge OS is the third app; it closes the task↔doc↔person graph
+- **Decision:** Build **Knowledge OS** (spaces + Markdown pages + search) as the third Phase-1 app,
+  completing the trio (PD-02). A page's **author is a People `Employee`** and a page may **link one Work
+  `Task`** — two real cross-app FKs, not strings. Plan: [docs/Sprint4-KnowledgeOS.md](docs/Sprint4-KnowledgeOS.md).
+  Collaborative RBAC (any member writes; archive is OWNER/ADMIN); DRAFT/PUBLISHED; a `parent_id` page tree.
+- **Reason:** Knowledge is a company's institutional memory (a long-term moat, §11), and linking docs to
+  the people and tasks they're about turns three separate apps into one graph — the platform thesis, visible
+  on a single page. Completing the trio is the milestone PD-02 has aimed at since kickoff.
+- **Alternatives considered:** a standalone wiki integrated later via API (rejected — the integration tax we
+  exist to remove); free-text authors / no task link (rejected — throws away the graph that is the whole point);
+  a heavy block/rich-text model (rejected for MVP — Markdown is portable and zero-dependency, SD-15).
+- **Trade-offs / debt:** no version history, rich editor, comments, or per-space permissions yet; search is
+  `ILIKE`, not full-text. All logged as future work in the Sprint 4 plan §5.
+- **Final outcome:** _Shipped & verified live 2026-07-20 (6 tests; a page authored by a People employee and
+  linked to Work `PLT-1`, found by full-text search)._ The Phase-1 trio is complete.
+
+### PD-07 · 2026-07-20 · Work OS depth — sprints, backlog & a workspace (tickets as logged debt)
+- **Decision:** Deepen Work OS from a single Kanban board into a **project workspace** (Board · Backlog ·
+  Sprints · Tickets). Add agile **sprints** (≤1 active/project; complete carries unfinished work to the
+  backlog), a **backlog**, and a **lightweight support-tickets** type. Plan:
+  [docs/Sprint5-WorkOS-Sprints.md](docs/Sprint5-WorkOS-Sprints.md).
+- **Reason:** After completing the Phase-1 trio, the highest-value move is *depth* in the app teams use
+  daily. Sprints/backlog are table-stakes for real work management; the founder also wanted tickets now.
+- **Alternatives considered:** a standalone agile tool integrated later (rejected — integration tax);
+  full **Service OS** for tickets now (rejected — Phase-2 scope; would sprawl). Tickets are therefore a
+  **deliberate, logged shortcut** (SD-22b) that graduates to Service OS.
+- **Trade-offs / debt:** no drag-and-drop, burndown/velocity, sub-tasks, or per-project roles yet;
+  tickets lack customers/SLAs/comments (that's Service OS). All logged in the Sprint 5 plan §5.
+- **Final outcome:** _Shipped & verified live 2026-07-20 (5 tests; active sprint on the board, backlog,
+  and tickets with People-employee assignees)._
+
+### PD-05 · 2026-07-10 · Work OS is the second app; tasks link to People employees
+- **Decision:** Build **Work OS** (projects + Kanban tasks + My Work) as the second Phase-1 app, with a
+  task's **assignee being a People OS `Employee`** (a real cross-app foreign key, not a name string).
+  Plan: [docs/Sprint3-WorkOS.md](docs/Sprint3-WorkOS.md). Collaborative RBAC (any member creates/edits;
+  archive is OWNER/ADMIN); per-project `KEY-N` task refs.
+- **Reason:** Proves the platform thesis end-to-end — the second app reuses the foundation *and* reads
+  the first app's graph with zero integration glue. This cross-app value is the moat (PD-01/PD-02).
+- **Alternatives considered:** free-text assignees (rejected — throws away the org graph, the whole
+  point); a separate task tool integrated later via API (rejected — that's the integration tax we exist
+  to remove).
+- **Trade-offs / debt:** no comments/subtasks/sprints/notifications yet; no per-project roles; no drag-
+  and-drop (move via controls). All logged as future work.
+- **Final outcome:** _Shipped & verified 2026-07-10 (5 tests, live board with cross-app assignees)._
+
+### PD-04 · 2026-07-10 · People OS is the first app; it owns the org graph
+- **Decision:** Build **People OS** as the first business module on the foundation (beachhead per PD-02),
+  modeling employees as a 1:1 auto-provisioned extension of the platform `User`. Scope shipped: directory,
+  departments/org chart, onboarding, time-off, self-service. Plan: [docs/Sprint2-PeopleOS.md](docs/Sprint2-PeopleOS.md).
+- **Reason:** People/org is the identity backbone every other app (Work, Knowledge, CRM…) reads. Building
+  it first produces that shared graph and proves the platform thesis (a full app with zero foundation changes).
+- **Alternatives considered:** start with Work OS (rejected — depends on the people graph); a standalone HRIS
+  with its own identity (rejected — duplicates auth, breaks the "one identity" promise).
+- **Trade-offs / debt:** flat vacation allowance (no accrual engine yet); Sprint-1 roles reused (no per-
+  department RBAC yet); contractors-without-login not modeled. All logged as future work.
+- **Final outcome:** _Shipped & verified 2026-07-10 (18 tests, live)._ Next apps consume this graph.
+
+### PD-03 · 2026-07-05 · Sprint 1 = Platform Foundation, not HRMS
+- **Decision:** The first build sprint delivers the tenancy/identity/auth/RBAC/invite spine + app
+  shell (13 demo capabilities), explicitly *not* any business module. Plan: [docs/Sprint1.md](docs/Sprint1.md).
+- **Reason:** Every future module depends on this foundation; building it right once is the highest-
+  leverage work we'll do. Matches the "Foundation before apps" sequencing in [docs/11](docs/11-roadmap.md).
+- **Alternatives considered:** start with an HRMS vertical (rejected — would hard-code assumptions the
+  platform must generalize); thinner auth-only slice (rejected — invites/settings prove the tenant
+  lifecycle the demo needs).
+- **Expected impact:** a secure, multi-tenant base that every Phase-1 app (People/Work/Knowledge)
+  plugs into; a live demo of the platform thesis.
+- **Risks:** scope is a **2–3 week** foundation, not a 5-day sprint (see Founder Note); tenant
+  isolation is app-layer-only for Sprint 1 (SD-2, debt logged). Mitigated by vertical slices +
+  adversarial isolation tests + a demoable milestone at Feature 6.
+- **Sprint-1 implementation decisions:** SD-1…SD-8 recorded in [DECISIONS.md](DECISIONS.md).
+- **Final outcome:** _Plan complete; awaiting founder approval to begin coding._
+
+### PD-02 · 2026-07-05 · Depth-first phasing: launch with 3 apps, not the full suite
+- **Decision:** Phase 1 ships **People OS + Work OS + Knowledge OS** on a Foundation built only
+  as far as those three need. A written "not building yet" list guards scope.
+- **Reason:** The #1-likelihood failure mode for a suite is "master of none." Depth-first proves
+  the platform thesis and yields sellable standalone products fast.
+- **Alternatives considered:** (a) build the full ecosystem in parallel — rejected, spreads thin;
+  (b) single app only — rejected, doesn't prove the cross-app thesis that is our whole moat.
+- **Expected impact:** faster time-to-revenue, credible each-app excellence, a real proof of
+  "one platform" with the universal assistant across all three.
+- **Risks:** individual apps must still beat focused best-of-breed tools; mitigated by depth-first
+  investment and design-partner validation.
+- **Final outcome:** _Open — in effect for Phase 1._ See [docs/11](docs/11-roadmap.md).
+
+### PD-01 · 2026-07-05 · Product scope & decomposition = 14 OS-apps on a shared Foundation
+- **Decision:** Define the Enterprise OS as a Foundation Platform + independent OS-apps
+  (People, Work, Knowledge, CRM, Finance, Service, Meeting, Analytics, Automation) + AI Studio,
+  Marketplace, Mobile, Admin. Apps decomposed by **business function with distinct primary users
+  and a single System of Record**.
+- **Reason:** Matches how customers buy and adopt, gives each app a clear data owner (avoiding
+  "who owns this data" fights), and aligns to team ownership (Conway's Law working for us).
+- **Alternatives considered:** decompose by technical layer (rejected — those are shared services,
+  not products); one monolithic do-everything app (rejected — collapses ownership and UX).
+- **Expected impact:** clean land-and-expand, coherent packaging, near-zero customer-side
+  integration cost per added app.
+- **Risks:** breadth vs. depth tension (see PD-02).
+- **Final outcome:** _Adopted as the product map._ See [docs/03](docs/03-enterprise-os-overview.md),
+  [docs/04](docs/04-product-map.md).
+
+### PD-25 · 2026-09-04 · The database moves to Neon, and the default role would have switched off isolation
+- **Context:** Render removes a free Postgres 30 days after it is created. Not sleeps — removes.
+  Everything else on that tier degrades; this one destroys the data, which makes it unusable for
+  anything we intend to keep. Moving was not an optimisation, it was a deadline.
+- **Considered and rejected — changing engine.** Asked whether a non-Postgres free database would do.
+  It would not: tenant isolation *is* a Postgres feature here. Twenty-one migrations carry row-level
+  security policies, and MySQL and PlanetScale have no equivalent — isolation would fall back to
+  "every query remembers its `WHERE company_id`", where one forgotten filter puts one customer's
+  payroll on another customer's screen. Add 161 `uuid` columns, 92 `timestamptz` and a Postgres
+  extension, and moving engines is weeks of work whose main achievement is deleting the security layer.
+- **Also rejected — schema-per-tenant**, asked separately. Same reasoning inverted: schema separation
+  relies entirely on the connection having the right `search_path`, so a bug leaks data where RLS
+  returns zero rows. Then migrations multiply by customer count (43 × N per deploy, with partial
+  failure leaving customers on different schema versions), the owner console's cross-tenant
+  aggregation becomes a UNION over N schemas, and 49 tables × 500 customers is 24,500 tables. Zoho
+  People, Keka and Freshteam all use shared-schema multi-tenancy. The answer to an enterprise buyer
+  who insists on physical separation is a dedicated deployment at a premium price — revenue, not a
+  rewrite.
+- **The finding that justified the whole exercise:** Neon's default role, `neondb_owner`, holds
+  **`BYPASSRLS`** — an attribute that makes Postgres ignore every row-level policy **without
+  erroring**. Had the application connected as it, every screen would have worked and the database
+  would have silently stopped being the thing separating customers. Caught by running
+  `select rolbypassrls …` before any data existed, not by assuming. A dedicated `calyvora` role was
+  created without it, and isolation was then *proved* on the real schema: `employees` returns 0 rows
+  until a tenant is bound, 6 after.
+- **Second trap, recorded because it fails just as quietly:** Neon's `-pooler` hostname is PgBouncer
+  in transaction mode, and `TenantAwareDataSource` binds the tenant with a *session*-scoped
+  `set_config(..., false)`. Under transaction pooling the setting and the query relying on it can land
+  on different server connections. The direct hostname is mandatory.
+- **No dump was taken.** Flyway builds the schema and `PlatformOwnerBootstrap` recreates the owner, so
+  an empty database was enough — and starting empty removed ten accumulated QA test companies for
+  free. One real row (`Bharat Enterprizes`) was lost and recreated.
+- **Final outcome:** _Live on Neon, Singapore, PostgreSQL 18.6._ 49 tables, 43 migrations, and an
+  identical role-by-role sweep before and after — same passes, same known gaps, nothing newly broken.
+  Runbook in [docs/DATABASE.md](docs/DATABASE.md).
+
+### PD-26 · 2026-09-04 · Sell payroll in India; sell HR without payroll in the United States
+- **Context:** with `calyvora.net` live in USD, the question was what is missing to sell in both
+  markets. The answer turned out to be different in kind, not degree.
+- **The finding that reframed it:** Orbit already has a payslip *engine* — `PayslipComponent` models
+  named components with percent-of-basic, fixed and remainder calculations, and the employee record
+  already stores PF number, UAN, ESI, PT state and PAN. What is missing is anything that knows the
+  **rules**: the ₹15,000 PF ceiling, the EPF/EPS split, the ₹21,000 ESI threshold, state PT slabs.
+  Structure without compliance — which is good news, because the architecture is done and what remains
+  is finite rule-writing.
+- **India: finish it.** PF/ESI/PT computation, then income tax (regime choice, 80C declarations,
+  monthly TDS, Form 24Q, Form 16), then a bank-ready payment file. Those three are table stakes at
+  greytHR and Keka; a buyer assumes them and discovers their absence during the trial.
+- **United States: do not build payroll.** Ten thousand-plus tax jurisdictions, per-state SUTA,
+  quarterly 941s, and money-transmitter licences in most states to actually remit. That is a
+  multi-year regulated business, not a module. **Decision: reposition `calyvora.net` as HR without
+  payroll** — people, hiring, performance, documents, "works alongside your payroll provider" — which
+  is the line BambooHR built a very large company on. Still required even there: I-9/W-4 onboarding
+  and accrual-based PTO, because US leave is earned per hour worked and our flat annual allowance
+  cannot express it.
+- **The asset we underuse:** Priority HR runs real payroll for real clients. That is a design partner
+  for the compliance engine that most founders pay dearly for.
+- **Final outcome:** _Recorded in [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md)._ India first, in the
+  market we already sell into.
+
+### PD-27 · 2026-09-04 · Publish the legal pages before taking any money
+- **Context:** both websites shipped with `href="#"` where Privacy and Terms should be. This was on
+  the debt list as a small thing. It is not a small thing.
+- **Why it blocks revenue, in three ways:** we hold other people's salaries, bank accounts and PAN, so
+  under the DPDP Act 2023 the entity holding it must be identifiable and must publish how it is
+  processed; **no Indian payment gateway activates an account without a published refund position**,
+  which arrives at the worst possible moment — when a customer is ready to pay; and the first serious
+  customer's compliance team asks.
+- **Written against the product, not from a template.** The policy names our four sub-processors
+  (Neon, Render, Cloudflare, Resend) and what each can see; states that data is in Singapore and
+  therefore leaves India, inviting anyone who needs residency to say so *before* subscribing rather
+  than discovering it later; and describes security specifically — row-level security in the database,
+  one-way password hashing — instead of saying "bank-grade". The terms say plainly that Orbit
+  generates payslips but does not compute or file statutory returns, and that there is **no
+  contractual uptime guarantee** on standard subscriptions. Publishing an SLA number we have not built
+  the redundancy to honour would be worse than publishing none.
+- **Deliberately unfinished:** every field needing the registered entity, address, CIN, grievance
+  officer and retention periods is left as `[[PLACEHOLDER]]` on a yellow highlight. Inventing a
+  registered address would be fabricating a legal record; making the gaps impossible to miss is the
+  honest alternative. Both pages need a lawyer's eye once.
+- **Final outcome:** _`privacy.html` and `terms.html` written and linked from every footer on both
+  sites; `calyvora.net` points at the `.in` copies so the two cannot drift._ Field list and rationale
+  in [docs/LEGAL.md](docs/LEGAL.md).
+
+### PD-28 · 2026-09-05 · Managers approve their own team's leave
+- **Context:** listing and deciding leave were restricted to OWNER/ADMIN/HR, so a manager could see
+  their team but could not action a single request. Every holiday in the company funnelled through HR.
+  It surfaced in the role-by-role sweep as a `403` and was recorded as a product decision rather than a
+  defect — but the product was already contradicting itself: attendance regularizations have always
+  been scoped to the caller's reports, so **the same manager could approve a missed punch but not a
+  day off.**
+- **Built by copying, not inventing.** `RegularizationService.pending()` already had the shape — HR and
+  admins see everything, everyone else sees their own reports. Leave now uses the same rule, so there
+  is one idea in the codebase rather than two that drift.
+- **The half that mattered more than the feature.** Adding MANAGER to the role check alone would have
+  let *any* manager approve *any* employee's leave anywhere in the company — a wider hole than the one
+  being closed, and invisible in a demo with a single team, because Spring's role expressions cannot
+  say "and only for their own reports". The scoping is enforced in the service, and
+  `managerB_cannot_approve_managerAs_report` is the test that would have caught it.
+- **Two things found on the way.** The nav gated the approvals screen behind People, which is HR-only,
+  so a manager had no route to it — fixed the way Exits and Regularizations already were, as a
+  top-level item. And the screen itself gated its Approvals block on Owner/Admin, meaning **HR could
+  approve leave through the API and never saw the queue on the page** — the one role whose job it is.
+  Both were pre-existing; adding a fourth role is what exposed them.
+- **Final outcome:** _7 new tests in `LeaveManagerApprovalTest`, the 5 existing leave tests still
+  green._ Recorded as closed in [docs/GO-LIVE.md](docs/GO-LIVE.md). The leave **policy** engine —
+  accrual, carry-forward, encashment, comp-off — is still missing and is the part buyers actually ask
+  about; see [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md).
+
+### PD-29 · 2026-09-06 · Leave becomes a policy instead of a constant
+- **Context:** every company on the platform got 25 vacation days, because
+  `VACATION_ALLOWANCE_DAYS = 25` was a constant in `LeaveService`. No accrual, no carry-forward, no
+  comp-off. It is the first thing an Indian buyer asks about after statutory payroll, and "four fixed
+  types with a flat allowance" is a demo rather than a policy.
+- **Built:** per-company policy per leave type (V45) — paid or unpaid, ANNUAL or MONTHLY accrual,
+  days per year, carry-forward cap, comp-off expiry. Plus comp-off as a first-class type: a day
+  worked is claimed, approved, and later spent as leave.
+- **The migration's promise, and why it constrains the defaults.** The seeded default is vacation
+  25/ANNUAL/no carry-forward — *exactly* what the constant produced. An existing company sees no
+  change on the day this deploys. A migration that silently recomputed everybody's balances would be
+  the wrong kind of clever: people plan holidays against these numbers. Every other type seeds at
+  zero rather than a guess, because showing a company an allowance it never agreed to is worse than
+  showing it none.
+- **Comp-off is credits, not a counter.** Each is a row — worked on this date, approved by this
+  person, expires then, spent on that leave request. A single number would make "why do I have three
+  days?" unanswerable and expiry impossible. They are spent oldest-first so the credit nearest to
+  expiring goes before one with months left, and expiry is *computed* rather than stored, so no
+  scheduled job is needed and lengthening the window does not have to resurrect rows a batch already
+  killed.
+- **The accrual engine is a pure function, and that decision paid immediately.** No repository, no
+  clock — just (policy, join date, today, days used per year). Fifteen unit tests run in 0.1 seconds
+  where the integration suite takes twenty-five seconds per case, and **three of them failed on the
+  first run against real bugs**. The worst: counting anniversary months with `ChronoUnit.MONTHS`
+  gave **11 days for a full calendar year**, because January to 31 December is eleven anniversary
+  months — the twelfth lands on 1 January. A rule that cannot award a whole year to somebody who
+  worked one is the wrong rule; it is now whole calendar months, which is also what Indian payroll
+  actually does, so everyone gains a day on the same predictable date.
+- **A smaller lesson worth keeping:** `BigDecimal.ZERO` is scale 0 and `0.0` is scale 1, and they are
+  not `equals`. An early return with a bare ZERO made a caller's comparison depend on which branch
+  produced the number. Everything leaving the calculator now shares one scale.
+- **Pending days are subtracted from what is available**, not just shown alongside it. Otherwise two
+  requests made before either is decided both look affordable, and the second is refused at approval
+  time by an approver with no idea why.
+- **Final outcome:** _25 new tests (15 unit, 10 integration); the whole backend suite green._ The
+  balance endpoint keeps its old shape and a richer `/leave/balances` sits beside it — widening a
+  response to add a feature breaks every caller that was happy with it. Still missing and recorded in
+  [docs/MARKET-GAPS.md](docs/MARKET-GAPS.md): **encashment**, sandwich-leave and probation rules, and
+  for any US sale an hours-worked accrual basis rather than months-of-service.
+
+### PD-30 · 2026-09-06 · Statutory payroll starts, behind a switch you control per customer
+- **Context:** PF/ESI/PT is the deal-breaker for an Indian sale (PD-26). It is also the first thing in
+  the product that can print a wrong figure on somebody's payslip and have them act on it. Those two
+  facts pull in opposite directions, and the resolution was asked for explicitly: build it, but keep
+  it behind a flag that can be turned on and off per customer.
+- **Built:** Provident Fund end to end — the ₹15,000 wage ceiling, the employer's 12% split between
+  EPS and EPF, the ceiling opt-out, admin charges and EDLI. Rates live in a `pf_settings` row per
+  company, not in constants, because statutes change and a rate change should be an UPDATE rather
+  than a redeploy.
+- **Two independent gates, and neither implies the other.** The company-level flag is the vendor's
+  (platform console); the per-employee `pfStatus` is HR's. A company with the feature on still
+  deducts nothing from someone not enrolled, and an employee marked enrolled at a company without the
+  feature sees nothing change. Both directions are tested, as is the one that would be worst:
+  **turning it on for one company must leave another alone.** A flag that leaked across tenants would
+  deduct money from the salaries of a customer who never asked for it.
+- **`company_features` has no row-level security, deliberately.** The platform owner toggles these for
+  *other* tenants from a session bound to its own platform company; an RLS policy keyed on
+  `calyvora.company_id` would make every such write invisible and silently do nothing. It joins
+  companies, users and subscriptions on the un-RLS'd control surface and holds no personal data.
+  `pf_settings` is RLS'd, because it is tenant data.
+- **The two errors the calculator is built to avoid**, both of which look fine on a payslip:
+  **(1)** EPS is capped at the ceiling even when the employer contributes on a higher wage — computing
+  8.33% of a ₹50,000 basic overstates the pension share fourfold while leaving the employer total
+  unchanged, so nothing looks wrong until the EPFO rejects the return; **(2)** PF is computed on
+  *basic*, not gross — using gross would roughly double every deduction in the company and remain
+  entirely plausible on the document. `PayslipTemplateService.Computed` now returns the basis amount
+  explicitly so no caller has to guess.
+- **Same pure-function approach as the leave engine**, for a stronger reason: this number leaves
+  somebody's bank account. Ten unit tests in 0.11 seconds, each a wage and a split checkable by hand
+  against the Act, including the ceiling opt-out and a moved ceiling.
+- **The employer contribution is reported separately** on the payslip and the payroll run. It is
+  neither gross nor net — the company pays it on top and the employee never banks it — and there was
+  previously nowhere to read what a month actually costs.
+- **Final outcome:** _20 new tests (10 unit, 10 integration); the whole backend suite green._ Off for
+  every company until switched on. Documented in
+  [docs/STATUTORY-PAYROLL.md](docs/STATUTORY-PAYROLL.md), including the order for what follows: ESI
+  (with the mid-period threshold rule), professional tax, TDS and Form 16, then the ECR and bank
+  payment files.
+
+### PD-31 · 2026-09-06 · The bank file, and plans that can actually be enforced
+- **Context:** two asks in one session. First the bank file — the last mile of payroll, without which
+  correct numbers on a screen still end with somebody retyping them into net banking. Then a control
+  console: "if a very small organisation wants limited features, how do I turn features on or off for
+  any agency or company, and decide which features go in how much money?"
+
+- **The bank file is mostly validation, and that is the valuable half.** Producing a CSV is twenty
+  lines; refusing to produce a bad one is the point. A missing IFSC found here costs a minute; found
+  by the bank it costs a re-run of payday, because **banks reject the whole batch rather than the one
+  bad row**. So nothing is silently dropped — every excluded person is named with a reason before the
+  download, and the total shown is what the file actually pays rather than what payroll said. Those
+  differ exactly when somebody has been excluded, which is when the difference matters most.
+- **Generated server-side, necessarily.** Account numbers are masked in every other response
+  (`bankAccountMasked`), so a file assembled in the browser could not contain the numbers it needs —
+  and making it able to would undo the masking everywhere else. One endpoint returns them, and it is
+  HR-only.
+- **The escaping test earns its place:** an unescaped comma in a name shifts every column after it, so
+  an account number lands in the amount field. The bank either rejects the batch or pays a number that
+  happened to parse.
+
+- **Plans: a package of features with a price, plus a per-company override.** Four rules decide any
+  feature — the company's own override, then their agency's, then their plan, then the feature
+  default. The order encodes a judgement: **a promise made in a sales call outranks a table**, so an
+  override wins even over the plan, in both directions.
+- **Three states, not two.** On, Off, and *Plan* — the third clears the override and puts them back on
+  whatever the package says. Without it there is no way to undo a change except by remembering what
+  the plan contained. On the API, omitting `enabled` clears rather than meaning false.
+- **Every module defaults ON**, so the day plans arrived nobody lost a screen. A plan must be assigned
+  deliberately. People, attendance, leave and documents are not switchable at all: they are what an HR
+  product *is*, and a switch that must never be flipped is a liability rather than a feature.
+- **Enforced server-side by `FeatureGuardFilter`, and that is what makes a plan real.** Hiding a nav
+  entry while the API stays open leaves the module one typed URL away — precisely the mistake the
+  subscription lock made before PD-10 fixed it. 403 rather than 404: pretending the endpoint does not
+  exist is a lie that costs a support call, where "you don't have it" is a sales conversation.
+- **The design error the tests caught, worth recording.** `plan_code` first went on `subscriptions`,
+  reasoning that seats and price already live there. Nine tests failed instantly with 404: a
+  subscription row is created **lazily** by `BillingService.getOrCreate`, so a self-registered company
+  has none, and a plan kept there could not be assigned to a new customer at all. Moved to
+  `companies`. The lesson underneath it: **entitlement is not a billing fact** — what a company may
+  use must be answerable on every request, including for a trial that has never been invoiced.
+- **Plans are retired, never deleted.** A company pointing at a deleted plan would fall back to
+  feature defaults, and every module defaults on — so deleting a plan would silently hand its
+  customers the entire product.
+- **Final outcome:** _30 new tests (16 bank file, 14 plans and enforcement); the whole backend suite
+  green._ Documented in [docs/PLANS-AND-FEATURES.md](docs/PLANS-AND-FEATURES.md).
+
+### PD-32 · 2026-09-07 · The org chart becomes the permission, not the job title
+- **Context:** the founder, reviewing the app: _"manager should see data only for his team not for
+  all full company — right now his and admin both have same data and sections"_, plus a request for a
+  My-team surface and for the ladder itself to be editable: _"admin team, hr team, managers, leads,
+  senior devs, junior devs, interns … all these roles can be decided by any company I am selling to."_
+
+- **This reverses part of PD-10's fixed role ladder, deliberately and only partly.** The six roles
+  stay as the *capability* layer — who may run payroll, invite people, open a review cycle. What
+  changes is that **visibility now comes from the reporting tree instead of the role**. Offered the
+  alternative (customer-defined roles with a permission matrix), we chose the tree; the matrix stays
+  on the shelf until a real customer asks to move a specific permission.
+- **Why the tree and not editable roles.** A designation is customer-editable free text. If a title
+  granted access, **a permission you can award yourself by renaming your own row is not a
+  permission**. The tree cannot be edited by the person it constrains, so it is the only one of the
+  two that can safely carry authority. Designations are therefore a pure label, and the screen says
+  so, because "designations" reads like permissions to anyone who has used another HR product.
+- **One class, `OrgScope`, is now the single answer to "who may this person see".** Each module used
+  to decide for itself, and they disagreed: the directory was open to everyone, attendance and
+  expenses were HR-only, leave had its own manager check. A MANAGER therefore saw either the whole
+  company or nothing at all depending on which page they opened — the founder's report, exactly.
+- **MANAGER is deliberately absent from the whole-company list.** A manager's reach comes from having
+  reports, so a manager of nobody now sees nobody. And a MEMBER with two interns under them leads a
+  team. **"My team" belongs to whoever has reports, not to a role** — which is what the founder's
+  real-world scenario actually describes.
+- **Transitive, not one level.** `teamReviews` was keyed on the review row's own manager column, so a
+  head of department with four leads under them saw four reviews and none of the thirty their leads
+  write. Same for approvals: a single-level check meant a head could not decide anything while their
+  leads were away, because nobody in the queue reported to them *directly*.
+- **The leak worth naming: Exits.** `/people/exits` listed **every resignation in the business** to
+  anybody who could open the screen, which was every manager. Who is leaving, before it is announced,
+  is among the most sensitive facts an HR system holds.
+- **A reporting loop became a security bug the moment the tree carried authority.** Only
+  self-management was blocked before. A→B→A would make each of them the other's subordinate and hand
+  them each other's attendance, leave and reviews — **a privilege escalation two profile edits deep,
+  available to anybody who can edit an org chart.** `requireNoCycle` now walks upward and refuses.
+- **No pay on any team screen, and it is enforced server-side.** A lead needs to know somebody was
+  absent nine days; what the company pays them is HR's. A manager could previously read each report's
+  exact salary off the review list, so `withoutPay()` strips the figures for everyone but HR and the
+  person themselves. A hike is still decided as a **percentage**, which is all the judgement needs.
+- **Nav: Finance and Performance came out of "Me".** Payday is the single thing an employee opens this
+  product for most months, and it was three clicks deep inside a section that reads as "my profile".
+  Old paths stay as redirect stubs — **notification rows already sitting in customer databases carry
+  those URLs**, and rewriting history is not an option.
+- **Still missing, on purpose:** approving a team's *expenses* is still Admin/HR, so that page is
+  read-only rather than showing a button that 403s. Departments already have a parent and a lead, so
+  "teams with their own manager" needed no new table — only the UI to make it obvious.
+- **Final outcome:** _7 new tests (`OrgScopeTest`); 405 backend tests green; frontend typecheck and
+  build clean._ Documented in [docs/ORG-AND-VISIBILITY.md](docs/ORG-AND-VISIBILITY.md).
+- **Lesson, logged the hard way.** The intern added to the demo seed moved headcount 6 → 7 and broke
+  five tests that hard-coded 6 — analytics, attendance, billing, directory paging and team overview.
+  Worse, an interim run was reported as green off a *partial* log and a completion code that came from
+  a shell `echo` rather than from Maven. **Read the build tool's own tally, not a proxy for it.** And
+  a demo seed is a fixture half the suite depends on: changing its shape is a test-wide change.
+
+### PD-33 · 2026-09-10 · The day sheet, and the fifth instance of one habit
+- **Context:** the founder, working down a triage list: _"lets start one by one fixing so that i can
+  sell it better."_ First item was the attendance day sheet — 16.5 s for a thousand people, the worst
+  screen left after the payroll run was fixed.
+
+- **The screen was slow for four reasons and all four were the same reason.** The company's people
+  were loaded **three times** in one request (`directory()`, which also built and sorted a thousand
+  response objects that were then discarded, then `findByCompanyId`, then `usersById`). Every leave
+  request the company had ever filed was read to answer a question about **one day**. And the
+  department name — six possible answers — was looked up **once per employee**.
+- **The fifth N+1 was hiding behind a correct comment.** `departmentName()` carried a note explaining
+  that it stayed cheap because a company has a handful of departments and the lookup is by primary
+  key. Both halves are true. The conclusion was still wrong, because it ran per row. **"Cheap per
+  call" and "cheap" are different claims, and a comment asserting the first reads like the second.**
+- **So the pattern now has a name in the code.** A `Prefetch` record carries the per-company facts a
+  bulk walk needs. This is the fifth time the same defect has been found in this codebase — holidays
+  per day per employee, holidays per employee, a salary-existence guard that was itself an N+1,
+  payslip config per employee, and now departments — and every one was *a per-company fact fetched
+  per row*. Naming it gives the next bulk caller somewhere obvious to put what it already has.
+- **`today()` was the quiet one.** Asking "am I on leave today" read the entire company's leave
+  history. That is on every page load, for every user, and it never appeared in any measurement
+  because at seven employees it is free.
+- **What was deliberately not done.** The day sheet still is not `readOnly`, because asking People for
+  the roster may provision missing profiles. That is a layering fault — **a GET should not write** —
+  and it is worth fixing on its own terms, not smuggled into a performance change. None of the 16.5 s
+  was the provisioning.
+- **On the directory-paging item: the answer was "change nothing."** It was on the list at 3.1 s, but
+  the paged path is a count, a page query and one `IN` batch — three queries for twenty-five rows at
+  any company size. The reading sits inside the free tier's own noise band (an identical payroll run
+  measured 3.7 s and 7.4 s minutes apart) and was taken immediately after the *unpaged* whole-list
+  call. **The defect was real but elsewhere:** five UI screens fetch the whole company to populate a
+  dropdown. That wants a search endpoint, not pagination.
+- **Standing caveat, restated because it keeps mattering.** 409 tests pass. They passed through a
+  version of the payroll work that made the run four times slower and one that made it time out.
+  Green means correct; it says nothing about cost, and it will not until the suite runs as a
+  non-superuser against more than seven people.
+
+### PD-34 · 2026-09-10 · A GET should not write, and the tenant was never unknown
+- **Context:** second item off the founder's triage list, straight after the day sheet. It is what
+  stopped that screen being read-only, and it is a layering fault rather than a performance one.
+
+- **The original reasoning was right in its premise and wrong in its conclusion.** `provision()`
+  argued that a profile could not be created at invitation-accept, because that endpoint is public,
+  no tenant is bound, and `employees` is under FORCE row level security, so the insert is refused.
+  Every clause of that is true. The conclusion drawn — provision on the first authenticated *read*
+  instead — is what made every directory read a potential write. **The tenant was never unknown at
+  accept time. It is written on the invitation. It simply was not bound.**
+- **The trap underneath it, now hit three times.** `TenantAwareDataSource` binds the GUC when a
+  connection is **borrowed**, and a `@Transactional` method borrows on entry. Setting `TenantContext`
+  inside such a method therefore changes nothing — and the failure is not a loud one: writes are
+  refused, reads quietly return nothing, and a delete quietly removes nothing while reporting success.
+  This broke the scale seeder, it is why V30 exists, and it nearly broke this change. It now has a
+  name and one implementation: `TenantBinder`.
+- **`TenantBinder` flushes before it restores.** Hibernate would otherwise defer the insert to the end
+  of the transaction, by which point the connection is back on the caller's tenant and the policy
+  refuses it — a bug that would have passed every test, because the test database is a superuser.
+- **A finding worth acting on later.** V30 turned Row-Level Security *off* for `company_settings`,
+  reasoning that the owner provisions a new company's settings row from the platform context and RLS
+  would block it. That is exactly the problem now solved, so the protection can be restored.
+  `subscriptions` is a genuine exemption — the owner really does read across tenants — but
+  `company_settings` was a workaround wearing a design decision's clothes.
+- **Scoping call, stated so it is not mistaken for finished.** `directory()` still provisions, because
+  the demo and scale seeds rely on it. The hot path uses a read-only roster that provisions nothing
+  and **logs a warning** if a user has no profile, rather than silently writing. A missing profile is
+  then a visible bug in whatever created the user, which is where it should be fixed — not papered
+  over on every read for the life of the product.
+- **The test was extended before it was trusted.** `FlywayUnderRlsTest` planted a company but no user,
+  so V50's per-company loop would have found nothing to do and the guarded insert would never have
+  been attempted. It would have passed against a broken migration. **A test that cannot fail is not
+  evidence** — and this is the second time that specific shape of gap has appeared in this file.
+
+### PD-35 · 2026-09-10 · Visibility is not authority
+- **Context:** third item off the triage list. Leads could see their team's expense claims and not act
+  on them, so the team screen carried a note explaining why its buttons were missing.
+
+- **The near-miss is the point of this entry.** The obvious implementation was to copy what leave
+  does: `if (!orgScope.seesWholeCompany(principal) && !isMyReport(...)) throw`. It compiles, it reads
+  well, and it would have **silently granted HR the power to approve company spending** — because
+  `seesWholeCompany` is `{OWNER, ADMIN, HR}`. It was caught only because a demo account used in an
+  existing test turned out to be `Role.HR` while a comment beside it called them a member.
+- **So: `seesWholeCompany` answers "who may this person *see*".** Approval is a question about
+  authority. The two sets overlap enough that one reads like a drop-in for the other, and reusing the
+  visibility helper for authority is how a permission widens without anyone deciding it should. The
+  expense check names OWNER and ADMIN explicitly, so the change only ever **adds** leads.
+- **What a role can and cannot say.** A role can say "a lead may decide expenses". It can never say
+  "this lead may decide *this* claim" — so gating by role alone would have opened every claim in the
+  company to every lead, a wider hole than the one being closed. The tree answers the second
+  question, which is the PD-32 rule applied to the last approval that was still stuck on a title.
+- **Approving and paying are split on purpose.** Approving is a judgement that the spend was
+  legitimate, and the manager who authorised the trip is best placed to make it. Reimbursing is money
+  leaving the company. Keeping those apart is worth more than the convenience of merging them.
+- **One thing deliberately left alone.** An Owner/Admin can still approve their own claim. Blocking
+  self-approval is better control in a company big enough to have two approvers, and in a five-person
+  customer it would leave the admin unable to claim expenses at all. That is a policy decision with
+  real consequences, and it belongs to the founder rather than to a bug fix.
+
+### PD-36 · 2026-09-14 · Forgotten-password mail: a gap, not a cap
+- **Context:** the founder could not get a reset code while rehearsing the demo. Mail was fine. The
+  endpoint allowed five requests per account per hour and dropped the rest without a word.
+- **Why a limit exists at all.** The endpoint is public. Anyone can type anyone's address into it.
+  With no limit, a script pointed at one inbox makes Orbit the sender of thousands of "your code is"
+  mails from `noreply@calyvora.in` — and that domain carries every tenant's payslips and invitations.
+  Resend suspends abused domains, bills per message, and the victim's provider blacklists the sender.
+  The limit protects the company's ability to send mail, not the person asking.
+- **Why the old one was wrong.** A cap of five an hour bites exactly the person the feature is for:
+  the first mail lands in spam, they click again, and after the fifth click they are silently locked
+  out for an hour. "Verified addresses only" was considered and does not help — the people worth
+  bombing are precisely the ones with accounts.
+- **Decision: one mail per address every 30 seconds, no ceiling.** A human never hits it; a script
+  drops from thousands an hour to two a minute. The page shows a countdown on the resend button so a
+  click inside the window is never mistaken for a delivery. The backend still says nothing about it,
+  for the same reason it never says "no such account".
+- **What was also missing:** the send result was thrown away, so a provider rejection was invisible
+  to everyone. It is logged now.
+
+### PD-37 · 2026-09-14 · Demo data has to survive someone who knows the domain
+- **Context:** a live QA pass found nothing broken and three things that would lose a sale anyway.
+  Northwind's salaries were dollar figures stored against a company that pays in rupees, so the CEO
+  drew ₹18,333 a month on the first payslip anyone opened. Two of seven people had no bank account,
+  so every bank file showed holes. No request was ever pending on a manager, so the manager login had
+  nothing to approve.
+- **Rule:** the demo tenants are the product to the person watching. A number an Indian HR head would
+  laugh at is a defect, whatever the tests say. Seed data is held to the same standard as a screen:
+  realistic bands (the ones Scaleworks already used), complete records, and one live item in every
+  queue that a role is meant to work.
+- **The top-up path matters as much as the fresh seed.** The deployed tenant was seeded long ago and
+  is never re-created, so every seed change also has to bring an existing tenant up to date — and
+  only fill gaps, never overwrite something set by hand.
+- **Left for later, on purpose:** managers get no team overview on their dashboard because the
+  endpoint is role-gated to Owner/Admin/HR. Under PD-32 the tree should grant it. Product work, not a
+  seed fix.
+
+### PD-38 · 2026-09-20 · Measure before you build the thing the backlog named
+- **Context:** the backlog said the fix for the two slowest screens was a closure table for the org
+  tree, and that was written down confidently enough to be built without checking. Reading the code
+  first showed the tree was never the problem. The team summary issued about six queries — a
+  respectable number — and every one of them read the whole company: the employee table three times
+  over, then the company's entire month of attendance, its whole leave history and all of its expense
+  claims, filtered down to a hundred people in memory. Team performance was a plain N+1 wearing a
+  list, six round trips per review.
+- **Rule:** a performance item is a hypothesis until something is measured. The closure table would
+  have been real work, would have added an index to maintain on every manager change, and would have
+  moved neither number — a thousand-person company is two thousand UUIDs, so walking the tree was
+  never the cost.
+- **What the budget test taught us, which is the more useful half.** The existing query budgets count
+  SQL statements, and by that measure the team summary looked thrifty: six statements reading twenty
+  thousand rows. The defect was invisible to the instrument pointed at it. The new budget asserts
+  **entities loaded**, because that was the quantity that was actually wrong. Pick the metric that
+  would have caught the defect, not the one already there.
+- **Both new budgets were checked by watching them fail.** The first draft passed against the old
+  code — the number was generous enough to admit the defect it existed to catch. A budget nobody has
+  seen fail is not evidence. (Same lesson as the vacuously-passing seed test, learned again.)
+- **Don't compute what you are about to throw away:** the review list loaded every employee's salary
+  and then stripped it a line later for any caller who was not HR. Work done purely to discard, on
+  the most sensitive table on the screen.
+
+### PD-39 · 2026-09-20 · An evadable limit that hurts nobody beats an unevadable one that does
+- **Context:** there was no rate limiting anywhere. A customer integration with a retry loop and no
+  backoff, or somebody working through a password list, could issue requests as fast as the network
+  allowed, and each one borrowed from a connection pool of ten. The first symptom is the whole
+  platform timing out for every other tenant.
+- **Rule:** two tiers, because the two surfaces fail differently. The unauthenticated surface is
+  where guessing happens and nobody legitimately logs in twenty times a minute, so it is held tight
+  and keyed by address. Everything behind a token is a real customer doing real work, held loose and
+  keyed by **user id** — so an office behind one corporate NAT is not one caller.
+- **Two limits accepted with open eyes, and written into the code rather than a ticket.**
+  `X-Forwarded-For` is caller-controlled and therefore spoofable, so a determined evader gets a fresh
+  allowance per request. Using it anyway is right: without it every request arrives from the load
+  balancer's address, all our customers are one caller, and the first person to fat-finger their
+  password locks out the platform. Likewise the buckets are per process, so a second instance doubles
+  the effective limit — a shared counter is a round trip on every request and another thing that can
+  be down, and is the right trade only once there is a second instance.
+- **What is deliberately exempt:** session refresh, because a browser with several tabs renews once
+  per tab on waking and a 429 there logs someone out of a product they were using correctly — it has
+  reuse detection, which is a better defence than a counter. And health, because the keep-alive
+  pinger arrives from the same edge as everybody else.
+- **A test-infrastructure lesson worth more than the feature.** Switching the limiter off for the
+  suite via `@SpringBootTest(properties = ...)` on the base class looked right and was silently
+  fragile: a subclass that re-declares `@SpringBootTest` replaces those properties wholesale, which
+  one test does on purpose, so it got the limiter back and failed for reasons unrelated to what it
+  tests. `@TestPropertySource` is inherited and merged, so a subclass has to mean it. Found by
+  running the suite, not by reasoning about it.
+
+### PD-40 · 2026-09-20 · Filtering the page is not a smaller version of filtering the query
+- **Context:** the approvals screen fetched every leave request the company had ever filed and kept
+  the pending ones. Adding paging to that read would have been a silent correctness bug, not just a
+  smaller one: the queue is newest-first, so a page of the fifty most recent requests can easily be
+  entirely decided already, and the screen would have said "nothing waiting" while the pending rows
+  sat on page three — unreachable, invisible, and indistinguishable from an empty queue.
+- **Rule:** whatever the screen actually shows is what the query must select. A filter applied after
+  the rows arrive is only equivalent to one in the database when the read is unbounded — which is the
+  thing being removed. Paginating a list therefore means pushing its filters down first, not after.
+- **The tiebreaker in a cursor is load-bearing.** Sorting by timestamp alone leaves rows created in
+  the same instant in undefined order, and these rows are created in bulk constantly — seeders,
+  imports, approval sweeps. A page boundary inside such a group drops some and repeats others, which
+  reads as data loss. `(createdAt, id)` makes the sequence total. Checked by deleting the tiebreaker
+  and watching two tests fail on dropped rows, rather than by believing the argument.
+- **Cursor, not offset, for queues.** Numbered pages are right for a directory somebody browses.
+  They are wrong for a newest-first queue: rows are inserted above the reader constantly, so page 2
+  repeats the tail of page 1 and skips whatever got pushed past the boundary. And OFFSET reaches row
+  20,000 by counting past 19,999, so deep pages get slower the further in you go.
+- **A malformed cursor is a 400, never a quiet restart.** Silently starting from the top turns a
+  client bug into an endless list: it pages forever, receives the first page every time, and nothing
+  anywhere says why.
+- **The backlog's "~20 unbounded endpoints" was wrong, in the useful direction.** Counting them
+  honestly, most are config tables of a few dozen rows, the feed and notifications are already
+  capped, and attendance is date-windowed. The real list was four admin queues — leave, expenses,
+  helpdesk, documents — and all four are now converted.
+- **Totals are the part that does not survive paging by itself.** The expense summary accumulated its
+  three money figures while walking the claims, which was right only because the claims were
+  everything. Paging the list silently redefines "outstanding across the company" as "outstanding on
+  this page" — a wrong number on a finance screen, unnoticed until someone reconciles against a bank
+  statement. Aggregates in the database, and a test that pages one row at a time so the reported
+  total cannot coincide with the page's own sum.
+
+### PD-41 · 2026-09-21 · Income tax: the law in a pure function, and the screen that shows its working
+- **Context:** the product paid Indian salaries, deducted PF and filed a bank file, but withheld no
+  income tax at all. Payroll that does not deduct TDS is not payroll — the employer is liable for it
+  whether or not the software remembered.
+- **Rule: the arithmetic never touches a database.** `IncomeTaxCalculator` is a pure function of
+  (gross, regime, declarations), like `PfCalculator` before it, because the number ends up deducted
+  from somebody's pay every month and reported in a quarterly return. It has to be checkable by
+  writing down a salary and an expected tax, and those checks have to run in milliseconds so there
+  can be twenty of them rather than three.
+- **Caps belong where the tax is computed, not on the form.** A limit enforced only in the browser is
+  not a limit: a ₹5,00,000 claim under 80C arriving over the API would cut somebody's tax by ₹70,000
+  they owe — with interest — when the return is assessed. The `TaxDeduction` enum carries each
+  ceiling and whether the section survives into the new regime, so switching regime silently stops
+  granting what it disallows and nobody has to remember to clear a form.
+- **Claims are stored uncapped and trimmed at computation.** That lets the screen say "you claimed
+  ₹5,00,000, ₹1,50,000 is allowable" rather than swallowing the difference, and lets a ceiling raised
+  by a future Finance Act reprice declarations already on file.
+- **Two tests failed, and the law was right.** They asserted that take-home never falls as salary
+  rises, across the ₹12 lakh rebate cliff and the ₹50 lakh surcharge threshold. Marginal relief caps
+  the *tax* at the income earned above the line, but the 4% cess is charged on top of the relieved
+  figure — so the effective marginal rate there is exactly 104% and take-home does dip slightly until
+  breakeven near ₹12.77 lakh. Checking the order of operations against published sources settled it:
+  the code was correct and the tests encoded a stronger guarantee than the Act provides. They now pin
+  104%, and a published worked example (₹12,25,000 taxable → ₹26,000) is asserted as an outside
+  opinion rather than another number of our own.
+- **Marginal relief is not optional anywhere it appears.** Without it, a rupee over ₹12,00,000 costs
+  about ₹61,000 and a rupee over ₹50,00,000 about ₹1,40,000 — wrong in the most visible way possible,
+  for precisely the employees who examine their payslips most closely.
+- **A financial year is its own type.** In February 2027 the financial year is still 2026-27, and
+  using the calendar year would file three months of everybody's tax under the wrong one. The
+  off-by-one is invisible, so it is written once.
+- **The comparison is the product.** Both regimes are priced on the employee's own numbers on every
+  computation. Neither wins in general, April is the only month somebody can act on it, and without
+  this the choice is made with a spreadsheet or not at all.
+- **Withholding it is a separate switch, off by default.** `INCOME_TAX` is its own feature rather
+  than part of `STATUTORY_PAYROLL`: a company can run PF through us and hand TDS to its auditor, and
+  enabling one must never start deducting the other from everybody's pay. The first assertion in the
+  payslip test is the one that changes nothing — a deduction appearing unbidden on every payslip is
+  noticed by the whole company at once and trusted by none of them afterwards.
+- **A payslip must reproduce.** TDS is an even twelfth of the year's tax, not the "what is left over
+  the months that remain" figure the screen shows, because a payslip is for a particular month, may
+  be re-run for one long past, and is a document people take to banks.
+- **Silence is not an exemption.** Somebody who never declared is taxed under the default regime with
+  nothing claimed — usually the higher bill. Treating a missing form as nil would under-withhold from
+  exactly the people who did not get round to filling it in, and the employer carries that.
+
+### PD-42 · 2026-09-21 · A default is a choice nobody made, so make it the right one
+- **Context:** attendance screens showed UTC. Not because anyone selected it — because both
+  `MeResponse` and `AttendanceService` fell back to `"UTC"` when a company had no settings row. A
+  company with no settings row is one that never opened the settings page, and it should behave
+  exactly like one that saved the defaults. Both fallbacks are now the same `Asia/Kolkata` the column
+  itself defaults to.
+- **Rule:** a fallback value is shipped behaviour for everybody who never configured anything, which
+  on a new tenant is everybody. "UTC" read as a deliberate engineering choice and was really the
+  absence of one.
+- **Time is per person, not per company.** There was no employee timezone at all. A Bengaluru company
+  with a designer in Berlin recorded her 09:00 arrival as 12:30, and every "late" on her month was an
+  artefact of the clock. Employees now carry an optional IANA zone; null means "same as the company",
+  which keeps the company setting as the one source of truth rather than a copy on every row that
+  drifts when the company changes it.
+- **One chain, used by both ends.** `Timezones.resolve` — person, else company, else default — both
+  stamps the punch and fills the `timezone` on `/me` that the screens set their clocks from. Two
+  separate resolutions would eventually disagree, and the symptom would be a clock that says one
+  thing and a saved row that says another, which is unfalsifiable from the user's side.
+- **Refuse what you cannot honour.** An unrecognised zone is a 400 rather than stored-and-ignored.
+  "IST" silently treated as Kolkata gives the person no way to learn their setting did nothing — and
+  IST is also Irish Standard Time.
+- **Pick a test fixture that cannot be confused with rounding.** The tests use Pacific/Kiritimati
+  (UTC+14) rather than Kolkata's +5:30, so a stamp resolved in the wrong zone is fourteen hours out
+  at any hour the suite happens to run.
+- **What this does not fix:** punches already recorded keep the wall-clock time they were stamped
+  with. They are stored as local times, so there is nothing to re-interpret them against.
+
+### PD-43 · 2026-09-22 · The typecheck is not the build
+- **Context:** the tax pages shipped with a named export (`inr`) from a Next App Router page. Pages
+  may export only `default` and the framework's own config fields, so `next build` fails — but
+  `tsc --noEmit` and `next lint` both pass, and those were what had been run. The branch went out
+  green by every gate that had actually been used.
+- **Rule:** the gate for frontend work is `next build`. It is the only check that compiles the route
+  types the framework generates, and it is already in CI — the mistake was pushing ahead of CI rather
+  than a missing check.
+- **The deeper gap is that nothing renders a page.** Every frontend gate is static: types, lint,
+  build, and unit tests over `lib/`. Not one of them opens a screen. A page that compiles, passes
+  types and throws on mount is green by all four. That is the argument for 3.6, and this defect is
+  the first concrete instance of it rather than a hypothetical.
+- **Closed the same day, and it paid immediately.** Twenty-three Playwright specs against the mock
+  backend, 41 seconds, now in CI. On its first full run it found `/finance/tax` returning its
+  spinner whenever data was null — so a failed first load span forever with the error message set
+  and never rendered, on live as much as in mock. Nothing static could have seen it.
+- **Run it against the mock, not the real stack.** The mock is kept faithful to the API deliberately,
+  and it needs no Postgres, no Java and no four-minute cold start. A suite that takes 41 seconds runs;
+  one that takes twenty minutes gets skipped. What genuinely turns on server behaviour is already
+  covered by the Java integration tests across thirty modules and six roles.
+- **Assert shallowly.** A heading with something in it, a status under 400, a clean console. Pinning
+  copy would make every improved sentence a failing test, and what this hunts is blank pages and
+  stack traces.
+
+### PD-44 · 2026-09-22 · An application-layer promise is not isolation
+- **Context:** V30 switched Row-Level Security off on `company_settings` because the platform owner
+  provisions a new company's settings row while bound to a different tenant, and the policy refused
+  the insert. Its reasoning was that the row is "benign per-company config" and that "the service
+  always keys reads/writes by the caller's own company id".
+- **Rule:** both halves of that age badly, and predictably. The row is no longer benign — it carries
+  the legal name, address, logo, session idle timeout, and now whether tax declarations are open —
+  and "the service always keys by company id" is a promise every future line of code has to keep.
+  One forgotten predicate is a cross-tenant read of every customer's settings, and nothing fails.
+  RLS exists precisely so nobody has to keep that promise.
+- **The obstacle had a better answer by the time we looked again.** `TenantBinder` names the tenant a
+  write belongs to. `PlatformService` was already using it on the very same code path, with a comment
+  observing that V30 met this problem and answered it by switching RLS off. V57 is the other half of
+  that observation.
+- **Restoring a policy is not a migration, it is a survey.** Turning it back on broke the context
+  outright, then four separate call sites, each on a path where no tenant is bound: registration and
+  login (public endpoints, nothing bound yet), refresh (a cookie, no token), the platform bootstrap
+  and the demo seeder. Every one of them would have failed silently in production and passed in a
+  test suite connected as superuser. They failed loudly here only because `IntegrationTestBase`
+  already runs every test under a role RLS applies to.
+- **It exposed a latent bug nobody was looking for.** `PlatformOwnerBootstrap.run()` called its own
+  `@Transactional` method on `this`, so Spring's proxy was never in the path and the bootstrap had
+  never run in a transaction at all. Harmless until something in it needed one — and quietly not
+  harmless before that: a failure partway through left the platform company created and its owner
+  missing, and the next start would reuse the company and never create the account.
+- **Seeders are the exception that proves the shape.** They deliberately run without one enclosing
+  transaction, so `TenantBinder` — which ends in a flush — cannot be used there at all. They bind
+  through `TenantContext` instead, which works precisely because each repository call borrows its own
+  connection and picks the binding up at borrow time. Two mechanisms, and which one applies is
+  decided by whether a transaction is open.
+- **Assert isolation at the database, not the API.** The new test reads `company_settings` on a raw
+  connection: bound to one tenant it sees one row, unbound it sees none. An API-level assertion would
+  have passed on the application's own filtering and proved nothing about the layer underneath — the
+  exact confusion V30 institutionalised.
+- **The first version of that test measured nothing.** It used `SET LOCAL`, which outside a
+  transaction is silently a no-op, so it read zero rows and looked like proof. `set_config(..., false)`
+  — what `TenantAwareDataSource` itself calls — is the honest form.
+- **`subscriptions` stays exempt, deliberately.** That table genuinely is platform-managed: the owner
+  console reads and writes every company's row, so there is no single tenant such a query belongs to.
+  `company_settings` was never like that — every access is on behalf of exactly one company.
+
+### PD-45 · 2026-09-22 · A list of tables is the wrong instrument for an erasure request
+- **Context:** the product could provision a customer and could not remove one. Forty-eight tables
+  carry a `company_id`; two cascaded, so `delete from companies` failed on the first foreign key it
+  met. Deleting a customer was something only a hand-written list of tables could have done.
+- **Rule: the catalogue, not a list.** A list in code is a thing to forget. The day somebody adds a
+  table and forgets it, an erasure request leaves that table's personal data behind, **reports
+  success**, and nothing anywhere disagrees — the worst possible shape for this particular failure.
+  V58 makes every `company_id` key cascade, and a test reads `pg_class` and asserts that any table
+  with a `company_id` has one. A future table that forgets fails the suite rather than a future GDPR
+  request.
+- **The migration is a catalogue sweep, not forty-six ALTERs.** The constraints were created across
+  thirty migrations with names Postgres chose. Transcribing them would have been a fresh chance to
+  mistype one; a sweep cannot miss a table that exists or invent one that does not.
+- **One reference must not cascade, and it is the dangerous one.** `companies.agency_id` points at
+  another company — a reseller. Its customers are tenants in their own right, with their own staff
+  and payroll. Cascading there would turn "remove this reseller" into "remove every company that
+  reseller ever signed": the single most destructive thing this schema could be asked to do by
+  accident. It is `ON DELETE SET NULL`, and deleting an agency that still has customers is refused
+  outright so the operator decides knowingly.
+- **Export is driven from the catalogue for the same reason.** Enumerating JPA entities would export
+  what the application models, which is not what the customer has — a table written by a migration
+  and read only by a report is still their data, and the ORM would never mention it.
+- **Refresh tokens are credentials, not records.** They are excluded from the export: a file that
+  contained them would hand the recipient a working session for every signed-in employee.
+- **The destructive act cannot be a single gesture.** Deletion requires typing the company's name
+  back. A console listing every customer is one mis-click from ending one of them, and a confirmation
+  that can be satisfied by the same motion that caused the mistake protects nobody. There is no undo
+  and no grace period, which is precisely why.
+- **Count before, not after.** The row counts go into the log line before the delete runs, because
+  afterwards there is nothing left to count — that line is the only remaining evidence the data
+  existed.
+- **Both are the vendor's tools.** A company deleting its own workspace is a different feature, with
+  a grace period and a way back, and should be designed as one rather than fall out of this.
+
+### PD-46 · 2026-09-25 · The tenant binding has to outlive nothing
+- **Context:** the tenant id is set on a borrowed connection with `set_config(..., false)` — *session*
+  scope, so it stays there until something changes it. That is correct while this process owns its
+  pool: every borrow re-sets it, so nothing leaks. It stops being correct the moment a **transaction
+  pooler** is put in front of Postgres, which is how one database serves many application instances.
+  A transaction pooler lends a physical connection for the length of a transaction and then lends it
+  to somebody else; session state left behind is inherited. Under session scope the thing left behind
+  is the tenant id, and the failure is not an error — it is the next client running the previous
+  client's predicate, reading their rows, and succeeding. That is 4.2, and it is why the backlog said
+  it ships *only* with an isolation test.
+- **Rule:** `Scope.TRANSACTION` binds with `is_local = true`, so Postgres discards the value at commit
+  or rollback. Nothing survives for the next borrower, because nothing is left behind.
+- **The obvious implementation cannot work, and fails silently.** The natural move is to make the
+  borrow-time binding local whenever a transaction is open. It never is: Spring obtains the connection
+  inside `doBegin` and marks the transaction active only afterwards, in `prepareSynchronization`, so
+  `isActualTransactionActive()` is always false at borrow. An `is_local` set there is quietly
+  session-scoped — transaction scope degrades into exactly the behaviour it exists to replace, while
+  the configuration claims otherwise. Found by writing the test first and watching it fail; nothing
+  about the code would have suggested it.
+- **So the binding moved to `doBegin` itself**, immediately after `super.doBegin` has opened the
+  transaction. That is the earliest point at which `is_local` means what it says.
+- **Under transaction scope the DataSource hands connections over empty**, and that is a feature
+  rather than tidiness: whatever the previous borrower left stops there, so a connection can never
+  arrive carrying somebody else's tenant. The cost is a stricter contract — a tenant-scoped read
+  outside a transaction now finds nothing rather than something — which is the correct failure and a
+  change worth making deliberately.
+- **`TenantBinder` had the same bug waiting.** It set the GUC session-scoped; a LOCAL setting takes
+  precedence for the remainder of a transaction, so under transaction scope its binding was silently
+  overridden by the one made at borrow and every write it exists to permit was refused. It is
+  transaction-local now, which is also strictly safer under session scope: an excursion can no longer
+  alter a pooled connection's session state even if the restore were missed.
+- **The default stays SESSION.** Today's deployment is one instance with its own pool and nothing in
+  front of it; switching the default would change how a running system behaves to suit one it does
+  not have. The capability is built and tested, and turning it on belongs with the decision to put a
+  pooler there — which is 3.4's decision, not this one's.
+- **No pooler in the test, deliberately.** What a pooler requires is that nothing survives the
+  transaction, and that is a property of our own connection handling, assertable directly. A test
+  that stood up PgBouncer would be testing PgBouncer.
+
+---
+
+### PD-47 · 2026-09-28 · A guard with a second door is not a guard
+- **Context:** a sweep of all 58 screens on the live deployment, as four roles. HR, Manager and
+  Member were bounced to `/login` on every single page; Admin passed all 58. At the API level all
+  four accounts logged in and refreshed cleanly, twice over, so it was never about the accounts.
+- **What it was:** every hard page load presented the rotating refresh cookie **twice**, from two
+  paths that did not know about each other. `renewSession` — the transport's 401 retry — has always
+  held a single in-flight promise for exactly this reason, and its comment says so: *"ten calls
+  hitting that wall together would each present the same refresh cookie, and rotation treats a
+  second presentation as theft and burns the family — so the naive fix logs everyone out."* The
+  session bootstrap called `http("/auth/refresh")` directly and never touched that promise. The
+  server did the right thing and revoked the family. Whoever won the race stayed signed in, which is
+  why it read as random.
+- **Rule:** one refresh path. `api.refresh()` and the transport's retry now share `refreshSession`,
+  and the single in-flight promise is the only way to that endpoint.
+- **The trigger was a second bug, and the two are the same story.** `AppShell` asked for company
+  features and team standing in a mount effect. React runs child effects before parent ones, and
+  `AppShell` is a child of `SessionProvider` — so those calls always went out before a token
+  existed. Not a race: an ordering, failing identically on all 232 page loads measured. They 401'd,
+  which woke the transport's renewal, which is where the second refresh came from.
+- **Swallowing the failures is what hid it.** Both calls end in `.catch(() => …)` with a benign
+  fallback, so nothing ever looked wrong — while `features === null` made the nav **show every
+  gated module to every company** whatever their plan, and `leadsTeam === false` made **My team,
+  Leave approvals and Exits invisible to managers and members**, the only people PD-32 built them
+  for. Admin, HR and Owner reach those by role, so the only people who could see the feature were
+  the people who did not need it.
+- **Why nothing caught this.** The unit tests pin the transport path and still pass — they were
+  written about `renewSession` and could not see a caller that bypassed it. The API sweep passes,
+  because every endpoint is correct. The Playwright suite passes, because in mock mode there is no
+  refresh cookie to rotate and no rotation to detect. **It needed a browser, a real server and more
+  than one page load**, which is a gap worth naming: our e2e can prove a screen renders, and cannot
+  prove a session survives.
+- **The regression test fails on the old code**, which is the only reason to trust it: two tests,
+  one asserting a single presentation when bootstrap and transport run together, one asserting the
+  bootstrap's own failure does not retry itself. On the old code the second reports two.
+
+---
+
+### PD-48 · 2026-09-28 · A profile name is not a security boundary
+- **Found while sweeping the live site:** /api/v1/dev/mailbox answers 200 to anyone, and
+  /api/v1/dev/mail-status reports the deployment delivers via Resend. The env is set to
+  SPRING_PROFILES_ACTIVE=staging, and every dev bean is @Profile("!prod"), so the whole /dev
+  surface — mailbox, seed endpoints, test-email — is live in what is really production.
+- **Why the mailbox is the emergency:** it captures password-reset codes and invite/verification
+  links. When a real provider delivers, the recipient already has the message; a second copy on a
+  public URL is pure downside. Request a reset for any account (including the platform owner), read
+  the code, own the account. No auth required.
+- **Fix, shipped:** the mailbox records nothing when the resolved provider delivers. It is fed only
+  by the console transport — the one case where it is the sole copy of a link that never left. A
+  runtime guard on the resolved provider, not the profile, because the profile was exactly what was
+  wrong: a box mislabeled non-prod must still refuse to leak codes.
+- **Still open, and it is the founder’s call:** the public seed endpoints. POST /api/v1/dev/seed-scale
+  builds a 1,000-person tenant with generated payroll, and it is reachable by anyone right now —
+  the most likely source of the ~120 unexplained payroll statements on the scale tenant. Closing
+  the /dev surface for good means running the prod profile, but the live demo currently depends on
+  public seeding (the "Explore the demo" button). That is the environment decision: one box that is
+  both demo and production cannot be secure. Either split demo from prod, or pre-seed a demo tenant
+  once and run prod with no public seeding.
+
+### PD-49 · 2026-10-01 · Demo seeds may be public; the scale tool and the mail send may not
+- **Context:** the live deployment runs the staging profile (see [PD-48]), so the whole
+  /api/v1/dev surface is public. PD-48 closed the credential leak in the mailbox. This closes the
+  two endpoints that let an anonymous caller *change the running system*: seed-scale, which builds
+  a 1,000-person tenant (and is the most likely origin of the unexplained payroll rows), and
+  test-email, which sends real mail on the vendor Resend account to any address a caller names.
+- **Rule:** the two write-the-world dev endpoints require the platform owner. The demo seeds do
+  not, because they only ever add believable demo data, they are idempotent, and the showcase
+  (Explore the demo -> seed-all) depends on reaching them without a login.
+- **Why not just flip to prod:** that removes every dev bean, including the demo seed the showcase
+  needs. The profile split (demo vs production) is still the proper end state and still the
+  founder’s call; this makes the current single deployment safe to show in the meantime.
+- **Cost:** the four integration tests that build the scale tenant as setup now present a
+  platform-owner bearer (one cached helper on IntegrationTestBase). A new test asserts an anonymous
+  test-email is refused with 403.
+
+## 4. Architecture Decision Log
+
+
+
+
+
+
+
+
+> Summaries here; binding detail in [docs/06](docs/06-architecture-principles.md) and (once
+> established in Phase 1) formal ADRs under `docs/adr/`. Newest first.
+
+### ADR-07 · 2026-07-05 · Backend language = Java (LTS) + Spring Boot (was .NET)
+- **What:** Transactional core & all OS-apps in **Java + Spring Boot / Spring Modulith**; TS/Node
+  for edge/BFF & real-time; Python for AI/ML pipelines.
+- **Why:** JVM-native data/event ecosystem (Kafka, Debezium, OpenSearch); Spring Modulith fits the
+  modular-monolith strategy; deepest enterprise talent pool (de-risks hiring); **the founder can
+  contribute in Java** — the team building the platform must be able to build it; boring/proven.
+- **Alternatives evaluated:** **.NET/C#** (originally penciled in) — equally excellent, rejected
+  for ecosystem fit, broader cloud-agnostic talent pool, and team contribution fit. Node-only
+  backend — rejected for transactional/enterprise-correctness workloads.
+- **Pros:** first-class libraries for our substrate; huge hiring pool; mature reliability;
+  contribution fit.
+- **Cons:** JVM memory footprint vs. lighter runtimes; more ceremony than Node for simple I/O
+  services (mitigated by using TS at the edge).
+- **Future improvements:** consider GraalVM native images for cold-start-sensitive services;
+  virtual threads (Project Loom) for high-concurrency I/O.
+- **Detail:** [docs/06 §6.14](docs/06-architecture-principles.md#614-runtime--languages).
+
+### ADR-06 · 2026-07-05 · Multi-tenancy = hybrid 3-tier isolation on one tenant-agnostic codebase
+- **What:** Tier 1 pooled (shared DB + Postgres RLS, the default), Tier 2 schema-per-tenant,
+  Tier 3 dedicated DB/cluster/region + BYOK. A Tenant Router resolves the physical target;
+  app code is identical across tiers.
+- **Why:** One codebase must profitably serve a 20-person startup and a 50k-person regulated bank.
+  Isolation is a data-routing/infra concern, not an app concern.
+- **Alternatives:** pure pooled (best economics, loses regulated segment); pure siloed (great
+  isolation, destroys SMB margins & fleet ops).
+- **Pros:** win the whole market; residency & compliance reachable; promote tenants across tiers
+  without code changes. **Cons:** routing complexity; per-tier ops differences.
+- **Detail:** [docs/07](docs/07-multi-tenant-strategy.md).
+
+### ADR-05 · 2026-07-05 · AI is a Foundation primitive (shared AI Platform), not per-app
+- **What:** One Model Gateway (Claude-default, provider-abstracted), RAG-first grounding,
+  tenant-scoped knowledge graph, agents-as-principals whose tools are permissioned APIs, full AI
+  audit + AI permissions.
+- **Why:** Cross-domain, permissioned, auditable AI needs a unified data + permission model built
+  in from the start — impossible to retrofit or to do per-silo.
+- **Alternatives:** AI-per-app (rejected — siloed, inconsistent guardrails, no cross-domain reasoning).
+- **Pros:** experiences no single-silo competitor can ship; governance as a selling point.
+- **Cons:** the AI Platform is a critical shared dependency; cost governance required.
+- **Detail:** [docs/09](docs/09-ai-strategy.md).
+
+### ADR-04 · 2026-07-05 · Security = Zero-Trust, RBAC+ABAC, per-tenant keys, immutable audit
+- **What:** OIDC/OAuth + SSO (Entra/Google/Okta) + SCIM; central live authZ (RBAC+ABAC hybrid);
+  mTLS everywhere; per-tenant encryption keys + BYOK; append-only tamper-evident audit of humans
+  **and agents**.
+- **Why:** We hold customers' entire operational data — a breach is an extinction event. Security
+  must be structural and blast-radius small.
+- **Pros:** enterprise/regulated trust; the secure path is the default path. **Cons:** more upfront
+  rigor. **Detail:** [docs/08](docs/08-security-architecture.md).
+
+### ADR-03 · 2026-07-05 · Event-driven backbone = Kafka + CloudEvents + transactional outbox
+- **What:** Domain events (past-tense facts) over Kafka; CloudEvents envelope; schema registry with
+  backward-compat enforcement; transactional outbox; idempotent consumers.
+- **Why:** The nervous system of "integrated by construction" — decouples producers/consumers,
+  gives replayable history, and lets new capabilities subscribe without the producer knowing.
+- **Alternatives:** RabbitMQ/SQS (great queues, poor event logs); point-to-point calls (coupling
+  swamp). **Fallback:** Redpanda (Kafka-API compatible). **Detail:** [docs/06 §6.5](docs/06-architecture-principles.md#65-event-driven-architecture).
+
+### ADR-02 · 2026-07-05 · Data stack = Postgres + Redis + Kafka + OpenSearch + object store + pgvector
+- **What:** Postgres SoR (RLS tenancy), Redis (cache/ephemeral), Kafka (events), OpenSearch
+  (search), S3-compatible object store (files), pgvector→dedicated vector store at scale.
+- **Why:** Boring, proven, open-source-friendly; five datastores cover ~all needs; new datastores
+  require an ADR. **Cons:** we operate more ourselves (accepted, aligned with no-lock-in).
+  **Detail:** [docs/06 §6.8](docs/06-architecture-principles.md#68-storage).
+
+### ADR-01 · 2026-07-05 · Topology = Modular Monolith → extract services under proven pressure
+- **What:** Each OS-app & the Foundation are modular monoliths with CI-enforced module boundaries
+  (separate schemas, module APIs, events); extract a service only under measured need.
+- **Why:** Most microservice benefits (ownership, testability, extractability) without the
+  distributed-systems tax before we can pay it. The classic startup-killer avoided.
+- **Alternatives:** microservices-from-day-one (rejected — premature); single monolith (rejected —
+  ball of mud). **Detail:** [docs/06 §6.1](docs/06-architecture-principles.md#61-topology).
+
+### ADR-02 · 2026-08-09 · Transactional email = HTTPS API (Resend), not SMTP
+- **What:** Outgoing mail goes through an `EmailSender` chosen per send from `EmailSettings`, with
+  three transports — Resend (HTTPS :443), SMTP, and a console transport for local dev. Which one is
+  used is resolved by an `EmailSettingsResolver`; `MAIL_PROVIDER` pins it, otherwise it's inferred
+  from whichever credentials exist. A deployment with nothing configured now logs a loud warning at
+  startup and reports its sends as *undelivered*, instead of silently pretending to work.
+- **Why:** Found in live QA — every signup on the hosted deployment was unrecoverable. Render (like
+  many hosts) blocks outbound SMTP on all ports, so `smtp.hostinger.com:587` timed out; the swallowed
+  failure meant registration returned 201, the verification mail went nowhere, and the account could
+  never be activated. Not a credential problem and not fixable with TLS settings — SMTP is simply not
+  available. Port 443 always is.
+- **Also:** sends now return an `EmailResult`, so `POST /auth/register` answers `{"emailSent": …}` and
+  the signup screen offers a resend instead of claiming "check your email" for mail that never left.
+  Failures still never roll back the signup — the account is real either way.
+- **Alternatives:** stay on SMTP via a relay on 2525 (rejected — still a blocked-port gamble);
+  fire-and-forget queue (rejected for now — the honest inline result is what the UI needs).
+- **Consequence:** per-tenant sending ("customer's mail comes from *their* domain") is now a matter
+  of implementing one resolver; no transport or caller knows tenants exist.
+
+### Deployment baseline (cross-cutting)
+Cloud-agnostic Kubernetes, service mesh (mTLS), GitOps, trunk-based dev + feature flags +
+progressive delivery, OpenTelemetry observability. See [docs/06 §6.10–6.13](docs/06-architecture-principles.md).
+
+---
+
+## 5. Weekly Progress Log
+
+> Auto-summarized at the end of each development week. Newest first.
+
+### Week of 2026-07-20 → 2026-07-22 (founder-feedback week)
+- **Features completed:** the founder's 8-page handwritten notes were transcribed into a living tracker
+  ([docs/Founder-Feedback-Backlog.md](docs/Founder-Feedback-Backlog.md)) and worked in bucket order.
+  Shipped: **Bucket A** (searchable member picker fixing the "dropdown not working" bug, always-on
+  Knowledge search, sprint-length picker, **left sidebar nav**, wordmark), **branding → Orbit** (PD-08),
+  **Bucket B** (role-aware dashboard + team overview, present vs on-leave, leave calendar),
+  **Bucket C** (salary + hike history + payslips V13, richer profiles/skills/ratings V14, goals V15,
+  assigned-work with overdue flags), **D1 Clients ⭐** (V16), and **D2+D3 Documents & templates** (V17).
+  People and Documents both gained **left-pane sub-panes** at the founder's request.
+- **Decisions made:** **PD-08** (product = Orbit, Calyvora = parent), **PD-09** (documents generated from
+  templates then **frozen**; merge-substitution, not a document editor). Attendance settled as
+  *"both, phased"* — derived from leave now, full daily records later (C.4).
+- **In progress / next:** C.4 full daily attendance, C.7 fuller review cycle, D4 Notifications, D5 Inbox,
+  BR3 modular packaging. C.9 ("kanban in the employee tab") and D6 ("Organization") need scope
+  confirmation from the founder before building.
+- **Blockers:** none technical. Business blockers unchanged (design partners, pricing).
+- **Bugs discovered/fixed:** members dropdown unusable at scale (→ `MemberSelect`); `Goal` NPE on
+  create (assigned-id insert defers `@PrePersist` — initialize timestamps in the constructor);
+  schema-validation mismatch `smallint` vs `Integer` (V14 uses `integer`).
+- **Technical debt created:** the frontend mock now mirrors the merge engine + starter templates
+  (`frontend/src/lib/documents.ts`) — two copies to keep in sync, accepted so the mock demo doesn't lie.
+- **Lessons learned:** shipping in the founder's stated bucket order — and keeping the tracker updated as
+  each item lands — made "what's left?" answerable at any moment without re-reading the notes.
+- **Customer feedback:** the notes themselves (the founder acting as first customer).
+
+### Week of 2026-06-30 → 2026-07-05
+- **Features completed:** none (pre-build). Foundational **architecture constitution** authored:
+  18 docs under [/docs](docs/README.md). **Sprint 1 plan** authored: [docs/Sprint1.md](docs/Sprint1.md)
+  (18-part production-quality plan) + [DECISIONS.md](DECISIONS.md) ledger.
+- **Decisions made:** PD-01, PD-02, **PD-03 (Sprint 1 = Platform Foundation)**, ADR-01…ADR-07,
+  **SD-1…SD-8** (Sprint-1 implementation choices). Notably: backend **.NET → Java + Spring Boot**.
+- **In progress:** Sprint 1 planning complete; awaiting approval to start Feature 0 (scaffolding +
+  foundation: Docker Compose, Spring Boot, Next.js, security skeleton, Flyway baseline, CI).
+- **Blockers:** none technical. **Business blockers (carried):** recruit 3–5 design partners; decide
+  pricing model — both should run parallel to the build.
+- **Bugs discovered:** n/a. **Technical debt created (planned, logged):** SD-2 app-layer tenant
+  isolation with **RLS deferred to Sprint 2**; SD-5 HS256 JWT (→ RS256 Sprint 2). **Resolved:** n/a.
+- **Lessons learned:** documenting decisions *with trade-offs at the moment of decision* is far
+  cheaper than reconstructing rationale later. Keeping foundational docs decision-neutral made the
+  .NET→Java switch a one-line change. Sizing honesty up front (2–3 wks, not 5 days) prevents
+  corner-cutting under a false deadline.
+- **Customer feedback:** none yet (no design partners onboarded).
+- **Important metrics:** none yet (pre-launch).
+
+---
+
+## 6. Customer Insights
+
+> Logged whenever customer/design-partner feedback arrives. _No entries yet — pre-build._
+
+_Template:_ Company · Industry · Feature requested · Problem experienced · Importance
+(Critical/High/Med/Low) · Proposed solution · Current status.
+
+---
+
+## 7. Product Backlog
+
+> Prioritized. Each item: business value · customer impact · effort · dependencies · timeline.
+> This is a strategic backlog; execution tickets live in Work OS once it exists.
+
+### Critical
+- **Foundation spine (thin but real):** Tenancy/Org (Tier-1 + RLS), AuthN (OIDC+SSO), AuthZ
+  (RBAC+core ABAC), service template/golden path, Kafka event backbone (+outbox+schema registry),
+  OTel observability, CI/CD+GitOps, enforcement gates (isolation tests, module boundaries, ADRs).
+  · *Value:* everything depends on it · *Impact:* enables all apps · *Effort:* High · *Deps:* none
+  · *Timeline:* Phase 1 start.
+- **Recruit 3–5 design partners** before building Phase 1. · *Value:* de-risks the #1 failure mode
+  · *Impact:* directional · *Effort:* Med (founder-led) · *Deps:* none · *Timeline:* immediate.
+
+### High
+- **People OS (beachhead):** HRIS, org/directory, onboarding, leave, self-service, basic
+  performance/goals, ATS basics. · Produces the identity+org graph every app consumes · Effort: High
+  · Deps: Foundation spine · Phase 1.
+- **Work OS + Knowledge OS:** proves cross-app value (task↔doc↔person). · Effort: High · Deps:
+  Foundation, People OS · Phase 1.
+- **AI Platform v1:** Model Gateway (Claude-default), RAG over docs, pgvector, prompt registry,
+  AI audit, universal assistant across the 3 apps. · The AI-native promise, visible in v1 · Effort:
+  High · Deps: Foundation, apps' events · Phase 1.
+- **Admin Platform v1 + Billing v1.** · Control plane + get paid · Effort: Med · Deps: Identity ·
+  Phase 1.
+
+### Medium
+- Workflow engine, Notification service, Comments primitive, Search service. · Deps: event backbone
+  · Phase 1–2.
+- Mobile Platform v1. · Phase 2.
+- Decide & implement pricing model (open question, §2). · Deps: GTM validation.
+
+### Low
+- CRM OS, Service OS, Meeting OS, Automation OS. · Phase 2.
+
+### Future Ideas
+- Analytics OS, Finance OS, AI Studio, Marketplace. · Phase 3+.
+- Knowledge graph as a standalone corporate-memory product. · Moonshot (see §11).
+- On-prem/customer-cluster deployment for sovereign/regulated buyers. · Phase 3+.
+
+---
+
+## 8. Competitor Research
+
+> Continuously updated. _Initial landscape scan — 2026-07-05._
+
+| Competitor | Strengths | Weaknesses | Opportunity for us |
+|-----------|-----------|------------|--------------------|
+| **Workday / SAP SF** | Enterprise depth, trust, compliance | Dated UX, slow/expensive implementation, weak cross-domain AI, costly | AI-native + fast onboarding + modern UX for mid-market |
+| **Rippling** | Strong land-and-expand across HR/IT/Finance | Still assembling breadth; AI shallow | Deeper AI-native core + knowledge graph |
+| **Notion / Confluence** | Delightful, composable docs/UX | Not a system of record; weak workflow/permissions at enterprise scale | Knowledge OS with real SoR + governance + graph |
+| **Jira / Linear / ClickUp / Monday / Asana** | Mature work management; Linear = craft/speed | Siloed from HR/CRM/finance; integration tax | Work OS natively linked to people/customers/knowledge |
+| **Salesforce / HubSpot / Zoho** | CRM depth, ecosystem | Expensive, complex; disconnected from delivery/support/finance | True 360° via one platform |
+| **ServiceNow / Freshservice** | Platform + workflow depth (ITSM) | Complex, costly, enterprise-only | Service OS for mid-market with native cross-app context |
+| **Slack / Teams / Zoom** | Ubiquitous collaboration | Meeting outcomes are dead-ends; siloed | Meeting OS that feeds the graph & creates tasks |
+| **Power BI / Tableau / Looker** | Powerful BI | Require ETL/warehouse integration projects | Analytics OS with no-ETL cross-domain queries |
+| **Zapier / Power Automate / Workato** | Broad connectors | Brittle polling, external to the data | Automation OS on the native event backbone |
+
+_To track over time:_ new releases, pricing changes, AI features shipped, UX improvements, and
+resulting market gaps.
+
+---
+
+## 9. Startup Metrics
+
+> _No live metrics yet (pre-build)._ Instrumentation is a Foundation requirement, not an
+> afterthought — usage metering feeds Billing from day one.
+
+| Metric | Definition | Current | Target (12mo post-launch) |
+|--------|------------|---------|---------------------------|
+| MAU / DAU | Monthly / daily active users | — | — |
+| DAU/MAU stickiness | Ratio | — | ≥ 0.4 |
+| **≥3-app customers** (north star) | Tenants on 3+ connected OS-apps | — | grow QoQ |
+| CAC | Customer acquisition cost | — | — |
+| LTV / LTV:CAC | Lifetime value / ratio | — | ≥ 3:1 |
+| MRR / ARR | Recurring revenue | — | — |
+| **NRR** | Net revenue retention (expansion moat) | — | ≥ 120% |
+| Logo churn | Monthly/annual | — | < 1%/mo |
+| Feature adoption | Universal-assistant WAU; cross-app action rate | — | — |
+| NPS | Net promoter score | — | ≥ 40 |
+
+---
+
+## 10. Lessons Learned
+
+> Knowledge base of mistakes, solutions, better approaches, and best practices. Newest first.
+
+- **2026-07-10 — Refresh-token rotation is hostile to concurrent/duplicate refreshes.** A duplicate
+  refresh (React StrictMode's dev double-invoke, or two browser tabs) re-presents the just-rotated
+  cookie, which reuse-detection correctly reads as theft and revokes the whole family — logging the
+  user out. Fix: fire the bootstrap refresh once per mount (client guard). Longer term, give the
+  server a small same-family grace window. Lesson: security mechanisms (reuse detection) need an
+  explicit concurrency story, or they fire on benign races.
+- **2026-07-10 — No Docker? Use a real embedded engine, not a fake.** Zonky embedded Postgres runs the
+  actual Postgres binary in tests and local runs, so partial indexes / `timestamptz` / real SQL are
+  exercised — an H2 substitute would have hidden bugs the tenant-isolation gate must catch.
+- **2026-07-05 — Keep foundational docs decision-neutral until a decision is actually made.** The
+  runtime sections stayed language-agnostic, so switching .NET→Java touched one standards line + a
+  new decision section rather than a rewrite. Defer commitments to the point of decision, then
+  record them explicitly.
+- **2026-07-05 — Decisions must be logged with trade-offs *at the moment of decision*.** Rationale
+  is expensive to reconstruct later; this journal exists so we never have to.
+- **2026-07-05 — Enforce principles with machines.** Standards that rely on memory decay at 100
+  engineers. Every standard in [docs/14](docs/14-engineering-standards.md) has an enforcement
+  mechanism (CI gate, lint, test).
+- **2026-07-05 — The hard part is restraint, not architecture.** The most likely failure is
+  building too much; guardrail is depth-first phasing + a written "not building yet" list.
+
+**Best practices adopted:** API-first & event-first before UI; single System of Record per entity;
+ambient/mandatory tenant context; trunk-based dev + feature flags; ADRs for foundational changes;
+docs-as-code reviewed in PRs.
+
+---
+
+## 11. Future Vision
+
+> Running list of big ideas, moonshots, AI opportunities, new modules, and expansion.
+
+- **Big ideas:** the org **knowledge graph as a durable corporate asset** — institutional memory
+  that's queryable and actionable; possibly our deepest long-term moat.
+- **Moonshot features:** governed AI agents performing a meaningful share of routine operational
+  work autonomously, humans supervising exceptions; agentic workflows as a primary work mode.
+- **AI opportunities:** cross-domain natural-language business questions; AI-authored automations
+  ("describe the process → we build the flow"); an AI/agent Marketplace; per-vertical expert agents.
+- **New product modules (later phases):** Analytics OS, Finance OS (GL/payroll), AI Studio,
+  Marketplace, deeper Meeting OS (native video), CMDB/change mgmt in Service OS, CPQ/marketing in
+  CRM OS.
+- **Expansion opportunities:** up-market to enterprise/regulated (Tier-3 + BYOK + residency);
+  on-prem/sovereign deployments; a partner/ISV platform economy building verticals on top
+  (healthcare, legal, manufacturing) — the "apps on iOS" end state.
+- **Long-term roadmap:** Phases 1–5 in [docs/11](docs/11-roadmap.md).
+
+---
+
+## Appendix · How this journal is maintained
+- **Who:** the founder and the AI co-founder, jointly. The AI co-founder updates it whenever a
+  significant decision, feedback item, or lesson occurs — without being asked.
+- **When:** at every material decision (add a PD/ADR entry), on customer feedback (§6), at week's
+  end (§5), and whenever a lesson is learned (§10).
+- **Relationship to /docs:** [/docs](docs/README.md) is the *binding constitution* (what the system
+  is). FOUNDER.md is the *narrative and rationale* (why we chose it, what we're thinking, where we're
+  going). They must not contradict; when a decision here changes an architecture doc, update both in
+  the same change.

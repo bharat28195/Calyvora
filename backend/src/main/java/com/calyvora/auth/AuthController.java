@@ -1,0 +1,148 @@
+package com.calyvora.auth;
+
+import com.calyvora.auth.dto.ForgotPasswordRequest;
+import com.calyvora.auth.dto.LoginRequest;
+import com.calyvora.auth.dto.LoginResponse;
+import com.calyvora.auth.dto.MeResponse;
+import com.calyvora.auth.dto.RegisterRequest;
+import com.calyvora.auth.dto.ResetPasswordRequest;
+import com.calyvora.auth.dto.ResendVerificationRequest;
+import com.calyvora.auth.dto.VerifyEmailRequest;
+import com.calyvora.common.config.AppProperties;
+import com.calyvora.common.security.AuthPrincipal;
+import com.calyvora.common.security.CurrentUser;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Duration;
+
+/** Authentication + registration surface (Sprint1 §7). All endpoints here are public except /me. */
+@RestController
+@RequestMapping("/api/v1/auth")
+public class AuthController {
+
+    private final AuthService authService;
+    private final PasswordResetService passwordResetService;
+    private final AppProperties.Refresh refreshProps;
+
+    public AuthController(AuthService authService, PasswordResetService passwordResetService,
+                          AppProperties props) {
+        this.authService = authService;
+        this.passwordResetService = passwordResetService;
+        this.refreshProps = props.security().refresh();
+    }
+
+    /**
+     * The workspace is created regardless of whether its verification email got out, so this returns
+     * 201 either way — but {@code emailSent} tells the client which screen to show: "check your
+     * email", or "we couldn't send it, here's how to resend".
+     */
+    @PostMapping("/register")
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        boolean emailSent = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new RegisterResponse(emailSent));
+    }
+
+    public record RegisterResponse(boolean emailSent) {}
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        authService.verifyEmail(request.token());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Void> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * Always 202, whether or not the address has an account (PD-23). Answering differently would turn
+     * this into a way to ask "does this person bank here?" one address at a time.
+     */
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestCode(request.email());
+    }
+
+    /** Spend the code and set the new password. Every session is signed out on success. */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.reset(request.email(), request.code(), request.newPassword());
+        return ResponseEntity.noContent()
+                // The browser may be holding a refresh cookie for a session just revoked. Clearing it
+                // means "sign in again" rather than a silent 401 on the next refresh.
+                .header(HttpHeaders.SET_COOKIE, clearRefreshCookie().toString())
+                .build();
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest httpRequest) {
+        AuthService.LoginResult result = authService.login(
+                request.email(), request.password(), httpRequest.getHeader(HttpHeaders.USER_AGENT));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(result.refreshToken()).toString())
+                .body(result.body());
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(
+            @CookieValue(name = "${calyvora.security.refresh.cookie-name}", required = false) String refreshToken,
+            HttpServletRequest httpRequest) {
+        AuthService.LoginResult result = authService.refresh(
+                refreshToken, httpRequest.getHeader(HttpHeaders.USER_AGENT));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(result.refreshToken()).toString())
+                .body(result.body());
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = "${calyvora.security.refresh.cookie-name}", required = false) String refreshToken) {
+        authService.logout(refreshToken);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, clearRefreshCookie().toString())
+                .build();
+    }
+
+    @GetMapping("/me")
+    public MeResponse me(@CurrentUser AuthPrincipal principal) {
+        return authService.me(principal.userId());
+    }
+
+    // ---- refresh cookie helpers ----
+
+    private ResponseCookie buildRefreshCookie(String value) {
+        return ResponseCookie.from(refreshProps.cookieName(), value)
+                .httpOnly(true)
+                .secure(refreshProps.cookieSecure())
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(refreshProps.ttl())
+                .build();
+    }
+
+    private ResponseCookie clearRefreshCookie() {
+        return ResponseCookie.from(refreshProps.cookieName(), "")
+                .httpOnly(true)
+                .secure(refreshProps.cookieSecure())
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(Duration.ZERO)
+                .build();
+    }
+}

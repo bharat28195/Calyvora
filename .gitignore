@@ -1,0 +1,38 @@
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# ---- Java / Maven ----
+backend/target/
+backend/.gradle/
+backend/build/
+backend/bin/
+backend/out/
+
+# ---- Node / Next.js ----
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+frontend/next-env.d.ts
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/tsconfig.tsbuildinfo
+
+# ---- Env / secrets ----
+.env
+.env.local
+*.local.env
+# Key material (JWT signing keys are generated locally and pasted into the host's dashboard)
+*.pem
+secrets/
+
+# ---- Misc ----
+calyvora-site.zip
+*.log
+frontend/.next-build/

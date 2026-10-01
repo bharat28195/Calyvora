@@ -1,0 +1,372 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, LogIn, LogOut, RotateCcw } from "lucide-react";
+import { api, ApiError } from "@/lib/api";
+import type { AttendanceEntry, AttendanceMonth, AttendanceStatus } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
+import { currentTimezone } from "@/lib/format";
+import { DayHeading, MonthCalendar } from "@/components/ui/month-calendar";
+import { cn } from "@/lib/utils";
+
+/*
+ * The self-service attendance pieces, shared by People -> Attendance (where they sit alongside the
+ * team day sheet) and the Me hub. One implementation, two placements.
+ */
+
+/** Colour + label per status. */
+export const STATUS: Record<AttendanceStatus, { label: string; chip: string; dot: string; bar: string }> = {
+  PRESENT: { label: "Present", chip: "bg-emerald-500/15 text-emerald-400", dot: "bg-emerald-500", bar: "bg-emerald-500" },
+  WORK_FROM_HOME: { label: "WFH", chip: "bg-sky-500/15 text-sky-400", dot: "bg-sky-500", bar: "bg-sky-500" },
+  HALF_DAY: { label: "Half day", chip: "bg-amber-500/15 text-amber-400", dot: "bg-amber-500", bar: "bg-amber-500" },
+  ABSENT: { label: "Absent", chip: "bg-red-500/15 text-red-400", dot: "bg-red-500", bar: "bg-red-500" },
+  ON_LEAVE: { label: "On leave", chip: "bg-violet/15 text-violet", dot: "bg-violet", bar: "bg-violet" },
+  HOLIDAY: { label: "Holiday", chip: "bg-fg/10 text-fg/50", dot: "bg-fg/30", bar: "bg-amber-400/60" },
+  WEEK_OFF: { label: "Week off", chip: "bg-fg/10 text-fg/40", dot: "bg-fg/20", bar: "bg-fg/20" },
+};
+
+/** The statuses an admin marks by hand; leave comes from the leave flow, week-offs resolve themselves. */
+export const MARKABLE: AttendanceStatus[] = ["PRESENT", "WORK_FROM_HOME", "HALF_DAY", "ABSENT", "ON_LEAVE", "HOLIDAY"];
+
+export function hhmm(t: string): string {
+  return t.slice(0, 5);
+}
+
+/**
+ * "HH:mm" for a live Date, in the company's timezone.
+ *
+ * <p>Not the browser's. The server stamps a check-in using the company timezone, so a clock reading
+ * the laptop's zone disagreed with the time that was actually recorded — a company left on the
+ * default UTC showed "09:53 PM" ticking above "In at 16:22", which reads as the check-in being
+ * broken rather than as two different clocks. One zone, chosen by the company, everywhere.
+ */
+function nowHHmm(d: Date): string {
+  return d.toLocaleTimeString("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: currentTimezone(),
+  });
+}
+
+/** Minutes between two "HH:mm[:ss]" times, or null if either is missing. */
+export function minutesBetween(inT: string | null, outT: string | null): number | null {
+  if (!inT || !outT) return null;
+  const [ih, im] = inT.split(":").map(Number);
+  const [oh, om] = outT.split(":").map(Number);
+  const mins = oh * 60 + om - (ih * 60 + im);
+  return mins > 0 ? mins : null;
+}
+
+/** "8h 05m" (or "—" when we can't compute it). */
+export function fmtDuration(mins: number | null): string {
+  if (mins == null) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+}
+
+export function StatusChip({ status, derived }: { status: AttendanceStatus; derived?: boolean }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs ${STATUS[status].chip} ${derived ? "opacity-70" : ""}`}
+      title={derived ? "Inferred — nobody marked this day" : undefined}
+    >
+      {STATUS[status].label}{derived && " (auto)"}
+    </span>
+  );
+}
+
+export function MyDay() {
+  const [entry, setEntry] = useState<AttendanceEntry | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+
+  const load = useCallback(() => {
+    api.attendanceToday()
+      .then(setEntry)
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load today"));
+  }, []);
+  useEffect(() => load(), [load]);
+
+  // A ticking clock, like Keka's "Time Today".
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  async function act(which: "in" | "out" | "reset") {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = which === "in" ? await api.checkIn()
+        : which === "out" ? await api.checkOut()
+        : await api.resetToday();
+      setEntry(next);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to record that");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const clockedIn = !!entry?.checkIn;
+  const clockedOut = !!entry?.checkOut;
+  const worked = fmtDuration(minutesBetween(entry?.checkIn ?? null, entry?.checkOut ?? (clockedIn ? nowHHmm(now) : null)));
+  const zone = currentTimezone();
+  const dateLabel = now.toLocaleDateString(undefined, {
+    weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: zone,
+  });
+  const timeLabel = now.toLocaleTimeString(undefined, {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: zone,
+  });
+  // Named only when it is not the zone the person's own machine is on. Someone sitting in the
+  // office never needs telling; someone whose company is set to UTC, or who is travelling, does —
+  // and that is exactly when the number looks wrong.
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const zoneLabel = zone && zone !== browserZone ? zone.replace(/_/g, " ") : null;
+
+  return (
+    <Card className="mt-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <CardTitle>Time Today</CardTitle>
+            {entry?.status && <StatusChip status={entry.status} derived={entry.derived} />}
+          </div>
+          <p className="mt-1 text-xs text-fg/40">
+            {dateLabel}
+            {zoneLabel && <span className="ml-1.5 text-fg/30">· {zoneLabel}</span>}
+          </p>
+          <p className="mt-2 font-mono text-4xl font-semibold tabular-nums tracking-tight">{timeLabel}</p>
+          <p className="mt-2 text-sm text-fg/60">
+            {clockedIn ? (
+              <>
+                In at <span className="font-medium text-fg">{hhmm(entry!.checkIn!)}</span>
+                {clockedOut
+                  ? <> · out at <span className="font-medium text-fg">{hhmm(entry!.checkOut!)}</span> · <span className="text-fg/80">{worked}</span></>
+                  : <> · <span className="text-emerald-400">working now</span> · {worked}</>}
+              </>
+            ) : "You haven't clocked in yet."}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          {!clockedIn ? (
+            <Button onClick={() => act("in")} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} Check in
+            </Button>
+          ) : (
+            <Button variant={clockedOut ? "ghost" : "primary"} onClick={() => act("out")} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} {clockedOut ? "Update check-out" : "Check out"}
+            </Button>
+          )}
+          {clockedIn && (
+            <button onClick={() => act("reset")} disabled={busy}
+              className="inline-flex items-center gap-1 text-xs text-fg/40 hover:text-fg/70">
+              <RotateCcw className="h-3 w-3" /> Reset today
+            </button>
+          )}
+        </div>
+      </div>
+      {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+    </Card>
+  );
+}
+
+
+export function MyMonth() {
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [data, setData] = useState<AttendanceMonth | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setData(null);
+    api.myAttendance(month)
+      .then(setData)
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load your month"));
+  }, [month]);
+
+  // The day whose detail is shown under the grid. Today when it is in view, so the page opens on
+  // something rather than on an empty panel.
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => {
+    const today = new Date().toLocaleDateString("sv");
+    setSelected(today.startsWith(month) ? today : `${month}-01`);
+  }, [month]);
+
+  const cells = useMemo(
+    () =>
+      (data?.days ?? []).map((d) => ({
+        date: d.date,
+        bars: d.status ? [{ color: STATUS[d.status].bar, label: STATUS[d.status].label }] : [],
+        tint: d.status === "HOLIDAY" ? "bg-amber-400/10" : undefined,
+        title: `${d.date} · ${d.status ? STATUS[d.status].label : "not marked"}${d.note ? ` · ${d.note}` : ""}`,
+      })),
+    [data],
+  );
+
+  const day = data?.days.find((d) => d.date === selected) ?? null;
+
+  return (
+    <div className="mt-10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">My month</h2>
+      </div>
+
+      {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+
+      {data === null ? (
+        <Card className="mt-3"><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></Card>
+      ) : (
+        <>
+        <Card className="mt-3">
+          <div className="flex flex-wrap items-center gap-6">
+            <div>
+              <p className="text-sm text-fg/50">Worked</p>
+              <p className="text-2xl font-semibold">
+                {data.workedDays}<span className="text-base text-fg/40"> / {data.expectedDays} days</span>
+              </p>
+            </div>
+            {data.attendanceRate !== null && (
+              <div>
+                <p className="text-sm text-fg/50">Attendance</p>
+                <p className="text-2xl font-semibold text-violet">{data.attendanceRate}%</p>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(data.counts)
+                .filter(([, n]) => n > 0)
+                .map(([s, n]) => (
+                  <span key={s} className={`rounded-full px-2 py-0.5 text-xs ${STATUS[s as AttendanceStatus].chip}`}>
+                    {STATUS[s as AttendanceStatus].label} {n}
+                  </span>
+                ))}
+              {/* Days nobody recorded anything on. They count against the rate, so the rate is not
+                  explicable without them: three present days out of fourteen expected is 21%, and
+                  the eleven have to be visible somewhere or the number looks wrong. */}
+              {data.notRecorded > 0 && (
+                <span className="rounded-full bg-fg/10 px-2 py-0.5 text-xs text-fg/60">
+                  Not recorded {data.notRecorded}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <MonthCalendar
+            className="mt-5"
+            month={month}
+            onMonthChange={setMonth}
+            days={cells}
+            selected={selected}
+            onSelect={setSelected}
+            legend={legendFor(data.days)}
+          />
+
+          {/* The selected day, under the grid rather than in a popover — the same place a phone
+              calendar puts it, and it survives switching days without anything opening or closing. */}
+          {selected && (
+            <div className="mt-6 border-t border-fg/10 pt-4">
+              <DayHeading date={selected}>
+                {day?.status ? <StatusChip status={day.status} derived={day.derived} /> : null}
+              </DayHeading>
+              {day && (day.checkIn || day.checkOut) ? (
+                <div className="mt-3 flex items-center gap-3 text-sm">
+                  <span className="h-8 w-1 shrink-0 rounded-full bg-violet" />
+                  <div>
+                    <p className="font-medium">Sign-in / out</p>
+                    <p className="text-fg/50">
+                      {day.checkIn ? hhmm(day.checkIn) : "—"} &ndash; {day.checkOut ? hhmm(day.checkOut) : "—"}
+                      <span className="ml-2 text-fg/40">{fmtDuration(minutesBetween(day.checkIn, day.checkOut))}</span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-fg/40">
+                  {day?.status ? `${STATUS[day.status].label} — no clock-in recorded.` : "Nothing recorded for this day."}
+                </p>
+              )}
+              {day?.note && <p className="mt-2 text-sm text-fg/60">{day.note}</p>}
+            </div>
+          )}
+        </Card>
+
+        <DailyLog days={data.days} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Only the statuses this month actually has: a legend of seven for a month with three is noise. */
+function legendFor(days: AttendanceEntry[]) {
+  const seen = new Set<AttendanceStatus>();
+  for (const d of days) if (d.status) seen.add(d.status);
+  return [...seen].map((s) => ({ color: STATUS[s].bar, label: STATUS[s].label }));
+}
+
+/**
+ * A day-wise log of when you clocked in and out — the table people expect from Keka/Zoho. Newest
+ * first, working days only (weekends/holidays are hidden), future days dropped. Hours are computed
+ * from the in/out pair and shown with a bar relative to a 9-hour day.
+ */
+export function DailyLog({ days }: { days: AttendanceEntry[] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  // Full log: every day up to today (newest first), including week-offs/holidays (muted) and today
+  // even if it's still open — a complete timesheet, not just the days that were worked.
+  const rows = days.filter((d) => d.date <= today).slice().reverse();
+
+  if (rows.length === 0) {
+    return (
+      <Card className="mt-4">
+        <CardTitle>Daily log</CardTitle>
+        <p className="mt-2 text-sm text-fg/50">No days logged yet this month.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-4 overflow-x-auto p-0">
+      <div className="px-5 pt-5"><CardTitle>Daily log</CardTitle></div>
+      <table className="mt-3 w-full min-w-[560px] border-collapse text-sm">
+        <thead>
+          <tr className="border-y border-fg/10 text-left text-xs uppercase tracking-wide text-fg/40">
+            <th className="px-5 py-2 font-medium">Date</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Check in</th>
+            <th className="px-3 py-2 font-medium">Check out</th>
+            <th className="px-3 py-2 font-medium">Hours</th>
+            <th className="w-32 px-5 py-2 font-medium">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((d) => {
+            const mins = minutesBetween(d.checkIn, d.checkOut);
+            const pct = mins == null ? 0 : Math.min(100, Math.round((mins / (9 * 60)) * 100));
+            const dt = new Date(`${d.date}T00:00:00`);
+            const weekday = dt.toLocaleDateString(undefined, { weekday: "short" });
+            const nice = dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+            const offDay = d.status === "WEEK_OFF" || d.status === "HOLIDAY" || !d.status;
+            return (
+              <tr key={d.date} className={cn("border-b border-fg/5 last:border-0 hover:bg-fg/[0.03]", offDay && "text-fg/40")}>
+                <td className="px-5 py-2.5 whitespace-nowrap">
+                  <span className="font-medium">{nice}</span>
+                  <span className="ml-1.5 text-xs text-fg/40">{weekday}</span>
+                </td>
+                <td className="px-3 py-2.5">{d.status ? <StatusChip status={d.status} derived={d.derived} /> : <span className="text-xs text-fg/30">not marked</span>}</td>
+                <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkIn ? hhmm(d.checkIn) : "—"}</td>
+                <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkOut ? hhmm(d.checkOut) : "—"}</td>
+                <td className="px-3 py-2.5 tabular-nums font-medium">{fmtDuration(mins)}</td>
+                <td className="px-5 py-2.5">
+                  <div className="h-1.5 w-full rounded-full bg-fg/10">
+                    <div className="h-1.5 rounded-full bg-violet" style={{ width: `${pct}%` }} />
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
