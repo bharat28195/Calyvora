@@ -1,0 +1,57 @@
+name: Keep-alive
+
+# Keeps the free Render services warm, so a visitor never meets the ~4.5-minute cold start.
+#
+# Render's free tier spins a service down after 15 minutes with no inbound traffic, and a Spring Boot
+# backend takes the better part of five minutes to come back. The frontend answers instantly, so the
+# worst case is the common one: someone opens the login page in half a second, submits, and then
+# watches a dead button for four minutes. This pings the backend (and the frontend) often enough that
+# the spin-down never happens.
+#
+# This is the free, in-repo equivalent of an UptimeRobot monitor. It runs on GitHub's machines, which
+# are external to Render — that is the whole point, because the thing doing the pinging must not be
+# the thing that falls asleep. A self-ping from inside the app could not work.
+#
+# When you move the backend to a paid always-on instance (Render Starter, $7/mo), this stops being
+# necessary and can be deleted — the instance no longer sleeps.
+
+on:
+  schedule:
+    # Every 10 minutes. The spin-down is at 15 minutes idle, so a 10-minute beat keeps a safe margin
+    # even when GitHub delays a scheduled run (it does, under load — scheduled crons are best-effort).
+    - cron: "*/10 * * * *"
+  # So you can prove it works without waiting for the clock.
+  workflow_dispatch:
+
+# No code is needed — this only makes HTTP calls — so it checks nothing out and needs no permissions.
+permissions: {}
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping the services
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the backend
+        run: |
+          # Readiness is the cheapest honest "are you up" the backend has. --max-time 300 tolerates a
+          # cold start that happens to land between beats; a slow 200 is still a success.
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 300 \
+            https://calyvora-backend.onrender.com/actuator/health/readiness || echo 000)
+          echo "backend readiness -> $code"
+          # 200 is up. Anything else is worth failing the run so the Actions tab shows a red mark and
+          # you find out from here rather than from a customer.
+          test "$code" = "200"
+
+      - name: Wake the frontend
+        # Run even if the backend step failed, so one cold service does not hide the other's state.
+        if: ${{ always() }}
+        run: |
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 120 \
+            https://orbit.calyvora.in/login || echo 000)
+          echo "frontend /login -> $code"
+          test "$code" = "200"
