@@ -25,11 +25,19 @@ databases:
     #   select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;
 
 services:
-  # ---- Backend: Spring Boot (Docker) ----
+  # ============================ PRODUCTION ============================
+  # The two services below are PRODUCTION: real customers, the prod profile (no dev/seed/mailbox
+  # endpoints exist at all), and the always-on Starter plan so nobody meets a cold start. They track
+  # `main`, which is the release branch — you merge product/hr-platform into main to ship. The demo
+  # environment is a separate, free pair at the bottom of this file, tracking product/hr-platform.
+
+  # ---- Backend (production): Spring Boot (Docker) ----
   - type: web
     name: calyvora-backend
     runtime: docker
-    plan: free
+    # Always-on. The app runs in 512 MB on the free tier already (the cold start was a successful
+    # boot, just slow); Starter is the same 512 MB with 5x the CPU and no spin-down. $7/mo.
+    plan: starter
     region: singapore            # pick the region closest to you / your customers
     # The branch that gets deployed, stated HERE rather than left to the dashboard.
     #
@@ -39,13 +47,15 @@ services:
     # edly on, and ruling the branch in or out cost a diagnosis round-trip this line makes unnecessary.
     #
     # Takes effect on a blueprint sync (Dashboard > Blueprints > this repo > Sync), not on a push.
-    branch: product/hr-platform
+    branch: main
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /actuator/health
     envVars:
       - key: SPRING_PROFILES_ACTIVE
-        value: staging
+        # Production. Under `prod` the whole @Profile("!prod") dev surface (seed, mailbox, mail test)
+        # does not exist, Swagger is off, and cookies are secure. This is what a customer touches.
+        value: prod
       # Database: Neon, not the Render one below.
       #
       # Render's free Postgres is DELETED 30 days after it is created, which makes it unusable for
@@ -128,16 +138,18 @@ services:
       - key: RESEND_API_KEY
         sync: false
 
-  # ---- Frontend: Next.js (native Node) ----
+  # ---- Frontend (production): Next.js (native Node) ----
   - type: web
     name: calyvora-frontend
+    # Left on free: Next.js wakes fast, and the keep-alive workflow pings it so it never sleeps in
+    # front of a customer. Bump to starter if you want it always-on without the ping.
     runtime: node
     plan: free
     region: singapore
     # Same branch as the backend, and stated for the same reason — see the note there. The two must
     # never drift: the frontend nav links to routes the backend has to know about, so a frontend built
     # from a different commit shows sections whose API answers 404.
-    branch: product/hr-platform
+    branch: main
     rootDir: frontend
     buildCommand: npm ci && npm run build
     startCommand: npm start
@@ -162,3 +174,67 @@ services:
       # or Render appends a uniqueness suffix to its url.
       - key: BACKEND_ORIGIN
         value: https://calyvora-backend.onrender.com
+
+  # ============================== DEMO ==============================
+  # A separate, free, throwaway environment for showing prospects. It tracks `product/hr-platform`
+  # (where you keep building) on the `staging` profile, so the demo-seed button and the dev tools
+  # work here — and it has its OWN database, so anything a prospect does to the demo can never touch
+  # a paying customer. Nothing below is a secret in this file; the sync:false values are set by hand
+  # in the Render dashboard, pointing at a SECOND Neon database you create for the demo.
+  #
+  # Before the demo services will boot, you need, once:
+  #   1. A second Neon database (free) — its own project/branch, NOT the production one.
+  #   2. A CNAME for `demo` at Hostinger pointing at calyvora-frontend-demo.onrender.com.
+  #   3. The sync:false env vars below, set in the dashboard for each demo service.
+  # Until then the production pair above runs fine on its own; these just sit unprovisioned.
+
+  # ---- Backend (demo): Spring Boot (Docker) ----
+  - type: web
+    name: calyvora-backend-demo
+    runtime: docker
+    plan: free                       # a demo may sleep; the keep-alive pings it, or let it cold-start
+    region: singapore
+    branch: product/hr-platform      # the working branch — demo shows the latest build
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: staging               # dev/seed/mailbox endpoints available — a demo needs to seed
+      - key: DB_URL                   # the SECOND Neon database, never production's
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: FRONTEND_BASE_URL
+        value: https://demo.calyvora.in
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://demo.calyvora.in,https://calyvora-frontend-demo.onrender.com
+      - key: JWT_KID
+        sync: false
+      - key: JWT_PRIVATE_KEY
+        sync: false
+      - key: JWT_PUBLIC_KEY
+        sync: false
+      # Leave RESEND_API_KEY unset on the demo: with no provider the dev mailbox captures
+      # verification/invite links (safe here precisely because nothing is delivered), which is how a
+      # demo completes signup flows without a real inbox.
+
+  # ---- Frontend (demo): Next.js (native Node) ----
+  - type: web
+    name: calyvora-frontend-demo
+    runtime: node
+    plan: free
+    region: singapore
+    branch: product/hr-platform
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    domains:
+      - demo.calyvora.in
+    envVars:
+      - key: NEXT_PUBLIC_API_MODE
+        value: live
+      - key: BACKEND_ORIGIN
+        value: https://calyvora-backend-demo.onrender.com
