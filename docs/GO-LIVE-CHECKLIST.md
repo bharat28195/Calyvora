@@ -12,40 +12,70 @@ Adding a customer = creating a company under your owner account. No new instance
 
 ## Phase 0 — Prerequisites (secrets that must be set before anything else)
 
-These live only in the Render dashboard (`sync: false` — never in the repo).
+These live only in the Render dashboard (`sync: false` — never in the repo). Set them on the
+**production** backend `calyvora-backend-prod` once it exists (Phase 1). The existing/demo backend
+keeps its own values.
 
-- [ ] **Platform-owner password.** Backend service → Environment → set `PLATFORM_OWNER_PASSWORD`,
-      then restart. You log in as OWNER (`bharat28195@calyvora.in`) to create companies, and that
-      account can read every customer — it must not be on the built-in default.
-- [ ] **JWT signing keys present:** `JWT_KID`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` on the backend.
-      Without them the app makes a throwaway key at each boot and every restart logs everyone out.
-- [ ] **Email:** `RESEND_API_KEY` set on the backend (production sends real mail via Resend on 443;
-      Render blocks SMTP, so Resend is the transport).
+- [ ] **Platform-owner password.** `calyvora-backend-prod` → Environment → set
+      `PLATFORM_OWNER_PASSWORD`, then restart. You log in as OWNER (`bharat28195@calyvora.in`) to
+      create companies, and that account can read every customer — it must not be on the default.
+- [ ] **JWT signing keys present:** `JWT_KID`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` on
+      `calyvora-backend-prod`. Without them the app makes a throwaway key at each boot and every
+      restart logs everyone out.
+- [ ] **Email:** `RESEND_API_KEY` on `calyvora-backend-prod` (production sends real mail via Resend
+      on 443; Render blocks SMTP, so Resend is the transport).
+
+(These overlap with Phase 1's per-service steps — set them whenever you create `calyvora-backend-prod`.)
 
 ---
 
-## Phase 1 — Production cutover (this is "deploy main to prod")
+## Phase 1 — Build the production services (new, alongside the existing ones)
 
-- [ ] **Point the Render Blueprint at the repo**, reading from the **`main`** branch (`main` is now
-      the production release branch — it has the full product and the two-environment `render.yaml`).
-- [ ] **Blueprints → Sync.** This:
-      - repoints `calyvora-backend` to `main`, the `prod` profile, and the **Starter** plan ($7 — your paid instance),
-      - repoints `calyvora-frontend` to `main`,
-      - creates the two new demo services (they stay unprovisioned until Phase 3 — harmless).
-- [ ] **Production database.** Create a **fresh Neon database** for production so it starts clean
-      (no demo/scale leftovers). Set `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` on `calyvora-backend`.
-      - Use Neon's **direct** hostname, **not** the `-pooler` one (the app binds its tenant on a
-        session-scoped setting; a transaction pooler can split that across connections).
-      - Pick the Neon region matching the service (**Singapore / ap-southeast-1**).
+Option A: production is a NEW pair of services; the existing services keep running untouched and
+become the demo. Nothing you rely on breaks while you build and verify prod.
+
+- [ ] **Point the Render Blueprint at the repo**, reading from the **`main`** branch (`main` is the
+      production release branch — full product + the two-environment `render.yaml`).
+- [ ] **Blueprints → Sync.** This **creates** the new production services
+      `calyvora-backend-prod` (Starter, `main`, `prod`) and `calyvora-frontend-prod` (`main`), and
+      leaves your existing `calyvora-backend`/`calyvora-frontend` as the demo. It does **not** move
+      any traffic — the new services come up on their own `onrender.com` urls.
+- [ ] **Production database.** Create a **fresh Neon database** for production so it starts clean.
+      Set `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` on **`calyvora-backend-prod`**.
+      - Use Neon's **direct** hostname, **not** the `-pooler` one.
+      - Region: **Singapore / ap-southeast-1**.
+- [ ] **Production signing keys + email.** On `calyvora-backend-prod` set its own `JWT_KID` /
+      `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` and `RESEND_API_KEY`.
 - [ ] **Verify the database role enforces isolation.** In Neon's SQL editor:
       `select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;`
       Both `rolsuper` and `rolbypassrls` must be **false** — otherwise row-level security is silently
       ignored and tenants could see each other.
-- [ ] **Confirm the backend is up and really in prod mode:**
-      - `https://calyvora-backend.onrender.com/actuator/health` → `200` `{"status":"UP"}`
-      - `https://calyvora-backend.onrender.com/api/v1/dev/mailbox` → **`404`** (under `prod` the dev
-        endpoints do not exist — a 404 here is proof the prod profile is active).
-- [ ] **Confirm the site loads:** `https://orbit.calyvora.in` → login page.
+- [ ] **Verify prod on its onrender.com url (before touching any domain):**
+      - `https://calyvora-backend-prod.onrender.com/actuator/health` → `200` `{"status":"UP"}`
+      - `https://calyvora-backend-prod.onrender.com/api/v1/dev/mailbox` → **`404`** (proof the `prod`
+        profile is active — dev endpoints do not exist).
+      - `https://calyvora-frontend-prod.onrender.com` → login page loads.
+
+---
+
+## Phase 1b — Point orbit.calyvora.in at production (the cutover)
+
+Do this only once prod is verified above. It moves your brand URL from the demo (old) frontend to
+the new prod frontend. Reversible — if anything looks wrong, move the domain back.
+
+- [ ] **Render — add the domain to prod:** `calyvora-frontend-prod` → Settings → Custom Domains →
+      add `orbit.calyvora.in`. Render shows the DNS target (e.g. `calyvora-frontend-prod.onrender.com`).
+- [ ] **Render — remove the domain from the old frontend:** `calyvora-frontend` → Custom Domains →
+      remove `orbit.calyvora.in` (a domain can only live on one service).
+- [ ] **Hostinger — repoint DNS:** edit the `orbit` **CNAME** for `calyvora.in` to point at
+      `calyvora-frontend-prod.onrender.com` (the target Render showed). Save.
+- [ ] **Wait for DNS + TLS** (usually minutes, up to ~an hour). Render marks the domain "Verified"
+      and issues the certificate automatically.
+- [ ] **Confirm:** `https://orbit.calyvora.in` now loads the production site, and
+      `https://orbit.calyvora.in/api/v1/dev/mailbox` → **`404`** (you're on prod).
+
+Your old `orbit` CNAME currently points at `calyvora-frontend.onrender.com`; you are changing it to
+`calyvora-frontend-prod.onrender.com`. That is the whole DNS change.
 
 ---
 
@@ -58,21 +88,21 @@ These live only in the Render dashboard (`sync: false` — never in the repo).
 
 ---
 
-## Phase 3 — Demo environment (optional — production works without it)
+## Phase 3 — Demo on its own domain (optional — production works without it)
 
-Only needed if you want a public, self-serve demo separate from real customers.
+In Option A the demo is your EXISTING services (`calyvora-backend` / `calyvora-frontend`), which keep
+their current database (already seeded) and the `staging` profile. The only thing to do is give them
+the `demo.calyvora.in` address — they already run.
 
-- [ ] **Second Neon database** for the demo (or reuse the *old* production database — it already has
-      demo data seeded). Never point the demo at the production database.
-- [ ] **DNS:** at Hostinger add a **CNAME**: `demo` → `calyvora-frontend-demo.onrender.com`.
-- [ ] On `calyvora-backend-demo`, set `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` (the demo DB) and its
-      own `JWT_KID` / `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY`.
-      - **Leave `RESEND_API_KEY` unset** on the demo. With no provider, verification/invite links are
-        captured in the in-app dev mailbox (`demo.calyvora.in/dev/mailbox`) instead of being emailed —
-        which is how a demo completes signup flows without a real inbox, and is safe because nothing
-        is actually delivered.
-- [ ] Seed the demo: open `demo.calyvora.in` and use the "Explore the demo" flow, or hit the demo
-      backend's seed. Verify the Northwind demo company appears.
+- [ ] **Hostinger — add a `demo` CNAME** for `calyvora.in` pointing at
+      `calyvora-frontend.onrender.com` (the existing frontend).
+- [ ] **Render — add the domain:** `calyvora-frontend` → Custom Domains → add `demo.calyvora.in`.
+      (After Phase 1b removed `orbit` from this service, `demo.calyvora.in` is its address.)
+- [ ] **Leave `RESEND_API_KEY` unset** on the existing `calyvora-backend` so the demo captures
+      verification/invite links in the in-app mailbox (`demo.calyvora.in/dev/mailbox`) instead of
+      emailing them — safe, since nothing is delivered, and it lets a demo finish signup flows.
+- [ ] Confirm `https://demo.calyvora.in` loads and the Northwind demo company is there (it already
+      is, in the existing database). Re-seed via the "Explore the demo" flow if you want it fresh.
 
 ---
 
