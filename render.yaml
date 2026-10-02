@@ -4,7 +4,7 @@
 #
 # TWO ENVIRONMENTS (Option A — new services are production, existing ones become the demo):
 #
-#   PRODUCTION  calyvora-backend-prod / calyvora-frontend-prod
+#   PRODUCTION  orbit-prod-backend / orbit-prod-frontend
 #               branch main · prod profile · Starter ($7) backend · orbit.calyvora.in
 #               Real customers. No dev/seed/mailbox endpoints exist. Its own clean database.
 #
@@ -36,7 +36,7 @@ services:
 
   # ---- Backend (production): Spring Boot (Docker) ----
   - type: web
-    name: calyvora-backend-prod
+    name: orbit-prod-backend
     runtime: docker
     # Always-on. The app runs in 512 MB on free already (the cold start was a successful boot, just
     # slow); Starter is the same 512 MB with 5x the CPU and no spin-down. $7/mo, billed on this one
@@ -68,7 +68,7 @@ services:
       - key: FRONTEND_BASE_URL
         value: https://orbit.calyvora.in
       - key: CORS_ALLOWED_ORIGINS
-        value: https://orbit.calyvora.in,https://calyvora-frontend-prod.onrender.com
+        value: https://orbit.calyvora.in,https://orbit-prod-frontend.onrender.com
       # RS256 signing keys — set by hand, never committed. Without them the app makes a throwaway
       # keypair at each boot and every restart logs all users out. Production needs its OWN keys.
       - key: JWT_KID
@@ -85,7 +85,7 @@ services:
 
   # ---- Frontend (production): Next.js (native Node) ----
   - type: web
-    name: calyvora-frontend-prod
+    name: orbit-prod-frontend
     runtime: node
     # Free: Next.js wakes fast and the keep-alive workflow pings it. Bump to starter for always-on.
     plan: free
@@ -96,7 +96,7 @@ services:
     startCommand: npm start
     # The production brand domain. MOVE IT HERE as the cutover step (dashboard: add to this service,
     # remove from the demo frontend; Hostinger: point the `orbit` CNAME at
-    # calyvora-frontend-prod.onrender.com). Until then prod is reachable on its onrender.com url.
+    # orbit-prod-frontend.onrender.com). Until then prod is reachable on its onrender.com url.
     domains:
       - orbit.calyvora.in
     envVars:
@@ -105,7 +105,7 @@ services:
       # The PUBLIC url of the PRODUCTION backend (not the private-network host). Update if Render
       # appends a uniqueness suffix to the backend's url.
       - key: BACKEND_ORIGIN
-        value: https://calyvora-backend-prod.onrender.com
+        value: https://orbit-prod-backend.onrender.com
 
   # ============================ DEMO (existing) ============================
   # The services that already exist, repurposed as the demo: the working branch on the staging

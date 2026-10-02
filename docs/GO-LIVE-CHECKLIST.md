@@ -13,19 +13,19 @@ Adding a customer = creating a company under your owner account. No new instance
 ## Phase 0 — Prerequisites (secrets that must be set before anything else)
 
 These live only in the Render dashboard (`sync: false` — never in the repo). Set them on the
-**production** backend `calyvora-backend-prod` once it exists (Phase 1). The existing/demo backend
+**production** backend `orbit-prod-backend` once it exists (Phase 1). The existing/demo backend
 keeps its own values.
 
-- [ ] **Platform-owner password.** `calyvora-backend-prod` → Environment → set
+- [ ] **Platform-owner password.** `orbit-prod-backend` → Environment → set
       `PLATFORM_OWNER_PASSWORD`, then restart. You log in as OWNER (`bharat28195@calyvora.in`) to
       create companies, and that account can read every customer — it must not be on the default.
 - [ ] **JWT signing keys present:** `JWT_KID`, `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` on
-      `calyvora-backend-prod`. Without them the app makes a throwaway key at each boot and every
+      `orbit-prod-backend`. Without them the app makes a throwaway key at each boot and every
       restart logs everyone out.
-- [ ] **Email:** `RESEND_API_KEY` on `calyvora-backend-prod` (production sends real mail via Resend
+- [ ] **Email:** `RESEND_API_KEY` on `orbit-prod-backend` (production sends real mail via Resend
       on 443; Render blocks SMTP, so Resend is the transport).
 
-(These overlap with Phase 1's per-service steps — set them whenever you create `calyvora-backend-prod`.)
+(These overlap with Phase 1's per-service steps — set them whenever you create `orbit-prod-backend`.)
 
 ---
 
@@ -37,24 +37,24 @@ become the demo. Nothing you rely on breaks while you build and verify prod.
 - [ ] **Point the Render Blueprint at the repo**, reading from the **`main`** branch (`main` is the
       production release branch — full product + the two-environment `render.yaml`).
 - [ ] **Blueprints → Sync.** This **creates** the new production services
-      `calyvora-backend-prod` (Starter, `main`, `prod`) and `calyvora-frontend-prod` (`main`), and
+      `orbit-prod-backend` (Starter, `main`, `prod`) and `orbit-prod-frontend` (`main`), and
       leaves your existing `calyvora-backend`/`calyvora-frontend` as the demo. It does **not** move
       any traffic — the new services come up on their own `onrender.com` urls.
 - [ ] **Production database.** Create a **fresh Neon database** for production so it starts clean.
-      Set `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` on **`calyvora-backend-prod`**.
+      Set `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` on **`orbit-prod-backend`**.
       - Use Neon's **direct** hostname, **not** the `-pooler` one.
       - Region: **Singapore / ap-southeast-1**.
-- [ ] **Production signing keys + email.** On `calyvora-backend-prod` set its own `JWT_KID` /
+- [ ] **Production signing keys + email.** On `orbit-prod-backend` set its own `JWT_KID` /
       `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` and `RESEND_API_KEY`.
 - [ ] **Verify the database role enforces isolation.** In Neon's SQL editor:
       `select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;`
       Both `rolsuper` and `rolbypassrls` must be **false** — otherwise row-level security is silently
       ignored and tenants could see each other.
 - [ ] **Verify prod on its onrender.com url (before touching any domain):**
-      - `https://calyvora-backend-prod.onrender.com/actuator/health` → `200` `{"status":"UP"}`
-      - `https://calyvora-backend-prod.onrender.com/api/v1/dev/mailbox` → **`404`** (proof the `prod`
+      - `https://orbit-prod-backend.onrender.com/actuator/health` → `200` `{"status":"UP"}`
+      - `https://orbit-prod-backend.onrender.com/api/v1/dev/mailbox` → **`404`** (proof the `prod`
         profile is active — dev endpoints do not exist).
-      - `https://calyvora-frontend-prod.onrender.com` → login page loads.
+      - `https://orbit-prod-frontend.onrender.com` → login page loads.
 
 ---
 
@@ -63,19 +63,19 @@ become the demo. Nothing you rely on breaks while you build and verify prod.
 Do this only once prod is verified above. It moves your brand URL from the demo (old) frontend to
 the new prod frontend. Reversible — if anything looks wrong, move the domain back.
 
-- [ ] **Render — add the domain to prod:** `calyvora-frontend-prod` → Settings → Custom Domains →
-      add `orbit.calyvora.in`. Render shows the DNS target (e.g. `calyvora-frontend-prod.onrender.com`).
+- [ ] **Render — add the domain to prod:** `orbit-prod-frontend` → Settings → Custom Domains →
+      add `orbit.calyvora.in`. Render shows the DNS target (e.g. `orbit-prod-frontend.onrender.com`).
 - [ ] **Render — remove the domain from the old frontend:** `calyvora-frontend` → Custom Domains →
       remove `orbit.calyvora.in` (a domain can only live on one service).
 - [ ] **Hostinger — repoint DNS:** edit the `orbit` **CNAME** for `calyvora.in` to point at
-      `calyvora-frontend-prod.onrender.com` (the target Render showed). Save.
+      `orbit-prod-frontend.onrender.com` (the target Render showed). Save.
 - [ ] **Wait for DNS + TLS** (usually minutes, up to ~an hour). Render marks the domain "Verified"
       and issues the certificate automatically.
 - [ ] **Confirm:** `https://orbit.calyvora.in` now loads the production site, and
       `https://orbit.calyvora.in/api/v1/dev/mailbox` → **`404`** (you're on prod).
 
 Your old `orbit` CNAME currently points at `calyvora-frontend.onrender.com`; you are changing it to
-`calyvora-frontend-prod.onrender.com`. That is the whole DNS change.
+`orbit-prod-frontend.onrender.com`. That is the whole DNS change.
 
 ---
 
