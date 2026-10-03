@@ -30,9 +30,10 @@ import java.util.UUID;
  * and carried a demo password. It is infrastructure, not demo data, so it is created here instead:
  * idempotent, safe to run on every boot, and configurable per environment.
  *
- * <p>The password is taken from {@code PLATFORM_OWNER_PASSWORD} when set. The built-in default exists
- * so a fresh deployment is usable immediately, and the app says loudly when it is in use — a shared
- * default on the account that reads every customer's data is worth being noisy about.
+ * <p>The password is taken from {@code PLATFORM_OWNER_PASSWORD}. There is deliberately NO built-in
+ * default: an owner account that reads every customer's data must never be created with a password
+ * that lives in the source tree. When the variable is unset and no owner exists yet, this refuses to
+ * create one and says so loudly, rather than shipping a guessable super-account.
  */
 @Component
 public class PlatformOwnerBootstrap implements ApplicationRunner {
@@ -40,23 +41,13 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(PlatformOwnerBootstrap.class);
     private static final String PLATFORM_COMPANY = "Calyvora (Platform)";
 
-    /**
-     * The founder's own account, so a fresh deployment is usable without setting anything.
-     *
-     * <p><b>This password is in the source tree, so it is not a secret.</b> Anyone who can read the
-     * repository can sign in as the account that sees every customer on the platform. Set
-     * {@code PLATFORM_OWNER_PASSWORD} on any deployment holding real customer data; the app says so
-     * loudly at startup while this default is in use.
-     */
-    private static final String DEFAULT_PASSWORD = "Bharat@28195#";
-
     private final CompanyRepository companyRepository;
     private final CompanySettingsRepository settingsRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final String ownerEmail;
     private final String ownerPassword;
-    private final boolean usingDefaultPassword;
+    private final boolean passwordConfigured;
 
     private final com.calyvora.common.security.TenantBinder tenantBinder;
 
@@ -73,8 +64,8 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.ownerEmail = ownerEmail.trim().toLowerCase();
-        this.usingDefaultPassword = configuredPassword == null || configuredPassword.isBlank();
-        this.ownerPassword = usingDefaultPassword ? DEFAULT_PASSWORD : configuredPassword;
+        this.ownerPassword = configuredPassword == null ? "" : configuredPassword;
+        this.passwordConfigured = !this.ownerPassword.isBlank();
     }
 
     @Override
@@ -109,6 +100,15 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
     @Transactional
     public boolean ensurePlatformOwner() {
         if (userRepository.existsByEmail(ownerEmail)) {
+            return false;   // already present under the configured address; nothing to do, no password needed.
+        }
+        // Both creating and moving the owner set a password, so one must be configured first — there is
+        // no built-in default to fall back to. (An owner that already exists under a DIFFERENT address
+        // is migrated onto the configured one, with the configured password, by renameExistingOwner.)
+        if (!passwordConfigured) {
+            log.error("No platform owner account for '{}' exists and PLATFORM_OWNER_PASSWORD is not set. "
+                    + "Refusing to create the account that reads every customer with a blank or guessable "
+                    + "password. Set PLATFORM_OWNER_EMAIL and PLATFORM_OWNER_PASSWORD, then restart.", ownerEmail);
             return false;
         }
         if (renameExistingOwner()) {
@@ -135,10 +135,6 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
         userRepository.save(owner);
 
         log.info("Created the platform owner {}.", ownerEmail);
-        if (usingDefaultPassword) {
-            log.warn("The platform owner is using the built-in default password. This account can read "
-                    + "every customer on the platform — set PLATFORM_OWNER_PASSWORD and restart.");
-        }
         return true;
     }
 
