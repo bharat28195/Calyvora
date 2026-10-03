@@ -100,13 +100,33 @@ After the backend deploys:
 - `https://<backend>.onrender.com/api/v1/dev/mailbox` → `404` on a `prod`-profile service (dev
   endpoints don't exist in prod — this is also how you confirm the service is really in prod mode).
 
-Isolation sanity check (optional) — Neon SQL Editor:
+Isolation check — Neon SQL Editor:
 ```sql
 select current_user, rolsuper, rolbypassrls from pg_roles where rolname = current_user;
 ```
-`rolsuper` and `rolbypassrls` must both be **false**. Even so, the migrations set
-`FORCE ROW LEVEL SECURITY` on every tenant table, so the owner role (`neondb_owner`) is subject to the
-tenant policies too — which is what makes `neondb_owner` safe to use here.
+`rolsuper` and `rolbypassrls` must both be **false**. The app enforces this at boot
+(`TenantIsolationVerifier`) and **refuses to start** if the role can bypass RLS — because such a role
+would let one tenant read another's data.
+
+**⚠️ Newer Neon projects give `neondb_owner` the BYPASSRLS attribute** (confirmed on the orbit-prod
+project, Oct 2026). If your check shows `rolbypassrls = true`, do NOT use that role and do NOT set
+`REQUIRE_TENANT_ISOLATION=false` (that just ships the data leak). Create a dedicated app role instead:
+
+```sql
+-- As neondb_owner, in the project's SQL editor.
+CREATE ROLE calyvora_app WITH LOGIN PASSWORD '<letters+numbers>'
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+GRANT CONNECT ON DATABASE neondb TO calyvora_app;
+
+-- Only safe on a FRESH database (no real data). Rebuilds the schema owned by the new role so
+-- Flyway re-runs cleanly and future migrations work (single owner). SKIP the DROP if the DB holds
+-- real data — instead reassign ownership, which is more involved.
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public AUTHORIZATION calyvora_app;
+GRANT ALL ON SCHEMA public TO calyvora_app;
+```
+Then set `DB_USERNAME = calyvora_app` / `DB_PASSWORD = <chosen>` (keep `DB_URL` the same) and redeploy.
+Boot log should then read `[TENANT ISOLATION] OK — role 'calyvora_app' is NOSUPERUSER without BYPASSRLS`.
 
 ---
 
@@ -116,6 +136,6 @@ tenant policies too — which is what makes `neondb_owner` safe to use here.
 |---|---|
 | Backend logs `UnknownHostException` on the DB host | Region mismatch, or you used Render's private DB host. Use the Neon public host; match regions (Singapore). |
 | Connection errors mentioning channel binding / SSL | You left `channel_binding=require` in `DB_URL`, or dropped `sslmode=require`. Use exactly `?sslmode=require`. |
-| `TENANT ISOLATION IS UNSAFE` at boot | The DB role is a superuser or has BYPASSRLS. Neon's `neondb_owner` is neither — check you're on the right role. |
+| `TENANT ISOLATION IS UNSAFE` at boot | The DB role has BYPASSRLS (newer Neon `neondb_owner` does). Create a dedicated `calyvora_app` role as shown in the isolation-check section and point the backend at it. Don't use `REQUIRE_TENANT_ISOLATION=false`. |
 | Tenants can see each other | You're on the `-pooler` host. Switch `DB_URL` to the direct host. |
 | Driver error "URL must start with jdbc" | `DB_URL` is missing the `jdbc:` prefix. |
