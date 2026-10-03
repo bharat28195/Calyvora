@@ -30,6 +30,35 @@ One Neon project **per environment**. Production and demo must never share a dat
 
 ---
 
+## 1b. ⭐ Create the app role BEFORE the first deploy (do not skip)
+
+Newer Neon projects give `neondb_owner` the **BYPASSRLS** attribute, which defeats tenant isolation —
+so the app refuses to boot as that role. The clean fix is to create a dedicated `NOBYPASSRLS` role
+**up front** and connect as it from the very first deploy, so Flyway creates every table owned by that
+role. (Connecting as `neondb_owner` first and switching later causes "permission denied" errors,
+because the tables end up owned by the wrong role.)
+
+In the new project's **SQL Editor** (connected as `neondb_owner`), run:
+```sql
+CREATE ROLE orbit_app WITH LOGIN PASSWORD '<letters+numbers>'
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+GRANT CONNECT ON DATABASE neondb TO orbit_app;
+GRANT USAGE, CREATE ON SCHEMA public TO orbit_app;
+```
+Then use **`orbit_app`** (not `neondb_owner`) as `DB_USERNAME` everywhere below. On the first deploy
+Flyway runs as `orbit_app`, so it owns `flyway_schema_history` and every table — no ownership mess,
+and isolation holds (`NOBYPASSRLS` + the migrations' `FORCE ROW LEVEL SECURITY`).
+
+**If you already deployed once as `neondb_owner`** (tables now owned by the wrong role), either start a
+fresh project, or transfer ownership in the existing one:
+```sql
+GRANT orbit_app TO neondb_owner;
+REASSIGN OWNED BY neondb_owner TO orbit_app;
+GRANT ALL ON SCHEMA public TO orbit_app;
+```
+
+---
+
 ## 2. Open the connection dialog and turn OFF pooling
 
 1. Project → branch (e.g. `production`) → **Connect**.
