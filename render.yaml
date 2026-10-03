@@ -5,22 +5,20 @@
 # TWO ENVIRONMENTS (Option A — new services are production, existing ones become the demo):
 #
 #   PRODUCTION  orbit-prod-backend / orbit-prod-frontend
-#               branch production · prod profile · Starter ($7) backend · orbit.calyvora.in
+#               branch production · prod profile · Starter ($7) backend · orbit.calyvora.net
 #               Real customers. No dev/seed/mailbox endpoints exist. Its own clean database.
 #
 #   DEMO        calyvora-backend / calyvora-frontend   (the services that already exist)
-#               branch product/hr-platform · staging profile · free · demo.calyvora.in
+#               branch product/hr-platform · staging profile · free · orbit.calyvora.in
 #               Throwaway. Dev/seed endpoints on. Keeps the existing database (already seeded).
+#
+# SEPARATE DOMAINS, NO CUTOVER: production is on its OWN domain, orbit.calyvora.net, so the demo keeps
+# orbit.calyvora.in untouched — nothing has to move. Add orbit.calyvora.net to the prod frontend
+# (Render custom domain) and a `orbit` CNAME on calyvora.net at Hostinger -> orbit-prod-frontend.onrender.com.
 #
 # BRANCHES: develop on `product/hr-platform` (the demo deploys from it); when a change is ready for
 # customers, merge product/hr-platform -> `production` and the prod services redeploy. `main` is a
 # separate, larger suite and is NOT a deploy source for either environment.
-#
-# CUTOVER IS DELIBERATE, NOT AUTOMATIC. A blueprint sync CREATES the new prod services; it does not
-# move live traffic. You verify prod on its onrender.com url first, then move the orbit.calyvora.in
-# domain from the demo frontend to the prod frontend in the dashboard + a DNS change at Hostinger
-# (see docs/GO-LIVE-CHECKLIST.md). Custom domains are managed in the dashboard — the `domains:` keys
-# below record intent; do the move when prod is ready.
 
 # SUPERSEDED by Neon — see the DB_URL blocks on the backend services. Left defined only so a sync
 # does not delete the old database out from under a deployment still pointing at it. Render removes a
@@ -70,9 +68,9 @@ services:
       # Stamped into every invitation / verification link, and the allowed cross-site origin. This is
       # the production brand URL.
       - key: FRONTEND_BASE_URL
-        value: https://orbit.calyvora.in
+        value: https://orbit.calyvora.net
       - key: CORS_ALLOWED_ORIGINS
-        value: https://orbit.calyvora.in,https://orbit-prod-frontend.onrender.com
+        value: https://orbit.calyvora.net,https://orbit-prod-frontend.onrender.com
       # RS256 signing keys — set by hand, never committed. Without them the app makes a throwaway
       # keypair at each boot and every restart logs all users out. Production needs its OWN keys.
       - key: JWT_KID
@@ -98,11 +96,11 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     startCommand: npm start
-    # The production brand domain. MOVE IT HERE as the cutover step (dashboard: add to this service,
-    # remove from the demo frontend; Hostinger: point the `orbit` CNAME at
-    # orbit-prod-frontend.onrender.com). Until then prod is reachable on its onrender.com url.
+    # The production brand domain — its own domain, so nothing is taken from the demo. Add it in the
+    # dashboard (Custom Domains) and point an `orbit` CNAME on calyvora.net at Hostinger to
+    # orbit-prod-frontend.onrender.com. Until DNS is live, prod is reachable on its onrender.com url.
     domains:
-      - orbit.calyvora.in
+      - orbit.calyvora.net
     envVars:
       - key: NEXT_PUBLIC_API_MODE
         value: live
@@ -138,9 +136,9 @@ services:
       - key: DB_PASSWORD
         sync: false
       - key: FRONTEND_BASE_URL
-        value: https://demo.calyvora.in
+        value: https://orbit.calyvora.in
       - key: CORS_ALLOWED_ORIGINS
-        value: https://demo.calyvora.in,https://calyvora-frontend.onrender.com
+        value: https://orbit.calyvora.in,https://calyvora-frontend.onrender.com
       - key: JWT_KID
         sync: false
       - key: JWT_PRIVATE_KEY
@@ -161,11 +159,9 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     startCommand: npm start
-    # The demo domain. During the cutover this service still holds orbit.calyvora.in (its current
-    # live domain); the cutover removes orbit here and adds demo.calyvora.in (dashboard + a `demo`
-    # CNAME at Hostinger -> calyvora-frontend.onrender.com).
+    # The demo keeps orbit.calyvora.in — production is on its own calyvora.net domain, so nothing moves.
     domains:
-      - demo.calyvora.in
+      - orbit.calyvora.in
     envVars:
       - key: NEXT_PUBLIC_API_MODE
         value: live
