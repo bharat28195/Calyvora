@@ -34,11 +34,14 @@ keeps its own values.
 Option A: production is a NEW pair of services; the existing services keep running untouched and
 become the demo. Nothing you rely on breaks while you build and verify prod.
 
-- [ ] **Point the Render Blueprint at the repo**, reading from the **`main`** branch (`main` is the
-      production release branch — full product + the two-environment `render.yaml`).
-- [ ] **Blueprints → Sync.** This **creates** the new production services
-      `orbit-prod-backend` (Starter, `main`, `prod`) and `orbit-prod-frontend` (`main`), and
-      leaves your existing `calyvora-backend`/`calyvora-frontend` as the demo. It does **not** move
+Production deploys from the dedicated **`production`** branch (develop on `product/hr-platform`, then
+merge it into `production` to ship). `main` is a separate, larger suite and is not a deploy source.
+
+- [ ] Create the production services (manually, or via Blueprint) tracking the **`production`** branch.
+- [ ] The production services are
+      `orbit-prod-backend` (Starter, branch `production`, `prod` profile) and `orbit-prod-frontend`
+      (branch `production`); your existing `calyvora-backend`/`calyvora-frontend` stay as the demo on
+      `product/hr-platform`. Creating them does **not** move
       any traffic — the new services come up on their own `onrender.com` urls.
 - [ ] **Production database.** Create a **fresh Neon database** for production so it starts clean.
       Set `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` on **`orbit-prod-backend`**.
