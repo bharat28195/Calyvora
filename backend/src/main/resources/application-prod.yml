@@ -4,6 +4,13 @@
 # DemoSeedService are @Profile("!prod")) and Swagger UI. Use this once you are past testing
 # and no longer want the one-click sample-data endpoints exposed.
 spring:
+  main:
+    # Open the web port fast so a small (0.5-CPU) instance clears the host's 90s boot timeout.
+    # Beans are built on first use instead of all at startup, so the security chain and Hibernate
+    # (the slow parts) no longer block the port from opening. Safe here: there are no @Scheduled or
+    # @EventListener beans that need eager creation. First request after a deploy is a little slower
+    # while those beans build; every request after is normal.
+    lazy-initialization: true
   jpa:
     show-sql: false
   datasource:

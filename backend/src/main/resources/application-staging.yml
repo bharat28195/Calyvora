@@ -8,6 +8,10 @@
 # Everything below reads from environment variables (set them in your host's dashboard).
 # The base application.yml already binds DB_URL / DB_USERNAME / DB_PASSWORD, etc.
 spring:
+  main:
+    # Open the web port fast so a small instance clears the host's 90s boot timeout — beans build on
+    # first use rather than all at startup. Safe: no @Scheduled/@EventListener beans need eager init.
+    lazy-initialization: true
   jpa:
     show-sql: false
   datasource:
