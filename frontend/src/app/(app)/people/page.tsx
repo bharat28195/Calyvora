@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Pencil, Search, Mail, Phone, MapPin, Briefcase, Building2, ListChecks, Plus, Trash2, CheckCircle2, Circle, Wallet } from "lucide-react";
+import { Loader2, Pencil, Search, Mail, Phone, MapPin, Briefcase, Building2, ListChecks, Plus, Trash2, CheckCircle2, Circle, Wallet, UserPlus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import type { Department, Designation, Employee, OnboardingTask } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
@@ -96,15 +96,23 @@ export default function PeoplePage() {
           <h1 className="text-2xl font-semibold tracking-tight">People</h1>
           <p className="mt-1 text-fg/50">Your company directory.</p>
         </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
-          <Input
-            className="w-64 pl-9"
-            placeholder="Search name, email, title…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search people"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg/30" />
+            <Input
+              className="w-64 pl-9"
+              placeholder="Search name, email, title…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search people"
+            />
+          </div>
+          {/* Adding a person is an invitation, and invitations live on Members — but People is where
+              you look for who's in the company, so this is where "add someone" is expected. Link
+              there rather than duplicate the invite form. Admin only; that's who can invite. */}
+          {isAdmin && (
+            <LinkButton href="/members"><UserPlus className="h-4 w-4" /> Add people</LinkButton>
+          )}
         </div>
       </div>
 
@@ -114,7 +122,16 @@ export default function PeoplePage() {
         <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
       ) : employees.length === 0 ? (
         <Card className="mt-8 text-center text-fg/50">
-          {query ? <>No people match &ldquo;{query}&rdquo;.</> : "No people yet."}
+          {query ? (
+            <>No people match &ldquo;{query}&rdquo;.</>
+          ) : (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <p>No people yet{isAdmin ? " — invite your team to get started." : "."}</p>
+              {isAdmin && (
+                <LinkButton href="/members"><UserPlus className="h-4 w-4" /> Add people</LinkButton>
+              )}
+            </div>
+          )}
         </Card>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

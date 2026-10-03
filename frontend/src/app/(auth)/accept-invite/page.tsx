@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { acceptInviteSchema, passwordStrength, type AcceptInviteInput } from "@/lib/validators";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Field } from "@/components/ui/field";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
@@ -135,7 +136,7 @@ function AcceptInviteInner() {
 
         <Field label="Password" htmlFor="password" error={errors.password}
           hint="At least 10 characters, with a letter and a number.">
-          <Input id="password" type="password" value={values.password} onChange={set("password")}
+          <PasswordInput id="password" value={values.password} onChange={set("password")}
             aria-invalid={!!errors.password} autoComplete="new-password" />
         </Field>
 

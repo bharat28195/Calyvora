@@ -4,6 +4,26 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-10-03 — Demo-feedback fixes: adding people, scroll, org chart, password visibility, announcements
+A batch from live use of a newly created company.
+- **Adding people is discoverable.** The People directory now has an "Add people" button (admins)
+  and an empty-state call to action, both linking to Members, where invitations live. You add a
+  person by inviting them; they become an employee when they accept.
+- **The employee edit dialog scrolls.** The modal was a fixed box, so its taller forms (the
+  employee edit has a dozen fields) ran off-screen with the Save button unreachable. Modals now cap
+  at 90% of the viewport and scroll.
+- **A new employee is always visible on the org chart.** The chart is built from reporting lines, so
+  someone added without a manager was a lone node the default "my line" view hid. People with no
+  manager yet now appear in a "Not in the reporting lines yet" strip, with a nudge to assign one.
+- **Password fields have a show/hide eye.** Login, invite-accept and reset-password — fewer mistyped
+  passwords, especially on the set-a-password steps.
+- **Announcements are in the sidebar.** The company feed (announcements, celebrations, questions —
+  company-wide or to one team) was built but not linked; it is now "Announcements" in the nav for
+  every company user.
+- **Document preview no longer stalls typing.** The generate-a-letter preview fired a network
+  request on every keystroke; it is debounced now. (Issued letters remain read-only by design — the
+  words are frozen at issue; wording changes go through the template or field overrides.)
+
 ### 2026-10-01 — Showcase hardening: dev tools locked down, billing stops rendering blank
 Three fixes from a full functional test of the live deployment as the company owner (30/30 modules
 working).

@@ -62,8 +62,12 @@ export default function GenerateDocumentPage() {
     }
   }, [templateId, employeeId, title, overrides]);
 
+  // Debounced: the preview is a network round-trip, and firing one on every keystroke in the title
+  // or an override field makes typing feel like it stalls after a word — especially against a cold
+  // or distant backend. Wait for a short pause, then render once.
   useEffect(() => {
-    void refresh();
+    const t = setTimeout(() => void refresh(), 350);
+    return () => clearTimeout(t);
   }, [refresh]);
 
   const template = useMemo(() => templates?.find((t) => t.id === templateId) ?? null, [templates, templateId]);

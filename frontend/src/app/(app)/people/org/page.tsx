@@ -242,17 +242,16 @@ function OrgTree({
 
   const deptName = (id: string | null) => departments.find((d) => d.id === id)?.name;
 
-  if (roots.length === employees.length) {
-    return (
-      <p className="text-sm text-fg/50">
-        No reporting lines set yet. Assign managers on the directory to build the chart.
-      </p>
-    );
-  }
+  // Roots that actually head a team form the chart. Roots with nobody under them are people not yet
+  // placed in the reporting lines — a fresh hire with no manager, or the very first account — and
+  // they get their own strip below. That strip is why a newly added employee is now always visible
+  // here, which it was not before: without a manager they were a lone root that "my line" hid.
+  const orgRoots = roots.filter((r) => (childrenOf.get(r.id)?.length ?? 0) > 0);
+  const unplaced = roots.filter((r) => (childrenOf.get(r.id)?.length ?? 0) === 0);
 
   // In "my line" mode only the branch containing you is drawn from the top. A search overrides that,
   // because looking for someone you do not report to is the ordinary reason to search.
-  const shown = mode === "mine" && me && !matches ? roots.filter((r) => myLine.has(r.id)) : roots;
+  const shown = mode === "mine" && me && !matches ? orgRoots.filter((r) => myLine.has(r.id)) : orgRoots;
 
   return (
     <div>
@@ -289,6 +288,13 @@ function OrgTree({
         </p>
       )}
 
+      {orgRoots.length === 0 && (
+        <p className="text-sm text-fg/50">
+          No reporting lines yet. Assign a manager on the directory to start building the chart —
+          everyone you&apos;ve added is listed below.
+        </p>
+      )}
+
       {/* The chart is as wide as the widest open level, which at a thousand people is wider than any
           screen. It scrolls in its own box so the page around it never does. */}
       <div className="-mx-2 overflow-x-auto px-2 pb-2">
@@ -311,6 +317,28 @@ function OrgTree({
           ))}
         </div>
       </div>
+
+      {unplaced.length > 0 && (
+        <div className="mt-6 border-t border-fg/10 pt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-fg/40">
+            Not in the reporting lines yet · {unplaced.length}
+          </p>
+          <p className="mb-3 mt-1 text-xs text-fg/40">
+            Give each a manager on the directory to place them in the chart.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {unplaced.map((e) => (
+              <div key={e.id} className="rounded-lg border border-fg/10 bg-surface px-3 py-2">
+                <p className="text-sm font-medium leading-tight">
+                  {e.firstName} {e.lastName}
+                  {e.id === me?.id && <span className="ml-1.5 text-[11px] font-normal text-violet">you</span>}
+                </p>
+                <p className="text-xs text-fg/50">{e.jobTitle ?? e.email}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

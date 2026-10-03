@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { resetPasswordSchema, passwordStrength, type ResetPasswordInput } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Field } from "@/components/ui/field";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
@@ -101,7 +102,7 @@ function ResetPasswordInner() {
 
         <Field label="New password" htmlFor="newPassword" error={errors.newPassword}
           hint="At least 10 characters, with a letter and a number.">
-          <Input id="newPassword" type="password" value={values.newPassword} onChange={set("newPassword")}
+          <PasswordInput id="newPassword" value={values.newPassword} onChange={set("newPassword")}
             aria-invalid={!!errors.newPassword} autoComplete="new-password" />
         </Field>
 
