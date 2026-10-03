@@ -5,12 +5,16 @@
 # TWO ENVIRONMENTS (Option A — new services are production, existing ones become the demo):
 #
 #   PRODUCTION  orbit-prod-backend / orbit-prod-frontend
-#               branch main · prod profile · Starter ($7) backend · orbit.calyvora.in
+#               branch production · prod profile · Starter ($7) backend · orbit.calyvora.in
 #               Real customers. No dev/seed/mailbox endpoints exist. Its own clean database.
 #
 #   DEMO        calyvora-backend / calyvora-frontend   (the services that already exist)
 #               branch product/hr-platform · staging profile · free · demo.calyvora.in
 #               Throwaway. Dev/seed endpoints on. Keeps the existing database (already seeded).
+#
+# BRANCHES: develop on `product/hr-platform` (the demo deploys from it); when a change is ready for
+# customers, merge product/hr-platform -> `production` and the prod services redeploy. `main` is a
+# separate, larger suite and is NOT a deploy source for either environment.
 #
 # CUTOVER IS DELIBERATE, NOT AUTOMATIC. A blueprint sync CREATES the new prod services; it does not
 # move live traffic. You verify prod on its onrender.com url first, then move the orbit.calyvora.in
@@ -32,7 +36,7 @@ services:
   # ========================= PRODUCTION (new) =========================
   # Real customers. prod profile => the whole @Profile("!prod") dev surface (seed, mailbox, mail
   # test) does not exist, Swagger is off, cookies are secure. Always-on Starter so nobody meets a
-  # cold start. Tracks `main` (the release branch — you ship by merging product/hr-platform -> main).
+  # cold start. Tracks `production` (ship by merging product/hr-platform -> production).
 
   # ---- Backend (production): Spring Boot (Docker) ----
   - type: web
@@ -43,7 +47,7 @@ services:
     # service; the workspace stays Hobby ($0).
     plan: starter
     region: singapore
-    branch: main
+    branch: production
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /actuator/health
@@ -90,7 +94,7 @@ services:
     # Free: Next.js wakes fast and the keep-alive workflow pings it. Bump to starter for always-on.
     plan: free
     region: singapore
-    branch: main
+    branch: production
     rootDir: frontend
     buildCommand: npm ci && npm run build
     startCommand: npm start
