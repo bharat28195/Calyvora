@@ -22,6 +22,10 @@
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.6.0</springdoc.version>
         <testcontainers.version>1.20.2</testcontainers.version>
+        <!-- Override Spring Boot 3.3's managed Flyway (10.10) to get PostgreSQL 18 support; the
+             production database runs PG 18, which 10.x only warns it has not been tested against.
+             Both flyway-core and flyway-database-postgresql inherit this version. -->
+        <flyway.version>11.20.3</flyway.version>
     </properties>
 
     <dependencies>

@@ -37,6 +37,15 @@ spring:
       max-file-size: 3MB
       max-request-size: 3MB
 
+  data:
+    jpa:
+      repositories:
+        # Build the EntityManagerFactory and repositories on a background thread so the web server
+        # binds its port without waiting for Hibernate's metamodel. On a small (0.5 CPU) instance the
+        # metamodel for 55 repositories took most of a 3+ minute startup, long enough that Render's
+        # deploy gave up waiting for the port ("Timed Out"). Deferred lets the port open first;
+        # anything that touches a repository before it is ready simply waits those few seconds.
+        bootstrap-mode: deferred
   jpa:
     hibernate:
       ddl-auto: validate          # Flyway owns the schema; JPA only validates
@@ -78,7 +87,10 @@ spring:
     throw-exception-if-no-handler-found: true
 
 server:
-  port: ${SERVER_PORT:8080}
+  # Render (and most PaaS) inject the port to listen on as PORT. Bind to it so the platform detects
+  # the open port immediately instead of scanning for it — which, combined with a slow startup, is
+  # what made the first prod deploys time out. Falls back to SERVER_PORT, then 8080 for local/Docker.
+  port: ${PORT:${SERVER_PORT:8080}}
   error:
     include-stacktrace: never     # never leak stack traces (Sprint1 §13)
 
