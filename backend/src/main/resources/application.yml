@@ -96,6 +96,16 @@ server:
 
 # --- Application-specific config (bound in AppProperties) ---
 calyvora:
+  platform:
+    # The platform-owner (vendor) super-account, created at startup by PlatformOwnerBootstrap. This
+    # account can read every customer, so BOTH of these belong in environment variables, never in the
+    # source tree. On any deployment with real data set PLATFORM_OWNER_EMAIL to your own business
+    # address and PLATFORM_OWNER_PASSWORD to a strong secret. Changing the email later moves the
+    # existing owner onto the new address (and resets its password) on the next restart.
+    owner-email: ${PLATFORM_OWNER_EMAIL:bharat28195@calyvora.in}
+    # No default on purpose: with this unset and no owner yet, the app refuses to create a guessable
+    # super-account rather than shipping one.
+    owner-password: ${PLATFORM_OWNER_PASSWORD:}
   ops:
     slow-request-ms: 1000   # one WARN line per request slower than this (SlowRequestFilter)
   rate-limit:

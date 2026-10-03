@@ -42,7 +42,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // TrialRequestFlowTest does on purpose — and would silently switch the limiter back on and fail for
 // reasons that have nothing to do with what it is testing. @TestPropertySource is inherited and
 // merged instead, so a subclass has to mean it.
-@org.springframework.test.context.TestPropertySource(properties = "calyvora.rate-limit.enabled=false")
+// The platform-owner password has no built-in default any more (it must come from the environment on a
+// real deployment), so the test context supplies its own throwaway value here. It is inherited and
+// merged by every subclass, including those that re-declare @SpringBootTest.
+@org.springframework.test.context.TestPropertySource(properties = {
+        "calyvora.rate-limit.enabled=false",
+        "calyvora.platform.owner-password=Test-Platform-Owner-1!"})
 @AutoConfigureMockMvc
 @AutoConfigureEmbeddedDatabase(provider = ZONKY, refresh = AFTER_EACH_TEST_METHOD)
 @Import({RecordingEmailService.class, RlsRoleConfig.class})
@@ -62,7 +67,9 @@ public abstract class IntegrationTestBase {
 
     /** The platform vendor. Real infrastructure, not demo data — created at startup (PD-18). */
     protected static final String PLATFORM_OWNER_EMAIL = "bharat28195@calyvora.in";
-    protected static final String PLATFORM_OWNER_PASSWORD = "Bharat@28195#";
+    // Test-only; matches calyvora.platform.owner-password in @TestPropertySource above. Not a real
+    // credential — the production password lives only in the PLATFORM_OWNER_PASSWORD env var.
+    protected static final String PLATFORM_OWNER_PASSWORD = "Test-Platform-Owner-1!";
 
     @BeforeEach
     void clearEmail() {
