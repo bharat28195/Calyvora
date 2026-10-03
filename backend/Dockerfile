@@ -16,6 +16,10 @@ WORKDIR /app
 COPY --from=build /app/target/calyvora-backend-*.jar app.jar
 # Respect the container's memory limit (free tiers are small).
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
-ENV SPRING_PROFILES_ACTIVE=staging
+# The profile is chosen by the deployment, never baked into the image. Each Render service sets
+# SPRING_PROFILES_ACTIVE explicitly (prod for production, staging for the demo). Baking in `staging`
+# meant a service that forgot to set it would silently run with the dev/seed/mailbox endpoints
+# exposed — the worst default for a production box. With nothing baked in, a missing value falls back
+# to application.yml's `local`, which cannot reach a real database and so fails loudly instead.
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
