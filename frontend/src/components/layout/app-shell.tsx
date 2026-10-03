@@ -7,7 +7,7 @@ import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
-  CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network,
+  CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network, Megaphone,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { IdleTimeout } from "@/components/layout/idle-timeout";
@@ -74,6 +74,10 @@ const NAV: NavItem[] = [
   // An agency sees only this — no company surface at all, because it holds no employees of its own.
   { href: "/agency", label: "My companies", icon: Building2, roles: ["AGENCY_OWNER"] },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
+  // The company feed: announcements, celebrations and questions, company-wide or to one team — the
+  // place to post something everyone sees. Open to every company user; who can post company-wide
+  // vs team-only is enforced on the server. Not feature-gated, so a new company has it from day one.
+  { href: "/feed", label: "Announcements", icon: Megaphone, roles: COMPANY },
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS, feature: "ANALYTICS" },
   // "Me" is attendance and time off. Everything that is really about money went to Finance and
   // everything about other people went to My team — this section is what I did, not what I am owed

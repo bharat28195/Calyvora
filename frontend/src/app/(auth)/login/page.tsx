@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { loginSchema, type LoginInput } from "@/lib/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Field } from "@/components/ui/field";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
@@ -69,7 +70,7 @@ function LoginInner() {
         </Field>
 
         <Field label="Password" htmlFor="password" error={errors.password}>
-          <Input id="password" type="password" value={values.password} onChange={set("password")}
+          <PasswordInput id="password" value={values.password} onChange={set("password")}
             aria-invalid={!!errors.password} autoComplete="current-password" />
         </Field>
 

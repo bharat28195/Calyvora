@@ -32,7 +32,10 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-fg/10 bg-surface p-6 shadow-2xl"
+        // max-h + scroll so a tall form (the employee edit has a dozen fields) can always be
+        // reached and the Save button at the bottom is never off-screen. 90dvh leaves a margin and
+        // uses the dynamic viewport so a mobile browser's address bar doesn't clip it.
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-fg/10 bg-surface p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
