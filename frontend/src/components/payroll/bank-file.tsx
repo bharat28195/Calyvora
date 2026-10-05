@@ -109,19 +109,19 @@ export function BankFilePanel({ month, currency }: { month: string; currency: st
 
           {preview.excluded.length > 0 && (
             <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-              <p className="flex items-center gap-2 text-sm font-medium text-amber-200">
+              <p className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-200">
                 <AlertTriangle className="h-4 w-4" />
                 {preview.excluded.length} {preview.excluded.length === 1 ? "person is" : "people are"} not
                 in this file
               </p>
               <ul className="mt-2 flex flex-col gap-1">
                 {preview.excluded.map((e) => (
-                  <li key={e.employeeId} className="text-xs text-amber-100/80">
+                  <li key={e.employeeId} className="text-xs text-amber-700/80 dark:text-amber-100/80">
                     <span className="font-medium">{e.name}</span> — {e.reason}
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-[11px] text-amber-100/60">
+              <p className="mt-2 text-[11px] text-amber-700/60 dark:text-amber-100/60">
                 Fix these on the employee&apos;s Finance tab, then download again. The total above is
                 what the file actually pays, not the payroll total.
               </p>

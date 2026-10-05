@@ -12,10 +12,10 @@ import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
 const STATUS_META: Record<ReviewStatus, { label: string; tone: string }> = {
-  PENDING_SELF: { label: "Self-assessment due", tone: "bg-amber-500/15 text-amber-300" },
+  PENDING_SELF: { label: "Self-assessment due", tone: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
   PENDING_MANAGER: { label: "Manager review due", tone: "bg-aqua/15 text-aqua" },
   SUBMITTED: { label: "Awaiting approval", tone: "bg-violet/15 text-violet" },
-  APPROVED: { label: "Approved", tone: "bg-emerald-500/15 text-emerald-300" },
+  APPROVED: { label: "Approved", tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
   CLOSED: { label: "Closed", tone: "bg-fg/10 text-fg/50" },
 };
 

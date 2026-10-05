@@ -152,7 +152,7 @@ function TreeRow({ node, depth, selectedId, onSelect }: { node: TreeNode; depth:
       >
         <FileText className="h-3.5 w-3.5 shrink-0 text-fg/30" />
         <span className="truncate">{node.page.title}</span>
-        {node.page.status === "DRAFT" && <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-amber-300/70">draft</span>}
+        {node.page.status === "DRAFT" && <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-amber-700/70 dark:text-amber-300/70">draft</span>}
       </button>
       {node.children.map((child) => (
         <TreeRow key={child.page.id} node={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
@@ -318,7 +318,7 @@ function StatusChip({ status }: { status: "DRAFT" | "PUBLISHED" }) {
   return (
     <span className={cn(
       "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-      status === "PUBLISHED" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300",
+      status === "PUBLISHED" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
     )}>
       {status}
     </span>

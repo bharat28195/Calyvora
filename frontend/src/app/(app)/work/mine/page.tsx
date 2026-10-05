@@ -11,8 +11,8 @@ import { Alert } from "@/components/ui/alert";
 const priorityChip: Record<string, string> = {
   LOW: "bg-fg/10 text-fg/50",
   MEDIUM: "bg-sky-500/15 text-sky-300",
-  HIGH: "bg-amber-500/15 text-amber-300",
-  URGENT: "bg-red-500/15 text-red-300",
+  HIGH: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  URGENT: "bg-red-500/15 text-red-700 dark:text-red-300",
 };
 const statusLabel: Record<string, string> = { TODO: "To do", IN_PROGRESS: "In progress", DONE: "Done" };
 

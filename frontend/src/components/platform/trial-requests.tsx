@@ -89,7 +89,7 @@ export function TrialRequestsSection({ onChanged, onWaitingCount }: {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <CardTitle>Trial requests</CardTitle>
         {waiting.length > 0 && (
-          <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-300">
+          <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
             {waiting.length} waiting on you
           </span>
         )}

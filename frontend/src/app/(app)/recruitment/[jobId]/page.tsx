@@ -40,7 +40,7 @@ const STAGE_DROP: Record<CandidateStage, string> = {
 
 /** Six fixed hues for candidate avatars, picked from the name so the same person keeps the same one. */
 const AVATAR_TONES = [
-  "bg-violet/20 text-violet", "bg-aqua/20 text-aqua", "bg-amber-400/20 text-amber-300",
+  "bg-violet/20 text-violet", "bg-aqua/20 text-aqua", "bg-amber-400/20 text-amber-700 dark:text-amber-300",
   "bg-emerald-400/20 text-emerald-400", "bg-rose-400/20 text-rose-400", "bg-sky-400/20 text-sky-400",
 ];
 

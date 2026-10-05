@@ -11,7 +11,7 @@ import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 
 export const REG_TONE: Record<RegularizationStatus, string> = {
-  PENDING: "bg-amber-500/15 text-amber-300",
+  PENDING: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   APPROVED: "bg-emerald-500/15 text-emerald-400",
   REJECTED: "bg-red-500/15 text-red-400",
 };

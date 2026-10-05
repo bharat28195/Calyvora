@@ -15,8 +15,8 @@ import { money } from "@/lib/format";
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-500/15 text-emerald-400",
   TRIALING: "bg-sky-500/15 text-sky-400",
-  PENDING: "bg-amber-500/15 text-amber-300",
-  PAST_DUE: "bg-amber-500/15 text-amber-300",
+  PENDING: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  PAST_DUE: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   CANCELLED: "bg-red-500/15 text-red-400",
   NONE: "bg-fg/10 text-fg/50",
 };

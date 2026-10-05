@@ -32,18 +32,18 @@ const TICKET_STATUSES = ["OPEN", "PENDING", "RESOLVED", "CLOSED"] as const;
 const priorityChip: Record<string, string> = {
   LOW: "bg-fg/10 text-fg/50",
   MEDIUM: "bg-sky-500/15 text-sky-300",
-  HIGH: "bg-amber-500/15 text-amber-300",
-  URGENT: "bg-red-500/15 text-red-300",
+  HIGH: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  URGENT: "bg-red-500/15 text-red-700 dark:text-red-300",
 };
 const sprintChip: Record<string, string> = {
   PLANNED: "bg-fg/10 text-fg/60",
-  ACTIVE: "bg-emerald-500/15 text-emerald-300",
+  ACTIVE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   COMPLETED: "bg-fg/10 text-fg/40",
 };
 const ticketChip: Record<string, string> = {
   OPEN: "bg-sky-500/15 text-sky-300",
-  PENDING: "bg-amber-500/15 text-amber-300",
-  RESOLVED: "bg-emerald-500/15 text-emerald-300",
+  PENDING: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  RESOLVED: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   CLOSED: "bg-fg/10 text-fg/40",
 };
 const selectCls =

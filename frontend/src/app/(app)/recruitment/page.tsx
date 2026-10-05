@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 const STATUS_TONE: Record<JobOpening["status"], string> = {
   OPEN: "bg-emerald-500/15 text-emerald-400",
-  ON_HOLD: "bg-amber-500/15 text-amber-300",
+  ON_HOLD: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   CLOSED: "bg-fg/10 text-fg/50",
 };
 
