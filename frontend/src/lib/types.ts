@@ -32,6 +32,12 @@ export interface Me {
    * disagree. Set the app-wide formatters from this, not from company.timezone.
    */
   timezone: string;
+  /**
+   * What this person may do, permission key → "COMPANY" or "TEAM" (PD-54). Optional only for a
+   * session cached before roles existed; read it through lib/permissions, which falls back to the
+   * built-in defaults for the role.
+   */
+  permissions?: Record<string, "COMPANY" | "TEAM">;
 }
 
 export interface CompanySettings {
@@ -53,6 +59,30 @@ export interface Member {
   lastName: string;
   role: Role;
   status: UserStatus;
+  /** The custom role they hold (PD-54); null means the built-in their `role` names. */
+  companyRoleId?: string | null;
+}
+
+/** A company role and what it may do (PD-54). */
+export interface CompanyRole {
+  id: string;
+  name: string;
+  description: string | null;
+  /** ADMIN | HR | MANAGER | EMPLOYEE for a built-in; null for a role the company made. */
+  builtin: "ADMIN" | "HR" | "MANAGER" | "EMPLOYEE" | null;
+  /** The Admin role: always every permission, cannot be edited. */
+  locked: boolean;
+  permissions: Record<string, "COMPANY" | "TEAM">;
+  memberCount: number;
+}
+
+export interface PermissionInfo {
+  key: string;
+  group: string;
+  label: string;
+  description: string;
+  /** Can be limited to the holder's own team. */
+  scoped: boolean;
 }
 
 export interface Invitation {

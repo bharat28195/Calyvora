@@ -53,6 +53,7 @@ public class AuthService {
     private final com.calyvora.people.EmployeeService employeeService;
 
     private final com.calyvora.common.security.TenantBinder tenantBinder;
+    private final com.calyvora.access.PermissionService permissionService;
 
     public AuthService(CompanyRepository companyRepository,
                        CompanySettingsRepository companySettingsRepository,
@@ -65,8 +66,10 @@ public class AuthService {
                        AppProperties props,
                        com.calyvora.people.EmployeeService employeeService,
                        com.calyvora.people.EmployeeRepository employeeRepository,
-                       com.calyvora.common.security.TenantBinder tenantBinder) {
+                       com.calyvora.common.security.TenantBinder tenantBinder,
+                       com.calyvora.access.PermissionService permissionService) {
         this.tenantBinder = tenantBinder;
+        this.permissionService = permissionService;
         this.employeeService = employeeService;
         this.employeeRepository = employeeRepository;
         this.companyRepository = companyRepository;
@@ -229,7 +232,19 @@ public class AuthService {
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new NotFoundException("Company not found"));
         CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
-        return MeResponse.of(user, company, settings, employeeRepository.findByUserId(userId).orElse(null));
+        return MeResponse.of(user, company, settings, employeeRepository.findByUserId(userId).orElse(null),
+                permissionsOf(user));
+    }
+
+    /** The person's permissions, read with their company bound (company_roles is under RLS). */
+    private java.util.Map<String, String> permissionsOf(User user) {
+        AuthPrincipal principal = new AuthPrincipal(user.getId(), user.getCompanyId(),
+                user.getRole().name(), user.getEmail());
+        return tenantBinder.callAs(user.getCompanyId(), () -> {
+            java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+            permissionService.grants(principal).forEach((p, s) -> out.put(p.name(), s.name()));
+            return out;
+        });
     }
 
     /** Login/refresh result: the access token, the raw refresh token (→ cookie), and the body. */
@@ -250,7 +265,7 @@ public class AuthService {
         LoginResponse body = tenantBinder.callAs(user.getCompanyId(), () -> {
             CompanySettings settings = companySettingsRepository.findById(user.getCompanyId()).orElse(null);
             return new LoginResponse(accessToken, MeResponse.of(user, company, settings,
-                    employeeRepository.findByUserId(user.getId()).orElse(null)));
+                    employeeRepository.findByUserId(user.getId()).orElse(null), permissionsOf(user)));
         });
         return new LoginResult(accessToken, issued.rawToken(), body);
     }

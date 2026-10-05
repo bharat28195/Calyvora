@@ -67,7 +67,7 @@ public class HelpdeskController {
     // ---- HR agents (ADMIN/HR) ----
 
     @GetMapping("/tickets")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('HELPDESK_MANAGE')")
     public com.calyvora.common.dto.CursorPage<TicketResponse> queue(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String cursor,
@@ -76,7 +76,7 @@ public class HelpdeskController {
     }
 
     @PatchMapping("/tickets/{id}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('HELPDESK_MANAGE')")
     public TicketResponse update(@PathVariable UUID id, @RequestBody UpdateTicketRequest req,
                                  @CurrentUser AuthPrincipal principal) {
         return service.update(id, req, principal);

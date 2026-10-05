@@ -30,20 +30,13 @@ import java.util.UUID;
  * or through a chain, is what does. That is deliberate: titles are customer-editable free text, and a
  * permission you can grant yourself by renaming your own row is not a permission.
  *
- * <p>Three roles still see the whole company, because their job is the company rather than a team:
- * ADMIN runs it, HR does people-ops for all of it, and OWNER is the vendor. Everyone else — MANAGER
- * and MEMBER alike — sees themselves plus their downline. MEMBER is not a separate case: a member with
- * no reports has an empty downline and the same code gives them only themselves.
+ * <p>Whoever holds {@code ORG_VIEW_ALL} sees the whole company — by default the Admin and HR roles,
+ * and the platform OWNER (PD-54 made this a permission a company can grant). Everyone else sees
+ * themselves plus their downline. A person with no reports has an empty downline and the same code
+ * gives them only themselves.
  */
 @Service
 public class OrgScope {
-
-    /**
-     * Roles whose scope is the company rather than a team. Note MANAGER is deliberately absent: a
-     * manager's reach comes from having reports, so a manager of nobody sees nobody — which is correct,
-     * and was not true before.
-     */
-    private static final Set<String> WHOLE_COMPANY = Set.of("OWNER", "ADMIN", "HR");
 
     /**
      * Depth cap for the downline walk. `manager_id` is a plain self-referencing column with no database
@@ -54,14 +47,20 @@ public class OrgScope {
     private static final int MAX_DEPTH = 64;
 
     private final EmployeeRepository employeeRepository;
+    private final com.calyvora.access.PermissionService permissions;
 
-    public OrgScope(EmployeeRepository employeeRepository) {
+    public OrgScope(EmployeeRepository employeeRepository, com.calyvora.access.PermissionService permissions) {
         this.employeeRepository = employeeRepository;
+        this.permissions = permissions;
     }
 
-    /** Whether this caller's scope is the whole company rather than their own branch of the tree. */
+    /**
+     * Whether this caller's scope is the whole company rather than their own branch of the tree: they
+     * hold {@code ORG_VIEW_ALL}. A manager of nobody, without it, sees nobody — which is correct.
+     */
     public boolean seesWholeCompany(AuthPrincipal principal) {
-        return principal != null && WHOLE_COMPANY.contains(principal.role());
+        return principal != null
+                && permissions.companyWide(principal, com.calyvora.access.Permission.ORG_VIEW_ALL);
     }
 
     /** The caller's own employee row, if they have one. The platform OWNER typically does not. */

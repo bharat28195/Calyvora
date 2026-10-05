@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { ReviewCard } from "@/components/performance/review-card";
 import { cn } from "@/lib/utils";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /**
  * Performance cycles (Owner/Admin/HR). Open a cycle, watch it fill in, and approve reviews — approval
@@ -29,12 +30,12 @@ export default function PerformancePage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
-  const role = session.me?.user.role;
-  const runsCycles = role === "OWNER" || role === "ADMIN" || role === "HR";
+  const runsCycles = can(session.me, "PERFORMANCE_MANAGE");
 
   useEffect(() => {
-    if (role && !runsCycles) router.replace("/performance/me");
-  }, [role, runsCycles, router]);
+    // Wait for the session: before it loads, "no permission" only means "not known yet".
+    if (session.me && !runsCycles) router.replace("/performance/me");
+  }, [session.me, runsCycles, router]);
 
   useEffect(() => {
     if (!runsCycles) return;

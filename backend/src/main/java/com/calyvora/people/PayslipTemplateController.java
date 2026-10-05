@@ -15,7 +15,7 @@ import java.util.List;
 /** The company payslip template (Owner/Admin). Base {@code /api/v1/payroll/payslip-template}. */
 @RestController
 @RequestMapping("/api/v1/payroll/payslip-template")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+@PreAuthorize("@perm.has('PAYROLL_MANAGE')")
 public class PayslipTemplateController {
 
     private final PayslipTemplateService service;

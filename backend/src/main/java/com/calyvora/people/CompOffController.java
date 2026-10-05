@@ -52,19 +52,19 @@ public class CompOffController {
      * the caller's downline, so the role check only decides who may ask.
      */
     @GetMapping("/pending")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public List<CompOffResponse> pending(@CurrentUser AuthPrincipal principal) {
         return service.pending(principal);
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public CompOffResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return service.decide(id, true, principal);
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public CompOffResponse reject(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return service.decide(id, false, principal);
     }

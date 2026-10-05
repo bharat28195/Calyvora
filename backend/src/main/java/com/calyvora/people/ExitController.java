@@ -54,7 +54,7 @@ public class ExitController {
     }
 
     @PostMapping("/employees/{employeeId}/exit")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('EXITS_MANAGE')")
     public ExitResponse start(@PathVariable UUID employeeId,
                               @Valid @RequestBody StartExitRequest request,
                               @CurrentUser AuthPrincipal principal) {
@@ -63,7 +63,7 @@ public class ExitController {
 
     /** Resignation withdrawn. */
     @DeleteMapping("/employees/{employeeId}/exit")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('EXITS_MANAGE')")
     public ExitResponse cancel(@PathVariable UUID employeeId, @CurrentUser AuthPrincipal principal) {
         return exitService.cancel(employeeId, principal);
     }
@@ -73,7 +73,7 @@ public class ExitController {
      * {@code force=true} — see {@link ExitService#complete}.
      */
     @PostMapping("/employees/{employeeId}/exit/complete")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('EXITS_MANAGE')")
     public ExitResponse complete(@PathVariable UUID employeeId,
                                  @RequestParam(defaultValue = "false") boolean force,
                                  @CurrentUser AuthPrincipal principal) {

@@ -30,7 +30,7 @@ import java.util.UUID;
 /** Recruitment / ATS (Owner/Admin). Base {@code /api/v1/recruit}. */
 @RestController
 @RequestMapping("/api/v1/recruit")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+@PreAuthorize("@perm.has('RECRUITMENT_MANAGE')")
 public class RecruitController {
 
     private final RecruitService service;

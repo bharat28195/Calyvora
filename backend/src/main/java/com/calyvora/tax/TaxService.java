@@ -50,6 +50,8 @@ public class TaxService {
     private final OrgScope orgScope;
     private final com.calyvora.feature.FeatureService featureService;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public TaxService(TaxDeclarationRepository declarationRepository,
                       TaxDeclarationItemRepository itemRepository,
                       EmployeeRepository employeeRepository,
@@ -57,7 +59,9 @@ public class TaxService {
                       CompensationRepository compensationRepository,
                       CompanySettingsRepository settingsRepository,
                       OrgScope orgScope,
-                      com.calyvora.feature.FeatureService featureService) {
+                      com.calyvora.feature.FeatureService featureService,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.declarationRepository = declarationRepository;
         this.itemRepository = itemRepository;
         this.employeeRepository = employeeRepository;
@@ -327,7 +331,7 @@ public class TaxService {
     @Transactional(readOnly = true)
     public List<TaxDtos.DeclarationSummaryRow> allDeclarations(AuthPrincipal principal, String year) {
         UUID companyId = TenantContext.getCompanyId();
-        if (!orgScope.seesWholeCompany(principal)) {
+        if (!permissions.has(principal, com.calyvora.access.Permission.TAX_MANAGE)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "You do not have permission to perform this action");
         }
         FinancialYear fy = yearOrCurrent(year);
@@ -386,7 +390,7 @@ public class TaxService {
     @Transactional
     public boolean setWindow(AuthPrincipal principal, boolean open) {
         UUID companyId = TenantContext.getCompanyId();
-        if (!orgScope.seesWholeCompany(principal)) {
+        if (!permissions.has(principal, com.calyvora.access.Permission.TAX_MANAGE)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "You do not have permission to perform this action");
         }
         CompanySettings settings = settingsRepository.findById(companyId)

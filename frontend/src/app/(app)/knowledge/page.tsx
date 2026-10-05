@@ -6,7 +6,6 @@ import { Loader2, Plus, FolderOpen, FileText, ArrowRight, CalendarCheck } from "
 import { api, ApiError } from "@/lib/api";
 import type { Space } from "@/lib/types";
 import { useSession } from "@/hooks/useSession";
-import { canPublishDocuments } from "@/lib/document-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -14,6 +13,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
 import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /**
  * Company documents: the handbook, policies and forms everyone in the company can read. HR and admins
@@ -21,7 +21,7 @@ import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
  */
 export default function CompanyDocumentsPage() {
   const { me } = useSession();
-  const publisher = canPublishDocuments(me?.user.role);
+  const publisher = can(me, "DOCUMENTS_PUBLISH");
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);

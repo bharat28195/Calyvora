@@ -70,7 +70,7 @@ public class ExpenseController {
     // HR too (founder decision, 2026-10-05): HR runs payroll, and the reimbursement queue is part of
     // the same monthly close.
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('EXPENSES_REIMBURSE')")
     public ExpenseSummaryResponse all(@RequestParam(required = false) String status,
                                       @RequestParam(required = false) String cursor,
                                       @RequestParam(required = false) Integer size) {
@@ -100,7 +100,7 @@ public class ExpenseController {
     // Approving a claim is still the manager's judgement about whether the spend was legitimate;
     // paying it is the finance step, which in a company this size is HR's alongside payroll.
     @PostMapping("/{claimId}/reimburse")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('EXPENSES_REIMBURSE')")
     public ExpenseResponse reimburse(@PathVariable UUID claimId, @CurrentUser AuthPrincipal principal) {
         return expenseService.reimburse(claimId, principal);
     }

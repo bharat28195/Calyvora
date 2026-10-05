@@ -77,7 +77,7 @@ public class LeaveController {
      * with no reports.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public com.calyvora.common.dto.CursorPage<LeaveRequestResponse> all(
             @CurrentUser AuthPrincipal principal,
             @RequestParam(required = false) String status,
@@ -87,13 +87,13 @@ public class LeaveController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public LeaveRequestResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.approve(id, principal);
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public LeaveRequestResponse reject(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.reject(id, principal);
     }

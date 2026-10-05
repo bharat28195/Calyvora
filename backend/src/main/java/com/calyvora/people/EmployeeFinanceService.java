@@ -31,7 +31,6 @@ import java.util.UUID;
 @Service
 public class EmployeeFinanceService {
 
-    private static final Set<String> HR_ROLES = Set.of("OWNER", "ADMIN", "HR");
 
     /** Fields only HR may change — they drive statutory filings, not personal preference. */
     private static final String STATUTORY_FIELDS =
@@ -76,11 +75,6 @@ public class EmployeeFinanceService {
     public EmployeeFinanceResponse update(UUID employeeId, UpdateEmployeeFinanceRequest request) {
         requireEmployee(employeeId);
         return respond(apply(getOrCreate(employeeId), request));
-    }
-
-    /** True when the caller is HR/admin/owner, who may read and edit anyone's record. */
-    public static boolean isHr(AuthPrincipal principal) {
-        return principal != null && HR_ROLES.contains(principal.role());
     }
 
     /** The employee row for a payslip header — absent until someone fills it in. */

@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/billing")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+@PreAuthorize("@perm.has('BILLING_MANAGE')")
 public class BillingController {
 
     private final BillingService service;

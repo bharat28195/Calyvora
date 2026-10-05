@@ -29,7 +29,7 @@ public class SubscriptionController {
 
     /** Admins ask the owner for more seats; the request lands in the owner's console queue. */
     @PostMapping("/request-seats")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('BILLING_MANAGE')")
     public SubscriptionView requestSeats(@Valid @RequestBody RequestSeatsRequest req) {
         return service.requestSeats(req);
     }

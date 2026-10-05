@@ -50,13 +50,15 @@ class CompanySnapshot {
         /** HR, Admin, Owner: hiring, reviews, documents — the operational picture. */
         HR_PLUS;
 
-        static Scope of(String role) {
-            if (role == null) return EVERYONE;
-            return switch (role) {
-                case "OWNER", "ADMIN", "HR" -> HR_PLUS;
-                case "MANAGER" -> MANAGES;
-                default -> EVERYONE;
-            };
+        /**
+         * From what the caller may do (PD-54) rather than their title: seeing the whole company is the
+         * operational picture; approving company-wide unlocks the company-wide approval counts; anything
+         * else is self-service. (Before PD-54 the MANAGES tier went to the MANAGER role by name, which
+         * handed company-wide notice counts to any manager of a team of two.)
+         */
+        static Scope of(boolean seesWholeCompany, boolean approvesCompanyWide) {
+            if (seesWholeCompany) return HR_PLUS;
+            return approvesCompanyWide ? MANAGES : EVERYONE;
         }
 
         boolean atLeast(Scope other) {

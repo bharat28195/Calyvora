@@ -44,11 +44,14 @@ public class AssistantService {
     private final CompanySnapshot snapshot;
     private final ClaudeAssistant claude;
     private final LocalGroundedAssistant local;
+    private final com.calyvora.access.PermissionService permissions;
 
     public AssistantService(EmployeeService employeeService, DepartmentRepository departmentRepository,
                             SpaceRepository spaceRepository,
                             PageRepository pageRepository, CompanySnapshot snapshot,
-                            ClaudeAssistant claude, LocalGroundedAssistant local) {
+                            ClaudeAssistant claude, LocalGroundedAssistant local,
+                            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.snapshot = snapshot;
         this.employeeService = employeeService;
         this.departmentRepository = departmentRepository;
@@ -65,7 +68,13 @@ public class AssistantService {
         }
         UUID companyId = TenantContext.getCompanyId();
         AssistantContext ctx = buildContext(companyId, question.trim(),
-                CompanySnapshot.Scope.of(principal == null ? null : principal.role()));
+                CompanySnapshot.Scope.of(
+                        permissions.companyWide(principal, com.calyvora.access.Permission.ORG_VIEW_ALL),
+                        // The MANAGES tier holds COMPANY-WIDE counts (pending leave, people on notice), so it
+                        // needs a company-wide approval: a team-scoped approver — every built-in Employee —
+                        // must not learn how many people across the company are leaving.
+                        permissions.companyWide(principal, com.calyvora.access.Permission.LEAVE_APPROVE)
+                                || permissions.companyWide(principal, com.calyvora.access.Permission.EXPENSES_APPROVE)));
 
         // Prefer Claude when configured; fall back to the always-available local provider.
         String answer = null;

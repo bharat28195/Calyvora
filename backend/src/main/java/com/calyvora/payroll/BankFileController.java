@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
  */
 @RestController
 @RequestMapping("/api/v1/payroll/bank-file")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+@PreAuthorize("@perm.has('PAYROLL_MANAGE')")
 public class BankFileController {
 
     private final BankFileService service;

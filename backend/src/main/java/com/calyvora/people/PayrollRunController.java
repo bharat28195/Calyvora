@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** HR/Admin payroll run — every employee's net for a month, after attendance LOP. */
 @RestController
 @RequestMapping("/api/v1/payroll")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+@PreAuthorize("@perm.has('PAYROLL_MANAGE')")
 public class PayrollRunController {
 
     private final CompensationService compensationService;

@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/alert";
 import { MyLeave } from "@/components/leave/my-leave";
 import { CompOffApprovals, MyCompOff } from "@/components/leave/comp-off";
 import { useTeamStanding } from "@/components/team/team-bits";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /**
  * Time off: your own balance and requests (shared with the Me hub) plus, for anyone who approves, the
@@ -29,8 +30,7 @@ import { useTeamStanding } from "@/components/team/team-bits";
 export default function TimeOffPage() {
   const { me } = useSession();
   const standing = useTeamStanding();
-  const role = me?.user.role;
-  const canApprove = role === "OWNER" || role === "ADMIN" || role === "HR" || !!standing?.leadsTeam;
+  const canApprove = canCompanyWide(me, "LEAVE_APPROVE") || (can(me, "LEAVE_APPROVE") && !!standing?.leadsTeam);
 
   return (
     <div>

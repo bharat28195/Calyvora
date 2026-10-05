@@ -36,13 +36,13 @@ public class CompanyController {
     }
 
     @PatchMapping("/settings")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
     public CompanySettingsResponse updateSettings(@Valid @RequestBody UpdateSettingsRequest request) {
         return companyService.updateSettings(request);
     }
 
     @GetMapping("/members")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('MEMBERS_MANAGE')")
     public List<MemberResponse> listMembers() {
         return companyService.listMembers();
     }

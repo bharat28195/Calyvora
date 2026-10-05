@@ -48,9 +48,13 @@ public class FeedService {
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public FeedService(PostRepository postRepository, PostCommentRepository commentRepository,
                        PostReactionRepository reactionRepository, UserRepository userRepository,
-                       EmployeeRepository employeeRepository, DepartmentRepository departmentRepository) {
+                       EmployeeRepository employeeRepository, DepartmentRepository departmentRepository,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.postRepository = postRepository;
         this.commentRepository = commentRepository;
         this.reactionRepository = reactionRepository;
@@ -301,7 +305,8 @@ public class FeedService {
         return u == null ? "Someone" : (u.getFirstName() + " " + u.getLastName()).trim();
     }
 
-    private static boolean isAdmin(AuthPrincipal principal) {
-        return "OWNER".equals(principal.role()) || "ADMIN".equals(principal.role());
+    /** May pin, edit or remove anybody's post: FEED_MODERATE (Admin by default, PD-54). */
+    private boolean isAdmin(AuthPrincipal principal) {
+        return permissions.has(principal, com.calyvora.access.Permission.FEED_MODERATE);
     }
 }

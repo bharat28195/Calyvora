@@ -88,6 +88,8 @@ import {
   type PageSummary,
   type Me,
   type Member,
+  type CompanyRole,
+  type PermissionInfo,
   type Role,
   type SearchResponse,
   type AssistantResponse,
@@ -734,6 +736,28 @@ export const api = {
   },
   listMembers(): Promise<Member[]> {
     return LIVE ? http<Member[]>("/company/members") : mockBackend.listMembers(accessToken);
+  },
+
+  // --- roles and permissions (PD-54) ---
+  roles(): Promise<CompanyRole[]> {
+    return LIVE ? http<CompanyRole[]>("/roles") : liveOnly("Roles");
+  },
+  permissionCatalogue(): Promise<PermissionInfo[]> {
+    return LIVE ? http<PermissionInfo[]>("/roles/permissions") : liveOnly("Roles");
+  },
+  createRole(input: { name: string; description?: string; permissions: Record<string, string> }): Promise<CompanyRole> {
+    return LIVE ? http<CompanyRole>("/roles", { method: "POST", body: JSON.stringify(input) }) : liveOnly("Roles");
+  },
+  updateRole(id: string, input: { name?: string; description?: string; permissions?: Record<string, string> }): Promise<CompanyRole> {
+    return LIVE ? http<CompanyRole>(`/roles/${id}`, { method: "PATCH", body: JSON.stringify(input) }) : liveOnly("Roles");
+  },
+  deleteRole(id: string): Promise<void> {
+    return LIVE ? http<void>(`/roles/${id}`, { method: "DELETE" }) : liveOnly("Roles");
+  },
+  assignRole(userId: string, roleId: string): Promise<void> {
+    return LIVE
+      ? http<void>(`/company/members/${userId}/role`, { method: "PUT", body: JSON.stringify({ roleId }) })
+      : liveOnly("Roles");
   },
 
   // --- invitations ---

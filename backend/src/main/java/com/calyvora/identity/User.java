@@ -42,6 +42,13 @@ public class User {
     @Column(nullable = false, length = 24)
     private Role role;
 
+    /**
+     * The company role this person holds (PD-54), when it is not simply the built-in their {@link #role}
+     * names. Null means "the built-in for my role", which is what everyone had before custom roles.
+     */
+    @Column(name = "company_role_id")
+    private java.util.UUID companyRoleId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 24)
     private UserStatus status;
@@ -123,6 +130,14 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public java.util.UUID getCompanyRoleId() {
+        return companyRoleId;
+    }
+
+    public void setCompanyRoleId(java.util.UUID companyRoleId) {
+        this.companyRoleId = companyRoleId;
     }
 
     public UserStatus getStatus() {

@@ -10,10 +10,11 @@ import { Alert } from "@/components/ui/alert";
 import { MARKABLE, STATUS, StatusChip, MyDay, MyMonth, hhmm } from "@/components/attendance/self";
 import { AttendanceMonthGrid } from "@/components/attendance/month-grid";
 import { DayHeading } from "@/components/ui/month-calendar";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 export default function AttendancePage() {
   const { me } = useSession();
-  const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
+  const isAdmin = canCompanyWide(me, "ATTENDANCE_MANAGE");
 
   return (
     <div>

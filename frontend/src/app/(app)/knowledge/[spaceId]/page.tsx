@@ -7,7 +7,6 @@ import { Loader2, Plus, FileText, ArrowLeft, Trash2, Save, Eye, Pencil, Upload, 
 import { api, ApiError } from "@/lib/api";
 import type { Space, KnowledgePage, PageSummary, CompanyFile } from "@/lib/types";
 import { useSession } from "@/hooks/useSession";
-import { canPublishDocuments } from "@/lib/document-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -16,6 +15,7 @@ import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
 import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
 import { cn } from "@/lib/utils";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 export default function SpacePageRoute() {
   return (
@@ -29,7 +29,7 @@ function SpacePage() {
   const { spaceId } = useParams<{ spaceId: string }>();
   const search = useSearchParams();
   const { me } = useSession();
-  const publisher = canPublishDocuments(me?.user.role);
+  const publisher = can(me, "DOCUMENTS_PUBLISH");
   const [space, setSpace] = useState<Space | null>(null);
   const [pages, setPages] = useState<PageSummary[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(search.get("page"));

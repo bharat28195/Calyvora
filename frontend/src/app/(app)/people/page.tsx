@@ -16,6 +16,7 @@ import { EmployeeCompensation } from "@/components/people/employee-compensation"
 import { EmployeeProfileExtras } from "@/components/people/employee-profile-extras";
 import { EmployeeGoals } from "@/components/people/employee-goals";
 import { EmployeeDocuments } from "@/components/people/employee-documents";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 const TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"] as const;
 const STATUSES = ["ONBOARDING", "ACTIVE", "TERMINATED"] as const;
@@ -37,7 +38,7 @@ const TIMEZONES: string[] = (() => {
 
 export default function PeoplePage() {
   const { me } = useSession();
-  const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
+  const isAdmin = can(me, "MEMBERS_MANAGE");
 
   const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);

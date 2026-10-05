@@ -5,7 +5,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
 
 /**
  * Who may publish company documents: the handbook, policies and files everyone in the company reads.
@@ -22,7 +21,11 @@ import java.util.Set;
 @Component("documentAccess")
 public class DocumentAccess {
 
-    private static final Set<String> PUBLISHERS = Set.of("OWNER", "ADMIN", "HR");
+    private final com.calyvora.access.PermissionService permissions;
+
+    public DocumentAccess(com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
+    }
 
     /** @return whether the current caller may create, edit, publish, upload or delete documents. */
     public boolean canPublish() {
@@ -30,7 +33,7 @@ public class DocumentAccess {
     }
 
     public boolean canPublish(AuthPrincipal principal) {
-        return principal != null && PUBLISHERS.contains(principal.role());
+        return permissions.has(principal, com.calyvora.access.Permission.DOCUMENTS_PUBLISH);
     }
 
     private static AuthPrincipal current() {

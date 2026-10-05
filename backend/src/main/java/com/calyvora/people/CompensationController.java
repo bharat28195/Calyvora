@@ -18,11 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * Compensation & payslips (People OS, feedback C1–C3). Sensitive — Owner/Admin only.
+ * Compensation, payslips and private details (People OS, feedback C1–C3). Sensitive, so each endpoint
+ * names its own permission (PD-54): reading pay is SALARY_VIEW (company-wide, or one's own team),
+ * changing it is PAYROLL_MANAGE; private details are PEOPLE_PRIVATE_VIEW to read, PEOPLE_MANAGE to edit.
  */
 @RestController
 @RequestMapping("/api/v1/people/employees/{employeeId}")
-@PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'HR')")
 public class CompensationController {
 
     private final CompensationService compensationService;
@@ -36,11 +37,13 @@ public class CompensationController {
 
     /** Anyone's bank / statutory / identity record — HR maintains these. */
     @GetMapping("/finance")
+    @PreAuthorize("@perm.has('PEOPLE_PRIVATE_VIEW')")
     public com.calyvora.people.dto.EmployeeFinanceResponse finance(@PathVariable UUID employeeId) {
         return financeService.forEmployee(employeeId);
     }
 
     @org.springframework.web.bind.annotation.PatchMapping("/finance")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public com.calyvora.people.dto.EmployeeFinanceResponse updateFinance(
             @PathVariable UUID employeeId,
             @Valid @RequestBody com.calyvora.people.dto.UpdateEmployeeFinanceRequest request) {
@@ -48,11 +51,13 @@ public class CompensationController {
     }
 
     @GetMapping("/compensation")
+    @PreAuthorize("@perm.seesSalaryOf(#employeeId)")
     public CompensationResponse compensation(@PathVariable UUID employeeId) {
         return compensationService.forEmployee(employeeId);
     }
 
     @PostMapping("/compensation")
+    @PreAuthorize("@perm.has('PAYROLL_MANAGE')")
     public CompensationResponse addCompensation(@PathVariable UUID employeeId,
                                                 @Valid @RequestBody AddCompensationRequest request,
                                                 @CurrentUser AuthPrincipal principal) {
@@ -60,6 +65,7 @@ public class CompensationController {
     }
 
     @GetMapping("/payslip")
+    @PreAuthorize("@perm.seesSalaryOf(#employeeId)")
     public PayslipResponse payslip(@PathVariable UUID employeeId,
                                    @RequestParam(name = "month", required = false) String month) {
         return compensationService.payslip(employeeId, month);

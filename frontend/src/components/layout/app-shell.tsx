@@ -13,22 +13,37 @@ import { useRequireAuth } from "@/hooks/useSession";
 import { IdleTimeout } from "@/components/layout/idle-timeout";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Role } from "@/lib/types";
+import type { Me, Role } from "@/lib/types";
 import { CommandBar } from "@/components/layout/command-bar";
 import { AssistantPanel } from "@/components/layout/assistant-panel";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { Wordmark } from "@/components/layout/wordmark";
+import { can, canCompanyWide, type PermissionKey } from "@/lib/permissions";
 
 interface NavChild {
   href: string;
   label: string;
+  /** The permission this pane needs, when it needs more than its section does. */
+  perm?: PermissionKey;
+  /** Needs the permission company-wide, not only for the holder's team. */
+  permWide?: boolean;
 }
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  /**
+   * Which kind of account sees this at all — the vendor console, an agency, or a company. Inside a
+   * company, what someone may open is a permission (`perm`), never their role's name (PD-54).
+   */
   roles?: Role[]; // undefined = everyone
+  /** The permission the section needs (PD-54). */
+  perm?: PermissionKey;
+  /** Needs the permission company-wide, not only for the holder's team. */
+  permWide?: boolean;
+  /** Hide from people who hold `perm` company-wide (they reach the same page elsewhere). */
+  hideIfWide?: boolean;
   /**
    * The module this section belongs to. Hidden when the company has not bought it.
    *
@@ -47,16 +62,12 @@ interface NavItem {
    */
   leadsTeam?: boolean;
   children?: NavChild[]; // sub-panes shown in the left pane when the section is active
-  /** Sub-panes only some roles may open, merged into `children` for those roles. */
-  hrChildren?: NavChild[];
 }
 
 // HR-only product surface (feature/hr-suite). Work, Knowledge, Clients and Feed are intentionally
 // omitted here — this branch presents Orbit as a focused HR suite for the demo.
 // Per-role visibility (PD-10). MEMBER/MANAGER get self-service; HR gets the people-ops surface;
 // ADMIN gets everything company-level; OWNER is the platform vendor — only the Platform console.
-const HR_PLUS: Role[] = ["ADMIN", "HR"];
-const MANAGES: Role[] = ["ADMIN", "HR", "MANAGER"]; // people who approve their team's requests
 const COMPANY: Role[] = ["ADMIN", "HR", "MANAGER", "MEMBER"]; // any company user (not the platform OWNER)
 const NAV: NavItem[] = [
   // Four pages rather than four sections of one, so each gets the whole width — the companies table
@@ -80,7 +91,7 @@ const NAV: NavItem[] = [
   { href: "/feed", label: "Announcements", icon: Megaphone, roles: COMPANY },
   // Everyone reads the company's policies and handbook; HR and admins publish them (DocumentAccess).
   { href: "/knowledge", label: "Company documents", icon: FolderOpen, roles: COMPANY, feature: "KNOWLEDGE" },
-  { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS, feature: "ANALYTICS" },
+  { href: "/analytics", label: "Insights", icon: BarChart3, roles: COMPANY, perm: "INSIGHTS_VIEW", feature: "ANALYTICS" },
   // "Me" is attendance and time off. Everything that is really about money went to Finance and
   // everything about other people went to My team — this section is what I did, not what I am owed
   // or who I work with.
@@ -128,9 +139,7 @@ const NAV: NavItem[] = [
       // Everyone declares their own tax and picks their own regime — which one is cheaper depends
       // on the individual, so this cannot be an HR-only screen.
       { href: "/finance/tax", label: "Tax declaration" },
-    ],
-    hrChildren: [
-      { href: "/finance/tax/manage", label: "Manage tax" },
+      { href: "/finance/tax/manage", label: "Manage tax", perm: "TAX_MANAGE" },
     ],
   },
   // One Performance section for everybody, with two extra panes for HR rather than a second
@@ -141,43 +150,41 @@ const NAV: NavItem[] = [
     children: [
       { href: "/performance/me", label: "My goals" },
       { href: "/performance/review", label: "My review" },
-    ],
-    hrChildren: [
-      { href: "/performance", label: "Review cycles" },
+      { href: "/performance", label: "Review cycles", perm: "PERFORMANCE_MANAGE" },
     ],
   },
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
   { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY, feature: "HELPDESK" },
-  { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: MANAGES },
+  { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: COMPANY, perm: "ATTENDANCE_MANAGE" },
   // Approvals, which is not the same thing as the team's leave calendar under My team — one is a
   // queue you have to act on, the other is a view. Shown to anyone who leads people rather than to
   // the MANAGER role, because the server now lets the whole chain above someone decide their
   // requests, and a lead who can approve but cannot find the queue is the same bug in a new place.
   // MANAGER/MEMBER rather than everyone, so HR and admins are not shown the same page twice — they
   // already reach it as People > Time off.
-  { href: "/people/time-off", label: "Leave approvals", icon: CalendarCheck, leadsTeam: true, roles: ["MANAGER", "MEMBER"] },
+  { href: "/people/time-off", label: "Leave approvals", icon: CalendarCheck, leadsTeam: true, roles: COMPANY, perm: "LEAVE_APPROVE", hideIfWide: true },
   // Top-level rather than under People, which is HR-only: exit clearance is a lead's job, and they
   // would never see it nested under a section their role cannot open. HR and admins reach the same
   // page and get the whole company; a lead now gets only their own org (ExitService.leaving).
   { href: "/people/exits", label: "Exits", icon: DoorOpen, roles: COMPANY, leadsTeam: true },
   {
-    href: "/people", label: "People", icon: Users, roles: HR_PLUS,
+    href: "/people", label: "People", icon: Users, roles: COMPANY, perm: "ORG_VIEW_ALL", permWide: true,
     children: [
       { href: "/people", label: "Directory" },
-      { href: "/people/designations", label: "Designations" },
-      { href: "/people/attendance", label: "Attendance" },
-      { href: "/people/time-off", label: "Time off" },
-      { href: "/people/leave-policy", label: "Leave policy" },
+      { href: "/people/designations", label: "Designations", perm: "PEOPLE_MANAGE" },
+      { href: "/people/attendance", label: "Attendance", perm: "ATTENDANCE_MANAGE", permWide: true },
+      { href: "/people/time-off", label: "Time off", perm: "LEAVE_APPROVE", permWide: true },
+      { href: "/people/leave-policy", label: "Leave policy", perm: "LEAVE_POLICY_MANAGE" },
       { href: "/people/holidays", label: "Holidays" },
     ],
   },
-  { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: HR_PLUS, feature: "RECRUITMENT" },
-  { href: "/shifts", label: "Shifts", icon: CalendarClock, roles: HR_PLUS, feature: "SHIFTS" },
+  { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: COMPANY, perm: "RECRUITMENT_MANAGE", feature: "RECRUITMENT" },
+  { href: "/shifts", label: "Shifts", icon: CalendarClock, roles: COMPANY, perm: "SHIFTS_MANAGE", feature: "SHIFTS" },
   // The HR-only Performance entry that used to sit here is gone: there is now one Performance section
   // for everybody (above), and HR gets the Review cycles pane inside it via hrChildren. Two nav
   // entries with the same label pointing at the same route is how a screen gets reported missing.
   {
-    href: "/payroll", label: "Payroll", icon: Wallet, roles: HR_PLUS, feature: "PAYROLL",
+    href: "/payroll", label: "Payroll", icon: Wallet, roles: COMPANY, perm: "PAYROLL_MANAGE", feature: "PAYROLL",
     children: [
       { href: "/payroll", label: "Salaries" },
       { href: "/payroll/run", label: "Payroll run" },
@@ -190,9 +197,9 @@ const NAV: NavItem[] = [
   },
   // Admins and HR, matching ExpenseController (HR manages expenses since 2026-10-05). Approving their
   // own team's claims stays open to whoever leads them (My team > Expenses).
-  { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS, feature: "EXPENSES" },
+  { href: "/expenses", label: "Expenses", icon: Receipt, roles: COMPANY, perm: "EXPENSES_REIMBURSE", feature: "EXPENSES" },
   {
-    href: "/documents", label: "Documents", icon: FileText, roles: HR_PLUS,
+    href: "/documents", label: "Documents", icon: FileText, roles: COMPANY, perm: "DOCUMENTS_ISSUE",
     children: [
       { href: "/documents", label: "Issued" },
       { href: "/documents/new", label: "Generate" },
@@ -200,17 +207,23 @@ const NAV: NavItem[] = [
       { href: "/documents/letterhead", label: "Letterpad" },
     ],
   },
-  { href: "/members", label: "Members", icon: UserCog, roles: ["ADMIN"] },
-  { href: "/subscription", label: "Subscription", icon: CreditCard, roles: ["ADMIN"] },
-  { href: "/settings", label: "Settings", icon: Settings, roles: ["ADMIN"] },
+  {
+    href: "/members", label: "Members", icon: UserCog, roles: COMPANY, perm: "MEMBERS_MANAGE",
+    children: [
+      { href: "/members", label: "People & invites" },
+      { href: "/settings/roles", label: "Roles & permissions" },
+    ],
+  },
+  { href: "/subscription", label: "Subscription", icon: CreditCard, roles: COMPANY, perm: "BILLING_MANAGE" },
+  { href: "/settings", label: "Settings", icon: Settings, roles: COMPANY, perm: "COMPANY_SETTINGS" },
 ];
 
 /**
  * Pages that exist but have no menu entry on this branch, with the rule their API applies — without
  * these the guard has nothing to go on and a typed URL renders the page under a 403 again.
  */
-const UNLISTED: { href: string; roles?: Role[]; feature?: string }[] = [
-  { href: "/billing", roles: ["ADMIN"] },                       // BillingController: OWNER/ADMIN
+const UNLISTED: { href: string; roles?: Role[]; feature?: string; perm?: PermissionKey; permWide?: boolean }[] = [
+  { href: "/billing", roles: COMPANY, perm: "BILLING_MANAGE" },
 ];
 
 /** Where each kind of account lands, and is sent back to from a page that is not theirs. */
@@ -231,21 +244,27 @@ function homeFor(role: Role): string {
  *
  * @return the roles and module for the route, or null when the route is open to anyone signed in
  */
-function routeRule(pathname: string): { roles: Role[] | null; feature?: string } | null {
-  const entries: { href: string; roles?: Role[]; feature?: string }[] = [...UNLISTED];
+type RouteEntry = { href: string; roles?: Role[]; feature?: string; perm?: PermissionKey; permWide?: boolean };
+
+function routeRule(pathname: string): { roles: Role[] | null; feature?: string; allows: (me: Me) => boolean } | null {
+  const entries: RouteEntry[] = [...UNLISTED];
   for (const n of NAV) {
-    entries.push({ href: n.href, roles: n.roles, feature: n.feature });
-    for (const c of n.children ?? []) entries.push({ href: c.href, roles: n.roles, feature: n.feature });
-    // hrChildren are only ever merged in for whole-company roles (see the nav filter below).
-    const wholeCompany = (n.roles ?? COMPANY).filter((r) => r === "ADMIN" || r === "HR");
-    for (const c of n.hrChildren ?? []) entries.push({ href: c.href, roles: wholeCompany, feature: n.feature });
+    entries.push({ href: n.href, roles: n.roles, feature: n.feature, perm: n.perm, permWide: n.permWide });
+    for (const c of n.children ?? []) {
+      // A pane with its own permission needs that; otherwise it needs whatever its section needs.
+      entries.push(c.perm
+        ? { href: c.href, roles: n.roles, feature: n.feature, perm: c.perm, permWide: c.permWide }
+        : { href: c.href, roles: n.roles, feature: n.feature, perm: n.perm, permWide: n.permWide });
+    }
   }
   const matches = entries.filter((e) => pathname === e.href || pathname.startsWith(e.href + "/"));
   if (matches.length === 0) return null;
   const longest = Math.max(...matches.map((e) => e.href.length));
   const best = matches.filter((e) => e.href.length === longest);
   const roles = best.some((e) => !e.roles) ? null : Array.from(new Set(best.flatMap((e) => e.roles ?? [])));
-  return { roles, feature: best.find((e) => e.feature)?.feature };
+  // Entries sharing the href pool their permissions too: any one of them lets the person in.
+  const allows = (me: Me) => best.some((e) => !e.perm || (e.permWide ? canCompanyWide(me, e.perm) : can(me, e.perm)));
+  return { roles, feature: best.find((e) => e.feature)?.feature, allows };
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -289,6 +308,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const blocked = !!role && (
     (role === "OWNER" && !pathname.startsWith("/platform")) ||
     (rule?.roles != null && !rule.roles.includes(role)) ||
+    (!!rule && !!session.me && !rule.allows(session.me)) ||
     // Only once features are known, and only an explicit "off": never hide a paid module on a slow load.
     (!!rule?.feature && features !== null && features[rule.feature] === false));
   useEffect(() => {
@@ -304,18 +324,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const { user, company } = session.me;
-  const seesWholeCompany = user.role === "ADMIN" || user.role === "HR" || user.role === "OWNER";
+  const me = session.me;
+  const seesWholeCompany = canCompanyWide(me, "ORG_VIEW_ALL");
+  const allowed = (perm?: PermissionKey, wide?: boolean) => !perm || (wide ? canCompanyWide(me, perm) : can(me, perm));
   const nav = NAV
     .filter((n) => !n.roles || n.roles.includes(user.role))
+    .filter((n) => allowed(n.perm, n.permWide))
+    .filter((n) => !(n.hideIfWide && n.perm && canCompanyWide(me, n.perm)))
     .filter((n) => !n.feature || features === null || features[n.feature] !== false)
     // A whole-company role is never gated by the team check: HR who happens to have nobody reporting
     // to them still runs exits for the business.
     .filter((n) => !n.leadsTeam || leadsTeam || seesWholeCompany)
-    // hrChildren are appended, not substituted: HR still has their own goals and their own review,
-    // and a section that swapped one set for the other would take those away from them.
-    .map((n) => (n.hrChildren && seesWholeCompany
-      ? { ...n, children: [...(n.children ?? []), ...n.hrChildren] }
-      : n));
+    // Each pane can need its own permission (Manage tax, Review cycles, Designations…).
+    .map((n) => (n.children ? { ...n, children: n.children.filter((c) => allowed(c.perm, c.permWide)) } : n));
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   async function logout() {

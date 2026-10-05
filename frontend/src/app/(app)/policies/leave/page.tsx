@@ -6,9 +6,9 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { LeavePolicy } from "@/lib/types";
 import { useSession } from "@/hooks/useSession";
-import { canPublishDocuments } from "@/lib/document-access";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 const LABELS: Record<string, string> = {
   VACATION: "Vacation",
@@ -79,7 +79,7 @@ export default function LeavePolicyReadPage() {
           ))}
           <p className="text-sm text-fg/50">
             Apply in <Link href="/me/leave" className="text-violet hover:underline">Me › Time off</Link>. Your manager gets the request to approve.
-            {canPublishDocuments(me?.user.role) && (
+            {can(me, "LEAVE_POLICY_MANAGE") && (
               <> HR can change these in <Link href="/people/leave-policy" className="text-violet hover:underline">People › Leave policy</Link>.</>
             )}
           </p>

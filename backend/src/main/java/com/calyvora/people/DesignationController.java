@@ -39,19 +39,19 @@ public class DesignationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public DesignationResponse create(@Valid @RequestBody DesignationRequest request) {
         return designationService.create(request);
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public DesignationResponse update(@PathVariable UUID id, @Valid @RequestBody DesignationRequest request) {
         return designationService.update(id, request);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public void delete(@PathVariable UUID id) {
         designationService.delete(id);
     }

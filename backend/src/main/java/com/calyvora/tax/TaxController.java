@@ -63,7 +63,7 @@ public class TaxController {
     }
 
     @GetMapping("/declarations")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('TAX_MANAGE')")
     public List<TaxDtos.DeclarationSummaryRow> all(@CurrentUser AuthPrincipal principal,
                                                    @RequestParam(required = false) String year) {
         return taxService.allDeclarations(principal, year);
@@ -71,7 +71,7 @@ public class TaxController {
 
     /** HR opens the window in April and closes it before the last run of the year. */
     @PostMapping("/window")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('TAX_MANAGE')")
     public Map<String, Boolean> setWindow(@CurrentUser AuthPrincipal principal,
                                           @RequestBody Map<String, Boolean> body) {
         boolean open = body != null && Boolean.TRUE.equals(body.get("open"));

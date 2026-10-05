@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 const selectCls =
   "h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
@@ -32,7 +33,7 @@ export default function ExitsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
 
   // A manager works the checklist; deciding that someone is leaving, and declaring them left, is HR's.
-  const canStart = me?.user.role === "ADMIN" || me?.user.role === "HR" || me?.user.role === "OWNER";
+  const canStart = can(me, "EXITS_MANAGE");
 
   const load = useCallback(async () => {
     try {

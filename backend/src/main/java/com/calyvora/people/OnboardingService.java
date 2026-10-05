@@ -54,7 +54,11 @@ public class OnboardingService {
     private final OnboardingTaskRepository taskRepository;
     private final EmployeeRepository employeeRepository;
 
-    public OnboardingService(OnboardingTaskRepository taskRepository, EmployeeRepository employeeRepository) {
+    private final com.calyvora.access.PermissionService permissions;
+
+    public OnboardingService(OnboardingTaskRepository taskRepository, EmployeeRepository employeeRepository,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.taskRepository = taskRepository;
         this.employeeRepository = employeeRepository;
     }
@@ -162,7 +166,7 @@ public class OnboardingService {
      * they would be signing off that they returned their own laptop.
      */
     private void requireManagerOrAdmin(Employee employee, AuthPrincipal principal) {
-        if (isAdmin(principal) || Role.HR.name().equals(principal.role())) {
+        if (permissions.has(principal, com.calyvora.access.Permission.EXITS_MANAGE)) {
             return;
         }
         boolean isTheirManager = employee.getManagerId() != null
@@ -174,7 +178,11 @@ public class OnboardingService {
         }
     }
 
-    private static boolean isAdmin(AuthPrincipal principal) {
-        return Role.OWNER.name().equals(principal.role()) || Role.ADMIN.name().equals(principal.role());
+    /**
+     * Opens anyone's onboarding checklist: PEOPLE_MANAGE (PD-54). Was OWNER/ADMIN only, which left HR
+     * able to add onboarding tasks through the API yet unable to open the checklist they had added to.
+     */
+    private boolean isAdmin(AuthPrincipal principal) {
+        return permissions.has(principal, com.calyvora.access.Permission.PEOPLE_MANAGE);
     }
 }

@@ -8,6 +8,7 @@ import type { PerformanceReview } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { ReviewCard } from "@/components/performance/review-card";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /**
  * My review: my own self-assessment and, if I manage people, my reports' reviews to fill in. One
@@ -15,7 +16,7 @@ import { ReviewCard } from "@/components/performance/review-card";
  */
 export default function MyReviewPage() {
   const { me } = useSession();
-  const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
+  const isAdmin = can(me, "PERFORMANCE_MANAGE");
   const [mine, setMine] = useState<PerformanceReview[] | null>(null);
   const [team, setTeam] = useState<PerformanceReview[]>([]);
   const [error, setError] = useState<string | null>(null);

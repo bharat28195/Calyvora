@@ -13,12 +13,13 @@ import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { dateTime } from "@/lib/format";
 import { STATUS_TONE, STATUS_LABEL, PRIORITY_TONE } from "@/lib/helpdesk";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /** One helpdesk ticket: details, the conversation thread, and (for HR) status/assignment controls. */
 export default function TicketPage() {
   const { id } = useParams<{ id: string }>();
   const { me } = useSession();
-  const isAgent = me?.user.role === "ADMIN" || me?.user.role === "HR" || me?.user.role === "OWNER";
+  const isAgent = can(me, "HELPDESK_MANAGE");
   const [ticket, setTicket] = useState<HelpdeskTicket | null>(null);
   const [comments, setComments] = useState<HelpdeskComment[]>([]);
   const [reply, setReply] = useState("");

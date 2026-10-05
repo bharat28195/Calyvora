@@ -15,15 +15,19 @@ public class SearchController {
 
     private final SearchService searchService;
 
-    public SearchController(SearchService searchService) {
+    private final com.calyvora.access.PermissionService permissions;
+
+    public SearchController(SearchService searchService,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.searchService = searchService;
     }
 
     @GetMapping
     public SearchResponse search(@RequestParam(name = "q", required = false) String q,
                                  @CurrentUser AuthPrincipal principal) {
-        // Admin-only modules (Clients, Documents) must not leak through the search box either.
-        boolean admin = "OWNER".equals(principal.role()) || "ADMIN".equals(principal.role());
+        // Issued letters must not leak through the search box: only for those who issue them.
+        boolean admin = permissions.has(principal, com.calyvora.access.Permission.DOCUMENTS_ISSUE);
         return searchService.search(q, admin);
     }
 }

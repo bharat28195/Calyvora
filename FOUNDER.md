@@ -1702,6 +1702,17 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Shape:** built-in Admin / HR / Manager / Employee roles per company reproduce today's behaviour
   exactly, so nothing changes until an admin edits one. Admin is locked so a company cannot lock
   itself out. Permissions are read per request, not baked into the token, so changes apply at once.
+- **Built:** 23 permissions in 6 groups (`Permission`); six are scoped (company / own team). Every
+  company `@PreAuthorize` and in-service role check was mapped to one, by an explicit table.
+- **Deliberate behaviour changes** (everything else is identical for the built-ins):
+  - HR can now open anyone's onboarding checklist (it could already add tasks to it), write any
+    performance review and manage anyone's goals (PERFORMANCE_MANAGE), and finds issued letters in
+    search (DOCUMENTS_ISSUE).
+  - The AI assistant's company-wide approval counts (pending leave, people on notice) now need a
+    company-wide approval permission. Before, any MANAGER got them by title — a manager of two could
+    ask how many people in the company were leaving.
+  - Holidays and leave policy are edited by whoever holds LEAVE_POLICY_MANAGE (HR could already via
+    the API; the screens only offered it to admins).
 
 ## 4. Architecture Decision Log
 
