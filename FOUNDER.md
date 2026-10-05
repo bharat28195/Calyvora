@@ -1646,6 +1646,39 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   platform-owner bearer (one cached helper on IntegrationTestBase). A new test asserts an anonymous
   test-email is refused with 403.
 
+### PD-50 · 2026-10-05 · Statutory deductions come from the statutory engine, never from the template
+- **Context:** a click-through QA of the live demo found every payslip ~16% short with PF and
+  income tax both switched OFF. The default payslip template (V25) shipped "Provident fund 12% of
+  basic" and a flat "Income tax 10% of gross" as ordinary DEDUCTION components. They bypassed the
+  per-company switches entirely, and once a company did switch PF or TDS on, the real statutory line
+  was added on top of the template's: both deducted twice. A finance team would have caught the flat
+  10% "tax" on the first payslip.
+- **Rule:** PF and TDS reach a payslip only through the statutory engine (capped basic for PF, each
+  employee's declaration for TDS), behind their switches. The template holds earnings and a
+  company's own deductions (loan recovery, professional tax, canteen). The default template is now
+  the three earnings. V59 removed the two components from every company where they were still the
+  untouched shipped defaults; a company that changed one keeps it.
+- **Related:** the employee's tax page showed a projected figure as "Deducted so far" to people from
+  whom nothing was withheld. It now says plainly when tax is not withheld through Orbit and labels
+  the numbers as an estimate.
+- **Cost:** net pay on existing demo payslips rises by the removed 16%. The data migration has its
+  own test against planted pre-V59 templates, bound per tenant (FORCE RLS would otherwise let a
+  migration "succeed" while deleting nothing).
+
+### PD-51 · 2026-10-05 · Leave approval follows the tree for members too
+- **Context:** PD-32 made the reporting tree the rule for reach ("a MEMBER with two interns leads a
+  team"), and the nav already offered "Leave approvals" to members who lead someone. The leave and
+  comp-off endpoints still checked the role and refused MEMBER with 403, so a member lead could see
+  the approvals page and never act on it.
+- **Rule:** MEMBER may reach the leave and comp-off approval endpoints; LeaveService and
+  CompOffService scope every read and decision to the caller's downline, as they already did for
+  MANAGER. A member with no reports gets an empty queue and is refused every decision.
+- **Same pass, same root (menu and server disagreeing):** pages a role cannot use (vendor console,
+  agency console, admin-only pages) rendered under a 403 when opened by URL. The app shell now
+  redirects using the nav's own role rules, so the menu and the guard cannot drift apart. Expenses
+  was offered to HR while the API is OWNER/ADMIN only; the menu now matches the API. Whether HR
+  should manage company expenses is open for the founder.
+
 ## 4. Architecture Decision Log
 
 

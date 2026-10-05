@@ -39,14 +39,16 @@ resolving path ids from earlier responses. Reports only non-200s plus a per-role
 
 Use it after any deploy. A clean run means every screen still loads for every role.
 
-Expected output on a healthy deployment — the 403s are correct role boundaries, not failures:
+Expected output on a healthy deployment — the 403s are correct role boundaries, not failures. The
+leave inbox answers every role since PD-51 (managers and members get only their own reports' requests,
+an empty list when they lead nobody), so it is no longer among the denials:
 
 ```
 OWNER   ava.chen      72/72 ok
 ADMIN   marcus.reed   16/16 ok
 HR      leo.martins   15/16 ok    (company/members denied)
-MANAGER tom.becker    11/16 ok    (leave, payroll, analytics, members, compensation denied)
-MEMBER  priya.nair    11/16 ok    (same five)
+MANAGER tom.becker    12/16 ok    (payroll, analytics, members, compensation denied)
+MEMBER  priya.nair    12/16 ok    (same four)
 PLATFORM owner         8/8  ok
 ```
 
