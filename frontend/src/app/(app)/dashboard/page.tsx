@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui/alert";
 import { TeamOverviewSection } from "@/components/dashboard/team-overview";
 import { WhatsComingUp } from "@/components/dashboard/whats-coming-up";
 import { MyDay } from "@/components/attendance/self";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /** HR-suite dashboard: the People side of the company up front — attendance, time off, and your own day. */
 export default function DashboardPage() {
@@ -31,8 +32,9 @@ export default function DashboardPage() {
     api.myTeamStanding().then((s) => setLeadsTeam(s.leadsTeam)).catch(() => {});
   }, []);
 
-  const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
-  const seesTeam = isAdmin || me?.user.role === "HR" || leadsTeam;
+  const isAdmin = can(me, "MEMBERS_MANAGE");
+  const wholeCompany = canCompanyWide(me, "ORG_VIEW_ALL");
+  const seesTeam = wholeCompany || leadsTeam;
   const leaveLeft = balance ? balance.remainingDays : null;
 
   return (
@@ -57,7 +59,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {seesTeam && <TeamOverviewSection wholeCompany={isAdmin || me?.user.role === "HR"} />}
+      {seesTeam && <TeamOverviewSection wholeCompany={wholeCompany} />}
 
       <div className="mt-2 grid gap-6 lg:grid-cols-3">
         {/* Time Today — the live clock + check-in/out */}

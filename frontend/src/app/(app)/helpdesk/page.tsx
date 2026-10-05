@@ -13,11 +13,12 @@ import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE, STATUS_LABEL, PRIORITY_TONE, CATEGORIES, CATEGORY_LABEL } from "@/lib/helpdesk";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /** HR Helpdesk — employees raise & track queries; HR agents run a queue. */
 export default function HelpdeskPage() {
   const { me } = useSession();
-  const isAgent = me?.user.role === "ADMIN" || me?.user.role === "HR" || me?.user.role === "OWNER";
+  const isAgent = can(me, "HELPDESK_MANAGE");
   const [tab, setTab] = useState<"queue" | "mine">(isAgent ? "queue" : "mine");
   const [status, setStatus] = useState<TicketStatus | "">("");
   const [tickets, setTickets] = useState<HelpdeskTicket[] | null>(null);

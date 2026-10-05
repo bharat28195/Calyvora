@@ -46,21 +46,25 @@ public class CompOffController {
         return service.mine(principal);
     }
 
-    /** Claims this caller can act on: their reports', or the whole company for HR and admins. */
+    /**
+     * Claims this caller can act on: their reports', or the whole company for HR and admins. Open to
+     * MEMBER for the same reason as leave (PD-32) — CompOffService scopes every read and decision to
+     * the caller's downline, so the role check only decides who may ask.
+     */
     @GetMapping("/pending")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public List<CompOffResponse> pending(@CurrentUser AuthPrincipal principal) {
         return service.pending(principal);
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public CompOffResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return service.decide(id, true, principal);
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
+    @PreAuthorize("@perm.has('LEAVE_APPROVE')")
     public CompOffResponse reject(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return service.decide(id, false, principal);
     }

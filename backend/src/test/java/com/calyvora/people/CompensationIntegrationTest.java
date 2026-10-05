@@ -49,7 +49,16 @@ class CompensationIntegrationTest extends IntegrationTestBase {
         double gross = slip.get("gross").asDouble();
         assertThat(gross).isCloseTo(6000000.0 / 12, org.assertj.core.data.Offset.offset(0.5));
         assertThat(slip.get("earnings")).hasSize(3);
-        assertThat(slip.get("net").asDouble()).isLessThan(gross);
+        // Was "net < gross", which only held because the default template invented a PF and a flat
+        // 10% income-tax deduction (PD-50/V59). With statutory PF and TDS off, the only deductions are
+        // the company's own and loss of pay — so net is exactly gross minus the listed deductions,
+        // and none of them is a PF or tax line.
+        double deducted = 0;
+        for (JsonNode d : slip.get("deductions")) {
+            assertThat(d.get("label").asText()).doesNotContainIgnoringCase("provident").doesNotContainIgnoringCase("tax");
+            deducted += d.get("amount").asDouble();
+        }
+        assertThat(slip.get("net").asDouble()).isCloseTo(gross - deducted, org.assertj.core.data.Offset.offset(0.5));
     }
 
     @Test

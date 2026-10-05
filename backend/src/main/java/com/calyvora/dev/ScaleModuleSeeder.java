@@ -1,11 +1,5 @@
 package com.calyvora.dev;
 
-import com.calyvora.client.Client;
-import com.calyvora.client.ClientRepository;
-import com.calyvora.client.ClientRequest;
-import com.calyvora.client.ClientRequestRepository;
-import com.calyvora.client.ClientStatus;
-import com.calyvora.client.RequestStatus;
 import com.calyvora.expense.ExpenseCategory;
 import com.calyvora.expense.ExpenseClaim;
 import com.calyvora.expense.ExpenseClaimRepository;
@@ -54,15 +48,6 @@ import com.calyvora.shift.Shift;
 import com.calyvora.shift.ShiftAssignment;
 import com.calyvora.shift.ShiftAssignmentRepository;
 import com.calyvora.shift.ShiftRepository;
-import com.calyvora.work.Project;
-import com.calyvora.work.ProjectRepository;
-import com.calyvora.work.Sprint;
-import com.calyvora.work.SprintRepository;
-import com.calyvora.work.SprintStatus;
-import com.calyvora.work.Task;
-import com.calyvora.work.TaskPriority;
-import com.calyvora.work.TaskRepository;
-import com.calyvora.work.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -118,9 +103,6 @@ public class ScaleModuleSeeder {
 
     private final LeaveRequestRepository leaveRepository;
     private final ExpenseClaimRepository expenseRepository;
-    private final ProjectRepository projectRepository;
-    private final SprintRepository sprintRepository;
-    private final TaskRepository taskRepository;
     private final SpaceRepository spaceRepository;
     private final PageRepository pageRepository;
     private final HelpdeskTicketRepository ticketRepository;
@@ -133,15 +115,12 @@ public class ScaleModuleSeeder {
     private final GoalRepository goalRepository;
     private final JobOpeningRepository jobRepository;
     private final CandidateRepository candidateRepository;
-    private final ClientRepository clientRepository;
-    private final ClientRequestRepository clientRequestRepository;
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final AttendanceRegularizationRepository regularizationRepository;
 
     public ScaleModuleSeeder(LeaveRequestRepository leaveRepository, ExpenseClaimRepository expenseRepository,
-                             ProjectRepository projectRepository, SprintRepository sprintRepository,
-                             TaskRepository taskRepository, SpaceRepository spaceRepository,
+                             SpaceRepository spaceRepository,
                              PageRepository pageRepository, HelpdeskTicketRepository ticketRepository,
                              HelpdeskCommentRepository ticketCommentRepository, PostRepository postRepository,
                              PostCommentRepository postCommentRepository,
@@ -149,15 +128,11 @@ public class ScaleModuleSeeder {
                              ReviewCycleRepository cycleRepository,
                              PerformanceReviewRepository reviewRepository, GoalRepository goalRepository,
                              JobOpeningRepository jobRepository, CandidateRepository candidateRepository,
-                             ClientRepository clientRepository, ClientRequestRepository clientRequestRepository,
                              ShiftRepository shiftRepository,
                              ShiftAssignmentRepository shiftAssignmentRepository,
                              AttendanceRegularizationRepository regularizationRepository) {
         this.leaveRepository = leaveRepository;
         this.expenseRepository = expenseRepository;
-        this.projectRepository = projectRepository;
-        this.sprintRepository = sprintRepository;
-        this.taskRepository = taskRepository;
         this.spaceRepository = spaceRepository;
         this.pageRepository = pageRepository;
         this.ticketRepository = ticketRepository;
@@ -170,16 +145,14 @@ public class ScaleModuleSeeder {
         this.goalRepository = goalRepository;
         this.jobRepository = jobRepository;
         this.candidateRepository = candidateRepository;
-        this.clientRepository = clientRepository;
-        this.clientRequestRepository = clientRequestRepository;
         this.shiftRepository = shiftRepository;
         this.shiftAssignmentRepository = shiftAssignmentRepository;
         this.regularizationRepository = regularizationRepository;
     }
 
     /** What was created, for the seed endpoint's response. */
-    public record Counts(int leave, int expenses, int projects, int tasks, int pages, int tickets,
-                         int posts, int reviews, int goals, int candidates, int clients,
+    public record Counts(int leave, int expenses, int pages, int tickets,
+                         int posts, int reviews, int goals, int candidates,
                          int shiftAssignments, int regularizations) {
     }
 
@@ -194,23 +167,19 @@ public class ScaleModuleSeeder {
 
         int leave = seedLeave(companyId, employees, adminUserId, rnd);
         int expenses = seedExpenses(companyId, employees, adminUserId, rnd);
-        Work work = seedWork(companyId, employees, rnd);
         int pages = seedKnowledge(companyId, employees, rnd);
         int tickets = seedHelpdesk(companyId, employees, rnd);
         int posts = seedFeed(companyId, employees, departments, rnd);
         Perf perf = seedPerformance(companyId, employees, adminUserId, rnd);
         int candidates = seedRecruitment(companyId, departments, adminUserId, rnd);
-        int clients = seedClients(companyId, adminUserId, rnd);
         int shifts = seedShifts(companyId, employees, rnd);
         int regularizations = seedRegularizations(companyId, employees, rnd);
 
-        Counts counts = new Counts(leave, expenses, work.projects(), work.tasks(), pages, tickets,
-                posts, perf.reviews(), perf.goals(), candidates, clients, shifts, regularizations);
+        Counts counts = new Counts(leave, expenses, pages, tickets,
+                posts, perf.reviews(), perf.goals(), candidates, shifts, regularizations);
         log.info("Scale modules seeded in {} ms: {}", System.currentTimeMillis() - started, counts);
         return counts;
     }
-
-    private record Work(int projects, int tasks) {}
 
     private record Perf(int reviews, int goals) {}
 
@@ -302,98 +271,6 @@ public class ScaleModuleSeeder {
         }
         saveInBatches(rows, expenseRepository::saveAll);
         return rows.size();
-    }
-
-    // --- work ------------------------------------------------------------------
-
-    private static final String[][] PROJECTS = {
-            {"Atlas Platform", "ATL", "The multi-tenant core: identity, tenancy and the shared services every app builds on."},
-            {"Mobile App", "MOB", "The Android and iOS clients, and the shared design system behind them."},
-            {"Billing Revamp", "BIL", "Usage metering, invoices and the move off the legacy payment gateway."},
-            {"Data Platform", "DAT", "The warehouse, the pipelines feeding it, and the reporting on top."},
-            {"Customer Onboarding", "ONB", "Everything between a signed contract and a customer in production."},
-            {"Site Reliability", "SRE", "Uptime, alerting, and the runbooks that keep the pager quiet."},
-            {"Security Hardening", "SEC", "Access reviews, dependency patching and the annual penetration test."},
-            {"Marketing Site", "WWW", "The public site, the pricing page and the docs that sit beside them."},
-    };
-
-    private static final String[] TASK_TITLES = {
-            "Write the migration", "Review the API contract", "Fix the flaky test", "Add request logging",
-            "Update the runbook", "Cut the release branch", "Triage last week's bugs", "Profile the slow query",
-            "Design the empty state", "Wire the feature flag", "Back-fill the missing rows",
-            "Document the rollback", "Add the missing index", "Handle the timeout case",
-            "Split the god component", "Cache the lookup", "Retire the old endpoint", "Chase the vendor",
-            "Prepare the demo data", "Rotate the signing key",
-    };
-
-    private Work seedWork(UUID companyId, List<Employee> employees, Random rnd) {
-        List<Project> projects = new ArrayList<>();
-        List<Sprint> sprints = new ArrayList<>();
-        List<Task> tasks = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-
-        for (int p = 0; p < PROJECTS.length; p++) {
-            String[] spec = PROJECTS[p];
-            // Leads sit just after the heads in the list; picking from there means a project lead is
-            // somebody with a team rather than a random junior.
-            Employee lead = employees.get(Math.min(2 + p, employees.size() - 1));
-            Project project = new Project(UUID.randomUUID(), companyId, spec[0], spec[1], spec[2],
-                    lead.getUserId());
-            projects.add(project);
-
-            // Two finished sprints, one running: the velocity chart needs history to plot.
-            Sprint done1 = sprint(companyId, project.getId(), "Sprint " + (p * 3 + 1),
-                    today.minusDays(42), today.minusDays(29), SprintStatus.COMPLETED);
-            Sprint done2 = sprint(companyId, project.getId(), "Sprint " + (p * 3 + 2),
-                    today.minusDays(28), today.minusDays(15), SprintStatus.COMPLETED);
-            Sprint active = sprint(companyId, project.getId(), "Sprint " + (p * 3 + 3),
-                    today.minusDays(14), today.plusDays(1), SprintStatus.ACTIVE);
-            sprints.add(done1);
-            sprints.add(done2);
-            sprints.add(active);
-
-            int number = 0;
-            for (Sprint s : List.of(done1, done2, active)) {
-                int count = 8 + rnd.nextInt(5);
-                for (int t = 0; t < count; t++) {
-                    Employee assignee = employees.get(rnd.nextInt(employees.size()));
-                    Task task = new Task(UUID.randomUUID(), companyId, project.getId(), ++number,
-                            pick(rnd, TASK_TITLES), lead.getUserId());
-                    task.setAssigneeId(assignee.getId());
-                    task.setSprintId(s.getId());
-                    task.setPriority(pick(rnd, TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH));
-                    task.setStoryPoints(pick(rnd, 1, 2, 3, 5, 8));
-                    task.setStatus(s.getStatus() == SprintStatus.COMPLETED
-                            ? TaskStatus.DONE
-                            : pick(rnd, TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE));
-                    task.setSortOrder(t);
-                    tasks.add(task);
-                }
-            }
-            // A backlog: tasks in no sprint at all, which is where a board starts.
-            for (int t = 0; t < 6; t++) {
-                Task task = new Task(UUID.randomUUID(), companyId, project.getId(), ++number,
-                        pick(rnd, TASK_TITLES), lead.getUserId());
-                task.setPriority(pick(rnd, TaskPriority.LOW, TaskPriority.MEDIUM));
-                task.setStatus(TaskStatus.TODO);
-                task.setSortOrder(t);
-                tasks.add(task);
-            }
-        }
-
-        projectRepository.saveAll(projects);
-        sprintRepository.saveAll(sprints);
-        saveInBatches(tasks, taskRepository::saveAll);
-        return new Work(projects.size(), tasks.size());
-    }
-
-    private Sprint sprint(UUID companyId, UUID projectId, String name, LocalDate from, LocalDate to,
-                          SprintStatus status) {
-        Sprint s = new Sprint(UUID.randomUUID(), companyId, projectId, name, "Ship what we committed to",
-                from, to);
-        s.setStatus(status);
-        s.setCapacityPoints(40);
-        return s;
     }
 
     // --- knowledge -------------------------------------------------------------
@@ -657,48 +534,6 @@ public class ScaleModuleSeeder {
         jobRepository.saveAll(jobs);
         saveInBatches(candidates, candidateRepository::saveAll);
         return candidates.size();
-    }
-
-    // --- clients ---------------------------------------------------------------
-
-    private static final String[] CLIENT_NAMES = {
-            "Meridian Logistics", "Bluepeak Retail", "Corvus Analytics", "Harbour & Finch",
-            "Northgate Health", "Solstice Media", "Tavara Foods", "Ironbridge Manufacturing",
-            "Lumen Education", "Pallas Insurance", "Verda Energy", "Westbay Hotels",
-    };
-
-    private static final String[] CLIENT_ASKS = {
-            "Single sign-on with our identity provider",
-            "Monthly usage export to our warehouse",
-            "A second sandbox environment",
-            "Custom approval rules for expenses",
-            "Data residency in-region",
-            "Quarterly business review deck",
-    };
-
-    private int seedClients(UUID companyId, UUID adminUserId, Random rnd) {
-        List<Client> clients = new ArrayList<>();
-        List<ClientRequest> requests = new ArrayList<>();
-        for (int i = 0; i < CLIENT_NAMES.length; i++) {
-            Client client = new Client(UUID.randomUUID(), companyId, CLIENT_NAMES[i], adminUserId);
-            client.setContactName(pick(rnd, CANDIDATE_FIRST) + " " + pick(rnd, CANDIDATE_LAST));
-            client.setContactEmail("hello@" + CLIENT_NAMES[i].toLowerCase(java.util.Locale.ROOT)
-                    .replaceAll("[^a-z]", "") + ".com");
-            client.setPhone(String.format("+91 2%09d", rnd.nextInt(1_000_000_000)));
-            client.setStatus(i < 8 ? ClientStatus.ACTIVE : i < 11 ? ClientStatus.LEAD : ClientStatus.CHURNED);
-            clients.add(client);
-
-            for (int r = 0; r < rnd.nextInt(4); r++) {
-                ClientRequest request = new ClientRequest(UUID.randomUUID(), companyId, client.getId(),
-                        pick(rnd, CLIENT_ASKS), "Raised on the last call. Needs a date before renewal.");
-                request.setStatus(pick(rnd, RequestStatus.REQUESTED, RequestStatus.IN_PROGRESS,
-                        RequestStatus.DELIVERED, RequestStatus.DECLINED));
-                requests.add(request);
-            }
-        }
-        clientRepository.saveAll(clients);
-        clientRequestRepository.saveAll(requests);
-        return clients.size();
     }
 
     // --- shifts ----------------------------------------------------------------

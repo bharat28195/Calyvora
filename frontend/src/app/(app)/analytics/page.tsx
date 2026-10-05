@@ -33,7 +33,7 @@ export default function AnalyticsPage() {
     <div>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Insights</h1>
-        <p className="mt-1 text-fg/50">Company analytics across People, Work and Finance — all from live data.</p>
+        <p className="mt-1 text-fg/50">Company analytics across people and finance, all from live data.</p>
       </div>
 
       {/* KPI strip */}

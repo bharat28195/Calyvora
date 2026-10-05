@@ -11,11 +11,12 @@ import { Field } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { DayHeading, MonthCalendar } from "@/components/ui/month-calendar";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 /** The company holiday calendar. Everyone reads it; Owner/Admin edits it. */
 export default function HolidaysPage() {
   const { me } = useSession();
-  const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
+  const isAdmin = can(me, "LEAVE_POLICY_MANAGE");
 
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [holidays, setHolidays] = useState<Holiday[] | null>(null);

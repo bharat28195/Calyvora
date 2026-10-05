@@ -32,7 +32,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/documents")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+@PreAuthorize("@perm.has('DOCUMENTS_ISSUE')")
 public class DocumentController {
 
     private final DocumentService documentService;
@@ -67,14 +67,14 @@ public class DocumentController {
      * a letter should be able to replace.
      */
     @PostMapping("/letterhead/background")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
     public LetterheadResponse uploadLetterpad(
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
         return letterheadService.uploadBackground(file);
     }
 
     @DeleteMapping("/letterhead/background")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
     public LetterheadResponse removeLetterpad() {
         return letterheadService.removeBackground();
     }

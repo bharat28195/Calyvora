@@ -27,9 +27,8 @@ class AnalyticsIntegrationTest extends IntegrationTestBase {
         assertThat(o.get("people").get("headcountGrowth")).hasSize(12);
         assertThat(o.get("people").get("byDepartment").size()).isGreaterThan(0);
 
-        // Work: task status series has all three states and a running sprint with committed points.
-        assertThat(o.get("work").get("tasksByStatus")).hasSize(3);
-        assertThat(o.get("work").get("activeSprint").get("committed").asInt()).isGreaterThan(0);
+        // The work tracker is archived (archive/work-tracker-and-clients); insights carry no Work section.
+        assertThat(o.has("work")).isFalse();
 
         // Finance: the demo seeds claims, so at least one category has spend.
         double catTotal = 0;

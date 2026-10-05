@@ -36,7 +36,7 @@ public class InvitationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('MEMBERS_MANAGE')")
     public ResponseEntity<InvitationResponse> create(@Valid @RequestBody CreateInvitationRequest request,
                                                      @CurrentUser AuthPrincipal principal) {
         InvitationResponse response = invitationService.create(request, principal);
@@ -44,7 +44,7 @@ public class InvitationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('MEMBERS_MANAGE')")
     public List<InvitationResponse> list() {
         return invitationService.listPending();
     }
@@ -54,13 +54,13 @@ public class InvitationController {
      * arrived. Invalidates the previous link — which is also what you want if it went astray.
      */
     @PostMapping("/{id}/link")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('MEMBERS_MANAGE')")
     public InvitationResponse regenerateLink(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return invitationService.regenerateLink(id, principal);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('MEMBERS_MANAGE')")
     public ResponseEntity<Void> revoke(@PathVariable UUID id) {
         invitationService.revoke(id);
         return ResponseEntity.noContent().build();

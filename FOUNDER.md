@@ -1646,6 +1646,74 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   platform-owner bearer (one cached helper on IntegrationTestBase). A new test asserts an anonymous
   test-email is refused with 403.
 
+### PD-50 · 2026-10-05 · Statutory deductions come from the statutory engine, never from the template
+- **Context:** a click-through QA of the live demo found every payslip ~16% short with PF and
+  income tax both switched OFF. The default payslip template (V25) shipped "Provident fund 12% of
+  basic" and a flat "Income tax 10% of gross" as ordinary DEDUCTION components. They bypassed the
+  per-company switches entirely, and once a company did switch PF or TDS on, the real statutory line
+  was added on top of the template's: both deducted twice. A finance team would have caught the flat
+  10% "tax" on the first payslip.
+- **Rule:** PF and TDS reach a payslip only through the statutory engine (capped basic for PF, each
+  employee's declaration for TDS), behind their switches. The template holds earnings and a
+  company's own deductions (loan recovery, professional tax, canteen). The default template is now
+  the three earnings. V59 removed the two components from every company where they were still the
+  untouched shipped defaults; a company that changed one keeps it.
+- **Related:** the employee's tax page showed a projected figure as "Deducted so far" to people from
+  whom nothing was withheld. It now says plainly when tax is not withheld through Orbit and labels
+  the numbers as an estimate.
+- **Cost:** net pay on existing demo payslips rises by the removed 16%. The data migration has its
+  own test against planted pre-V59 templates, bound per tenant (FORCE RLS would otherwise let a
+  migration "succeed" while deleting nothing).
+
+### PD-51 · 2026-10-05 · Leave approval follows the tree for members too
+- **Context:** PD-32 made the reporting tree the rule for reach ("a MEMBER with two interns leads a
+  team"), and the nav already offered "Leave approvals" to members who lead someone. The leave and
+  comp-off endpoints still checked the role and refused MEMBER with 403, so a member lead could see
+  the approvals page and never act on it.
+- **Rule:** MEMBER may reach the leave and comp-off approval endpoints; LeaveService and
+  CompOffService scope every read and decision to the caller's downline, as they already did for
+  MANAGER. A member with no reports gets an empty queue and is refused every decision.
+- **Same pass, same root (menu and server disagreeing):** pages a role cannot use (vendor console,
+  agency console, admin-only pages) rendered under a 403 when opened by URL. The app shell now
+  redirects using the nav's own role rules, so the menu and the guard cannot drift apart. Expenses
+  was offered to HR while the API is OWNER/ADMIN only; the menu now matches the API. Whether HR
+  should manage company expenses is open for the founder.
+
+### PD-52 · 2026-10-05 · Orbit is an HR product: the work tracker and Clients are archived
+- **Decision (founder):** the work tracker (projects, tasks, sprints, tickets) and the Clients /
+  staffing module leave the product. Their code is preserved unchanged on branch
+  `archive/work-tracker-and-clients`. HR manages expenses (queue, decisions, reimbursement).
+- **How:** V61 removes WORK and CLIENTS from plans and company overrides before the enum loses them.
+  The tables and their rows stay — deleting customer data is not a code clean-up decision.
+
+### PD-53 · 2026-10-05 · Company documents: everyone reads, publishers write
+- **Decision (founder):** the knowledge base becomes the company's documents area — pages written in
+  Orbit plus uploaded files (PDF, Word, Excel…), visible to everyone; a published leave policy is
+  readable by all. Previously any employee could edit any page, which is not a policy.
+- **Rule:** reading is everyone's; writing, publishing, uploading and deleting are a publisher's
+  (OWNER/ADMIN/HR today, one rule in DocumentAccess). Drafts are invisible to non-publishers, search
+  and the assistant. Files live in Postgres (100 MB/company cap) until Cloudflare R2 is configured.
+
+### PD-54 · 2026-10-05 · Custom roles, permissions plus the org chart (reverses PD-32's shelving)
+- **Decision (founder):** admins define their own roles and choose what each can do (who sees
+  salaries, runs payroll, approves leave…). PD-32 had shelved a permission matrix in favour of the
+  tree alone; the founder has now chosen permissions *combined with* the tree: a permission says
+  what kind of data or action, its scope (whole company or own team) says whose.
+- **Shape:** built-in Admin / HR / Manager / Employee roles per company reproduce today's behaviour
+  exactly, so nothing changes until an admin edits one. Admin is locked so a company cannot lock
+  itself out. Permissions are read per request, not baked into the token, so changes apply at once.
+- **Built:** 23 permissions in 6 groups (`Permission`); six are scoped (company / own team). Every
+  company `@PreAuthorize` and in-service role check was mapped to one, by an explicit table.
+- **Deliberate behaviour changes** (everything else is identical for the built-ins):
+  - HR can now open anyone's onboarding checklist (it could already add tasks to it), write any
+    performance review and manage anyone's goals (PERFORMANCE_MANAGE), and finds issued letters in
+    search (DOCUMENTS_ISSUE).
+  - The AI assistant's company-wide approval counts (pending leave, people on notice) now need a
+    company-wide approval permission. Before, any MANAGER got them by title — a manager of two could
+    ask how many people in the company were leaving.
+  - Holidays and leave policy are edited by whoever holds LEAVE_POLICY_MANAGE (HR could already via
+    the API; the screens only offered it to admins).
+
 ## 4. Architecture Decision Log
 
 

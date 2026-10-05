@@ -9,12 +9,6 @@ import com.calyvora.knowledge.SpaceRepository;
 import com.calyvora.search.dto.SearchResponse;
 import com.calyvora.search.dto.SearchResponse.SearchGroup;
 import com.calyvora.search.dto.SearchResponse.SearchHit;
-import com.calyvora.work.Project;
-import com.calyvora.work.ProjectRepository;
-import com.calyvora.work.Task;
-import com.calyvora.work.TaskRepository;
-import com.calyvora.work.Ticket;
-import com.calyvora.work.TicketRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -39,31 +33,21 @@ public class SearchService {
     private static final Pageable LIMIT = PageRequest.of(0, PER_TYPE);
 
     private final UserRepository userRepository;
-    private final ProjectRepository projectRepository;
-    private final TaskRepository taskRepository;
-    private final TicketRepository ticketRepository;
     private final SpaceRepository spaceRepository;
     private final PageRepository pageRepository;
-    private final com.calyvora.client.ClientRepository clientRepository;
     private final com.calyvora.document.GeneratedDocumentRepository documentRepository;
 
-    public SearchService(UserRepository userRepository, ProjectRepository projectRepository,
-                         TaskRepository taskRepository, TicketRepository ticketRepository,
+    public SearchService(UserRepository userRepository,
                          SpaceRepository spaceRepository, PageRepository pageRepository,
-                         com.calyvora.client.ClientRepository clientRepository,
                          com.calyvora.document.GeneratedDocumentRepository documentRepository) {
         this.userRepository = userRepository;
-        this.projectRepository = projectRepository;
-        this.taskRepository = taskRepository;
-        this.ticketRepository = ticketRepository;
         this.spaceRepository = spaceRepository;
         this.pageRepository = pageRepository;
-        this.clientRepository = clientRepository;
         this.documentRepository = documentRepository;
     }
 
     /**
-     * @param admin whether the caller may see Owner/Admin-only modules (Clients, Documents). Search
+     * @param admin whether the caller may see Owner/Admin-only modules (issued documents). Search
      *              must not become a side door around the role gates on those APIs.
      */
     @Transactional(readOnly = true)
@@ -74,9 +58,7 @@ public class SearchService {
         }
         UUID companyId = TenantContext.getCompanyId();
 
-        // Lookup maps so Work/Knowledge hits can carry a human subtitle without N+1 queries.
-        Map<UUID, Project> projects = projectRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
-                .stream().collect(Collectors.toMap(Project::getId, Function.identity()));
+        // Lookup map so page hits can carry their space's name without N+1 queries.
         Map<UUID, Space> spaces = spaceRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
                 .stream().collect(Collectors.toMap(Space::getId, Function.identity()));
 
@@ -85,39 +67,21 @@ public class SearchService {
             people.add(new SearchHit("person", u.fullName(), u.getEmail(), "/people"));
         }
 
-        List<SearchHit> work = new ArrayList<>();
-        for (Project p : projectRepository.search(companyId, q, LIMIT)) {
-            work.add(new SearchHit("project", p.getName(), "Project · " + p.getKey(), "/work/" + p.getId()));
-        }
-        for (Task t : taskRepository.search(companyId, q, LIMIT)) {
-            Project p = projects.get(t.getProjectId());
-            String ref = p == null ? "Task" : p.getKey() + "-" + t.getNumber();
-            String project = p == null ? "" : " · " + p.getName();
-            work.add(new SearchHit("task", t.getTitle(), ref + project, "/work/" + t.getProjectId()));
-        }
-        for (Ticket t : ticketRepository.search(companyId, q, LIMIT)) {
-            Project p = projects.get(t.getProjectId());
-            String ref = p == null ? "Ticket" : p.getKey() + "-T" + t.getNumber();
-            work.add(new SearchHit("ticket", t.getSubject(), ref, "/work/" + t.getProjectId()));
-        }
-
         List<SearchHit> knowledge = new ArrayList<>();
         for (Space s : spaceRepository.search(companyId, q, LIMIT)) {
             knowledge.add(new SearchHit("space", s.getName(), "Space · " + s.getKey(), "/knowledge/" + s.getId()));
         }
-        pageRepository.search(companyId, q).stream().limit(PER_TYPE).forEach(page -> {
+        // Published only: a draft company document is not there yet for search.
+        pageRepository.search(companyId, q).stream()
+                .filter(p -> p.getStatus() == com.calyvora.knowledge.PageStatus.PUBLISHED)
+                .limit(PER_TYPE).forEach(page -> {
             Space s = spaces.get(page.getSpaceId());
             knowledge.add(new SearchHit("page", page.getTitle(),
                     s == null ? "Page" : s.getName(), "/knowledge/" + page.getSpaceId()));
         });
 
-        List<SearchHit> clients = new ArrayList<>();
         List<SearchHit> documents = new ArrayList<>();
         if (admin) {
-            for (com.calyvora.client.Client c : clientRepository.search(companyId, q, LIMIT)) {
-                clients.add(new SearchHit("client", c.getName(),
-                        c.getContactName() == null ? "Client" : c.getContactName(), "/clients/" + c.getId()));
-            }
             for (com.calyvora.document.GeneratedDocument d : documentRepository.search(companyId, q, LIMIT)) {
                 documents.add(new SearchHit("document", d.getTitle(),
                         d.getKind().name().replace('_', ' ').toLowerCase(), "/documents/" + d.getId()));
@@ -126,12 +90,10 @@ public class SearchService {
 
         List<SearchGroup> groups = new ArrayList<>();
         if (!people.isEmpty()) groups.add(new SearchGroup("People", people));
-        if (!work.isEmpty()) groups.add(new SearchGroup("Work", work));
         if (!knowledge.isEmpty()) groups.add(new SearchGroup("Knowledge", knowledge));
-        if (!clients.isEmpty()) groups.add(new SearchGroup("Clients", clients));
         if (!documents.isEmpty()) groups.add(new SearchGroup("Documents", documents));
 
-        int total = people.size() + work.size() + knowledge.size() + clients.size() + documents.size();
+        int total = people.size() + knowledge.size() + documents.size();
         return new SearchResponse(q, total, groups);
     }
 }

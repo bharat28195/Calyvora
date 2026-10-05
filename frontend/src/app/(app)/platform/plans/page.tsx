@@ -13,6 +13,33 @@ const selectCls =
   "h-9 rounded-lg border border-fg/15 bg-fg/5 px-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
 
 /**
+ * What every customer gets whatever they buy. Not switchable, so not in the Feature enum — which is
+ * exactly why a plan card used to read "2 modules" beside a description listing four things. Shown
+ * once, above the catalogue, so the counts below read as "on top of this".
+ */
+const CORE = ["People directory", "Attendance", "Leave", "Documents & letters", "Org chart", "Dashboard"];
+
+/**
+ * Features that are never sold as part of a package: they put figures on payslips, so they are
+ * switched on for one customer at a time once that customer's numbers have been checked (V46/V47).
+ */
+const PER_CUSTOMER = new Set(["STATUTORY_PAYROLL", "INCOME_TAX"]);
+
+/**
+ * The feature list, fetched once per page load and shared — every plan card needs the labels, and
+ * each opening its own request would fire one call per plan.
+ */
+let catalogue: Promise<FeatureState[]> | null = null;
+function useFeatureCatalogue(): FeatureState[] {
+  const [all, setAll] = useState<FeatureState[]>([]);
+  useEffect(() => {
+    catalogue ??= api.companyFeatures().catch((e) => { catalogue = null; throw e; });
+    catalogue.then(setAll).catch(() => setAll([]));
+  }, []);
+  return all;
+}
+
+/**
  * Plans and per-customer features — what each package includes, what it costs, and who has what.
  *
  * <p>Two halves, in the order they are used: the catalogue you sell from, then one customer at a
@@ -50,6 +77,20 @@ export default function PlansPage() {
       {note && <Alert tone="success" className="mt-6">{note}</Alert>}
 
       <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-fg/40">The catalogue</h2>
+      <Card className="mt-3">
+        <p className="text-sm font-medium">Included in every plan</p>
+        <p className="mt-0.5 text-xs text-fg/50">
+          The core of the product — always on, never switched off, and not counted in the module totals
+          below.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {CORE.map((c) => (
+            <span key={c} className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-600 dark:text-emerald-400">
+              {c}
+            </span>
+          ))}
+        </div>
+      </Card>
       <div className="mt-3 flex flex-col gap-3">
         {plans === null ? (
           <Card><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></Card>
@@ -73,16 +114,23 @@ function PlanCard({ plan, onSaved, onError }: {
   plan: Plan; onSaved: (message: string) => void; onError: (message: string) => void;
 }) {
   const [price, setPrice] = useState(plan.pricePerEmployee == null ? "" : String(plan.pricePerEmployee));
+  const [description, setDescription] = useState(plan.description ?? "");
   const [features, setFeatures] = useState<string[]>(plan.features);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  const all = useFeatureCatalogue();
+  const label = (f: string) => all.find((x) => x.feature === f)?.label ?? f;
+  // Listed in catalogue order, not the order they happened to be ticked.
+  const included = all.length ? all.map((x) => x.feature).filter((f) => plan.features.includes(f)) : plan.features;
+  const modules = included.filter((f) => !PER_CUSTOMER.has(f));
 
   const dirty = useMemo(
     () =>
       (price === "" ? null : Number(price)) !== plan.pricePerEmployee ||
+      description.trim() !== (plan.description ?? "") ||
       features.length !== plan.features.length ||
       features.some((f) => !plan.features.includes(f)),
-    [price, features, plan],
+    [price, description, features, plan],
   );
 
   async function save() {
@@ -91,6 +139,7 @@ function PlanCard({ plan, onSaved, onError }: {
       await api.updatePlan(plan.code, {
         // Blank means "no plan price, charge the published list" — a real state, not a missing value.
         pricePerEmployee: price === "" ? null : Number(price),
+        description: description.trim(),
         features,
       });
       onSaved(`${plan.name} saved.`);
@@ -116,19 +165,26 @@ function PlanCard({ plan, onSaved, onError }: {
   return (
     <Card className={plan.active ? "" : "opacity-60"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <CardTitle>
             {plan.name}
             {!plan.active && <span className="ml-2 text-xs font-normal text-fg/40">retired</span>}
           </CardTitle>
           <p className="mt-1 text-xs text-fg/50">{plan.description}</p>
           <p className="mt-1 text-xs text-fg/40">
-            {plan.features.length} module{plan.features.length === 1 ? "" : "s"} · code {plan.code}
+            Core + {modules.length} module{modules.length === 1 ? "" : "s"} · code {plan.code}
           </p>
+          {modules.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {modules.map((f) => (
+                <span key={f} className="rounded-full bg-violet/10 px-2 py-0.5 text-[11px] text-violet">{label(f)}</span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 text-xs text-fg/50">
-            per employee
+            per employee / month
             <Input type="number" min={0} className="w-24" value={price} placeholder="list price"
               onChange={(e) => setPrice(e.target.value)} />
           </label>
@@ -142,6 +198,10 @@ function PlanCard({ plan, onSaved, onError }: {
 
       {open && (
         <div className="mt-4 border-t border-fg/10 pt-4">
+          <label className="mb-4 flex flex-col gap-1 text-xs text-fg/50">
+            Description — what a customer reads; name what the plan includes
+            <Input value={description} maxLength={300} onChange={(e) => setDescription(e.target.value)} />
+          </label>
           <FeaturePicker selected={features} onChange={setFeatures} />
           <button type="button" onClick={toggleActive}
             className="mt-4 text-xs text-fg/40 underline underline-offset-2 hover:text-fg/70">
@@ -168,31 +228,41 @@ function PlanCard({ plan, onSaved, onError }: {
  * quietly drift out of date.
  */
 function FeaturePicker({ selected, onChange }: { selected: string[]; onChange: (next: string[]) => void }) {
-  const [all, setAll] = useState<FeatureState[]>([]);
-
-  useEffect(() => {
-    api.companyFeatures().then(setAll).catch(() => setAll([]));
-  }, []);
+  const all = useFeatureCatalogue();
 
   if (all.length === 0) {
     return <p className="text-xs text-fg/40">Loading modules…</p>;
   }
 
+  const box = (f: FeatureState) => {
+    const on = selected.includes(f.feature);
+    return (
+      <label key={f.feature} className="flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-1" checked={on}
+          onChange={() => onChange(on ? selected.filter((x) => x !== f.feature) : [...selected, f.feature])} />
+        <span>
+          <span className="font-medium">{f.label}</span>
+          <span className="mt-0.5 block text-xs text-fg/40">{f.description}</span>
+        </span>
+      </label>
+    );
+  };
+  const perCustomer = all.filter((f) => PER_CUSTOMER.has(f.feature));
+
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {all.map((f) => {
-        const on = selected.includes(f.feature);
-        return (
-          <label key={f.feature} className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-1" checked={on}
-              onChange={() => onChange(on ? selected.filter((x) => x !== f.feature) : [...selected, f.feature])} />
-            <span>
-              <span className="font-medium">{f.label}</span>
-              <span className="mt-0.5 block text-xs text-fg/40">{f.description}</span>
-            </span>
-          </label>
-        );
-      })}
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-fg/40">Modules</p>
+      <div className="grid gap-2 sm:grid-cols-2">{all.filter((f) => !PER_CUSTOMER.has(f.feature)).map(box)}</div>
+      {perCustomer.length > 0 && (
+        <>
+          <p className="mb-1 mt-5 text-xs font-medium uppercase tracking-wide text-fg/40">Switched on per customer</p>
+          <p className="mb-2 text-xs text-fg/40">
+            These put figures on payslips, so they are normally left out of plans and turned on for one
+            customer under &ldquo;One customer&rdquo; below, once their numbers have been checked.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">{perCustomer.map(box)}</div>
+        </>
+      )}
     </div>
   );
 }
@@ -202,6 +272,7 @@ function NewPlan({ onCreated, onError }: { onCreated: (m: string) => void; onErr
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [description, setDescription] = useState("");
   const [features, setFeatures] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -218,12 +289,13 @@ function NewPlan({ onCreated, onError }: { onCreated: (m: string) => void; onErr
     try {
       await api.createPlan({
         code, name,
+        description: description.trim() || null,
         pricePerEmployee: price === "" ? null : Number(price),
         features,
       });
       onCreated(`${name} created.`);
       setOpen(false);
-      setCode(""); setName(""); setPrice(""); setFeatures([]);
+      setCode(""); setName(""); setPrice(""); setDescription(""); setFeatures([]);
     } catch (e) {
       onError(e instanceof ApiError ? e.message : "Failed to create the plan");
     } finally {
@@ -243,8 +315,13 @@ function NewPlan({ onCreated, onError }: { onCreated: (m: string) => void; onErr
           <Input className="w-48" value={name} placeholder="Tiny" onChange={(e) => setName(e.target.value)} />
         </label>
         <label className="flex flex-col gap-1 text-xs text-fg/50">
-          Per employee
+          Per employee / month
           <Input type="number" min={0} className="w-28" value={price} onChange={(e) => setPrice(e.target.value)} />
+        </label>
+        <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-xs text-fg/50">
+          Description
+          <Input value={description} maxLength={300} placeholder="What it includes, in a customer's words"
+            onChange={(e) => setDescription(e.target.value)} />
         </label>
         <Button onClick={create} disabled={busy || !code.trim() || !name.trim()}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" />} Create

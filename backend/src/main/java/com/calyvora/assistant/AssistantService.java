@@ -13,11 +13,6 @@ import com.calyvora.knowledge.SpaceRepository;
 import com.calyvora.people.DepartmentRepository;
 import com.calyvora.people.EmployeeService;
 import com.calyvora.people.dto.EmployeeResponse;
-import com.calyvora.work.ProjectRepository;
-import com.calyvora.work.TaskRepository;
-import com.calyvora.work.TaskStatus;
-import com.calyvora.work.TicketRepository;
-import com.calyvora.work.TicketStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,26 +39,22 @@ public class AssistantService {
 
     private final EmployeeService employeeService;
     private final DepartmentRepository departmentRepository;
-    private final ProjectRepository projectRepository;
-    private final TaskRepository taskRepository;
-    private final TicketRepository ticketRepository;
     private final SpaceRepository spaceRepository;
     private final PageRepository pageRepository;
     private final CompanySnapshot snapshot;
     private final ClaudeAssistant claude;
     private final LocalGroundedAssistant local;
+    private final com.calyvora.access.PermissionService permissions;
 
     public AssistantService(EmployeeService employeeService, DepartmentRepository departmentRepository,
-                            ProjectRepository projectRepository, TaskRepository taskRepository,
-                            TicketRepository ticketRepository, SpaceRepository spaceRepository,
+                            SpaceRepository spaceRepository,
                             PageRepository pageRepository, CompanySnapshot snapshot,
-                            ClaudeAssistant claude, LocalGroundedAssistant local) {
+                            ClaudeAssistant claude, LocalGroundedAssistant local,
+                            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.snapshot = snapshot;
         this.employeeService = employeeService;
         this.departmentRepository = departmentRepository;
-        this.projectRepository = projectRepository;
-        this.taskRepository = taskRepository;
-        this.ticketRepository = ticketRepository;
         this.spaceRepository = spaceRepository;
         this.pageRepository = pageRepository;
         this.claude = claude;
@@ -77,7 +68,13 @@ public class AssistantService {
         }
         UUID companyId = TenantContext.getCompanyId();
         AssistantContext ctx = buildContext(companyId, question.trim(),
-                CompanySnapshot.Scope.of(principal == null ? null : principal.role()));
+                CompanySnapshot.Scope.of(
+                        permissions.companyWide(principal, com.calyvora.access.Permission.ORG_VIEW_ALL),
+                        // The MANAGES tier holds COMPANY-WIDE counts (pending leave, people on notice), so it
+                        // needs a company-wide approval: a team-scoped approver — every built-in Employee —
+                        // must not learn how many people across the company are leaving.
+                        permissions.companyWide(principal, com.calyvora.access.Permission.LEAVE_APPROVE)
+                                || permissions.companyWide(principal, com.calyvora.access.Permission.EXPENSES_APPROVE)));
 
         // Prefer Claude when configured; fall back to the always-available local provider.
         String answer = null;
@@ -98,11 +95,6 @@ public class AssistantService {
         Map<String, Long> metrics = new LinkedHashMap<>();
         metrics.put("members", (long) employeeDirectory(companyId).size());
         metrics.put("departments", departmentRepository.countByCompanyId(companyId));
-        metrics.put("projects", projectRepository.countByCompanyId(companyId));
-        metrics.put("openTasks", taskRepository.countByCompanyIdAndStatusNot(companyId, TaskStatus.DONE));
-        metrics.put("doneTasks", taskRepository.countByCompanyIdAndStatus(companyId, TaskStatus.DONE));
-        metrics.put("openTickets", ticketRepository.countByCompanyIdAndStatusIn(companyId,
-                List.of(TicketStatus.OPEN, TicketStatus.PENDING)));
         metrics.put("spaces", spaceRepository.countByCompanyId(companyId));
         metrics.put("pages", pageRepository.countByCompanyId(companyId));
         // The rest of the app — people ops, hiring, approvals, documents — added at whatever depth
@@ -193,6 +185,8 @@ public class AssistantService {
         Map<UUID, Page> byId = new LinkedHashMap<>();
         for (String word : keywords(question)) {
             for (Page p : pageRepository.search(companyId, word)) {
+                // Drafts are unpublished company documents; the assistant quotes only what is live.
+                if (p.getStatus() != com.calyvora.knowledge.PageStatus.PUBLISHED) continue;
                 byId.putIfAbsent(p.getId(), p);
                 score.merge(p.getId(), 1, Integer::sum);
             }

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/payroll/pf-settings")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+@PreAuthorize("@perm.has('PAYROLL_MANAGE')")
 public class PfSettingsController {
 
     private final PfSettingsService service;

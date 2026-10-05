@@ -32,6 +32,12 @@ export interface Me {
    * disagree. Set the app-wide formatters from this, not from company.timezone.
    */
   timezone: string;
+  /**
+   * What this person may do, permission key → "COMPANY" or "TEAM" (PD-54). Optional only for a
+   * session cached before roles existed; read it through lib/permissions, which falls back to the
+   * built-in defaults for the role.
+   */
+  permissions?: Record<string, "COMPANY" | "TEAM">;
 }
 
 export interface CompanySettings {
@@ -53,6 +59,30 @@ export interface Member {
   lastName: string;
   role: Role;
   status: UserStatus;
+  /** The custom role they hold (PD-54); null means the built-in their `role` names. */
+  companyRoleId?: string | null;
+}
+
+/** A company role and what it may do (PD-54). */
+export interface CompanyRole {
+  id: string;
+  name: string;
+  description: string | null;
+  /** ADMIN | HR | MANAGER | EMPLOYEE for a built-in; null for a role the company made. */
+  builtin: "ADMIN" | "HR" | "MANAGER" | "EMPLOYEE" | null;
+  /** The Admin role: always every permission, cannot be edited. */
+  locked: boolean;
+  permissions: Record<string, "COMPANY" | "TEAM">;
+  memberCount: number;
+}
+
+export interface PermissionInfo {
+  key: string;
+  group: string;
+  label: string;
+  description: string;
+  /** Can be limited to the holder's own team. */
+  scoped: boolean;
 }
 
 export interface Invitation {
@@ -170,38 +200,8 @@ export interface TeamStanding {
   totalCount: number;
 }
 
-export interface Client {
-  id: string;
-  name: string;
-  contactName: string | null;
-  contactEmail: string | null;
-  phone: string | null;
-  website: string | null;
-  status: "LEAD" | "ACTIVE" | "CHURNED";
-  notes: string | null;
-  createdAt: string;
-  openRequests: number;
-}
-export interface ClientRequestItem {
-  id: string;
-  title: string;
-  description: string | null;
-  status: "REQUESTED" | "IN_PROGRESS" | "DELIVERED" | "DECLINED";
-  createdAt: string;
-}
-export interface ClientDetail {
-  client: Client;
-  requests: ClientRequestItem[];
-}
 
 /** Sprint reporting — burndown, velocity, capacity and per-person load. */
-export interface BurndownPoint {
-  date: string;
-  /** Recorded remaining points; null for days with no snapshot (future days). */
-  remainingPoints: number | null;
-  ideal: number;
-  projected: boolean;
-}
 export interface MemberLoad {
   employeeId: string;
   name: string;
@@ -209,36 +209,12 @@ export interface MemberLoad {
   tasks: number;
   donePoints: number;
 }
-export interface SprintReport {
-  sprintId: string;
-  name: string;
-  goal: string | null;
-  status: string;
-  startDate: string | null;
-  endDate: string | null;
-  capacityPoints: number | null;
-  committedPoints: number;
-  completedPoints: number;
-  remainingPoints: number;
-  totalTasks: number;
-  doneTasks: number;
-  unestimatedTasks: number;
-  daysTotal: number;
-  daysElapsed: number;
-  burndown: BurndownPoint[];
-  byAssignee: MemberLoad[];
-}
 export interface SprintVelocity {
   sprintId: string;
   name: string;
   endDate: string | null;
   committedPoints: number;
   completedPoints: number;
-}
-export interface Velocity {
-  sprints: SprintVelocity[];
-  averageVelocity: number;
-  suggestedCommitment: number;
 }
 
 /** Company feed — posts with per-post visibility, reactions and comments. */
@@ -371,6 +347,8 @@ export interface TaxComputation {
   /** What the next pay run should withhold — what is left, over the months that are left. */
   projectedNextMonth: number;
   comparison: TaxRegimeComparison;
+  /** False while the employer does not withhold income tax through Orbit — the figures are an estimate. */
+  withheldByPayroll: boolean;
 }
 
 export interface TaxDeclarationRow {
@@ -1028,14 +1006,6 @@ export interface AnalyticsOverview {
     ratingDistribution: Slice[];
     leaveByType: Slice[];
   };
-  work: {
-    projects: number;
-    tasksByStatus: Slice[];
-    tasksByPriority: Slice[];
-    ticketsByStatus: Slice[];
-    activeSprint: { name: string; committed: number; done: number; remaining: number; unestimated: number } | null;
-    velocity: Slice[];
-  };
   finance: {
     currency: string;
     pending: number;
@@ -1045,16 +1015,6 @@ export interface AnalyticsOverview {
   };
 }
 
-export interface WorkItem {
-  ref: string;
-  title: string;
-  status: TaskStatusT;
-  priority: TaskPriorityT;
-  projectId: string;
-  projectName: string | null;
-  dueDate: string | null;
-  overdue: boolean;
-}
 
 export type LeaveTypeT = "VACATION" | "SICK" | "PERSONAL" | "UNPAID" | "COMP_OFF";
 export type LeaveAccrualT = "ANNUAL" | "MONTHLY";
@@ -1197,80 +1157,16 @@ export interface HireResult extends OfferResult {
   joinLink: string | null;
 }
 
-export type TaskStatusT = "TODO" | "IN_PROGRESS" | "DONE";
-export type TaskPriorityT = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
-export interface Project {
-  id: string;
-  name: string;
-  key: string;
-  description: string | null;
-  status: "ACTIVE" | "ARCHIVED";
-  leadUserId: string | null;
-  leadName: string | null;
-  taskCount: number;
-  openTaskCount: number;
-  createdAt: string;
-}
 
-export interface Task {
-  id: string;
-  projectId: string;
-  ref: string;
-  number: number;
-  title: string;
-  description: string | null;
-  status: TaskStatusT;
-  priority: TaskPriorityT;
-  assigneeId: string | null;
-  assigneeName: string | null;
-  sprintId: string | null;
-  dueDate: string | null;
-  /** Estimate; null when the task hasn't been sized. */
-  storyPoints: number | null;
-  createdAt: string;
-}
 
 export type SprintStatusT = "PLANNED" | "ACTIVE" | "COMPLETED";
 
-export interface Sprint {
-  id: string;
-  projectId: string;
-  name: string;
-  goal: string | null;
-  startDate: string | null;
-  endDate: string | null;
-  status: SprintStatusT;
-  /** What the team believes it can take on this sprint. */
-  capacityPoints: number | null;
-  taskCount: number;
-  doneCount: number;
-  createdAt: string;
-}
 
 /** The board view: the active sprint (null if none) and the tasks currently on the board. */
-export interface Board {
-  activeSprint: Sprint | null;
-  tasks: Task[];
-}
 
 export type TicketStatusT = "OPEN" | "PENDING" | "RESOLVED" | "CLOSED";
 
-export interface Ticket {
-  id: string;
-  projectId: string;
-  ref: string;
-  number: number;
-  subject: string;
-  description: string | null;
-  requesterName: string | null;
-  requesterEmail: string | null;
-  status: TicketStatusT;
-  priority: TaskPriorityT;
-  assigneeId: string | null;
-  assigneeName: string | null;
-  createdAt: string;
-}
 
 export type SpaceStatusT = "ACTIVE" | "ARCHIVED";
 export type PageStatusT = "DRAFT" | "PUBLISHED";
@@ -1286,6 +1182,18 @@ export interface Space {
 }
 
 /** Full page detail (includes the Markdown body + resolved cross-app labels). */
+/** A file in a company documents folder (policy PDF, form, spreadsheet). */
+export interface CompanyFile {
+  id: string;
+  spaceId: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByName: string | null;
+  createdAt: string;
+}
+
 export interface KnowledgePage {
   id: string;
   spaceId: string;
@@ -1331,16 +1239,9 @@ export interface DashboardSummary {
   memberCount: number;
   pendingInviteCount: number;
   departmentCount: number;
-  // Work
-  projectCount: number;
-  openTaskCount: number;
-  doneTaskCount: number;
-  openTicketCount: number;
-  // Knowledge
+  // Company documents
   spaceCount: number;
   pageCount: number;
-  // Active sprint progress (null when none running)
-  activeSprint: { name: string; total: number; done: number } | null;
 }
 
 export interface LoginResult {

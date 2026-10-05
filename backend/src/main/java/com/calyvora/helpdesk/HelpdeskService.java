@@ -41,8 +41,12 @@ public class HelpdeskService {
     private final UserRepository userRepository;
     private final NotificationService notifications;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public HelpdeskService(HelpdeskTicketRepository ticketRepository, HelpdeskCommentRepository commentRepository,
-                           UserRepository userRepository, NotificationService notifications) {
+                           UserRepository userRepository, NotificationService notifications,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.ticketRepository = ticketRepository;
         this.commentRepository = commentRepository;
         this.userRepository = userRepository;
@@ -185,9 +189,9 @@ public class HelpdeskService {
         return t;
     }
 
+    /** Answers anyone's ticket: HELPDESK_MANAGE (Admin and HR by default, PD-54). */
     private boolean isAgent(AuthPrincipal principal) {
-        String r = principal.role();
-        return "ADMIN".equals(r) || "HR".equals(r) || "OWNER".equals(r);
+        return permissions.has(principal, com.calyvora.access.Permission.HELPDESK_MANAGE);
     }
 
     private Map<UUID, String> names(UUID companyId) {

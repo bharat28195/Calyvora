@@ -40,7 +40,7 @@ export default function MyPagesPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium">{p.title}</span>
-                    {p.status === "DRAFT" && <span className="shrink-0 text-[10px] uppercase tracking-wide text-amber-300/70">draft</span>}
+                    {p.status === "DRAFT" && <span className="shrink-0 text-[10px] uppercase tracking-wide text-amber-700/70 dark:text-amber-300/70">draft</span>}
                   </div>
                   <p className="text-xs text-fg/40">{p.spaceName}</p>
                 </div>

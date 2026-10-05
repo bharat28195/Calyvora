@@ -36,7 +36,7 @@ public class LeavePolicyController {
     }
 
     @PatchMapping("/{type}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('LEAVE_POLICY_MANAGE')")
     public LeavePolicyResponse update(@PathVariable String type,
                                       @Valid @RequestBody LeavePolicyPayload payload) {
         return service.update(LeavePolicyService.parseType(type), payload);

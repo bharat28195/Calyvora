@@ -34,13 +34,11 @@ class ScaleModuleSeedTest extends IntegrationTestBase {
     private static final List<Listing> MUST_NOT_BE_EMPTY = List.of(
             new Listing("/api/v1/people/leave", "items"),
             new Listing("/api/v1/expenses", "claims"),
-            new Listing("/api/v1/work/projects", null),
             new Listing("/api/v1/knowledge/spaces", null),
             new Listing("/api/v1/helpdesk/tickets", "items"),
             new Listing("/api/v1/feed", null),
             new Listing("/api/v1/performance/cycles", null),
             new Listing("/api/v1/recruit/jobs", null),
-            new Listing("/api/v1/clients", null),
             new Listing("/api/v1/shifts", null),
             new Listing("/api/v1/shifts/roster", "assignments"),
             new Listing("/api/v1/attendance/regularizations/pending", null),

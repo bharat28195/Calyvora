@@ -67,7 +67,7 @@ export default function SubscriptionPage() {
         </div>
 
         {sub.pendingRequestSeats != null ? (
-          <p className="mt-4 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+          <p className="mt-4 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
             Seat request pending: {sub.pendingRequestSeats} seats — awaiting your account manager.
           </p>
         ) : asking ? (

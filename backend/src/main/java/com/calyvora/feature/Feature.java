@@ -50,12 +50,14 @@ public enum Feature {
             false, null),
     RECRUITMENT("Recruitment", "Job openings, candidate pipeline, offers and hiring", true, "/api/v1/recruit/"),
     PERFORMANCE("Performance", "Review cycles, self and manager reviews, hikes", true, "/api/v1/performance/"),
-    WORK("Work", "Projects, tasks, sprints and tickets", true, "/api/v1/work/"),
-    KNOWLEDGE("Knowledge base", "Spaces, pages and search", true, "/api/v1/knowledge/"),
+    /**
+     * Company documents: handbooks and policies HR publishes for everyone to read. The enum name
+     * stays KNOWLEDGE because plans and company overrides store it by name.
+     */
+    KNOWLEDGE("Company documents", "Policies and handbooks everyone can read", true, "/api/v1/knowledge/"),
     HELPDESK("Helpdesk", "Internal tickets and replies", true, "/api/v1/helpdesk/"),
     EXPENSES("Expenses", "Claims, approval and reimbursement", true, "/api/v1/expenses"),
     SHIFTS("Shifts", "Shift patterns and the roster", true, "/api/v1/shifts"),
-    CLIENTS("Clients", "Client records and their staffing requirements", true, "/api/v1/clients"),
     FEED("Company feed", "Announcements, posts and comments", true, "/api/v1/feed"),
     ASSISTANT("AI assistant", "Answers questions from the company's own data", true, "/api/v1/assistant/"),
     ANALYTICS("Insights", "Headcount, attrition and cost analytics", true, "/api/v1/analytics/");

@@ -110,7 +110,7 @@ export default function TeamAttendancePage() {
                   <td className="px-3 py-2.5 text-right tabular-nums">{m.presentDays}</td>
                   {/* Absences are the reason anybody opens this page, so they carry colour and the
                       other columns do not. A zero stays grey — nothing to look at is the good case. */}
-                  <td className={"px-3 py-2.5 text-right tabular-nums " + (m.absentDays > 0 ? "text-amber-300" : "text-fg/30")}>
+                  <td className={"px-3 py-2.5 text-right tabular-nums " + (m.absentDays > 0 ? "text-amber-700 dark:text-amber-300" : "text-fg/30")}>
                     {m.absentDays}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{m.leaveDays || <span className="text-fg/30">0</span>}</td>

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { notificationAge } from "@/lib/notifications";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 const KIND_META: Record<PostKind, { label: string; icon: React.ReactNode; accent: string }> = {
   UPDATE: { label: "Update", icon: <MessageSquare className="h-3.5 w-3.5" />, accent: "text-fg/50" },
@@ -67,7 +68,7 @@ export default function FeedPage() {
       ) : (
         <div className="mt-6 flex flex-col gap-4">
           {posts.map((p) => (
-            <PostCard key={p.id} post={p} isAdmin={me?.user.role === "OWNER" || me?.user.role === "ADMIN"}
+            <PostCard key={p.id} post={p} isAdmin={can(me, "FEED_MODERATE")}
               onChanged={replace} onDeleted={load} />
           ))}
         </div>

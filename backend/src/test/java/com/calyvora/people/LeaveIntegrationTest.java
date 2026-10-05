@@ -80,15 +80,15 @@ class LeaveIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void member_cannot_approve_and_cannot_see_the_inbox() throws Exception {
+    void member_with_no_reports_cannot_approve_and_sees_an_empty_inbox() throws Exception {
         Session owner = onboardOwner("Acme", "owner2@acme.com", PW);
         Session emp = addMember(owner, "emp2@acme.com");
         String year = String.valueOf(LocalDate.now().getYear());
         String reqId = requestLeave(emp, "SICK", year + "-09-01", year + "-09-01");
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/v1/people/leave").header("Authorization", "Bearer " + emp.accessToken()))
-                .andExpect(status().isForbidden());
+        // PD-32: the inbox is scoped by the reporting tree, so nobody under them means nothing in it —
+        // not even their own request, which is not theirs to decide.
+        assertThat(getJson("/api/v1/people/leave", emp).get("items")).isEmpty();
         mockMvc.perform(post("/api/v1/people/leave/" + reqId + "/approve")
                         .header("Authorization", "Bearer " + emp.accessToken()))
                 .andExpect(status().isForbidden());

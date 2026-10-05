@@ -52,10 +52,14 @@ public class LeaveService {
 
     private final OrgScope orgScope;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public LeaveService(LeaveRequestRepository leaveRepository, EmployeeRepository employeeRepository,
                         UserRepository userRepository, NotificationService notificationService,
                         LeavePolicyService policyService, CompOffService compOffService,
-                        OrgScope orgScope) {
+                        OrgScope orgScope,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.orgScope = orgScope;
         this.leaveRepository = leaveRepository;
         this.employeeRepository = employeeRepository;
@@ -397,9 +401,9 @@ public class LeaveService {
                 .orElseGet(() -> employeeRepository.save(new Employee(UUID.randomUUID(), companyId, userId)));
     }
 
-    /** Roles whose approvals inbox is the whole company rather than their own org. */
+    /** LEAVE_APPROVE company-wide: the approvals inbox is the whole company rather than their own org. */
     private boolean seesEveryone(AuthPrincipal principal) {
-        return orgScope.seesWholeCompany(principal);
+        return permissions.companyWide(principal, com.calyvora.access.Permission.LEAVE_APPROVE);
     }
 
     /**

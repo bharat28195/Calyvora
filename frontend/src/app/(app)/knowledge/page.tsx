@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Plus, BookOpen, FileText, ArrowRight } from "lucide-react";
+import { Loader2, Plus, FolderOpen, FileText, ArrowRight, CalendarCheck } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { Space } from "@/lib/types";
+import { useSession } from "@/hooks/useSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -12,8 +13,15 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
 import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
+import { can, canCompanyWide } from "@/lib/permissions";
 
-export default function KnowledgePage() {
+/**
+ * Company documents: the handbook, policies and forms everyone in the company can read. HR and admins
+ * publish (folders, pages, uploaded files); everyone else reads what has been published.
+ */
+export default function CompanyDocumentsPage() {
+  const { me } = useSession();
+  const publisher = can(me, "DOCUMENTS_PUBLISH");
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -23,7 +31,7 @@ export default function KnowledgePage() {
     try {
       setSpaces(await api.listSpaces());
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to load spaces");
+      setError(e instanceof ApiError ? e.message : "Failed to load company documents");
     }
   }, []);
 
@@ -37,35 +45,47 @@ export default function KnowledgePage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Knowledge</h1>
-          <p className="mt-1 text-fg/50">Docs &amp; wiki, linked to the people and work they&apos;re about.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Company documents</h1>
+          <p className="mt-1 text-fg/50">
+            Policies, handbooks and forms for everyone at {me?.company.name ?? "your company"}.
+          </p>
         </div>
-        <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> New space</Button>
+        {publisher && <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> New folder</Button>}
       </div>
 
       <KnowledgeSearch className="mt-6" />
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
-      {spaces === null ? (
-        <Card className="mt-8"><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
-      ) : active.length === 0 ? (
-        <Card className="mt-8 flex flex-col items-center gap-3 py-12 text-center">
-          <BookOpen className="h-8 w-8 text-fg/30" />
-          <CardTitle>No spaces yet</CardTitle>
-          <p className="text-sm text-fg/50">Create a space to start writing docs — a runbook, a handbook, meeting notes.</p>
-          <Button onClick={() => setOpen(true)} className="mt-2"><Plus className="h-4 w-4" /> New space</Button>
-        </Card>
-      ) : (
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {active.map((s) => (
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Always here: the live leave policy, read straight from the leave settings HR maintains, so it
+            can never disagree with what the leave screens actually apply. */}
+        <Link href="/policies/leave">
+          <Card className="group h-full transition-colors hover:border-fg/20">
+            <div className="flex items-center justify-between">
+              <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Live</span>
+              <ArrowRight className="h-4 w-4 text-fg/20 transition-colors group-hover:text-fg/60" />
+            </div>
+            <h3 className="mt-3 flex items-center gap-2 font-medium">
+              <CalendarCheck className="h-4 w-4 text-violet" /> Leave policy
+            </h3>
+            <p className="mt-1 text-sm text-fg/50">How much leave you get, how it builds up and what carries forward.</p>
+          </Card>
+        </Link>
+
+        {spaces === null ? (
+          <Card><Loader2 className="mx-auto h-6 w-6 animate-spin text-violet" /></Card>
+        ) : (
+          active.map((s) => (
             <Link key={s.id} href={`/knowledge/${s.id}`}>
               <Card className="group h-full transition-colors hover:border-fg/20">
                 <div className="flex items-center justify-between">
                   <span className="rounded-md bg-violet/20 px-2 py-0.5 text-xs font-semibold text-violet">{s.key}</span>
                   <ArrowRight className="h-4 w-4 text-fg/20 transition-colors group-hover:text-fg/60" />
                 </div>
-                <h3 className="mt-3 font-medium">{s.name}</h3>
+                <h3 className="mt-3 flex items-center gap-2 font-medium">
+                  <FolderOpen className="h-4 w-4 text-fg/40" /> {s.name}
+                </h3>
                 {s.description && <p className="mt-1 line-clamp-2 text-sm text-fg/50">{s.description}</p>}
                 <p className="mt-4 flex items-center gap-1.5 text-xs text-fg/40">
                   <FileText className="h-3.5 w-3.5" />
@@ -73,17 +93,35 @@ export default function KnowledgePage() {
                 </p>
               </Card>
             </Link>
-          ))}
-        </div>
+          ))
+        )}
+      </div>
+
+      {spaces !== null && active.length === 0 && (
+        <Card className="mt-4 flex flex-col items-center gap-3 py-10 text-center">
+          <FolderOpen className="h-8 w-8 text-fg/30" />
+          <CardTitle>No folders yet</CardTitle>
+          {publisher ? (
+            <>
+              <p className="text-sm text-fg/50">
+                Create a folder such as &ldquo;Employee handbook&rdquo;, then write policies in it or upload PDFs.
+              </p>
+              <Button onClick={() => setOpen(true)} className="mt-2"><Plus className="h-4 w-4" /> New folder</Button>
+            </>
+          ) : (
+            <p className="text-sm text-fg/50">HR hasn&apos;t published any documents yet.</p>
+          )}
+        </Card>
       )}
 
-      <NewSpaceDialog open={open} onClose={() => setOpen(false)} onCreated={() => { setOpen(false); void load(); }} />
+      {publisher && (
+        <NewFolderDialog open={open} onClose={() => setOpen(false)} onCreated={() => { setOpen(false); void load(); }} />
+      )}
     </div>
   );
 }
 
-
-function NewSpaceDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+function NewFolderDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const [description, setDescription] = useState("");
@@ -98,7 +136,7 @@ function NewSpaceDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
     e.preventDefault();
     setError(null);
     if (name.trim().length < 2 || effectiveKey.length < 1) {
-      setError("Enter a name and a short key.");
+      setError("Enter a name and a short code.");
       return;
     }
     setBusy(true);
@@ -107,20 +145,20 @@ function NewSpaceDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
       setName(""); setKey(""); setDescription(""); setKeyTouched(false);
       onCreated();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create space");
+      setError(err instanceof ApiError ? err.message : "Failed to create the folder");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="New space">
+    <Modal open={open} onClose={onClose} title="New folder">
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         {error && <Alert tone="error">{error}</Alert>}
         <Field label="Name" htmlFor="s-name">
-          <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Engineering handbook" />
+          <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Employee handbook" />
         </Field>
-        <Field label="Key" htmlFor="s-key" hint="Short code that groups the space's docs.">
+        <Field label="Short code" htmlFor="s-key" hint="A few letters shown on the folder, such as HR or POL.">
           <Input id="s-key" value={effectiveKey} maxLength={10}
             onChange={(e) => { setKeyTouched(true); setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); }} />
         </Field>

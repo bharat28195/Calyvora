@@ -37,9 +37,13 @@ public class CompOffService {
     private final LeavePolicyService policyService;
     private final NotificationService notificationService;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public CompOffService(CompOffCreditRepository repository, EmployeeRepository employeeRepository,
                           UserRepository userRepository, LeavePolicyService policyService,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.repository = repository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
@@ -175,9 +179,9 @@ public class CompOffService {
                 "/comp-off", "COMP_OFF", credit.getId());
     }
 
+    /** LEAVE_APPROVE company-wide; at team scope the tree decides (isMyReport). */
     private boolean seesEveryone(AuthPrincipal principal) {
-        String role = principal.role();
-        return "OWNER".equals(role) || "ADMIN".equals(role) || "HR".equals(role);
+        return permissions.companyWide(principal, com.calyvora.access.Permission.LEAVE_APPROVE);
     }
 
     private boolean isMyReport(UUID companyId, UUID employeeId, UUID managerUserId) {

@@ -169,15 +169,43 @@ class LeaveManagerApprovalTest extends IntegrationTestBase {
         assertThat(getJson("/api/v1/people/leave", lone).get("items")).isEmpty();
     }
 
+    /**
+     * A member who leads nobody (PD-32: reach comes from the tree, not the role) gets what a manager of
+     * nobody gets — an empty inbox, and a refusal for any decision. This used to be a flat 403 on the
+     * role, which also locked out members who DO lead someone; see the next test.
+     */
     @Test
-    void a_plain_member_still_cannot_reach_the_approvals_inbox() throws Exception {
+    void a_member_who_leads_nobody_sees_an_empty_inbox_and_decides_nothing() throws Exception {
         Fixture f = twoTeams();
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/v1/people/leave")
+        assertThat(getJson("/api/v1/people/leave", f.reportA()).get("items")).isEmpty();
+
+        mockMvc.perform(post("/api/v1/people/leave/" + f.leaveB() + "/approve")
                         .header("Authorization", "Bearer " + f.reportA().accessToken()))
                 .andExpect(status().isForbidden());
+    }
 
+    /**
+     * The case the role check got wrong: a MEMBER with someone reporting to them leads a team. The nav
+     * offered them "Leave approvals"; the API answered 403 to the listing and to every decision.
+     */
+    @Test
+    void a_member_who_leads_someone_sees_and_approves_only_their_report() throws Exception {
+        Fixture f = twoTeams();
+        Session intern = addUser(f.owner(), "intern@acme.com", "MEMBER", "Ira");
+        // Arun (a MEMBER, reporting to manager A) now has an intern under him.
+        setManager(f.owner(), employeeIdOf(f.owner(), "intern@acme.com"), employeeIdOf(f.owner(), "rep.a@acme.com"));
+        String year = String.valueOf(LocalDate.now().getYear());
+        String internLeave = requestLeave(intern, year + "-10-12", year + "-10-13");
+
+        JsonNode inbox = getJson("/api/v1/people/leave", f.reportA()).get("items");
+        assertThat(inbox).hasSize(1);
+        assertThat(inbox.get(0).get("id").asText()).isEqualTo(internLeave);
+
+        mockMvc.perform(post("/api/v1/people/leave/" + internLeave + "/approve")
+                        .header("Authorization", "Bearer " + f.reportA().accessToken()))
+                .andExpect(status().isOk());
+        // Still nobody else's: Bina reports to manager B, not to Arun.
         mockMvc.perform(post("/api/v1/people/leave/" + f.leaveB() + "/approve")
                         .header("Authorization", "Bearer " + f.reportA().accessToken()))
                 .andExpect(status().isForbidden());

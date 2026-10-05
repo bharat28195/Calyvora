@@ -3,9 +3,10 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Plus, FileText, ArrowLeft, Trash2, Link2, Save, Eye, Pencil } from "lucide-react";
+import { Loader2, Plus, FileText, ArrowLeft, Trash2, Save, Eye, Pencil, Upload, Download, Paperclip } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { Space, KnowledgePage, PageSummary, Project, Task } from "@/lib/types";
+import type { Space, KnowledgePage, PageSummary, CompanyFile } from "@/lib/types";
+import { useSession } from "@/hooks/useSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -14,6 +15,7 @@ import { Alert } from "@/components/ui/alert";
 import { Modal } from "@/components/ui/modal";
 import { KnowledgeSearch } from "@/components/knowledge/knowledge-search";
 import { cn } from "@/lib/utils";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 export default function SpacePageRoute() {
   return (
@@ -26,6 +28,8 @@ export default function SpacePageRoute() {
 function SpacePage() {
   const { spaceId } = useParams<{ spaceId: string }>();
   const search = useSearchParams();
+  const { me } = useSession();
+  const publisher = can(me, "DOCUMENTS_PUBLISH");
   const [space, setSpace] = useState<Space | null>(null);
   const [pages, setPages] = useState<PageSummary[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(search.get("page"));
@@ -65,7 +69,7 @@ function SpacePage() {
   return (
     <div>
       <Link href="/knowledge" className="inline-flex items-center gap-1.5 text-sm text-fg/50 hover:text-fg">
-        <ArrowLeft className="h-4 w-4" /> Spaces
+        <ArrowLeft className="h-4 w-4" /> Company documents
       </Link>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
@@ -73,13 +77,15 @@ function SpacePage() {
           {space && <span className="rounded-md bg-violet/20 px-2 py-0.5 text-xs font-semibold text-violet">{space.key}</span>}
           <h1 className="text-2xl font-semibold tracking-tight">{space?.name ?? "…"}</h1>
         </div>
-        <NewPageButton onCreate={createPage} busy={creating} />
+        {publisher && <NewPageButton onCreate={createPage} busy={creating} />}
       </div>
       {space?.description && <p className="mt-1 text-fg/50">{space.description}</p>}
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 
       <KnowledgeSearch className="mt-6" />
+
+      <FilesSection spaceId={spaceId} publisher={publisher} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
         {/* page tree */}
@@ -88,7 +94,7 @@ function SpacePage() {
             <Card><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></Card>
           ) : pages.length === 0 ? (
             <p className="rounded-lg border border-dashed border-fg/10 px-4 py-6 text-center text-sm text-fg/40">
-              No pages yet.
+              {publisher ? "No pages yet. Write one with New page." : "No pages here yet."}
             </p>
           ) : (
             tree.map((node) => (
@@ -105,13 +111,14 @@ function SpacePage() {
               pageId={selectedId}
               spaceId={spaceId}
               siblings={pages ?? []}
+              publisher={publisher}
               onChanged={loadPages}
               onDeleted={() => { setSelectedId(null); void loadPages(); }}
             />
           ) : (
             <Card className="flex flex-col items-center gap-3 py-16 text-center">
               <FileText className="h-8 w-8 text-fg/30" />
-              <p className="text-sm text-fg/50">Select a page, or create one to start writing.</p>
+              <p className="text-sm text-fg/50">{publisher ? "Select a page, or create one to start writing." : "Select a page to read it."}</p>
             </Card>
           )}
         </section>
@@ -152,7 +159,7 @@ function TreeRow({ node, depth, selectedId, onSelect }: { node: TreeNode; depth:
       >
         <FileText className="h-3.5 w-3.5 shrink-0 text-fg/30" />
         <span className="truncate">{node.page.title}</span>
-        {node.page.status === "DRAFT" && <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-amber-300/70">draft</span>}
+        {node.page.status === "DRAFT" && <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-amber-700/70 dark:text-amber-300/70">draft</span>}
       </button>
       {node.children.map((child) => (
         <TreeRow key={child.page.id} node={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
@@ -163,8 +170,9 @@ function TreeRow({ node, depth, selectedId, onSelect }: { node: TreeNode; depth:
 
 // ---- editor ----
 
-function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
-  pageId: string; spaceId: string; siblings: PageSummary[]; onChanged: () => Promise<void>; onDeleted: () => void;
+function PageEditor({ pageId, spaceId, siblings, publisher, onChanged, onDeleted }: {
+  pageId: string; spaceId: string; siblings: PageSummary[]; publisher: boolean;
+  onChanged: () => Promise<void>; onDeleted: () => void;
 }) {
   const [page, setPage] = useState<KnowledgePage | null>(null);
   const [title, setTitle] = useState("");
@@ -172,7 +180,6 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [linkOpen, setLinkOpen] = useState(false);
 
   useEffect(() => {
     setEditing(false);
@@ -212,19 +219,6 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
     }
   }
 
-  async function linkTask(taskId: string | null) {
-    setBusy(true);
-    try {
-      const updated = await api.updatePage(pageId, { linkedTaskId: taskId ?? "" });
-      setPage(updated);
-      setLinkOpen(false);
-      await onChanged();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to link task");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function remove() {
     if (!confirm("Delete this page? This cannot be undone.")) return;
@@ -248,14 +242,8 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
         <div className="flex items-center gap-2 text-xs text-fg/40">
           <StatusChip status={page.status} />
           {page.authorName && <span>· by {page.authorName}</span>}
-          {page.linkedTaskRef && (
-            <span className="inline-flex items-center gap-1 rounded bg-aqua/15 px-1.5 py-0.5 font-medium text-aqua">
-              <Link2 className="h-3 w-3" /> {page.linkedTaskRef}
-            </span>
-          )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" onClick={() => setLinkOpen(true)}><Link2 className="h-4 w-4" /> Link task</Button>
+        {publisher && <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="sm" onClick={togglePublish} disabled={busy}>
             {page.status === "PUBLISHED" ? "Unpublish" : "Publish"}
           </Button>
@@ -265,10 +253,10 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> Edit</Button>
           )}
           <button onClick={remove} disabled={busy} aria-label="Delete page"
-            className="rounded-md p-2 text-fg/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50">
+            className="rounded-md p-2 text-fg/40 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 disabled:opacity-50">
             <Trash2 className="h-4 w-4" />
           </button>
-        </div>
+        </div>}
       </div>
 
       {editing ? (
@@ -297,19 +285,163 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
           <div className="mt-4">
             {page.body ? <Markdown source={page.body} /> : (
               <p className="flex items-center gap-2 text-sm text-fg/40">
-                <Eye className="h-4 w-4" /> This page is empty. <button onClick={() => setEditing(true)} className="text-violet hover:underline">Add content →</button>
+                <Eye className="h-4 w-4" /> This page is empty.
+                {publisher && <button onClick={() => setEditing(true)} className="text-violet hover:underline">Add content →</button>}
               </p>
             )}
           </div>
         </article>
       )}
+    </Card>
+  );
+}
 
-      <LinkTaskDialog
-        open={linkOpen}
-        onClose={() => setLinkOpen(false)}
-        current={page.linkedTaskId}
-        onPick={linkTask}
-      />
+// ---- files ----
+
+function sizeLabel(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Uploaded files in this folder: policy PDFs, forms, spreadsheets. Everyone can open or download;
+ * publishers upload and delete. Downloads go through fetch so the request carries the sign-in.
+ */
+function FilesSection({ spaceId, publisher }: { spaceId: string; publisher: boolean }) {
+  const [files, setFiles] = useState<CompanyFile[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [picked, setPicked] = useState<File | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setFiles(await api.listCompanyFiles(spaceId));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load files");
+    }
+  }, [spaceId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function upload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!picked) return;
+    setBusy("upload");
+    setError(null);
+    try {
+      await api.uploadCompanyFile(spaceId, picked, title.trim() || undefined);
+      setTitle("");
+      setPicked(null);
+      const input = document.getElementById("cf-file") as HTMLInputElement | null;
+      if (input) input.value = "";
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Upload failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function open(f: CompanyFile, inline: boolean) {
+    setBusy(f.id);
+    setError(null);
+    try {
+      const blob = await api.downloadCompanyFile(f.id, inline);
+      const url = URL.createObjectURL(blob);
+      if (inline) {
+        window.open(url, "_blank", "noopener");
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = f.fileName;
+        a.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not open the file");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(f: CompanyFile) {
+    if (!confirm(`Delete "${f.title}"? Everyone loses access to it.`)) return;
+    setBusy(f.id);
+    try {
+      await api.deleteCompanyFile(f.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not delete the file");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (files !== null && files.length === 0 && !publisher) return null;
+
+  return (
+    <Card className="mt-6">
+      <div className="flex items-center gap-2">
+        <Paperclip className="h-4 w-4 text-fg/40" />
+        <h2 className="text-sm font-medium">Files</h2>
+      </div>
+      {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+
+      {files === null ? (
+        <Loader2 className="mt-3 h-5 w-5 animate-spin text-violet" />
+      ) : files.length === 0 ? (
+        <p className="mt-2 text-sm text-fg/40">No files yet. Upload a PDF, Word or Excel file below.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-fg/5">
+          {files.map((f) => (
+            <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{f.title}</p>
+                <p className="truncate text-xs text-fg/40">
+                  {f.fileName} · {sizeLabel(f.sizeBytes)}{f.uploadedByName ? ` · by ${f.uploadedByName}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                {(f.contentType === "application/pdf" || f.contentType.startsWith("image/")) && (
+                  <Button variant="ghost" size="sm" disabled={busy === f.id} onClick={() => open(f, true)}>
+                    <Eye className="h-4 w-4" /> View
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" disabled={busy === f.id} onClick={() => open(f, false)}>
+                  <Download className="h-4 w-4" /> Download
+                </Button>
+                {publisher && (
+                  <button onClick={() => remove(f)} disabled={busy === f.id} aria-label={`Delete ${f.title}`}
+                    className="rounded-md p-2 text-fg/40 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300 disabled:opacity-50">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {publisher && (
+        <form onSubmit={upload} className="mt-4 flex flex-wrap items-end gap-3 border-t border-fg/10 pt-4">
+          <Field label="Title (optional)" htmlFor="cf-title">
+            <Input id="cf-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Leave policy 2026" />
+          </Field>
+          <Field label="File" htmlFor="cf-file" hint="PDF, Word, Excel, PowerPoint, text or image, up to 10 MB.">
+            <input id="cf-file" type="file"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg"
+              onChange={(e) => setPicked(e.target.files?.[0] ?? null)}
+              className="block text-sm text-fg/70 file:mr-3 file:rounded-md file:border-0 file:bg-violet/15 file:px-3 file:py-1.5 file:text-sm file:text-violet" />
+          </Field>
+          <Button type="submit" disabled={!picked || busy === "upload"}>
+            {busy === "upload" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload
+          </Button>
+        </form>
+      )}
     </Card>
   );
 }
@@ -318,7 +450,7 @@ function StatusChip({ status }: { status: "DRAFT" | "PUBLISHED" }) {
   return (
     <span className={cn(
       "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-      status === "PUBLISHED" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300",
+      status === "PUBLISHED" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
     )}>
       {status}
     </span>
@@ -349,65 +481,6 @@ function NewPageButton({ onCreate, busy }: { onCreate: (title: string) => void; 
   );
 }
 
-// ---- link-a-task dialog (cross-app into Work OS) ----
-
-function LinkTaskDialog({ open, onClose, current, onPick }: {
-  open: boolean; onClose: () => void; current: string | null; onPick: (taskId: string | null) => void;
-}) {
-  const [projects, setProjects] = useState<Project[] | null>(null);
-  const [projectId, setProjectId] = useState<string>("");
-  const [tasks, setTasks] = useState<Task[] | null>(null);
-
-  useEffect(() => {
-    if (open) void api.listProjects().then((p) => setProjects(p.filter((x) => x.status === "ACTIVE")));
-  }, [open]);
-
-  useEffect(() => {
-    if (projectId) void api.listTasks(projectId).then(setTasks);
-    else setTasks(null);
-  }, [projectId]);
-
-  return (
-    <Modal open={open} onClose={onClose} title="Link a Work task">
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-fg/50">Connect this doc to a task in Work OS — the doc↔task link that ties knowledge to delivery.</p>
-        <Field label="Project" htmlFor="lt-project">
-          <select
-            id="lt-project"
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            className="w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg focus:border-violet focus:outline-none"
-          >
-            <option value="">Select a project…</option>
-            {projects?.map((p) => <option key={p.id} value={p.id}>{p.key} · {p.name}</option>)}
-          </select>
-        </Field>
-        {projectId && (
-          <div className="max-h-56 space-y-1 overflow-y-auto">
-            {tasks === null ? (
-              <Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" />
-            ) : tasks.length === 0 ? (
-              <p className="text-sm text-fg/40">No tasks in this project.</p>
-            ) : (
-              tasks.map((t) => (
-                <button key={t.id} onClick={() => onPick(t.id)}
-                  className={cn("flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-fg/5",
-                    t.id === current && "bg-violet/10")}>
-                  <span className="font-mono text-xs text-fg/40">{t.ref}</span>
-                  <span className="truncate">{t.title}</span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-        <div className="flex justify-between">
-          <Button variant="ghost" onClick={() => onPick(null)} disabled={!current}>Remove link</Button>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 // ---- minimal, safe Markdown renderer (headings, bold, italics, inline code, lists) ----
 

@@ -25,7 +25,7 @@ import java.util.UUID;
 /** Shift scheduling / rostering (Owner/Admin). Base {@code /api/v1/shifts}. */
 @RestController
 @RequestMapping("/api/v1/shifts")
-@PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+@PreAuthorize("@perm.has('SHIFTS_MANAGE')")
 public class ShiftController {
 
     private final ShiftService service;

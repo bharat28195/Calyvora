@@ -10,10 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { can, canCompanyWide } from "@/lib/permissions";
 
 export default function OrgPage() {
   const { me } = useSession();
-  const isAdmin = me?.user.role === "OWNER" || me?.user.role === "ADMIN";
+  const isAdmin = can(me, "PEOPLE_MANAGE");
 
   const [departments, setDepartments] = useState<Department[] | null>(null);
   const [employees, setEmployees] = useState<Employee[] | null>(null);

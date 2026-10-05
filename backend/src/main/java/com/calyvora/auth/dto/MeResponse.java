@@ -15,7 +15,9 @@ import com.calyvora.people.Timezones;
  * records when the button is pressed cannot disagree. {@code company.timezone} stays as well, for
  * the settings screen that edits it.
  */
-public record MeResponse(UserView user, CompanyView company, String timezone) {
+public record MeResponse(UserView user, CompanyView company, String timezone,
+                         /** What this person may do, permission key → COMPANY or TEAM (PD-54). Drives the menu. */
+                         java.util.Map<String, String> permissions) {
 
     public record UserView(String id, String email, String firstName, String lastName,
                            String role, String status) {
@@ -32,7 +34,8 @@ public record MeResponse(UserView user, CompanyView company, String timezone) {
      * and was never what anybody chose — it was the value for "has not opened the settings page yet".
      * The fallback is now the same default the settings row itself would have had.
      */
-    public static MeResponse of(User user, Company company, CompanySettings settings, Employee employee) {
+    public static MeResponse of(User user, Company company, CompanySettings settings, Employee employee,
+                                java.util.Map<String, String> permissions) {
         String currency = settings == null ? "INR" : settings.getCurrency();
         String companyZone = Timezones.forCompany(settings).getId();
         String effectiveZone = Timezones.resolve(employee, settings).getId();
@@ -42,6 +45,6 @@ public record MeResponse(UserView user, CompanyView company, String timezone) {
                 new CompanyView(company.getId().toString(), company.getName(), company.getSlug(),
                         company.getStatus().name(), currency, companyZone,
                         settings == null ? null : settings.getSessionIdleMinutes()),
-                effectiveZone);
+                effectiveZone, permissions);
     }
 }

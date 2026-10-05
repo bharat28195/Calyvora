@@ -48,6 +48,9 @@ public class TaxService {
     private final CompensationRepository compensationRepository;
     private final CompanySettingsRepository settingsRepository;
     private final OrgScope orgScope;
+    private final com.calyvora.feature.FeatureService featureService;
+
+    private final com.calyvora.access.PermissionService permissions;
 
     public TaxService(TaxDeclarationRepository declarationRepository,
                       TaxDeclarationItemRepository itemRepository,
@@ -55,7 +58,10 @@ public class TaxService {
                       UserRepository userRepository,
                       CompensationRepository compensationRepository,
                       CompanySettingsRepository settingsRepository,
-                      OrgScope orgScope) {
+                      OrgScope orgScope,
+                      com.calyvora.feature.FeatureService featureService,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.declarationRepository = declarationRepository;
         this.itemRepository = itemRepository;
         this.employeeRepository = employeeRepository;
@@ -63,6 +69,7 @@ public class TaxService {
         this.compensationRepository = compensationRepository;
         this.settingsRepository = settingsRepository;
         this.orgScope = orgScope;
+        this.featureService = featureService;
     }
 
     // ---- the employee's own declaration -------------------------------------------------------
@@ -217,7 +224,12 @@ public class TaxService {
 
         int elapsed = fy.monthsElapsed(LocalDate.now());
         BigDecimal perMonth = result.monthlyTds();
-        BigDecimal deductedSoFar = perMonth.multiply(BigDecimal.valueOf(elapsed));
+        // Whether this company withholds income tax through Orbit at all (off until switched on per
+        // customer). When it does not, nothing has been "deducted so far" — the page showed a projected
+        // figure under that label to people whose payslips carried no tax line, so it says zero and the
+        // screen presents the rest as an estimate to plan with.
+        boolean withheld = featureService.isEnabled(companyId, com.calyvora.feature.Feature.INCOME_TAX);
+        BigDecimal deductedSoFar = withheld ? perMonth.multiply(BigDecimal.valueOf(elapsed)) : BigDecimal.ZERO;
         if (deductedSoFar.compareTo(result.totalTax()) > 0) {
             deductedSoFar = result.totalTax();
         }
@@ -232,7 +244,7 @@ public class TaxService {
                 bandRows(result), result.taxOnIncome(), result.rebate(),
                 result.surcharge(), result.cess(), result.totalTax(), perMonth,
                 elapsed, deductedSoFar, remaining, nextMonth,
-                new TaxDtos.RegimeComparison(oldTax, newTax, cheaper, saving));
+                new TaxDtos.RegimeComparison(oldTax, newTax, cheaper, saving), withheld);
     }
 
     private static List<TaxDtos.DeductionRow> deductionRows(IncomeTaxCalculator.Result result) {
@@ -319,7 +331,7 @@ public class TaxService {
     @Transactional(readOnly = true)
     public List<TaxDtos.DeclarationSummaryRow> allDeclarations(AuthPrincipal principal, String year) {
         UUID companyId = TenantContext.getCompanyId();
-        if (!orgScope.seesWholeCompany(principal)) {
+        if (!permissions.has(principal, com.calyvora.access.Permission.TAX_MANAGE)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "You do not have permission to perform this action");
         }
         FinancialYear fy = yearOrCurrent(year);
@@ -378,7 +390,7 @@ public class TaxService {
     @Transactional
     public boolean setWindow(AuthPrincipal principal, boolean open) {
         UUID companyId = TenantContext.getCompanyId();
-        if (!orgScope.seesWholeCompany(principal)) {
+        if (!permissions.has(principal, com.calyvora.access.Permission.TAX_MANAGE)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "You do not have permission to perform this action");
         }
         CompanySettings settings = settingsRepository.findById(companyId)

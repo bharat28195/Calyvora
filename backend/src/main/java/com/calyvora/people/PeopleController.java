@@ -23,8 +23,10 @@ import java.util.UUID;
 public class PeopleController {
 
     private final EmployeeService employeeService;
+    private final com.calyvora.access.PermissionService permissions;
 
-    public PeopleController(EmployeeService employeeService) {
+    public PeopleController(EmployeeService employeeService, com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.employeeService = employeeService;
     }
 
@@ -34,7 +36,7 @@ public class PeopleController {
      */
     @GetMapping("/employees")
     public List<EmployeeResponse> directory(@CurrentUser AuthPrincipal principal) {
-        return RatingVisibility.filter(employeeService.directory(), principal);
+        return RatingVisibility.filter(employeeService.directory(), principal, seesRatings(principal));
     }
 
     /** Paged, searchable directory — the scalable path for large companies. */
@@ -45,7 +47,7 @@ public class PeopleController {
             @org.springframework.web.bind.annotation.RequestParam(name = "page", defaultValue = "0") int page,
             @org.springframework.web.bind.annotation.RequestParam(name = "size", defaultValue = "25") int size) {
         var result = employeeService.directoryPage(q, page, size);
-        return result.map(e -> RatingVisibility.filter(e, principal, myEmployeeId(principal)));
+        return result.map(e -> RatingVisibility.filter(e, principal, myEmployeeId(principal), seesRatings(principal)));
     }
 
     /**
@@ -63,7 +65,7 @@ public class PeopleController {
 
     @GetMapping("/employees/{id}")
     public EmployeeResponse get(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
-        return RatingVisibility.filter(employeeService.get(id), principal, myEmployeeId(principal));
+        return RatingVisibility.filter(employeeService.get(id), principal, myEmployeeId(principal), seesRatings(principal));
     }
 
     /** The caller's own employee id — needed to tell "my report" from "a colleague". */
@@ -86,8 +88,13 @@ public class PeopleController {
 
     /** Admin: update any employee's HR profile. */
     @PatchMapping("/employees/{id}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public EmployeeResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateEmployeeRequest request) {
         return employeeService.update(id, request);
+    }
+
+    /** Everyone's rating, not only one's own and one's reports': PERFORMANCE_MANAGE (PD-54). */
+    private boolean seesRatings(AuthPrincipal principal) {
+        return permissions.has(principal, com.calyvora.access.Permission.PERFORMANCE_MANAGE);
     }
 }

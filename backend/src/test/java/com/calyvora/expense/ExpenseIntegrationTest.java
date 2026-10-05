@@ -97,26 +97,45 @@ class ExpenseIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void you_can_only_touch_your_own_claims_and_only_admins_decide() throws Exception {
+    void you_can_only_touch_your_own_claims_and_a_plain_member_decides_nothing() throws Exception {
         seedDemo();
         Session priya = login("priya.nair@northwind.demo", DEMO_PW);
-        Session leo = login("leo.martins@northwind.demo", DEMO_PW);
+        // Dev is a MEMBER with nobody reporting to him. (This used Leo until HR was given expenses.)
+        Session dev = login("dev.sharma@northwind.demo", DEMO_PW);
         String claimId = submit(priya, "Monitor", "SUPPLIES", 8000);
 
-        mockMvc.perform(patch("/api/v1/expenses/" + claimId).header("Authorization", bearer(leo))
+        mockMvc.perform(patch("/api/v1/expenses/" + claimId).header("Authorization", bearer(dev))
                         .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("amount", 1))))
                 .andExpect(status().isForbidden());
 
         // a member can't approve, and can't see the company-wide queue
-        mockMvc.perform(post("/api/v1/expenses/" + claimId + "/approve").header("Authorization", bearer(leo)))
+        mockMvc.perform(post("/api/v1/expenses/" + claimId + "/approve").header("Authorization", bearer(dev)))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/v1/expenses").header("Authorization", bearer(leo)))
+        mockMvc.perform(get("/api/v1/expenses").header("Authorization", bearer(dev)))
                 .andExpect(status().isForbidden());
 
         // and only sees their own claims in /me — never Priya's
-        for (JsonNode c : getJson("/api/v1/expenses/me", leo).get("claims")) {
-            assertThat(c.get("employeeName").asText()).isEqualTo("Leo Martins");
+        for (JsonNode c : getJson("/api/v1/expenses/me", dev).get("claims")) {
+            assertThat(c.get("employeeName").asText()).isEqualTo("Dev Sharma");
         }
+    }
+
+    /** Founder decision, 2026-10-05: HR manages expenses — the company queue, decisions and payment. */
+    @Test
+    void hr_sees_the_company_queue_decides_and_reimburses() throws Exception {
+        seedDemo();
+        Session priya = login("priya.nair@northwind.demo", DEMO_PW);
+        Session leo = login("leo.martins@northwind.demo", DEMO_PW);   // HR
+        String claimId = submit(priya, "Standing desk", "SUPPLIES", 14000);
+
+        mockMvc.perform(get("/api/v1/expenses").header("Authorization", bearer(leo)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/expenses/" + claimId + "/approve").header("Authorization", bearer(leo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+        mockMvc.perform(post("/api/v1/expenses/" + claimId + "/reimburse").header("Authorization", bearer(leo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REIMBURSED"));
     }
 
     @Test

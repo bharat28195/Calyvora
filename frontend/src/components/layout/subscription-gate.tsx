@@ -51,13 +51,13 @@ export function SubscriptionGate() {
   const expiring = sub.daysLeft != null && sub.daysLeft <= 14;
   if (expiring && !dismissed) {
     return (
-      <div className="sticky top-0 z-40 flex items-center justify-center gap-2 bg-amber-500/15 px-4 py-2 text-center text-sm text-amber-300">
+      <div className="sticky top-0 z-40 flex items-center justify-center gap-2 bg-amber-500/15 px-4 py-2 text-center text-sm text-amber-700 dark:text-amber-300">
         <AlertTriangle className="h-4 w-4 shrink-0" />
         <span>
           Your subscription {sub.daysLeft! <= 0 ? "expires today" : `ends in ${sub.daysLeft} day${sub.daysLeft === 1 ? "" : "s"}`}.
           Renew soon to avoid interruption.
         </span>
-        <button onClick={() => setDismissed(true)} className="ml-2 rounded px-1.5 text-amber-300/70 hover:text-amber-200">Dismiss</button>
+        <button onClick={() => setDismissed(true)} className="ml-2 rounded px-1.5 text-amber-700/70 dark:text-amber-300/70 hover:text-amber-200">Dismiss</button>
       </div>
     );
   }

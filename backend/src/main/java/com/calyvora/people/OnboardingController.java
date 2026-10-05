@@ -38,7 +38,7 @@ public class OnboardingController {
     }
 
     @PostMapping("/employees/{employeeId}/onboarding")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public ResponseEntity<OnboardingTaskResponse> add(@PathVariable UUID employeeId,
                                                       @Valid @RequestBody AddOnboardingTaskRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -46,7 +46,7 @@ public class OnboardingController {
     }
 
     @PostMapping("/employees/{employeeId}/onboarding/seed-defaults")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public List<OnboardingTaskResponse> seedDefaults(@PathVariable UUID employeeId) {
         return onboardingService.seedDefaults(employeeId, ChecklistKind.ONBOARDING);
     }
@@ -65,7 +65,7 @@ public class OnboardingController {
     }
 
     @PostMapping("/employees/{employeeId}/exit-checklist")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('EXITS_MANAGE')")
     public ResponseEntity<OnboardingTaskResponse> addExitTask(@PathVariable UUID employeeId,
                                                               @Valid @RequestBody AddOnboardingTaskRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -73,7 +73,7 @@ public class OnboardingController {
     }
 
     @PostMapping("/employees/{employeeId}/exit-checklist/seed-defaults")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('EXITS_MANAGE')")
     public List<OnboardingTaskResponse> seedExitDefaults(@PathVariable UUID employeeId) {
         return onboardingService.seedDefaults(employeeId, ChecklistKind.EXIT);
     }
@@ -90,7 +90,7 @@ public class OnboardingController {
     }
 
     @DeleteMapping("/onboarding/{taskId}")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR')")
+    @PreAuthorize("@perm.has('PEOPLE_MANAGE')")
     public ResponseEntity<Void> delete(@PathVariable UUID taskId) {
         onboardingService.delete(taskId);
         return ResponseEntity.noContent().build();

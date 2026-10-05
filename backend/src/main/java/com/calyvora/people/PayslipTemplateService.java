@@ -61,7 +61,17 @@ public class PayslipTemplateService {
         return validated.stream().map(PayslipComponentResponse::of).toList();
     }
 
-    /** The standard template — a conventional CTC breakdown. Not persisted here. */
+    /**
+     * The standard template — a conventional CTC breakdown of EARNINGS only. Not persisted here.
+     *
+     * <p>No PF or income-tax deduction, on purpose. It used to ship "Provident fund 12% of basic" and a
+     * flat "Income tax 10% of gross", which put a made-up tax figure on every payslip while the real
+     * statutory switches were off — and, once a company turned PF or TDS on, deducted both twice,
+     * because CompensationService adds the statutory lines on top of the template's. PF and TDS come
+     * only from the statutory engine (real ceilings, each employee's declaration). The template is for
+     * a company's own deductions: loan recovery, professional tax, a canteen charge. V59 removed the
+     * two from companies still carrying them unmodified.
+     */
     private List<PayslipComponent> defaultComponents(UUID companyId) {
         return List.of(
                 new PayslipComponent(UUID.randomUUID(), companyId, "Basic", PayComponentKind.EARNING,
@@ -69,11 +79,7 @@ public class PayslipTemplateService {
                 new PayslipComponent(UUID.randomUUID(), companyId, "House rent allowance", PayComponentKind.EARNING,
                         PayComponentCalc.PERCENT_OF_GROSS, new BigDecimal("25"), false, 1),
                 new PayslipComponent(UUID.randomUUID(), companyId, "Special allowance", PayComponentKind.EARNING,
-                        PayComponentCalc.REMAINDER, null, false, 2),
-                new PayslipComponent(UUID.randomUUID(), companyId, "Provident fund", PayComponentKind.DEDUCTION,
-                        PayComponentCalc.PERCENT_OF_BASIC, new BigDecimal("12"), false, 3),
-                new PayslipComponent(UUID.randomUUID(), companyId, "Income tax", PayComponentKind.DEDUCTION,
-                        PayComponentCalc.PERCENT_OF_GROSS, new BigDecimal("10"), false, 4));
+                        PayComponentCalc.REMAINDER, null, false, 2));
     }
 
     /** Provision the standard template on first use. Reproduces a conventional CTC breakdown. */

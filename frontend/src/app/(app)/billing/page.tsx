@@ -80,7 +80,7 @@ export default function BillingPage() {
             </p>
             {/* Say why the number isn't headcount × rate, rather than leaving them to work it out. */}
             {data.minimumApplied && data.monthlyMinimum != null && (
-              <p className="mt-1 text-sm text-amber-300/90">
+              <p className="mt-1 text-sm text-amber-700/90 dark:text-amber-300/90">
                 Your team is below the {money(data.monthlyMinimum)} monthly minimum, so that&apos;s
                 what you pay. It stops applying once your usage passes it.
               </p>
@@ -182,7 +182,7 @@ function StatusPill({ status }: { status: BillingOverview["status"] }) {
   const map: Record<BillingOverview["status"], string> = {
     ACTIVE: "bg-emerald-500/15 text-emerald-400",
     TRIALING: "bg-aqua/15 text-aqua",
-    PAST_DUE: "bg-amber-500/15 text-amber-300",
+    PAST_DUE: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
     CANCELLED: "bg-fg/10 text-fg/50",
   };
   return <span className={cn("rounded-full px-3 py-1 text-xs font-medium", map[status])}>{status.toLowerCase().replace("_", " ")}</span>;

@@ -82,7 +82,9 @@ public final class TaxDtos {
             BigDecimal remainingTax,
             /** What the next pay run should withhold, spreading what is left over the months left. */
             BigDecimal projectedNextMonth,
-            RegimeComparison comparison) {
+            RegimeComparison comparison,
+            /** False while the company does not withhold income tax through Orbit: the figures are an estimate. */
+            boolean withheldByPayroll) {
     }
 
     /** The same income under both sets of rules, and which one wins. */

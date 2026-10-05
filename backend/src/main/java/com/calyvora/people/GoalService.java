@@ -28,8 +28,12 @@ public class GoalService {
     private final EmployeeRepository employeeRepository;
     private final NotificationService notificationService;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public GoalService(GoalRepository goalRepository, EmployeeRepository employeeRepository,
-                       NotificationService notificationService) {
+                       NotificationService notificationService,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.goalRepository = goalRepository;
         this.employeeRepository = employeeRepository;
         this.notificationService = notificationService;
@@ -104,7 +108,7 @@ public class GoalService {
      * manage only their own. This is what lets a team lead set goals for their downline (founder request).
      */
     private void requireCanManage(Employee employee, AuthPrincipal principal) {
-        boolean admin = "OWNER".equals(principal.role()) || "ADMIN".equals(principal.role());
+        boolean admin = permissions.has(principal, com.calyvora.access.Permission.PERFORMANCE_MANAGE);
         boolean self = employee.getUserId().equals(principal.userId());
         if (!admin && !self && !isManagerOf(employee, principal)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "You can only manage goals for yourself or your reports");

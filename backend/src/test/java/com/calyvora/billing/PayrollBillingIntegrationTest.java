@@ -24,16 +24,18 @@ class PayrollBillingIntegrationTest extends IntegrationTestBase {
         seedDemo();
         Session owner = login("ava.chen@northwind.demo", DEMO_PW);
 
-        // Default template = 5 components (Basic, HRA, Special, PF, Income tax).
-        assertThat(getJson("/api/v1/payroll/payslip-template", owner).size()).isEqualTo(5);
+        // Default template = the 3 earnings (Basic, HRA, Special). No PF or income-tax component: those
+        // come only from the statutory engine, which is off until switched on per company (V59).
+        assertThat(getJson("/api/v1/payroll/payslip-template", owner).size()).isEqualTo(3);
 
-        // Priya earns 18,00,000/yr → 1,50,000/mo. Net should be gross minus PF(12% of basic)+tax(10% of gross).
+        // Priya earns 18,00,000/yr → 1,50,000/mo. With statutory PF and TDS off, nothing is withheld:
+        // a made-up 16% here was the defect — a flat "income tax" on every payslip.
         String priyaEmp = firstEmployeeNamed(owner, "Priya Nair");
         JsonNode slip = getJson("/api/v1/people/employees/" + priyaEmp + "/payslip", owner);
         assertThat(slip.get("gross").asDouble()).isEqualTo(150000.00);
-        assertThat(slip.get("net").asDouble()).isEqualTo(126000.00);
+        assertThat(slip.get("net").asDouble()).isEqualTo(150000.00);
         assertThat(slip.get("earnings").size()).isEqualTo(3);
-        assertThat(slip.get("deductions").size()).isEqualTo(2);
+        assertThat(slip.get("deductions").size()).isZero();
     }
 
     @Test

@@ -57,13 +57,17 @@ public class PerformanceReviewService {
     private final NotificationService notificationService;
     private final com.calyvora.people.OrgScope orgScope;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public PerformanceReviewService(ReviewCycleRepository cycleRepository,
                                     PerformanceReviewRepository reviewRepository,
                                     EmployeeRepository employeeRepository, UserRepository userRepository,
                                     GoalRepository goalRepository, CompensationService compensationService,
                                     CompensationRepository compensationRepository,
                                     NotificationService notificationService,
-                                    com.calyvora.people.OrgScope orgScope) {
+                                    com.calyvora.people.OrgScope orgScope,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.orgScope = orgScope;
         this.cycleRepository = cycleRepository;
         this.reviewRepository = reviewRepository;
@@ -158,7 +162,7 @@ public class PerformanceReviewService {
     public List<PerformanceReviewResponse> teamReviews(AuthPrincipal principal) {
         java.util.Set<UUID> roster = orgScope.downline(principal, false);
         if (roster.isEmpty()) return List.of();
-        boolean maySeePay = orgScope.seesWholeCompany(principal);
+        boolean maySeePay = permissions.companyWide(principal, com.calyvora.access.Permission.SALARY_VIEW);
         List<PerformanceReview> reviews = reviewRepository.findByEmployeeIdInOrderByCreatedAtDesc(roster);
         Bulk bulk = Bulk.forReviews(reviews, maySeePay, employeeRepository, userRepository,
                 cycleRepository, goalRepository, compensationRepository);
@@ -246,7 +250,9 @@ public class PerformanceReviewService {
         requireCanView(review, principal);
         // Leadership and the person whose salary it is see the figures; a manager or a skip-level
         // reading the same review does not.
-        boolean maySeePay = orgScope.seesWholeCompany(principal) || isSelf(review, principal);
+        boolean maySeePay = permissions.companyWide(principal, com.calyvora.access.Permission.SALARY_VIEW) || isSelf(review, principal)
+                || (permissions.scope(principal, com.calyvora.access.Permission.SALARY_VIEW) == com.calyvora.access.PermissionScope.TEAM
+                    && orgScope.downline(principal, false).contains(review.getEmployeeId()));
         PerformanceReviewResponse response = toResponse(review);
         return maySeePay ? response : response.withoutPay();
     }
@@ -500,8 +506,9 @@ public class PerformanceReviewService {
         throw new ApiException(ErrorCode.FORBIDDEN, "Only the reporting manager or an admin can write this review");
     }
 
+    /** Writes or reads any review: PERFORMANCE_MANAGE (Admin and HR by default, PD-54). */
     private boolean isAdmin(AuthPrincipal principal) {
-        return "OWNER".equals(principal.role()) || "ADMIN".equals(principal.role());
+        return permissions.has(principal, com.calyvora.access.Permission.PERFORMANCE_MANAGE);
     }
 
     private boolean isSelf(PerformanceReview review, AuthPrincipal principal) {

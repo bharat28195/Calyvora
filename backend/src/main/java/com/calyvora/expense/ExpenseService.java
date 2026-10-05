@@ -48,10 +48,14 @@ public class ExpenseService {
     private final NotificationService notificationService;
     private final com.calyvora.people.OrgScope orgScope;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public ExpenseService(ExpenseClaimRepository claimRepository, EmployeeRepository employeeRepository,
                           EmployeeService employeeService, UserRepository userRepository,
                           NotificationService notificationService,
-                          com.calyvora.people.OrgScope orgScope) {
+                          com.calyvora.people.OrgScope orgScope,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.orgScope = orgScope;
         this.claimRepository = claimRepository;
         this.employeeRepository = employeeRepository;
@@ -363,8 +367,13 @@ public class ExpenseService {
      * decision with real consequences for small customers, not a defect to fix in passing.
      */
     private void requireCanDecide(UUID companyId, ExpenseClaim claim, AuthPrincipal principal) {
-        if ("OWNER".equals(principal.role()) || "ADMIN".equals(principal.role())) {
+        // EXPENSES_APPROVE company-wide decides any claim (Admin and HR by default, PD-54); at team
+        // scope only claims from beneath the caller in the tree; without it, none.
+        if (permissions.companyWide(principal, com.calyvora.access.Permission.EXPENSES_APPROVE)) {
             return;
+        }
+        if (!permissions.has(principal, com.calyvora.access.Permission.EXPENSES_APPROVE)) {
+            throw new ForbiddenException("You can't decide expense claims");
         }
         UUID mine = employeeRepository.findByUserId(principal.userId())
                 .filter(e -> companyId.equals(e.getCompanyId()))

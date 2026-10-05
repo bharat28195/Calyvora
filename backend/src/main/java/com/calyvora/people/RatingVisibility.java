@@ -13,16 +13,16 @@ import java.util.Set;
  * find each other. The rating rode along in the same payload, which meant any employee could read
  * every colleague's score. Salary was already protected; this closes the same gap for ratings.
  *
- * <p>Visible to HR and company leadership, to the person themselves, and to that person's manager.
+ * <p>Visible to whoever holds PERFORMANCE_MANAGE (Admin and HR by default, PD-54), to the person
+ * themselves, and to that person's manager. The caller passes {@code privileged} in, because this is a
+ * static helper and the permission lives in a service.
  */
 final class RatingVisibility {
 
-    private static final Set<String> PRIVILEGED_ROLES = Set.of("OWNER", "ADMIN", "HR");
-
     private RatingVisibility() {}
 
-    static List<EmployeeResponse> filter(List<EmployeeResponse> employees, AuthPrincipal viewer) {
-        if (isPrivileged(viewer)) {
+    static List<EmployeeResponse> filter(List<EmployeeResponse> employees, AuthPrincipal viewer, boolean privileged) {
+        if (privileged) {
             return employees;
         }
         String viewerEmployeeId = employees.stream()
@@ -33,8 +33,9 @@ final class RatingVisibility {
         return employees.stream().map(e -> visible(e, viewer, viewerEmployeeId) ? e : e.withoutRating()).toList();
     }
 
-    static EmployeeResponse filter(EmployeeResponse employee, AuthPrincipal viewer, String viewerEmployeeId) {
-        return isPrivileged(viewer) || visible(employee, viewer, viewerEmployeeId)
+    static EmployeeResponse filter(EmployeeResponse employee, AuthPrincipal viewer, String viewerEmployeeId,
+                                   boolean privileged) {
+        return privileged || visible(employee, viewer, viewerEmployeeId)
                 ? employee
                 : employee.withoutRating();
     }
@@ -43,9 +44,5 @@ final class RatingVisibility {
         boolean isSelf = e.userId().equals(viewer.userId().toString());
         boolean isMyReport = viewerEmployeeId != null && viewerEmployeeId.equals(e.managerId());
         return isSelf || isMyReport;
-    }
-
-    private static boolean isPrivileged(AuthPrincipal viewer) {
-        return viewer != null && PRIVILEGED_ROLES.contains(viewer.role());
     }
 }

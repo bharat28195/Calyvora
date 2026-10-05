@@ -38,10 +38,14 @@ public class RegularizationService {
     private final NotificationService notifications;
     private final OrgScope orgScope;
 
+    private final com.calyvora.access.PermissionService permissions;
+
     public RegularizationService(AttendanceRegularizationRepository repository,
                                  AttendanceRepository attendanceRepository, EmployeeRepository employeeRepository,
                                  EmployeeService employeeService, UserRepository userRepository,
-                                 NotificationService notifications, OrgScope orgScope) {
+                                 NotificationService notifications, OrgScope orgScope,
+            com.calyvora.access.PermissionService permissions) {
+        this.permissions = permissions;
         this.orgScope = orgScope;
         this.repository = repository;
         this.attendanceRepository = attendanceRepository;
@@ -101,6 +105,9 @@ public class RegularizationService {
         if (isAgent(principal)) {
             return all.stream().map(r -> RegularizationResponse.of(r, names)).toList();
         }
+        if (!approvesTeam(principal)) {
+            return List.of();
+        }
         UUID myEmployeeId = employeeService.ensureEmployeeId(companyId, principal.userId());
         return all.stream()
                 .filter(r -> isMyReport(companyId, r.getEmployeeId(), myEmployeeId))
@@ -112,8 +119,8 @@ public class RegularizationService {
         UUID companyId = TenantContext.getCompanyId();
         AttendanceRegularization r = repository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new NotFoundException("Regularization not found"));
-        if (!isAgent(principal)
-                && !isMyReport(companyId, r.getEmployeeId(), employeeService.ensureEmployeeId(companyId, principal.userId()))) {
+        if (!isAgent(principal) && !(approvesTeam(principal)
+                && isMyReport(companyId, r.getEmployeeId(), employeeService.ensureEmployeeId(companyId, principal.userId())))) {
             throw new ForbiddenException("You can't decide this request");
         }
         if (r.getStatus() != RegularizationStatus.PENDING) {
@@ -148,9 +155,14 @@ public class RegularizationService {
 
     // ---- helpers ----
 
+    /** ATTENDANCE_MANAGE company-wide decides anyone's correction (Admin and HR by default, PD-54). */
     private boolean isAgent(AuthPrincipal principal) {
-        String role = principal.role();
-        return "ADMIN".equals(role) || "HR".equals(role) || "OWNER".equals(role);
+        return permissions.companyWide(principal, com.calyvora.access.Permission.ATTENDANCE_MANAGE);
+    }
+
+    /** At team scope, only for people beneath the caller; without the permission, nobody's. */
+    private boolean approvesTeam(AuthPrincipal principal) {
+        return permissions.has(principal, com.calyvora.access.Permission.ATTENDANCE_MANAGE);
     }
 
     /**

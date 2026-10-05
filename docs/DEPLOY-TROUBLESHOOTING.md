@@ -122,6 +122,31 @@ its own keypair; don't share with the demo.
 
 ---
 
+## 9. Platform-owner password won't change / env var ignored
+
+**Two traps, both fixed in code now:**
+
+- **Wrong env var name.** The owner email/password were only `@Value` defaults with no
+  `application.yml` binding, so Spring's relaxed binding looked for `CALYVORA_PLATFORM_OWNER_PASSWORD`,
+  not the `PLATFORM_OWNER_PASSWORD` the docs told you to set — so the variable was silently ignored and
+  the owner kept the hardcoded default. **Fixed:** `application.yml` now binds the clean names
+  `PLATFORM_OWNER_EMAIL` and `PLATFORM_OWNER_PASSWORD`, and the hardcoded default password is gone.
+
+- **Setting the password alone does NOT rotate it.** `PlatformOwnerBootstrap` only writes a password
+  when it **creates** the owner or **moves it to a new email**. If the owner already exists under the
+  same address, boot returns early and the password is left as-is. So to rotate off a compromised
+  default on an existing deployment, **change `PLATFORM_OWNER_EMAIL` to a new address** (e.g. your
+  business `owner@calyvora.net`) at the same time — that triggers the rename path, which resets the
+  password and disables the old address.
+
+**To set up (or rotate) the owner:** set both `PLATFORM_OWNER_EMAIL` (a new address) and
+`PLATFORM_OWNER_PASSWORD`, then redeploy. Confirm in the log:
+```
+Moved the platform owner from <old> to <new> and reset its password. The old address can no longer sign in.
+```
+
+---
+
 ## What a healthy production boot looks like
 
 ```

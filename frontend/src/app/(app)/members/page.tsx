@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Check, Link as LinkIcon, Loader2, MailPlus, Trash2, UserPlus, Mail } from "lucide-react";
 import { api, ApiError, isLive } from "@/lib/api";
 import { inviteSchema } from "@/lib/validators";
-import type { Invitation, Member } from "@/lib/types";
+import type { CompanyRole, Invitation, Member } from "@/lib/types";
+import { useSession } from "@/hooks/useSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -19,7 +20,12 @@ import { Modal } from "@/components/ui/modal";
 const showDevMailbox = !isLive || process.env.NODE_ENV !== "production";
 
 export default function MembersPage() {
+  const { me } = useSession();
   const [members, setMembers] = useState<Member[] | null>(null);
+  // The company's roles, for the Role column. Null until loaded (or when the backend has none, as in
+  // the mock) — then the column shows the plain role badge instead of a picker.
+  const [roles, setRoles] = useState<CompanyRole[] | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invitation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -31,6 +37,7 @@ export default function MembersPage() {
       const [m, i] = await Promise.all([api.listMembers(), api.listInvitations()]);
       setMembers(m);
       setInvites(i);
+      api.roles().then(setRoles).catch(() => setRoles(null));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load members");
     }
@@ -39,6 +46,26 @@ export default function MembersPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** The role a member holds: their custom role, or the built-in their base role names. */
+  function roleOf(m: Member): string {
+    if (m.companyRoleId) return m.companyRoleId;
+    const builtin = m.role === "MEMBER" ? "EMPLOYEE" : m.role;
+    return roles?.find((r) => r.builtin === builtin)?.id ?? "";
+  }
+
+  async function changeRole(m: Member, roleId: string) {
+    setSavingId(m.id);
+    setError(null);
+    try {
+      await api.assignRole(m.id, roleId);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't change the role");
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   async function revoke(id: string) {
     await api.revokeInvitation(id);
@@ -69,7 +96,10 @@ export default function MembersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-          <p className="mt-1 text-fg/50">Your team and pending invitations.</p>
+          <p className="mt-1 text-fg/50">
+            Your team and pending invitations. Change what each role can do in{" "}
+            <Link href="/settings/roles" className="text-violet hover:underline">Roles &amp; permissions</Link>.
+          </p>
         </div>
         <Button onClick={() => setInviteOpen(true)}>
           <UserPlus className="h-4 w-4" /> Invite
@@ -84,8 +114,8 @@ export default function MembersPage() {
         </Card>
       ) : (
         <>
-          <Card className="mt-8 overflow-hidden p-0">
-            <table className="w-full text-left text-sm">
+          <Card className="mt-8 overflow-x-auto p-0">
+            <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-fg/10 text-xs uppercase tracking-wide text-fg/40">
                 <tr>
                   <th className="px-5 py-3 font-medium">Name</th>
@@ -99,7 +129,19 @@ export default function MembersPage() {
                   <tr key={m.id} className="border-b border-fg/5 last:border-0">
                     <td className="px-5 py-3">{m.firstName} {m.lastName}</td>
                     <td className="px-5 py-3 text-fg/70">{m.email}</td>
-                    <td className="px-5 py-3"><Badge value={m.role} /></td>
+                    <td className="px-5 py-3">
+                      {roles && m.id !== me?.user.id ? (
+                        <select aria-label={`Role for ${m.firstName} ${m.lastName}`} value={roleOf(m)}
+                          disabled={savingId === m.id} onChange={(e) => changeRole(m, e.target.value)}
+                          className="h-8 rounded-md border border-fg/15 bg-fg/5 px-2 text-sm text-fg disabled:opacity-50">
+                          {roles.map((r) => <option key={r.id} value={r.id} className="bg-surface">{r.name}</option>)}
+                        </select>
+                      ) : roles && m.companyRoleId ? (
+                        <span className="text-sm">{roles.find((r) => r.id === m.companyRoleId)?.name ?? "Custom"}</span>
+                      ) : (
+                        <Badge value={m.role} />
+                      )}
+                    </td>
                     <td className="px-5 py-3"><Badge value={m.status} /></td>
                   </tr>
                 ))}

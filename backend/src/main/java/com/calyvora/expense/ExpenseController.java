@@ -67,8 +67,10 @@ public class ExpenseController {
 
     // ---- approving ----
 
+    // HR too (founder decision, 2026-10-05): HR runs payroll, and the reimbursement queue is part of
+    // the same monthly close.
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('EXPENSES_REIMBURSE')")
     public ExpenseSummaryResponse all(@RequestParam(required = false) String status,
                                       @RequestParam(required = false) String cursor,
                                       @RequestParam(required = false) Integer size) {
@@ -94,11 +96,11 @@ public class ExpenseController {
         return expenseService.decide(claimId, false, body == null ? null : body.get("note"), principal);
     }
 
-    // Reimbursement stays with Owner/Admin. Approving a claim is a judgement about whether the spend
-    // was legitimate, which is the manager's to make; paying it is money leaving the company, which
-    // is finance's. Keeping the two apart is worth more than the convenience of merging them.
+    // Reimbursement is for Owner/Admin and HR (founder decision, 2026-10-05: HR manages expenses).
+    // Approving a claim is still the manager's judgement about whether the spend was legitimate;
+    // paying it is the finance step, which in a company this size is HR's alongside payroll.
     @PostMapping("/{claimId}/reimburse")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@perm.has('EXPENSES_REIMBURSE')")
     public ExpenseResponse reimburse(@PathVariable UUID claimId, @CurrentUser AuthPrincipal principal) {
         return expenseService.reimburse(claimId, principal);
     }

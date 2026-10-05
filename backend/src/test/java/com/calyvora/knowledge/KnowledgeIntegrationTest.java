@@ -52,25 +52,6 @@ class KnowledgeIntegrationTest extends IntegrationTestBase {
         return objectMapper.readTree(r.getResponse().getContentAsString()).get("id").asText();
     }
 
-    // Work OS helpers, so we can prove the doc<->task cross-app link.
-    private String createProject(Session s, String name, String key) throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/work/projects").header("Authorization", bearer(s))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", name, "key", key))))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return objectMapper.readTree(r.getResponse().getContentAsString()).get("id").asText();
-    }
-
-    private String createTask(Session s, String projectId, String title) throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/work/projects/" + projectId + "/tasks").header("Authorization", bearer(s))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("title", title))))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return objectMapper.readTree(r.getResponse().getContentAsString()).get("id").asText();
-    }
-
     @Test
     void space_and_page_lifecycle() throws Exception {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
@@ -95,45 +76,55 @@ class KnowledgeIntegrationTest extends IntegrationTestBase {
         assertThat(getJson("/api/v1/knowledge/spaces", owner).get(0).get("pageCount").asInt()).isEqualTo(1);
     }
 
+    /**
+     * Company documents: a publisher writes, everyone reads what is published, and a draft is invisible
+     * to anyone who cannot publish it — including to search.
+     */
     @Test
-    void page_links_to_a_work_task_cross_app() throws Exception {
-        Session owner = onboardOwner("Acme", "owner2@acme.com", PW);
-        String projectId = createProject(owner, "Platform", "PLT");
-        String taskId = createTask(owner, projectId, "Ship the thing");
-        String spaceId = createSpace(owner, "Docs", "DOC");
-
-        // create a page linked to the Work task (doc<->task), then read it back with the resolved ref
-        String pageId = createPage(owner, spaceId,
-                Map.of("title", "Ship notes", "body", "How we shipped it.", "linkedTaskId", taskId));
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/v1/knowledge/pages/" + pageId).header("Authorization", bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.linkedTaskId").value(taskId))
-                .andExpect(jsonPath("$.linkedTaskRef").value("PLT-1"));
-    }
-
-    @Test
-    void authored_pages_show_up_in_my_pages_and_search() throws Exception {
+    void publishers_write_everyone_reads_published_pages() throws Exception {
         Session owner = onboardOwner("Acme", "owner3@acme.com", PW);
         Session dev = addMember(owner, "dev@acme.com");
         String spaceId = createSpace(owner, "Handbook", "HB");
 
-        // the developer authors a page
-        createPage(dev, spaceId, Map.of("title", "Vacation policy", "body", "Everyone gets 25 unicorn days."));
+        String pageId = createPage(owner, spaceId, Map.of("title", "Vacation policy", "body", "Everyone gets 25 unicorn days."));
+        assertThat(getJson("/api/v1/knowledge/pages/mine", owner).size()).isEqualTo(1);
 
-        // "my pages" for the dev returns it, authored by Dev Eloper
-        JsonNode mine = getJson("/api/v1/knowledge/pages/mine", dev);
-        assertThat(mine.size()).isEqualTo(1);
-        assertThat(mine.get(0).get("authorName").asText()).isEqualTo("Dev Eloper");
+        // A draft: the member cannot see it in the folder, open it, or find it.
+        assertThat(getJson("/api/v1/knowledge/spaces/" + spaceId + "/pages", dev).size()).isZero();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/knowledge/pages/" + pageId).header("Authorization", bearer(dev)))
+                .andExpect(status().isNotFound());
+        assertThat(getJson("/api/v1/knowledge/search?q=unicorn", dev).size()).isZero();
 
-        // full-text search across the tenant finds it with a snippet
-        JsonNode hits = getJson("/api/v1/knowledge/search?q=unicorn", owner);
+        // Published: now everyone reads it, and search finds it with a snippet.
+        mockMvc.perform(patch("/api/v1/knowledge/pages/" + pageId).header("Authorization", bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("status", "PUBLISHED"))))
+                .andExpect(status().isOk());
+        assertThat(getJson("/api/v1/knowledge/spaces/" + spaceId + "/pages", dev).size()).isEqualTo(1);
+        JsonNode hits = getJson("/api/v1/knowledge/search?q=unicorn", dev);
         assertThat(hits.size()).isEqualTo(1);
-        assertThat(hits.get(0).get("title").asText()).isEqualTo("Vacation policy");
         assertThat(hits.get(0).get("snippet").asText()).contains("unicorn");
+    }
 
-        // the owner has authored nothing → their "my pages" is empty
-        assertThat(getJson("/api/v1/knowledge/pages/mine", owner).size()).isZero();
+    @Test
+    void a_member_cannot_create_edit_or_delete_company_documents() throws Exception {
+        Session owner = onboardOwner("Acme", "owner6@acme.com", PW);
+        Session dev = addMember(owner, "dev6@acme.com");
+        String spaceId = createSpace(owner, "Handbook", "HB");
+        String pageId = createPage(owner, spaceId, Map.of("title", "Leave policy", "body", "21 days."));
+
+        mockMvc.perform(post("/api/v1/knowledge/spaces").header("Authorization", bearer(dev))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("name", "Mine", "key", "MINE"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/knowledge/spaces/" + spaceId + "/pages").header("Authorization", bearer(dev))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("title", "My own policy"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(patch("/api/v1/knowledge/pages/" + pageId).header("Authorization", bearer(dev))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("body", "100 days."))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/v1/knowledge/pages/" + pageId).header("Authorization", bearer(dev)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
