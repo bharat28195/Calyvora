@@ -186,7 +186,10 @@ const NAV: NavItem[] = [
       { href: "/payroll/statutory", label: "Statutory (PF)" },
     ],
   },
-  { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS, feature: "EXPENSES" },
+  // ADMIN only, matching ExpenseController: the company-wide list and reimbursement are OWNER/ADMIN on
+  // the server. Listed for HR, it opened to a 403 for every HR user. Approving their own team's claims
+  // is separate and stays open to whoever leads them (My team > Expenses).
+  { href: "/expenses", label: "Expenses", icon: Receipt, roles: ["ADMIN"], feature: "EXPENSES" },
   {
     href: "/documents", label: "Documents", icon: FileText, roles: HR_PLUS,
     children: [
@@ -200,6 +203,52 @@ const NAV: NavItem[] = [
   { href: "/subscription", label: "Subscription", icon: CreditCard, roles: ["ADMIN"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["ADMIN"] },
 ];
+
+/**
+ * Pages that exist but have no menu entry on this branch, with the rule their API applies — without
+ * these the guard has nothing to go on and a typed URL renders the page under a 403 again.
+ */
+const UNLISTED: { href: string; roles?: Role[]; feature?: string }[] = [
+  { href: "/billing", roles: ["ADMIN"] },                       // BillingController: OWNER/ADMIN
+  { href: "/clients", roles: ["ADMIN"], feature: "CLIENTS" },   // ClientController: OWNER/ADMIN
+  { href: "/work", roles: COMPANY, feature: "WORK" },
+  { href: "/knowledge", roles: COMPANY, feature: "KNOWLEDGE" },
+];
+
+/** Where each kind of account lands, and is sent back to from a page that is not theirs. */
+function homeFor(role: Role): string {
+  return role === "OWNER" ? "/platform" : role === "AGENCY_OWNER" ? "/agency" : "/dashboard";
+}
+
+/**
+ * Who may open `pathname`, read off NAV so the menu and the guard cannot disagree.
+ *
+ * <p>Typing a URL used to skip the menu entirely: a company admin who opened /platform got the
+ * vendor's console — heading, "New company" button, zeroed totals — under a 403 banner. Nothing
+ * leaked (the API refuses every call), but it looked broken and invited the question "what is this?".
+ *
+ * <p>The most specific matching entry wins, and entries sharing that href pool their roles: the
+ * leave-approvals queue is listed once for leads and once under People for HR, and both may open it.
+ * A route NAV does not mention is allowed — the server is still the one that enforces.
+ *
+ * @return the roles and module for the route, or null when the route is open to anyone signed in
+ */
+function routeRule(pathname: string): { roles: Role[] | null; feature?: string } | null {
+  const entries: { href: string; roles?: Role[]; feature?: string }[] = [...UNLISTED];
+  for (const n of NAV) {
+    entries.push({ href: n.href, roles: n.roles, feature: n.feature });
+    for (const c of n.children ?? []) entries.push({ href: c.href, roles: n.roles, feature: n.feature });
+    // hrChildren are only ever merged in for whole-company roles (see the nav filter below).
+    const wholeCompany = (n.roles ?? COMPANY).filter((r) => r === "ADMIN" || r === "HR");
+    for (const c of n.hrChildren ?? []) entries.push({ href: c.href, roles: wholeCompany, feature: n.feature });
+  }
+  const matches = entries.filter((e) => pathname === e.href || pathname.startsWith(e.href + "/"));
+  if (matches.length === 0) return null;
+  const longest = Math.max(...matches.map((e) => e.href.length));
+  const best = matches.filter((e) => e.href.length === longest);
+  const roles = best.some((e) => !e.roles) ? null : Array.from(new Set(best.flatMap((e) => e.roles ?? [])));
+  return { roles, feature: best.find((e) => e.feature)?.feature };
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const session = useRequireAuth();
@@ -234,15 +283,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       .catch(() => setLeadsTeam(false));
   }, [authenticated]);
 
-  // The platform OWNER (vendor) has no company app — send them to the Platform console.
+  // The platform OWNER (vendor) has no company app — send them to the Platform console. Beyond that,
+  // a page whose NAV entry is not for this role — or belongs to a module this company has not bought
+  // — sends its visitor home rather than rendering a console that can only answer 403.
   const role = session.me?.user.role;
+  const rule = routeRule(pathname);
+  const blocked = !!role && (
+    (role === "OWNER" && !pathname.startsWith("/platform")) ||
+    (rule?.roles != null && !rule.roles.includes(role)) ||
+    // Only once features are known, and only an explicit "off": never hide a paid module on a slow load.
+    (!!rule?.feature && features !== null && features[rule.feature] === false));
   useEffect(() => {
-    if (role === "OWNER" && !pathname.startsWith("/platform")) {
-      router.replace("/platform");
-    }
-  }, [role, pathname, router]);
+    if (blocked && role) router.replace(homeFor(role));
+  }, [blocked, role, router]);
 
-  if (session.status !== "authenticated" || !session.me) {
+  if (session.status !== "authenticated" || !session.me || blocked) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-violet" />

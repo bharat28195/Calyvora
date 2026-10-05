@@ -37,7 +37,9 @@ export function TeamOverviewSection({ wholeCompany = true }: { wholeCompany?: bo
           loading={loading} href={peopleHref} />
         <Tile icon={<UserCheck className="h-5 w-5 text-emerald-400" />} label="Present today" value={data?.presentToday}
           loading={loading} href={attendanceHref}
-          hint={data && data.unmarkedToday > 0 ? `${data.unmarkedToday} not marked yet` : undefined} />
+          // presentToday counts anyone not on leave, marked or not (TeamOverviewResponse). "7 present ·
+          // 6 not marked yet" read as a contradiction; say that the unmarked are inside the 7.
+          hint={data && data.unmarkedToday > 0 ? `includes ${data.unmarkedToday} not checked in yet` : undefined} />
         <Tile icon={<CalendarOff className="h-5 w-5 text-amber-400" />} label="On leave today" value={data?.onLeaveToday}
           loading={loading} href={attendanceHref} hint="See who" />
       </div>
