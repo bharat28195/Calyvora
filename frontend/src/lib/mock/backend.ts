@@ -583,8 +583,9 @@ export const mockBackend = {
     if (comp.currentAnnual == null) throw new ApiError({ timestamp: "", status: 404, code: "NOT_FOUND", message: "No salary on record" });
     const gross = round2(comp.currentAnnual / 12);
     const basic = round2(gross * 0.5), hra = round2(gross * 0.25), special = round2(gross - basic - hra);
-    const pf = round2(basic * 0.12), tax = round2(gross * 0.1);
-    const deductions = [{ label: "Provident fund", amount: pf }, { label: "Income tax", amount: tax }];
+    // No PF or income tax from the template — mirrors PayslipTemplateService/V59. Statutory PF and TDS
+    // are off by default and are not modelled here, so only loss of pay is withheld.
+    const deductions: { label: string; amount: number }[] = [];
 
     // Attendance linkage (LOP) — mirror CompensationService.
     const mon = buildAttendanceMonth(db, employeeId, month);
@@ -595,7 +596,7 @@ export const mockBackend = {
       if (d.status === "ABSENT") lopDays += 1;
       else if (d.status === "HALF_DAY") lopDays += 0.5;
     }
-    let totalDed = round2(pf + tax), net = round2(gross - pf - tax);
+    let totalDed = 0, net = gross;
     if (lopDays > 0 && workingDays > 0) {
       const lop = round2((gross / workingDays) * lopDays);
       deductions.push({ label: `Loss of pay (${lopDays === Math.floor(lopDays) ? lopDays : lopDays} day${lopDays === 1 ? "" : "s"})`, amount: lop });
@@ -3485,8 +3486,6 @@ function mockPayslipTemplate(companyId: string): PayslipComponent[] {
     { name: "Basic", kind: "EARNING", calc: "PERCENT_OF_GROSS", value: 50, basis: true, sortOrder: 0 },
     { name: "House rent allowance", kind: "EARNING", calc: "PERCENT_OF_GROSS", value: 25, basis: false, sortOrder: 1 },
     { name: "Special allowance", kind: "EARNING", calc: "REMAINDER", value: null, basis: false, sortOrder: 2 },
-    { name: "Provident fund", kind: "DEDUCTION", calc: "PERCENT_OF_BASIC", value: 12, basis: false, sortOrder: 3 },
-    { name: "Income tax", kind: "DEDUCTION", calc: "PERCENT_OF_GROSS", value: 10, basis: false, sortOrder: 4 },
   ]);
 }
 function validatePayslipTemplate(components: PayslipComponent[]): void {
