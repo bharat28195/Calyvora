@@ -363,7 +363,8 @@ public class ExpenseService {
      * decision with real consequences for small customers, not a defect to fix in passing.
      */
     private void requireCanDecide(UUID companyId, ExpenseClaim claim, AuthPrincipal principal) {
-        if ("OWNER".equals(principal.role()) || "ADMIN".equals(principal.role())) {
+        // HR manages expenses company-wide (founder decision, 2026-10-05), like admins.
+        if ("OWNER".equals(principal.role()) || "ADMIN".equals(principal.role()) || "HR".equals(principal.role())) {
             return;
         }
         UUID mine = employeeRepository.findByUserId(principal.userId())

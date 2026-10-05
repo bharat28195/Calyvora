@@ -186,10 +186,9 @@ const NAV: NavItem[] = [
       { href: "/payroll/statutory", label: "Statutory (PF)" },
     ],
   },
-  // ADMIN only, matching ExpenseController: the company-wide list and reimbursement are OWNER/ADMIN on
-  // the server. Listed for HR, it opened to a 403 for every HR user. Approving their own team's claims
-  // is separate and stays open to whoever leads them (My team > Expenses).
-  { href: "/expenses", label: "Expenses", icon: Receipt, roles: ["ADMIN"], feature: "EXPENSES" },
+  // Admins and HR, matching ExpenseController (HR manages expenses since 2026-10-05). Approving their
+  // own team's claims stays open to whoever leads them (My team > Expenses).
+  { href: "/expenses", label: "Expenses", icon: Receipt, roles: HR_PLUS, feature: "EXPENSES" },
   {
     href: "/documents", label: "Documents", icon: FileText, roles: HR_PLUS,
     children: [
@@ -210,8 +209,6 @@ const NAV: NavItem[] = [
  */
 const UNLISTED: { href: string; roles?: Role[]; feature?: string }[] = [
   { href: "/billing", roles: ["ADMIN"] },                       // BillingController: OWNER/ADMIN
-  { href: "/clients", roles: ["ADMIN"], feature: "CLIENTS" },   // ClientController: OWNER/ADMIN
-  { href: "/work", roles: COMPANY, feature: "WORK" },
   { href: "/knowledge", roles: COMPANY, feature: "KNOWLEDGE" },
 ];
 
