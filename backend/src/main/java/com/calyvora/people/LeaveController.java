@@ -69,9 +69,15 @@ public class LeaveController {
      * check only decides who may reach the endpoint at all; <em>which</em> requests a manager may see
      * and decide is enforced in {@link LeaveService}, because Spring's role expressions cannot express
      * "and only for their own reports".
+     *
+     * <p>MEMBER too (PD-32): reach comes from the reporting tree, not the role. A member with an intern
+     * under them leads a team — the nav already offered them "Leave approvals", and this check answered
+     * 403, so a lead could see the queue's page but never act on it. A member who leads nobody gets an
+     * empty inbox from OrgScope and is refused every decision by LeaveService, exactly like a MANAGER
+     * with no reports.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
     public com.calyvora.common.dto.CursorPage<LeaveRequestResponse> all(
             @CurrentUser AuthPrincipal principal,
             @RequestParam(required = false) String status,
@@ -81,13 +87,13 @@ public class LeaveController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
     public LeaveRequestResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.approve(id, principal);
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER','ADMIN','HR','MANAGER','MEMBER')")
     public LeaveRequestResponse reject(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
         return leaveService.reject(id, principal);
     }
