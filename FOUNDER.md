@@ -1679,6 +1679,30 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   was offered to HR while the API is OWNER/ADMIN only; the menu now matches the API. Whether HR
   should manage company expenses is open for the founder.
 
+### PD-52 · 2026-10-05 · Orbit is an HR product: the work tracker and Clients are archived
+- **Decision (founder):** the work tracker (projects, tasks, sprints, tickets) and the Clients /
+  staffing module leave the product. Their code is preserved unchanged on branch
+  `archive/work-tracker-and-clients`. HR manages expenses (queue, decisions, reimbursement).
+- **How:** V61 removes WORK and CLIENTS from plans and company overrides before the enum loses them.
+  The tables and their rows stay — deleting customer data is not a code clean-up decision.
+
+### PD-53 · 2026-10-05 · Company documents: everyone reads, publishers write
+- **Decision (founder):** the knowledge base becomes the company's documents area — pages written in
+  Orbit plus uploaded files (PDF, Word, Excel…), visible to everyone; a published leave policy is
+  readable by all. Previously any employee could edit any page, which is not a policy.
+- **Rule:** reading is everyone's; writing, publishing, uploading and deleting are a publisher's
+  (OWNER/ADMIN/HR today, one rule in DocumentAccess). Drafts are invisible to non-publishers, search
+  and the assistant. Files live in Postgres (100 MB/company cap) until Cloudflare R2 is configured.
+
+### PD-54 · 2026-10-05 · Custom roles, permissions plus the org chart (reverses PD-32's shelving)
+- **Decision (founder):** admins define their own roles and choose what each can do (who sees
+  salaries, runs payroll, approves leave…). PD-32 had shelved a permission matrix in favour of the
+  tree alone; the founder has now chosen permissions *combined with* the tree: a permission says
+  what kind of data or action, its scope (whole company or own team) says whose.
+- **Shape:** built-in Admin / HR / Manager / Employee roles per company reproduce today's behaviour
+  exactly, so nothing changes until an admin edits one. Admin is locked so a company cannot lock
+  itself out. Permissions are read per request, not baked into the token, so changes apply at once.
+
 ## 4. Architecture Decision Log
 
 
