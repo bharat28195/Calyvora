@@ -977,8 +977,11 @@ public class DemoSeedService {
         return new CreateDepartmentRequest(name, null, leadUserId.toString());
     }
 
+    /** A handbook page, published: a draft is invisible to everyone but HR, which is not what a demo shows. */
     private PageResponse page(UUID spaceId, AuthPrincipal owner, String title, String body) {
-        return pageService.create(spaceId, new CreatePageRequest(title, body, null, null), owner);
+        PageResponse created = pageService.create(spaceId, new CreatePageRequest(title, body, null, null), owner);
+        return pageService.update(UUID.fromString(created.id()),
+                new com.calyvora.knowledge.dto.UpdatePageRequest(null, null, "PUBLISHED", null, null));
     }
 
     private String uniqueSlug(String name) {

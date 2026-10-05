@@ -9,6 +9,7 @@ import com.calyvora.knowledge.dto.UpdatePageRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,7 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/** Knowledge OS — pages (slices K2–K5), including "my pages" and tenant-wide search. */
+/**
+ * Company documents — pages. Everyone reads published pages; only publishers ({@link DocumentAccess})
+ * write, publish or delete, and only publishers see drafts.
+ */
 @RestController
 @RequestMapping("/api/v1/knowledge")
 public class PageController {
@@ -39,6 +43,7 @@ public class PageController {
     }
 
     @PostMapping("/spaces/{spaceId}/pages")
+    @PreAuthorize("@documentAccess.canPublish()")
     public ResponseEntity<PageResponse> create(@PathVariable UUID spaceId,
                                                @Valid @RequestBody CreatePageRequest request,
                                                @CurrentUser AuthPrincipal principal) {
@@ -61,11 +66,13 @@ public class PageController {
     }
 
     @PatchMapping("/pages/{id}")
+    @PreAuthorize("@documentAccess.canPublish()")
     public PageResponse update(@PathVariable UUID id, @Valid @RequestBody UpdatePageRequest request) {
         return pageService.update(id, request);
     }
 
     @DeleteMapping("/pages/{id}")
+    @PreAuthorize("@documentAccess.canPublish()")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         pageService.delete(id);
         return ResponseEntity.noContent().build();

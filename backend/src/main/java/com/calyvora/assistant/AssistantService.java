@@ -176,6 +176,8 @@ public class AssistantService {
         Map<UUID, Page> byId = new LinkedHashMap<>();
         for (String word : keywords(question)) {
             for (Page p : pageRepository.search(companyId, word)) {
+                // Drafts are unpublished company documents; the assistant quotes only what is live.
+                if (p.getStatus() != com.calyvora.knowledge.PageStatus.PUBLISHED) continue;
                 byId.putIfAbsent(p.getId(), p);
                 score.merge(p.getId(), 1, Integer::sum);
             }

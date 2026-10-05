@@ -27,7 +27,6 @@ const SCREENS = [
   "/finance/expenses",
   "/finance/tax",
   "/performance/me",
-  "/work",
   "/knowledge",
   "/helpdesk",
   "/feed",
@@ -68,7 +67,7 @@ test.describe("empty states", () => {
     // A fresh tenant has no claims, no documents, no tickets. Each of these lists has to cope with
     // nothing at all — the state every customer is in for their first week and no seeded demo ever
     // reproduces.
-    for (const path of ["/finance/expenses", "/documents", "/helpdesk", "/work"]) {
+    for (const path of ["/finance/expenses", "/documents", "/helpdesk", "/knowledge"]) {
       await page.goto(path);
       await expect(page.locator("h1").first()).toBeVisible({ timeout: 15_000 });
     }

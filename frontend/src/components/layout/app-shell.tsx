@@ -7,7 +7,7 @@ import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
   Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
-  CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network, Megaphone,
+  CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network, Megaphone, FolderOpen,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
 import { IdleTimeout } from "@/components/layout/idle-timeout";
@@ -78,6 +78,8 @@ const NAV: NavItem[] = [
   // place to post something everyone sees. Open to every company user; who can post company-wide
   // vs team-only is enforced on the server. Not feature-gated, so a new company has it from day one.
   { href: "/feed", label: "Announcements", icon: Megaphone, roles: COMPANY },
+  // Everyone reads the company's policies and handbook; HR and admins publish them (DocumentAccess).
+  { href: "/knowledge", label: "Company documents", icon: FolderOpen, roles: COMPANY, feature: "KNOWLEDGE" },
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: HR_PLUS, feature: "ANALYTICS" },
   // "Me" is attendance and time off. Everything that is really about money went to Finance and
   // everything about other people went to My team — this section is what I did, not what I am owed
@@ -209,7 +211,6 @@ const NAV: NavItem[] = [
  */
 const UNLISTED: { href: string; roles?: Role[]; feature?: string }[] = [
   { href: "/billing", roles: ["ADMIN"] },                       // BillingController: OWNER/ADMIN
-  { href: "/knowledge", roles: COMPANY, feature: "KNOWLEDGE" },
 ];
 
 /** Where each kind of account lands, and is sent back to from a page that is not theirs. */

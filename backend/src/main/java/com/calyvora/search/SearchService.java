@@ -71,7 +71,10 @@ public class SearchService {
         for (Space s : spaceRepository.search(companyId, q, LIMIT)) {
             knowledge.add(new SearchHit("space", s.getName(), "Space · " + s.getKey(), "/knowledge/" + s.getId()));
         }
-        pageRepository.search(companyId, q).stream().limit(PER_TYPE).forEach(page -> {
+        // Published only: a draft company document is not there yet for search.
+        pageRepository.search(companyId, q).stream()
+                .filter(p -> p.getStatus() == com.calyvora.knowledge.PageStatus.PUBLISHED)
+                .limit(PER_TYPE).forEach(page -> {
             Space s = spaces.get(page.getSpaceId());
             knowledge.add(new SearchHit("page", page.getTitle(),
                     s == null ? "Page" : s.getName(), "/knowledge/" + page.getSpaceId()));

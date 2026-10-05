@@ -73,6 +73,7 @@ import {
   type LeaveBalance,
   type PfSettings,
   type LeavePolicy,
+  type CompanyFile,
   type CursorPage,
   type TaxComputation,
   type TaxDeclaration,
@@ -1001,6 +1002,42 @@ export const api = {
   },
   archiveSpace(id: string): Promise<Space> {
     return LIVE ? http<Space>(`/knowledge/spaces/${id}/archive`, { method: "POST" }) : mockBackend.archiveSpace(accessToken, id);
+  },
+
+  // --- company documents (files) ---
+  listCompanyFiles(spaceId: string): Promise<CompanyFile[]> {
+    return LIVE ? http<CompanyFile[]>(`/knowledge/spaces/${spaceId}/files`) : Promise.resolve([]);
+  },
+  /** Multipart, so its own fetch — like uploadLetterpad, the browser sets the boundary. */
+  async uploadCompanyFile(spaceId: string, file: File, title?: string): Promise<CompanyFile> {
+    if (!LIVE) return liveOnly("File uploads");
+    const form = new FormData();
+    form.append("file", file);
+    if (title) form.append("title", title);
+    const res = await fetch(`${BASE}/knowledge/spaces/${spaceId}/files`, {
+      method: "POST",
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    return body as CompanyFile;
+  },
+  deleteCompanyFile(id: string): Promise<void> {
+    return LIVE ? http<void>(`/knowledge/files/${id}`, { method: "DELETE" }) : liveOnly("File uploads");
+  },
+  /** The file's bytes. A plain link would not carry the bearer token, so the caller makes an object URL. */
+  async downloadCompanyFile(id: string, inline = false): Promise<Blob> {
+    const res = await fetch(`${BASE}/knowledge/files/${id}/download${inline ? "?inline=true" : ""}`, {
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    }
+    return res.blob();
   },
 
   // --- Knowledge OS (pages) ---

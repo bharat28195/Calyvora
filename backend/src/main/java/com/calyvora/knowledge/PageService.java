@@ -36,15 +36,17 @@ public class PageService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;
     private final UserRepository userRepository;
+    private final DocumentAccess documentAccess;
 
     public PageService(PageRepository pageRepository, SpaceRepository spaceRepository,
                        EmployeeRepository employeeRepository, EmployeeService employeeService,
-                       UserRepository userRepository) {
+                       UserRepository userRepository, DocumentAccess documentAccess) {
         this.pageRepository = pageRepository;
         this.spaceRepository = spaceRepository;
         this.employeeRepository = employeeRepository;
         this.employeeService = employeeService;
         this.userRepository = userRepository;
+        this.documentAccess = documentAccess;
     }
 
     @Transactional(readOnly = true)
@@ -52,6 +54,7 @@ public class PageService {
         Space space = requireSpace(spaceId);
         Cache cache = new Cache();
         return pageRepository.findBySpaceIdOrderBySortOrderAscCreatedAtAsc(spaceId).stream()
+                .filter(this::visible)
                 .map(p -> summary(p, space.getName(), cache, null))
                 .toList();
     }
@@ -59,6 +62,10 @@ public class PageService {
     @Transactional(readOnly = true)
     public PageResponse get(UUID id) {
         Page page = require(id);
+        if (!visible(page)) {
+            // A draft is not there yet for anyone but a publisher; say "not found", not "forbidden".
+            throw new NotFoundException("Page not found");
+        }
         Cache cache = new Cache();
         return PageResponse.of(page, cache.authorName(page.getAuthorId()), cache.taskRef(page.getLinkedTaskId()));
     }
@@ -140,11 +147,17 @@ public class PageService {
         }
         Cache cache = new Cache();
         return pageRepository.search(companyId, q).stream()
+                .filter(this::visible)
                 .map(p -> summary(p, cache.spaceName(p.getSpaceId()), cache, snippet(p.getBody(), q)))
                 .toList();
     }
 
     // ---- helpers ----
+
+    /** Published pages are everyone's; drafts are only for the people who can publish them. */
+    private boolean visible(Page page) {
+        return page.getStatus() == PageStatus.PUBLISHED || documentAccess.canPublish();
+    }
 
     private Space requireSpace(UUID spaceId) {
         UUID companyId = TenantContext.getCompanyId();

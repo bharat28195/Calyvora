@@ -1152,6 +1152,18 @@ export interface Space {
 }
 
 /** Full page detail (includes the Markdown body + resolved cross-app labels). */
+/** A file in a company documents folder (policy PDF, form, spreadsheet). */
+export interface CompanyFile {
+  id: string;
+  spaceId: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByName: string | null;
+  createdAt: string;
+}
+
 export interface KnowledgePage {
   id: string;
   spaceId: string;

@@ -20,7 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/** Knowledge OS — spaces (slice K1). Base {@code /api/v1/knowledge/spaces}. */
+/**
+ * Company documents — spaces (folders such as "Employee Handbook"). Everyone in the company reads;
+ * only publishers ({@link DocumentAccess}) create, rename or archive.
+ */
 @RestController
 @RequestMapping("/api/v1/knowledge/spaces")
 public class SpaceController {
@@ -42,18 +45,20 @@ public class SpaceController {
     }
 
     @PostMapping
+    @PreAuthorize("@documentAccess.canPublish()")
     public ResponseEntity<SpaceResponse> create(@Valid @RequestBody CreateSpaceRequest request,
                                                 @CurrentUser AuthPrincipal principal) {
         return ResponseEntity.status(HttpStatus.CREATED).body(spaceService.create(request, principal));
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("@documentAccess.canPublish()")
     public SpaceResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateSpaceRequest request) {
         return spaceService.update(id, request);
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
+    @PreAuthorize("@documentAccess.canPublish()")
     public SpaceResponse archive(@PathVariable UUID id) {
         return spaceService.archive(id);
     }
