@@ -7,7 +7,7 @@ import java.util.List;
  * we actually hold — no synthetic history. Series are lists of {@link Slice} (label + value) so the
  * frontend can render each as a donut, bar, or trend without bespoke shapes per metric.
  */
-public record AnalyticsOverviewResponse(People people, Work work, Finance finance) {
+public record AnalyticsOverviewResponse(People people, Finance finance) {
 
     /** A single labelled data point in a chart series. */
     public record Slice(String label, double value) {}
@@ -26,17 +26,6 @@ public record AnalyticsOverviewResponse(People people, Work work, Finance financ
             List<Slice> ratingDistribution, // how many people at each 1–5 rating
             List<Slice> leaveByType         // approved leave days this year, by type
     ) {}
-
-    public record Work(
-            long projects,
-            List<Slice> tasksByStatus,
-            List<Slice> tasksByPriority,
-            List<Slice> ticketsByStatus,
-            ActiveSprint activeSprint,
-            List<Slice> velocity            // completed story points per finished sprint (most recent last)
-    ) {
-        public record ActiveSprint(String name, int committed, int done, int remaining, int unestimated) {}
-    }
 
     public record Finance(
             String currency,

@@ -14,10 +14,6 @@ import com.calyvora.knowledge.dto.UpdatePageRequest;
 import com.calyvora.people.Employee;
 import com.calyvora.people.EmployeeRepository;
 import com.calyvora.people.EmployeeService;
-import com.calyvora.work.Project;
-import com.calyvora.work.ProjectRepository;
-import com.calyvora.work.Task;
-import com.calyvora.work.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +24,7 @@ import java.util.UUID;
 
 /**
  * Pages (Knowledge OS slices K2–K5). A page's author is a People OS {@link Employee} and a page may
- * link a Work OS {@link Task} — the cross-app knowledge graph. All access is tenant-scoped.
+ * link a work task (no longer: the work tracker is archived). All access is tenant-scoped.
  */
 @Service
 public class PageService {
@@ -40,20 +36,15 @@ public class PageService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeService employeeService;
     private final UserRepository userRepository;
-    private final TaskRepository taskRepository;
-    private final ProjectRepository projectRepository;
 
     public PageService(PageRepository pageRepository, SpaceRepository spaceRepository,
                        EmployeeRepository employeeRepository, EmployeeService employeeService,
-                       UserRepository userRepository, TaskRepository taskRepository,
-                       ProjectRepository projectRepository) {
+                       UserRepository userRepository) {
         this.pageRepository = pageRepository;
         this.spaceRepository = spaceRepository;
         this.employeeRepository = employeeRepository;
         this.employeeService = employeeService;
         this.userRepository = userRepository;
-        this.taskRepository = taskRepository;
-        this.projectRepository = projectRepository;
     }
 
     @Transactional(readOnly = true)
@@ -189,15 +180,13 @@ public class PageService {
         return parent;
     }
 
-    /** Validate an optional linked Work task (blank clears it) — the cross-app link into Work OS. */
+    /**
+     * Pages used to link a work-tracker task. The tracker is archived (branch
+     * archive/work-tracker-and-clients), so a link is always cleared; the field stays in the request
+     * shape so an older client sending it is not refused.
+     */
     private UUID resolveTask(UUID companyId, String linkedTaskId) {
-        if (linkedTaskId == null || linkedTaskId.isBlank()) {
-            return null;
-        }
-        UUID taskId = parseId(linkedTaskId, "Invalid task id");
-        taskRepository.findByIdAndCompanyId(taskId, companyId)
-                .orElseThrow(() -> new NotFoundException("Linked task not found"));
-        return taskId;
+        return null;
     }
 
     private static UUID parseId(String raw, String message) {
@@ -229,7 +218,6 @@ public class PageService {
     /** Per-request memoization for the cross-app / cross-entity label lookups. */
     private final class Cache {
         private final Map<UUID, String> authors = new HashMap<>();
-        private final Map<UUID, String> tasks = new HashMap<>();
         private final Map<UUID, String> spaces = new HashMap<>();
 
         String authorName(UUID authorId) {
@@ -243,13 +231,7 @@ public class PageService {
         }
 
         String taskRef(UUID taskId) {
-            if (taskId == null) {
-                return null;
-            }
-            return tasks.computeIfAbsent(taskId, id -> taskRepository.findById(id)
-                    .map(t -> projectRepository.findById(t.getProjectId())
-                            .map(Project::getKey).orElse("?") + "-" + t.getNumber())
-                    .orElse(null));
+            return null;   // no work tracker to point at (see resolveTask)
         }
 
         String spaceName(UUID spaceId) {

@@ -36,18 +36,18 @@ class AssistantIntegrationTest extends IntegrationTestBase {
     @Test
     void answers_count_questions_from_real_metrics() throws Exception {
         Session owner = demoOwner();
-        JsonNode res = ask(owner, "How many open tickets do we have?");
+        JsonNode res = ask(owner, "How many departments do we have?");
         assertThat(res.get("mode").asText()).isEqualTo("local");
-        // The seed creates 3 open tickets.
-        assertThat(res.get("answer").asText()).contains("3");
+        // The seed creates 4 departments.
+        assertThat(res.get("answer").asText()).contains("4");
     }
 
     @Test
     void answers_knowledge_questions_with_grounded_sources() throws Exception {
         Session owner = demoOwner();
-        JsonNode res = ask(owner, "How does our authentication and key rotation work?");
-        // Should surface the auth handbook page as a source and quote it.
-        assertThat(res.get("answer").asText()).containsIgnoringCase("rotation");
+        JsonNode res = ask(owner, "How much vacation carries forward to next year?");
+        // Should surface the handbook's leave policy page as a source and quote it.
+        assertThat(res.get("answer").asText()).contains("Leave policy");
         assertThat(res.get("sources")).isNotEmpty();
         assertThat(res.get("sources").get(0).get("kind").asText()).isEqualTo("page");
     }

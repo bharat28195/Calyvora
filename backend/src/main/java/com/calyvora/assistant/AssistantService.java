@@ -13,11 +13,6 @@ import com.calyvora.knowledge.SpaceRepository;
 import com.calyvora.people.DepartmentRepository;
 import com.calyvora.people.EmployeeService;
 import com.calyvora.people.dto.EmployeeResponse;
-import com.calyvora.work.ProjectRepository;
-import com.calyvora.work.TaskRepository;
-import com.calyvora.work.TaskStatus;
-import com.calyvora.work.TicketRepository;
-import com.calyvora.work.TicketStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,9 +39,6 @@ public class AssistantService {
 
     private final EmployeeService employeeService;
     private final DepartmentRepository departmentRepository;
-    private final ProjectRepository projectRepository;
-    private final TaskRepository taskRepository;
-    private final TicketRepository ticketRepository;
     private final SpaceRepository spaceRepository;
     private final PageRepository pageRepository;
     private final CompanySnapshot snapshot;
@@ -54,16 +46,12 @@ public class AssistantService {
     private final LocalGroundedAssistant local;
 
     public AssistantService(EmployeeService employeeService, DepartmentRepository departmentRepository,
-                            ProjectRepository projectRepository, TaskRepository taskRepository,
-                            TicketRepository ticketRepository, SpaceRepository spaceRepository,
+                            SpaceRepository spaceRepository,
                             PageRepository pageRepository, CompanySnapshot snapshot,
                             ClaudeAssistant claude, LocalGroundedAssistant local) {
         this.snapshot = snapshot;
         this.employeeService = employeeService;
         this.departmentRepository = departmentRepository;
-        this.projectRepository = projectRepository;
-        this.taskRepository = taskRepository;
-        this.ticketRepository = ticketRepository;
         this.spaceRepository = spaceRepository;
         this.pageRepository = pageRepository;
         this.claude = claude;
@@ -98,11 +86,6 @@ public class AssistantService {
         Map<String, Long> metrics = new LinkedHashMap<>();
         metrics.put("members", (long) employeeDirectory(companyId).size());
         metrics.put("departments", departmentRepository.countByCompanyId(companyId));
-        metrics.put("projects", projectRepository.countByCompanyId(companyId));
-        metrics.put("openTasks", taskRepository.countByCompanyIdAndStatusNot(companyId, TaskStatus.DONE));
-        metrics.put("doneTasks", taskRepository.countByCompanyIdAndStatus(companyId, TaskStatus.DONE));
-        metrics.put("openTickets", ticketRepository.countByCompanyIdAndStatusIn(companyId,
-                List.of(TicketStatus.OPEN, TicketStatus.PENDING)));
         metrics.put("spaces", spaceRepository.countByCompanyId(companyId));
         metrics.put("pages", pageRepository.countByCompanyId(companyId));
         // The rest of the app — people ops, hiring, approvals, documents — added at whatever depth

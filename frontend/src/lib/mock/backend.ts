@@ -17,7 +17,6 @@ import {
   type Payslip,
   type EmployeeFinance,
   type PayrollRun,
-  type WorkItem,
   type AnalyticsOverview,
   type BillingOverview,
   type PayslipComponent,
@@ -42,16 +41,10 @@ import {
   type CreateCycleInput,
   type SelfAssessmentInput,
   type ManagerReviewInput,
-  type Client,
-  type ClientDetail,
-  type ClientRequestItem,
   type AppNotification,
   type NotificationType,
   type Post,
   type PostInput,
-  type SprintReport,
-  type Velocity,
-  type BurndownPoint,
   type MemberLoad,
   type PostKind,
   type PostVisibility,
@@ -79,11 +72,6 @@ import {
   type LeaveRequest,
   type LoginResult,
   type OnboardingTask,
-  type Project,
-  type Task,
-  type Sprint,
-  type Board,
-  type Ticket,
   type Space,
   type KnowledgePage,
   type PageSummary,
@@ -179,61 +167,6 @@ interface LeaveRow {
   decidedAt: string | null;
   createdAt: string;
 }
-interface ProjectRow {
-  id: string;
-  companyId: string;
-  name: string;
-  key: string;
-  description: string | null;
-  status: Project["status"];
-  leadUserId: string | null;
-  createdAt: string;
-}
-interface TaskRow {
-  id: string;
-  companyId: string;
-  projectId: string;
-  number: number;
-  title: string;
-  description: string | null;
-  status: Task["status"];
-  priority: Task["priority"];
-  assigneeId: string | null;
-  sprintId: string | null;
-  dueDate: string | null;
-  sortOrder: number;
-  createdAt: string;
-  /** Estimate; null when unsized (V23). */
-  storyPoints?: number | null;
-}
-interface SprintRow {
-  id: string;
-  companyId: string;
-  projectId: string;
-  name: string;
-  goal: string | null;
-  startDate: string | null;
-  endDate: string | null;
-  status: Sprint["status"];
-  createdAt: string;
-  /** What the team believes it can take on (V23). */
-  capacityPoints?: number | null;
-}
-interface TicketRow {
-  id: string;
-  companyId: string;
-  projectId: string;
-  number: number;
-  subject: string;
-  description: string | null;
-  requesterName: string | null;
-  requesterEmail: string | null;
-  status: Ticket["status"];
-  priority: Ticket["priority"];
-  assigneeId: string | null;
-  createdBy: string;
-  createdAt: string;
-}
 interface SpaceRow {
   id: string;
   companyId: string;
@@ -269,10 +202,6 @@ interface DB {
   departments: DeptRow[];
   onboarding: OnboardRow[];
   leave: LeaveRow[];
-  projects: ProjectRow[];
-  tasks: TaskRow[];
-  sprints: SprintRow[];
-  tickets: TicketRow[];
   spaces: SpaceRow[];
   pages: PageRow[];
   sessions: Record<string, string>; // accessToken -> userId
@@ -298,11 +227,11 @@ function err(status: number, code: string, message: string, fields?: Record<stri
 
 function load(): DB {
   if (typeof window === "undefined") {
-    return { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], projects: [], tasks: [], sprints: [], tickets: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
+    return { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
   }
   const raw = window.localStorage.getItem(KEY);
   if (!raw) {
-    const fresh: DB = { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], projects: [], tasks: [], sprints: [], tickets: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
+    const fresh: DB = { companies: [], users: [], tokens: [], invitations: [], settings: [], employees: [], departments: [], onboarding: [], leave: [], spaces: [], pages: [], sessions: {}, mailbox: [] };
     window.localStorage.setItem(KEY, JSON.stringify(fresh));
     return fresh;
   }
@@ -523,14 +452,6 @@ export const mockBackend = {
     const company = db.companies.find((c) => c.id === user.companyId)!;
     const cid = user.companyId;
     const mine = <T extends { companyId: string }>(rows: T[]) => rows.filter((r) => r.companyId === cid);
-    const activeSprintRow = mine(db.sprints).find((s) => s.status === "ACTIVE") ?? null;
-    const activeSprint = activeSprintRow
-      ? {
-          name: activeSprintRow.name,
-          total: db.tasks.filter((t) => t.sprintId === activeSprintRow.id).length,
-          done: db.tasks.filter((t) => t.sprintId === activeSprintRow.id && t.status === "DONE").length,
-        }
-      : null;
     return {
       companyName: company.name,
       yourRole: user.role,
@@ -539,13 +460,8 @@ export const mockBackend = {
         (i) => i.status === "PENDING" && companyOfInvite(db, i.id) === cid,
       ).length,
       departmentCount: mine(db.departments).length,
-      projectCount: mine(db.projects).length,
-      openTaskCount: mine(db.tasks).filter((t) => t.status !== "DONE").length,
-      doneTaskCount: mine(db.tasks).filter((t) => t.status === "DONE").length,
-      openTicketCount: mine(db.tickets).filter((t) => t.status === "OPEN" || t.status === "PENDING").length,
       spaceCount: mine(db.spaces).length,
       pageCount: mine(db.pages).length,
-      activeSprint,
     };
   },
 
@@ -684,166 +600,12 @@ export const mockBackend = {
     return { month: month || new Date().toISOString().slice(0, 7), currency, rows, totalGross, totalNet, totalLopDays, employees: rows.length, totalEmployerContribution: 0 };
   },
 
-  async clients(accessToken: string | null): Promise<Client[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    requireAdmin(user);
-    return (mockClients[user.companyId] ?? []).map((c) => withOpen(user.companyId, c));
-  },
-  async createClient(accessToken: string | null, input: Partial<Client> & { name: string }): Promise<Client> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    requireAdmin(user);
-    const c: Client = {
-      id: crypto.randomUUID(), name: input.name, contactName: input.contactName ?? null,
-      contactEmail: input.contactEmail ?? null, phone: input.phone ?? null, website: input.website ?? null,
-      status: input.status ?? "LEAD", notes: input.notes ?? null, createdAt: new Date().toISOString(), openRequests: 0,
-    };
-    mockClients[user.companyId] = [c, ...(mockClients[user.companyId] ?? [])];
-    return c;
-  },
-  async client(accessToken: string | null, id: string): Promise<ClientDetail> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    requireAdmin(user);
-    const c = (mockClients[user.companyId] ?? []).find((x) => x.id === id);
-    if (!c) throw err(404, "NOT_FOUND", "Client not found");
-    return { client: withOpen(user.companyId, c), requests: (mockClientReqs[id] ?? []).slice() };
-  },
-  async updateClient(accessToken: string | null, id: string, patch: Partial<Client>): Promise<Client> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    requireAdmin(user);
-    const c = (mockClients[user.companyId] ?? []).find((x) => x.id === id);
-    if (!c) throw err(404, "NOT_FOUND", "Client not found");
-    Object.assign(c, patch);
-    return withOpen(user.companyId, c);
-  },
-  async deleteClient(accessToken: string | null, id: string): Promise<void> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    requireAdmin(user);
-    mockClients[user.companyId] = (mockClients[user.companyId] ?? []).filter((x) => x.id !== id);
-    delete mockClientReqs[id];
-  },
-  async addClientRequest(accessToken: string | null, clientId: string, input: { title: string; description?: string }): Promise<ClientRequestItem> {
-    await delay();
-    const db = load();
-    requireAdmin(requireSession(db, accessToken));
-    const r: ClientRequestItem = { id: crypto.randomUUID(), title: input.title, description: input.description ?? null, status: "REQUESTED", createdAt: new Date().toISOString() };
-    mockClientReqs[clientId] = [r, ...(mockClientReqs[clientId] ?? [])];
-    return r;
-  },
-  async updateClientRequest(accessToken: string | null, clientId: string, requestId: string, patch: Partial<ClientRequestItem>): Promise<ClientRequestItem> {
-    await delay();
-    const db = load();
-    requireAdmin(requireSession(db, accessToken));
-    const r = (mockClientReqs[clientId] ?? []).find((x) => x.id === requestId);
-    if (!r) throw err(404, "NOT_FOUND", "Request not found");
-    Object.assign(r, patch);
-    return r;
-  },
-  async deleteClientRequest(accessToken: string | null, clientId: string, requestId: string): Promise<void> {
-    await delay();
-    const db = load();
-    requireAdmin(requireSession(db, accessToken));
-    mockClientReqs[clientId] = (mockClientReqs[clientId] ?? []).filter((x) => x.id !== requestId);
-  },
-
   async myEmployee(accessToken: string | null): Promise<Employee> {
     await delay();
     const db = load();
     const user = requireSession(db, accessToken);
     employeeForUser(db, user);   // auto-provisions, matching the real endpoint
     return toEmployee(db, user);
-  },
-
-  // --- sprint reporting (mirrors SprintReportService) ---
-  async sprintReport(accessToken: string | null, sprintId: string): Promise<SprintReport> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const sprint = db.sprints.find((s) => s.id === sprintId && s.companyId === user.companyId);
-    if (!sprint) throw err(404, "NOT_FOUND", "Sprint not found");
-    const tasks = db.tasks.filter((t) => t.sprintId === sprintId);
-
-    let committed = 0, completed = 0, unestimated = 0, done = 0;
-    for (const t of tasks) {
-      const points = t.storyPoints ?? 0;
-      if (t.storyPoints == null) unestimated++;
-      committed += points;
-      if (t.status === "DONE") { completed += points; done++; }
-    }
-
-    const start = sprint.startDate, end = sprint.endDate;
-    const burndown: BurndownPoint[] = [];
-    if (start && end) {
-      const startMs = new Date(`${start}T00:00:00`).getTime();
-      const endMs = new Date(`${end}T00:00:00`).getTime();
-      const span = Math.max(1, Math.round((endMs - startMs) / 86_400_000));
-      const today = todayIso();
-      for (let i = 0; i <= span; i++) {
-        const date = new Date(startMs + i * 86_400_000).toISOString().slice(0, 10);
-        const ideal = Math.round((committed - (committed * i) / span) * 10) / 10;
-        // The mock has no snapshot history, so the actual line is only drawn for today.
-        const remaining = date === today ? committed - completed : null;
-        burndown.push({ date, remainingPoints: remaining, ideal, projected: date > today });
-      }
-    }
-
-    const loads = new Map<string, MemberLoad>();
-    for (const t of tasks) {
-      if (!t.assigneeId) continue;
-      const emp = db.employees.find((e) => e.id === t.assigneeId);
-      const u = emp && db.users.find((x) => x.id === emp.userId);
-      const row = loads.get(t.assigneeId) ?? {
-        employeeId: t.assigneeId, name: u ? `${u.firstName} ${u.lastName}` : "Unassigned",
-        points: 0, tasks: 0, donePoints: 0,
-      };
-      row.points += t.storyPoints ?? 0;
-      row.tasks += 1;
-      if (t.status === "DONE") row.donePoints += t.storyPoints ?? 0;
-      loads.set(t.assigneeId, row);
-    }
-
-    const daysTotal = burndown.length;
-    return {
-      sprintId, name: sprint.name, goal: sprint.goal, status: sprint.status,
-      startDate: start, endDate: end, capacityPoints: sprint.capacityPoints ?? null,
-      committedPoints: committed, completedPoints: completed, remainingPoints: committed - completed,
-      totalTasks: tasks.length, doneTasks: done, unestimatedTasks: unestimated,
-      daysTotal,
-      daysElapsed: burndown.filter((p) => !p.projected).length,
-      burndown,
-      byAssignee: [...loads.values()].sort((a, b) => b.points - a.points),
-    };
-  },
-  async velocity(accessToken: string | null, projectId: string): Promise<Velocity> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const sprints = db.sprints
-      .filter((s) => s.projectId === projectId && s.companyId === user.companyId && s.status === "COMPLETED")
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-
-    const rows = sprints.map((s) => {
-      let committed = 0, completed = 0;
-      for (const t of db.tasks.filter((t) => t.sprintId === s.id)) {
-        const points = t.storyPoints ?? 0;
-        committed += points;
-        if (t.status === "DONE") completed += points;
-      }
-      return { sprintId: s.id, name: s.name, endDate: s.endDate, committedPoints: committed, completedPoints: completed };
-    });
-    const average = rows.length
-      ? Math.round((rows.reduce((sum, r) => sum + r.completedPoints, 0) / rows.length) * 10) / 10
-      : 0;
-    return { sprints: rows, averageVelocity: average, suggestedCommitment: Math.round(average) };
   },
 
   // --- company feed ---
@@ -1438,36 +1200,6 @@ export const mockBackend = {
     const goalsMissed = goals.filter((g) => g.status === "MISSED").length;
     const avgGoalProgress = goals.length === 0 ? 0 : Math.round((goals.reduce((s, g) => s + g.progress, 0) / goals.length) * 10) / 10;
 
-    // Work
-    const tasks = db.tasks.filter((t) => t.companyId === cid);
-    const tasksByStatus = ["TODO", "IN_PROGRESS", "DONE"].map((s) => ({ label: title(s), value: tasks.filter((t) => t.status === s).length }));
-    const tasksByPriority = ["LOW", "MEDIUM", "HIGH", "URGENT"].map((p) => ({ label: title(p), value: tasks.filter((t) => t.priority === p).length }));
-    const tickets = db.tickets.filter((t) => t.companyId === cid);
-    const ticketsByStatus = ["OPEN", "PENDING", "RESOLVED", "CLOSED"].map((s) => ({ label: title(s), value: tickets.filter((t) => t.status === s).length }));
-
-    const sprints = db.sprints.filter((s) => s.companyId === cid);
-    const activeSprintRow = sprints.find((s) => s.status === "ACTIVE");
-    let activeSprint: AnalyticsOverview["work"]["activeSprint"] = null;
-    if (activeSprintRow) {
-      const st = tasks.filter((t) => t.sprintId === activeSprintRow.id);
-      let committed = 0, done = 0, unestimated = 0;
-      st.forEach((t) => {
-        const pts = t.storyPoints ?? 0;
-        if (t.storyPoints == null) unestimated++;
-        committed += pts;
-        if (t.status === "DONE") done += pts;
-      });
-      activeSprint = { name: activeSprintRow.name, committed, done, remaining: committed - done, unestimated };
-    }
-    const velocity = sprints
-      .filter((s) => s.status === "COMPLETED")
-      .sort((a, b) => (a.startDate ?? "").localeCompare(b.startDate ?? ""))
-      .map((s) => ({
-        label: (s.name.split("—")[0] ?? s.name).trim(),
-        value: tasks.filter((t) => t.sprintId === s.id && t.status === "DONE" && t.storyPoints != null)
-          .reduce((sum, t) => sum + (t.storyPoints ?? 0), 0),
-      }));
-
     // Finance
     const claims = mockExpenses[cid] ?? [];
     let pending = 0, awaiting = 0, reimbursed = 0, currency = "INR";
@@ -1487,10 +1219,6 @@ export const mockBackend = {
         onLeaveToday, goalsOpen, goalsAchieved, goalsMissed, avgGoalProgress,
         byDepartment: [...byDept].map(([label, value]) => ({ label, value })),
         headcountGrowth, ratingDistribution, leaveByType,
-      },
-      work: {
-        projects: db.projects.filter((p) => p.companyId === cid).length,
-        tasksByStatus, tasksByPriority, ticketsByStatus, activeSprint, velocity,
       },
       finance: {
         currency, pending: Math.round(pending * 100) / 100,
@@ -2001,25 +1729,6 @@ export const mockBackend = {
   },
 
   // --- People OS (employees) ---
-  async employeeWork(accessToken: string | null, employeeId: string): Promise<WorkItem[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const today = new Date().toISOString().slice(0, 10);
-    const projects = db.projects.filter((p) => p.companyId === user.companyId);
-    return db.tasks
-      .filter((t) => t.companyId === user.companyId && t.assigneeId === employeeId && t.status !== "DONE")
-      .map((t) => {
-        const p = projects.find((pr) => pr.id === t.projectId);
-        return {
-          ref: p ? `${p.key}-${t.number}` : `#${t.number}`, title: t.title, status: t.status, priority: t.priority,
-          projectId: t.projectId, projectName: p?.name ?? null, dueDate: t.dueDate,
-          overdue: !!t.dueDate && t.dueDate < today,
-        };
-      })
-      .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
-  },
-
   async employeeGoals(accessToken: string | null, employeeId: string): Promise<Goal[]> {
     await delay();
     const db = load();
@@ -2545,108 +2254,6 @@ export const mockBackend = {
     return toLeave(db, row);
   },
 
-  // --- Work OS (projects) ---
-  async listProjects(accessToken: string | null): Promise<Project[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    return db.projects.filter((p) => p.companyId === user.companyId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((p) => toProject(db, p));
-  },
-  async getProject(accessToken: string | null, id: string): Promise<Project> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const p = db.projects.find((x) => x.id === id && x.companyId === user.companyId);
-    if (!p) throw err(404, "NOT_FOUND", "Project not found");
-    return toProject(db, p);
-  },
-  async createProject(accessToken: string | null, input: { name: string; key: string; description?: string }): Promise<Project> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const key = input.key.trim().toUpperCase();
-    if (db.projects.some((p) => p.companyId === user.companyId && p.key.toUpperCase() === key)) {
-      throw err(409, "CONFLICT", "A project with that key already exists");
-    }
-    const row: ProjectRow = { id: uuid(), companyId: user.companyId, name: input.name.trim(), key, description: input.description || null, status: "ACTIVE", leadUserId: null, createdAt: new Date().toISOString() };
-    db.projects.push(row);
-    save(db);
-    return toProject(db, row);
-  },
-  async archiveProject(accessToken: string | null, id: string): Promise<Project> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    requireAdmin(user);
-    const p = db.projects.find((x) => x.id === id && x.companyId === user.companyId);
-    if (!p) throw err(404, "NOT_FOUND", "Project not found");
-    p.status = "ARCHIVED";
-    save(db);
-    return toProject(db, p);
-  },
-
-  // --- Work OS (tasks) ---
-  async listTasks(accessToken: string | null, projectId: string): Promise<Task[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    return db.tasks.filter((t) => t.projectId === projectId).sort((a, b) => a.sortOrder - b.sortOrder || a.number - b.number).map((t) => toTask(db, t, project));
-  },
-  async createTask(accessToken: string | null, projectId: string, input: { title: string; description?: string; priority?: string; assigneeId?: string; dueDate?: string }): Promise<Task> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    const number = db.tasks.filter((t) => t.projectId === projectId).reduce((m, t) => Math.max(m, t.number), 0) + 1;
-    const row: TaskRow = {
-      id: uuid(), companyId: user.companyId, projectId, number, title: input.title.trim(),
-      description: input.description || null, status: "TODO", priority: (input.priority as TaskRow["priority"]) || "MEDIUM",
-      assigneeId: input.assigneeId || null, sprintId: null, dueDate: input.dueDate || null, sortOrder: number, createdAt: new Date().toISOString(),
-    };
-    db.tasks.push(row);
-    save(db);
-    return toTask(db, row, project);
-  },
-  async updateTask(accessToken: string | null, id: string, patch: { title?: string; description?: string; status?: string; priority?: string; assigneeId?: string; sprintId?: string; dueDate?: string }): Promise<Task> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.tasks.find((t) => t.id === id && t.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Task not found");
-    if (patch.title !== undefined && patch.title) row.title = patch.title;
-    if (patch.description !== undefined) row.description = patch.description || null;
-    if (patch.status !== undefined) row.status = patch.status as TaskRow["status"];
-    if (patch.priority !== undefined) row.priority = patch.priority as TaskRow["priority"];
-    if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId || null;
-    if (patch.sprintId !== undefined) row.sprintId = patch.sprintId || null;
-    if (patch.dueDate !== undefined) row.dueDate = patch.dueDate || null;
-    save(db);
-    const project = db.projects.find((p) => p.id === row.projectId)!;
-    return toTask(db, row, project);
-  },
-  async deleteTask(accessToken: string | null, id: string): Promise<void> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.tasks.find((t) => t.id === id && t.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Task not found");
-    db.tasks = db.tasks.filter((t) => t.id !== id);
-    save(db);
-  },
-  async myTasks(accessToken: string | null): Promise<Task[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const emp = employeeForUser(db, user);
-    return db.tasks
-      .filter((t) => t.assigneeId === emp.id && t.status !== "DONE")
-      .map((t) => toTask(db, t, db.projects.find((p) => p.id === t.projectId)!))
-      .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
-  },
-
   // --- Knowledge OS (spaces) ---
   async listSpaces(accessToken: string | null): Promise<Space[]> {
     await delay();
@@ -2710,9 +2317,6 @@ export const mockBackend = {
     const user = requireSession(db, accessToken);
     const space = db.spaces.find((s) => s.id === spaceId && s.companyId === user.companyId);
     if (!space) throw err(404, "NOT_FOUND", "Space not found");
-    if (input.linkedTaskId && !db.tasks.some((t) => t.id === input.linkedTaskId && t.companyId === user.companyId)) {
-      throw err(404, "NOT_FOUND", "Linked task not found");
-    }
     const author = employeeForUser(db, user); // provision the People profile if needed
     const sortOrder = db.pages.filter((p) => p.spaceId === spaceId).length;
     const now = new Date().toISOString();
@@ -2731,9 +2335,6 @@ export const mockBackend = {
     const user = requireSession(db, accessToken);
     const row = db.pages.find((p) => p.id === id && p.companyId === user.companyId);
     if (!row) throw err(404, "NOT_FOUND", "Page not found");
-    if (patch.linkedTaskId && !db.tasks.some((t) => t.id === patch.linkedTaskId && t.companyId === user.companyId)) {
-      throw err(404, "NOT_FOUND", "Linked task not found");
-    }
     if (patch.title !== undefined && patch.title) row.title = patch.title;
     if (patch.body !== undefined) row.body = patch.body || null;
     if (patch.status !== undefined) row.status = patch.status as PageRow["status"];
@@ -2780,8 +2381,6 @@ export const mockBackend = {
     if (query.length < 2) return { query, total: 0, groups: [] };
     const cid = user.companyId;
     const has = (s: string | null | undefined) => (s || "").toLowerCase().includes(query);
-    const projects = db.projects.filter((p) => p.companyId === cid);
-    const projOf = (id: string) => projects.find((p) => p.id === id);
     const spaces = db.spaces.filter((s) => s.companyId === cid);
     const spaceOf = (id: string) => spaces.find((s) => s.id === id);
 
@@ -2790,18 +2389,6 @@ export const mockBackend = {
       .slice(0, 5)
       .map((u) => ({ kind: "person", title: `${u.firstName} ${u.lastName}`, subtitle: u.email, href: "/people" }));
 
-    const work: SearchHit[] = [
-      ...projects.filter((p) => has(p.name) || has(p.key)).slice(0, 5)
-        .map((p): SearchHit => ({ kind: "project", title: p.name, subtitle: `Project · ${p.key}`, href: `/work/${p.id}` })),
-      ...db.tasks.filter((t) => t.companyId === cid && has(t.title)).slice(0, 5).map((t): SearchHit => {
-        const p = projOf(t.projectId);
-        return { kind: "task", title: t.title, subtitle: p ? `${p.key}-${t.number} · ${p.name}` : "Task", href: `/work/${t.projectId}` };
-      }),
-      ...db.tickets.filter((t) => t.companyId === cid && has(t.subject)).slice(0, 5).map((t): SearchHit => {
-        const p = projOf(t.projectId);
-        return { kind: "ticket", title: t.subject, subtitle: p ? `${p.key}-T${t.number}` : "Ticket", href: `/work/${t.projectId}` };
-      }),
-    ];
 
     const knowledge: SearchHit[] = [
       ...spaces.filter((s) => has(s.name) || has(s.key)).slice(0, 5)
@@ -2814,10 +2401,6 @@ export const mockBackend = {
 
     // Owner/Admin-only modules must not leak through the search box either.
     const admin = user.role === "OWNER" || user.role === "ADMIN";
-    const clients: SearchHit[] = !admin ? [] : (mockClients[cid] ?? [])
-      .filter((c) => has(c.name) || has(c.contactName) || has(c.contactEmail))
-      .slice(0, 5)
-      .map((c): SearchHit => ({ kind: "client", title: c.name, subtitle: c.contactName ?? "Client", href: `/clients/${c.id}` }));
     const documents: SearchHit[] = !admin ? [] : (mockDocs[cid] ?? [])
       .filter((d) => has(d.title))
       .slice(0, 5)
@@ -2825,13 +2408,11 @@ export const mockBackend = {
 
     const groups: SearchGroup[] = [];
     if (people.length) groups.push({ label: "People", hits: people });
-    if (work.length) groups.push({ label: "Work", hits: work });
     if (knowledge.length) groups.push({ label: "Knowledge", hits: knowledge });
-    if (clients.length) groups.push({ label: "Clients", hits: clients });
     if (documents.length) groups.push({ label: "Documents", hits: documents });
     return {
       query,
-      total: people.length + work.length + knowledge.length + clients.length + documents.length,
+      total: people.length + knowledge.length + documents.length,
       groups,
     };
   },
@@ -2848,19 +2429,13 @@ export const mockBackend = {
     const metrics: Record<string, number> = {
       members: db.users.filter((u) => u.companyId === cid && u.status === "ACTIVE").length,
       departments: mine(db.departments).length,
-      projects: mine(db.projects).length,
-      openTasks: mine(db.tasks).filter((t) => t.status !== "DONE").length,
-      openTickets: mine(db.tickets).filter((t) => t.status === "OPEN" || t.status === "PENDING").length,
       spaces: mine(db.spaces).length,
       pages: mine(db.pages).length,
     };
     const say = (n: number, noun: string) => `You have **${n}** ${noun}${n === 1 ? "" : "s"}.`;
 
     if (q.includes("how many") || q.includes("number of") || q.includes("count")) {
-      if (q.includes("ticket")) return { answer: say(metrics.openTickets, "open support ticket"), mode: "local", sources: [] };
-      if (q.includes("task")) return { answer: say(metrics.openTasks, "open task"), mode: "local", sources: [] };
-      if (q.includes("project")) return { answer: say(metrics.projects, "project"), mode: "local", sources: [] };
-      if (q.includes("page") || q.includes("doc")) return { answer: say(metrics.pages, "knowledge page"), mode: "local", sources: [] };
+      if (q.includes("page") || q.includes("doc")) return { answer: say(metrics.pages, "company document page"), mode: "local", sources: [] };
       if (q.includes("employee") || q.includes("people") || q.includes("member") || q.includes("team") || q.includes("staff"))
         return { answer: say(metrics.members, "team member"), mode: "local", sources: [] };
       if (q.includes("department")) return { answer: say(metrics.departments, "department"), mode: "local", sources: [] };
@@ -2882,165 +2457,10 @@ export const mockBackend = {
     return {
       answer:
         `Here's your company at a glance:\n\n- **${metrics.members}** team members across **${metrics.departments}** departments\n` +
-        `- **${metrics.openTasks}** open tasks and **${metrics.openTickets}** open tickets in **${metrics.projects}** project(s)\n` +
-        `- **${metrics.pages}** knowledge pages in **${metrics.spaces}** space(s)\n\nAsk me about a person, a project, a ticket, or anything in your docs.`,
+        `- **${metrics.pages}** company document pages in **${metrics.spaces}** space(s)\n\nAsk me about a person, a policy, or anything in your company documents.`,
       mode: "local",
       sources: [],
     };
-  },
-
-  // --- Work OS (board & backlog) ---
-  async board(accessToken: string | null, projectId: string): Promise<Board> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    const active = db.sprints.find((s) => s.projectId === projectId && s.status === "ACTIVE") || null;
-    const rows = active
-      ? db.tasks.filter((t) => t.sprintId === active.id)
-      : db.tasks.filter((t) => t.projectId === projectId && !t.sprintId);
-    const tasks = rows.sort((a, b) => a.sortOrder - b.sortOrder || a.number - b.number).map((t) => toTask(db, t, project));
-    return { activeSprint: active ? toSprint(db, active) : null, tasks };
-  },
-  async backlog(accessToken: string | null, projectId: string): Promise<Task[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    return db.tasks
-      .filter((t) => t.projectId === projectId && !t.sprintId)
-      .sort((a, b) => a.sortOrder - b.sortOrder || a.number - b.number)
-      .map((t) => toTask(db, t, project));
-  },
-
-  // --- Work OS (sprints) ---
-  async listSprints(accessToken: string | null, projectId: string): Promise<Sprint[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    return db.sprints.filter((s) => s.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((s) => toSprint(db, s));
-  },
-  async createSprint(accessToken: string | null, projectId: string, input: { name: string; goal?: string; startDate?: string; endDate?: string }): Promise<Sprint> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    const row: SprintRow = { id: uuid(), companyId: user.companyId, projectId, name: input.name.trim(), goal: input.goal || null, startDate: input.startDate || null, endDate: input.endDate || null, status: "PLANNED", createdAt: new Date().toISOString() };
-    db.sprints.push(row);
-    save(db);
-    return toSprint(db, row);
-  },
-  async updateSprint(accessToken: string | null, id: string, patch: { name?: string; goal?: string; startDate?: string; endDate?: string }): Promise<Sprint> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
-    if (patch.name !== undefined && patch.name) row.name = patch.name;
-    if (patch.goal !== undefined) row.goal = patch.goal || null;
-    if (patch.startDate !== undefined) row.startDate = patch.startDate || null;
-    if (patch.endDate !== undefined) row.endDate = patch.endDate || null;
-    save(db);
-    return toSprint(db, row);
-  },
-  async startSprint(accessToken: string | null, id: string): Promise<Sprint> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
-    if (row.status === "COMPLETED") throw err(409, "CONFLICT", "A completed sprint cannot be started");
-    if (db.sprints.some((s) => s.projectId === row.projectId && s.status === "ACTIVE" && s.id !== row.id)) {
-      throw err(409, "CONFLICT", "This project already has an active sprint");
-    }
-    row.status = "ACTIVE";
-    save(db);
-    return toSprint(db, row);
-  },
-  async completeSprint(accessToken: string | null, id: string): Promise<Sprint> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
-    if (row.status !== "ACTIVE") throw err(409, "CONFLICT", "Only an active sprint can be completed");
-    for (const t of db.tasks) if (t.sprintId === row.id && t.status !== "DONE") t.sprintId = null;
-    row.status = "COMPLETED";
-    save(db);
-    return toSprint(db, row);
-  },
-  async deleteSprint(accessToken: string | null, id: string): Promise<void> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.sprints.find((s) => s.id === id && s.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Sprint not found");
-    for (const t of db.tasks) if (t.sprintId === id) t.sprintId = null;
-    db.sprints = db.sprints.filter((s) => s.id !== id);
-    save(db);
-  },
-
-  // --- Work OS (support tickets) ---
-  async listTickets(accessToken: string | null, projectId: string): Promise<Ticket[]> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    return db.tickets.filter((t) => t.projectId === projectId).sort((a, b) => b.number - a.number).map((t) => toTicket(db, t));
-  },
-  async createTicket(accessToken: string | null, projectId: string, input: { subject: string; description?: string; requesterName?: string; requesterEmail?: string; priority?: string; assigneeId?: string }): Promise<Ticket> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const project = db.projects.find((p) => p.id === projectId && p.companyId === user.companyId);
-    if (!project) throw err(404, "NOT_FOUND", "Project not found");
-    if (input.assigneeId && !db.employees.some((e) => e.id === input.assigneeId && e.companyId === user.companyId)) {
-      throw err(404, "NOT_FOUND", "Assignee not found");
-    }
-    const number = db.tickets.filter((t) => t.projectId === projectId).reduce((m, t) => Math.max(m, t.number), 0) + 1;
-    const row: TicketRow = {
-      id: uuid(), companyId: user.companyId, projectId, number, subject: input.subject.trim(),
-      description: input.description || null, requesterName: input.requesterName || null, requesterEmail: input.requesterEmail || null,
-      status: "OPEN", priority: (input.priority as TicketRow["priority"]) || "MEDIUM", assigneeId: input.assigneeId || null,
-      createdBy: user.id, createdAt: new Date().toISOString(),
-    };
-    db.tickets.push(row);
-    save(db);
-    return toTicket(db, row);
-  },
-  async updateTicket(accessToken: string | null, id: string, patch: { subject?: string; description?: string; requesterName?: string; requesterEmail?: string; status?: string; priority?: string; assigneeId?: string }): Promise<Ticket> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.tickets.find((t) => t.id === id && t.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Ticket not found");
-    if (patch.assigneeId && !db.employees.some((e) => e.id === patch.assigneeId && e.companyId === user.companyId)) {
-      throw err(404, "NOT_FOUND", "Assignee not found");
-    }
-    if (patch.subject !== undefined && patch.subject) row.subject = patch.subject;
-    if (patch.description !== undefined) row.description = patch.description || null;
-    if (patch.requesterName !== undefined) row.requesterName = patch.requesterName || null;
-    if (patch.requesterEmail !== undefined) row.requesterEmail = patch.requesterEmail || null;
-    if (patch.status !== undefined) row.status = patch.status as TicketRow["status"];
-    if (patch.priority !== undefined) row.priority = patch.priority as TicketRow["priority"];
-    if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId || null;
-    save(db);
-    return toTicket(db, row);
-  },
-  async deleteTicket(accessToken: string | null, id: string): Promise<void> {
-    await delay();
-    const db = load();
-    const user = requireSession(db, accessToken);
-    const row = db.tickets.find((t) => t.id === id && t.companyId === user.companyId);
-    if (!row) throw err(404, "NOT_FOUND", "Ticket not found");
-    db.tickets = db.tickets.filter((t) => t.id !== id);
-    save(db);
   },
 
   mailbox(): MailMessage[] {
@@ -3158,89 +2578,9 @@ function toLeave(db: DB, row: LeaveRow): LeaveRequest {
   };
 }
 
-function toProject(db: DB, p: ProjectRow): Project {
-  const lead = p.leadUserId ? db.users.find((u) => u.id === p.leadUserId) : undefined;
-  const tasks = db.tasks.filter((t) => t.projectId === p.id);
-  return {
-    id: p.id,
-    name: p.name,
-    key: p.key,
-    description: p.description,
-    status: p.status,
-    leadUserId: p.leadUserId,
-    leadName: lead ? `${lead.firstName} ${lead.lastName}` : null,
-    taskCount: tasks.length,
-    openTaskCount: tasks.filter((t) => t.status !== "DONE").length,
-    createdAt: p.createdAt,
-  };
-}
 
-function toTask(db: DB, t: TaskRow, project: ProjectRow): Task {
-  let assigneeName: string | null = null;
-  if (t.assigneeId) {
-    const emp = db.employees.find((e) => e.id === t.assigneeId);
-    const user = emp ? db.users.find((u) => u.id === emp.userId) : undefined;
-    assigneeName = user ? `${user.firstName} ${user.lastName}` : null;
-  }
-  return {
-    id: t.id,
-    projectId: t.projectId,
-    ref: `${project.key}-${t.number}`,
-    number: t.number,
-    title: t.title,
-    description: t.description,
-    status: t.status,
-    priority: t.priority,
-    assigneeId: t.assigneeId,
-    assigneeName,
-    sprintId: t.sprintId,
-    dueDate: t.dueDate,
-    storyPoints: t.storyPoints ?? null,
-    createdAt: t.createdAt,
-  };
-}
 
-function toSprint(db: DB, s: SprintRow): Sprint {
-  const tasks = db.tasks.filter((t) => t.sprintId === s.id);
-  return {
-    id: s.id,
-    projectId: s.projectId,
-    name: s.name,
-    goal: s.goal,
-    startDate: s.startDate,
-    endDate: s.endDate,
-    status: s.status,
-    capacityPoints: s.capacityPoints ?? null,
-    taskCount: tasks.length,
-    doneCount: tasks.filter((t) => t.status === "DONE").length,
-    createdAt: s.createdAt,
-  };
-}
 
-function toTicket(db: DB, t: TicketRow): Ticket {
-  const project = db.projects.find((p) => p.id === t.projectId);
-  let assigneeName: string | null = null;
-  if (t.assigneeId) {
-    const emp = db.employees.find((e) => e.id === t.assigneeId);
-    const user = emp ? db.users.find((u) => u.id === emp.userId) : undefined;
-    assigneeName = user ? `${user.firstName} ${user.lastName}` : null;
-  }
-  return {
-    id: t.id,
-    projectId: t.projectId,
-    ref: `${project ? project.key : "?"}-T${t.number}`,
-    number: t.number,
-    subject: t.subject,
-    description: t.description,
-    requesterName: t.requesterName,
-    requesterEmail: t.requesterEmail,
-    status: t.status,
-    priority: t.priority,
-    assigneeId: t.assigneeId,
-    assigneeName,
-    createdAt: t.createdAt,
-  };
-}
 
 function knowledgeAuthorName(db: DB, authorId: string | null): string | null {
   if (!authorId) return null;
@@ -3249,12 +2589,8 @@ function knowledgeAuthorName(db: DB, authorId: string | null): string | null {
   return user ? `${user.firstName} ${user.lastName}` : null;
 }
 
-function knowledgeTaskRef(db: DB, taskId: string | null): string | null {
-  if (!taskId) return null;
-  const task = db.tasks.find((t) => t.id === taskId);
-  if (!task) return null;
-  const project = db.projects.find((p) => p.id === task.projectId);
-  return project ? `${project.key}-${task.number}` : null;
+function knowledgeTaskRef(_db: DB, _taskId: string | null): string | null {
+  return null;   // the work tracker is archived; pages no longer link tasks
 }
 
 function toSpace(db: DB, s: SpaceRow): Space {
@@ -4017,12 +3353,3 @@ function prettyEnum(name: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// --- clients (mock, in-memory; resets on reload) ----------------------------
-const mockClients: Record<string, Client[]> = {};
-const mockClientReqs: Record<string, ClientRequestItem[]> = {};
-
-function withOpen(companyId: string, c: Client): Client {
-  void companyId;
-  const reqs = mockClientReqs[c.id] ?? [];
-  return { ...c, openRequests: reqs.filter((r) => r.status !== "DELIVERED" && r.status !== "DECLINED").length };
-}

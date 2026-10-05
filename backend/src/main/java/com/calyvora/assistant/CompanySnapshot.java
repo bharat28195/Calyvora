@@ -1,6 +1,5 @@
 package com.calyvora.assistant;
 
-import com.calyvora.client.ClientRepository;
 import com.calyvora.document.DocumentTemplateRepository;
 import com.calyvora.expense.ExpenseClaimRepository;
 import com.calyvora.expense.ExpenseStatus;
@@ -48,7 +47,7 @@ class CompanySnapshot {
         EVERYONE,
         /** Managers: the work their team owes and the approvals sitting with them. */
         MANAGES,
-        /** HR, Admin, Owner: hiring, reviews, documents, clients — the operational picture. */
+        /** HR, Admin, Owner: hiring, reviews, documents — the operational picture. */
         HR_PLUS;
 
         static Scope of(String role) {
@@ -74,14 +73,13 @@ class CompanySnapshot {
     private final ExpenseClaimRepository expenses;
     private final ReviewCycleRepository cycles;
     private final DocumentTemplateRepository templates;
-    private final ClientRepository clients;
     private final InvitationRepository invitations;
 
     CompanySnapshot(EmployeeRepository employees, LeaveRequestRepository leave, HolidayRepository holidays,
                     com.calyvora.helpdesk.HelpdeskTicketRepository helpdesk, JobOpeningRepository jobs,
                     CandidateRepository candidates, ExpenseClaimRepository expenses,
                     ReviewCycleRepository cycles, DocumentTemplateRepository templates,
-                    ClientRepository clients, InvitationRepository invitations) {
+                    InvitationRepository invitations) {
         this.employees = employees;
         this.leave = leave;
         this.holidays = holidays;
@@ -91,7 +89,6 @@ class CompanySnapshot {
         this.expenses = expenses;
         this.cycles = cycles;
         this.templates = templates;
-        this.clients = clients;
         this.invitations = invitations;
     }
 
@@ -124,7 +121,6 @@ class CompanySnapshot {
             m.put("candidatesTotal", candidates.countByCompanyId(companyId));
             m.put("openReviewCycles", cycles.countByCompanyIdAndStatus(companyId, ReviewCycleStatus.OPEN));
             m.put("letterTemplates", templates.countByCompanyId(companyId));
-            m.put("clients", clients.countByCompanyId(companyId));
             m.put("pendingInvitations", invitations.countByCompanyIdAndStatus(companyId, InvitationStatus.PENDING));
         }
 
@@ -155,7 +151,6 @@ class CompanySnapshot {
                     - candidatesInPipeline: candidates still in play (excludes hired and rejected)
                     - openReviewCycles: performance review cycles currently running
                     - letterTemplates: offer/joining/relieving letter templates set up
-                    - clients: client companies on the books
                     - pendingInvitations: people invited who have not accepted yet
                     """);
         }

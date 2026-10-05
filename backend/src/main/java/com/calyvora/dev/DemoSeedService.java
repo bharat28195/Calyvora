@@ -29,18 +29,6 @@ import com.calyvora.people.dto.CreateDepartmentRequest;
 import com.calyvora.people.dto.DepartmentResponse;
 import com.calyvora.people.dto.EmployeeResponse;
 import com.calyvora.people.dto.UpdateEmployeeRequest;
-import com.calyvora.work.ProjectService;
-import com.calyvora.work.SprintService;
-import com.calyvora.work.TaskService;
-import com.calyvora.work.TicketService;
-import com.calyvora.work.dto.CreateProjectRequest;
-import com.calyvora.work.dto.CreateSprintRequest;
-import com.calyvora.work.dto.CreateTaskRequest;
-import com.calyvora.work.dto.CreateTicketRequest;
-import com.calyvora.work.dto.ProjectResponse;
-import com.calyvora.work.dto.SprintResponse;
-import com.calyvora.work.dto.TaskResponse;
-import com.calyvora.work.dto.UpdateTaskRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -84,16 +72,11 @@ public class DemoSeedService {
     private final PasswordEncoder passwordEncoder;
     private final DepartmentService departmentService;
     private final EmployeeService employeeService;
-    private final ProjectService projectService;
-    private final SprintService sprintService;
-    private final TaskService taskService;
-    private final TicketService ticketService;
     private final SpaceService spaceService;
     private final PageService pageService;
     private final com.calyvora.people.CompensationRepository compensationRepository;
     private final com.calyvora.people.LeaveRequestRepository leaveRequestRepository;
     private final com.calyvora.people.GoalRepository goalRepository;
-    private final com.calyvora.client.ClientService clientService;
     private final com.calyvora.document.DocumentService documentService;
     private final com.calyvora.people.AttendanceService attendanceService;
     private final com.calyvora.people.HolidayService holidayService;
@@ -117,13 +100,10 @@ public class DemoSeedService {
                            CompanySettingsRepository companySettingsRepository,
                            UserRepository userRepository, PasswordEncoder passwordEncoder,
                            DepartmentService departmentService, EmployeeService employeeService,
-                           ProjectService projectService, SprintService sprintService,
-                           TaskService taskService, TicketService ticketService,
                            SpaceService spaceService, PageService pageService,
                            com.calyvora.people.CompensationRepository compensationRepository,
                            com.calyvora.people.LeaveRequestRepository leaveRequestRepository,
                            com.calyvora.people.GoalRepository goalRepository,
-                           com.calyvora.client.ClientService clientService,
                            com.calyvora.document.DocumentService documentService,
                            com.calyvora.people.AttendanceService attendanceService,
                            com.calyvora.people.HolidayService holidayService,
@@ -159,7 +139,6 @@ public class DemoSeedService {
         this.compensationRepository = compensationRepository;
         this.leaveRequestRepository = leaveRequestRepository;
         this.goalRepository = goalRepository;
-        this.clientService = clientService;
         this.documentService = documentService;
         this.companyRepository = companyRepository;
         this.companySettingsRepository = companySettingsRepository;
@@ -167,10 +146,6 @@ public class DemoSeedService {
         this.passwordEncoder = passwordEncoder;
         this.departmentService = departmentService;
         this.employeeService = employeeService;
-        this.projectService = projectService;
-        this.sprintService = sprintService;
-        this.taskService = taskService;
-        this.ticketService = ticketService;
         this.spaceService = spaceService;
         this.pageService = pageService;
     }
@@ -482,83 +457,16 @@ public class DemoSeedService {
         seedGoal(emp, priya.getEmail(), "Mentor one junior engineer this quarter", 30, owner);
         seedGoal(emp, sara.getEmail(), "Cut average ticket response time to under 2 hours", 45, owner);
 
-        // --- Work: project, active sprint, tasks, tickets -------------------
-        ProjectResponse atlas = projectService.create(new CreateProjectRequest(
-                "Atlas Platform", "ATL",
-                "The core multi-tenant platform: identity, tenancy, and the shared services every app builds on.",
-                marcus.getId().toString()));
-        UUID atlasId = UUID.fromString(atlas.id());
-
-        // Two finished sprints before the current one, so the velocity chart has real history. These
-        // must be created and completed before Sprint 12 starts (a project has one active sprint at a time).
-        seedCompletedSprint(atlasId, owner, "Sprint 10 — Onboarding revamp",
-                LocalDate.now().minusDays(46), LocalDate.now().minusDays(32),
-                emp.get(priya.getEmail()).id(), 8, 5, 8);
-        seedCompletedSprint(atlasId, owner, "Sprint 11 — Billing & invoices",
-                LocalDate.now().minusDays(32), LocalDate.now().minusDays(18),
-                emp.get(marcus.getEmail()).id(), 13, 8, 5, 3);
-
-        SprintResponse sprint = sprintService.create(atlasId, new CreateSprintRequest(
-                "Sprint 12 — Security hardening",
-                "Ship RS256 tokens and tenant Row-Level Security; polish onboarding.",
-                LocalDate.now().minusDays(4).toString(), LocalDate.now().plusDays(10).toString(), 34));
-        sprintService.start(UUID.fromString(sprint.id()));
-
-        String eMarcus = emp.get(marcus.getEmail()).id();
-        String ePriya = emp.get(priya.getEmail()).id();
-        String eLeo = emp.get(leo.getEmail()).id();
-        String eSara = emp.get(sara.getEmail()).id();
-
-        // In-sprint work, with realistic progress spread.
-        TaskResponse t1 = task(atlasId, owner, "RS256 JWT signing with key rotation", ePriya, "HIGH",
-                "Replace the HS256 shared secret with asymmetric RS256 + a JWKS endpoint.", 8);
-        inSprint(t1, sprint.id(), "DONE");
-        TaskResponse t2 = task(atlasId, owner, "Postgres Row-Level Security for tenant isolation", eMarcus, "URGENT",
-                "Enable + force RLS on all tenant tables; bind the tenant per connection.", 13);
-        inSprint(t2, sprint.id(), "IN_PROGRESS");
-        TaskResponse t3 = task(atlasId, owner, "Onboarding wizard polish", eLeo, "MEDIUM",
-                "Tighten the empty states and first-run experience for new tenants.", 5);
-        inSprint(t3, sprint.id(), "IN_PROGRESS");
-        TaskResponse t4 = task(atlasId, owner, "Rotate signing keys without downtime", ePriya, "MEDIUM",
-                "Document and test the kid-based rotation flow.", 5);
-        inSprint(t4, sprint.id(), "TODO");
-
-        // Backlog (no sprint) — proves the backlog view.
-        task(atlasId, owner, "Full-text search across Knowledge pages", eMarcus, "MEDIUM",
-                "tsvector-based search as the retrieval layer for the assistant.", 8);
-        task(atlasId, owner, "Universal AI assistant (RAG over the org graph)", eMarcus, "HIGH",
-                "Ask questions in plain English, answered from People/Work/Knowledge data.", 13);
-        task(atlasId, owner, "Audit log for admin actions", null, "LOW", null);
-
-        ticketService.create(atlasId, ticket("Cannot reset my password", "Priya", eSara, "HIGH",
-                "A user reports the reset link 404s after 15 minutes."), owner);
-        ticketService.create(atlasId, ticket("Add SSO with Okta", "Enterprise prospect", eSara, "MEDIUM",
-                "Prospect requires SAML SSO before signing."), owner);
-        ticketService.create(atlasId, ticket("Invoice PDF missing tax line", "Finance", eSara, "LOW",
-                "Generated invoices omit the VAT line for EU customers."), owner);
-
-        // --- Knowledge: a handbook that links back into Work ----------------
+        // --- Company documents: the employee handbook everyone can read ------
         SpaceResponse handbook = spaceService.create(new CreateSpaceRequest(
-                "Engineering Handbook", "ENG",
-                "How we build and run Atlas — architecture, security, and runbooks."), owner);
+                "Employee Handbook", "HR",
+                "Company policies for everyone at Northwind Robotics."), owner);
         UUID spaceId = UUID.fromString(handbook.id());
 
-        page(spaceId, owner, "New Engineer Onboarding", null,
-                onboardingBody());
-        page(spaceId, owner, "Authentication: RS256, JWKS & Key Rotation", t1.id(),
-                authDocBody());
-        page(spaceId, owner, "Multi-Tenant Isolation & Row-Level Security", t2.id(),
-                rlsDocBody());
-        page(spaceId, owner, "Incident Response Runbook", null,
-                runbookBody());
-
-        // --- Clients: a few customers + what they've requested --------------
-        seedClient(owner, "Globex Corporation", "Hank Scorpio", "hank@globex.com", "ACTIVE",
-                new String[]{"SAML SSO with Okta:IN_PROGRESS", "White-label the customer portal:REQUESTED"});
-        seedClient(owner, "Initech", "Bill Lumbergh", "bill@initech.com", "LEAD",
-                new String[]{"Trial extension to 30 days:DELIVERED", "Bulk CSV employee import:REQUESTED"});
-        seedClient(owner, "Umbrella Inc", "Ada Wong", "ada@umbrella.com", "ACTIVE",
-                new String[]{"Custom SLA (99.9%):IN_PROGRESS", "Data residency in EU:REQUESTED", "Quarterly business review:DELIVERED"});
+        page(spaceId, owner, "Leave policy", leavePolicyBody());
+        page(spaceId, owner, "Code of conduct", conductBody());
+        page(spaceId, owner, "Work from home", wfhBody());
+        page(spaceId, owner, "Expense reimbursement", expensePolicyBody());
 
         // --- Documents: the starter template library + a couple of issued letters ---
         seedDocuments(owner, emp, List.of(leo.getEmail(), sara.getEmail()));
@@ -848,19 +756,6 @@ public class DemoSeedService {
         }
     }
 
-    private void seedClient(AuthPrincipal owner, String name, String contact, String email, String status, String[] requests) {
-        var client = clientService.create(
-                new com.calyvora.client.dto.ClientPayload(name, contact, email, null, null, status, null), owner);
-        UUID clientId = UUID.fromString(client.id());
-        for (String r : requests) {
-            int i = r.lastIndexOf(':');
-            clientService.addRequest(clientId, new com.calyvora.client.dto.ClientRequestPayload(
-                    r.substring(0, i), null, r.substring(i + 1)));
-        }
-    }
-
-    // ---- provisioning primitives ------------------------------------------
-
     private Company provisionCompany() {
         Company company = new Company(UUID.randomUUID(), COMPANY, uniqueSlug(COMPANY), CompanyStatus.ACTIVE);
         companyRepository.save(company);
@@ -1082,46 +977,8 @@ public class DemoSeedService {
         return new CreateDepartmentRequest(name, null, leadUserId.toString());
     }
 
-    private TaskResponse task(UUID projectId, AuthPrincipal owner, String title, String assigneeId,
-                              String priority, String description) {
-        return task(projectId, owner, title, assigneeId, priority, description, null);
-    }
-
-    /** Overload that sizes the task, so velocity and the burndown have real numbers to work with. */
-    private TaskResponse task(UUID projectId, AuthPrincipal owner, String title, String assigneeId,
-                              String priority, String description, Integer storyPoints) {
-        return taskService.create(projectId,
-                new CreateTaskRequest(title, description, priority, assigneeId, null, storyPoints), owner);
-    }
-
-    private void inSprint(TaskResponse task, String sprintId, String status) {
-        taskService.update(UUID.fromString(task.id()),
-                new UpdateTaskRequest(null, null, status, null, null, sprintId, null, null));
-    }
-
-    /** A finished sprint whose done, sized tasks give the velocity chart real bars to plot. */
-    private void seedCompletedSprint(UUID projectId, AuthPrincipal owner, String name,
-                                     LocalDate start, LocalDate end, String assigneeId, int... points) {
-        int capacity = 0;
-        for (int p : points) capacity += p;
-        SprintResponse s = sprintService.create(projectId,
-                new CreateSprintRequest(name, null, start.toString(), end.toString(), capacity));
-        sprintService.start(UUID.fromString(s.id()));
-        int i = 1;
-        for (int p : points) {
-            TaskResponse t = task(projectId, owner, name + " · task " + i++, assigneeId, "MEDIUM", null, p);
-            inSprint(t, s.id(), "DONE");
-        }
-        sprintService.complete(UUID.fromString(s.id()));
-    }
-
-    private static CreateTicketRequest ticket(String subject, String requester, String assigneeId,
-                                              String priority, String description) {
-        return new CreateTicketRequest(subject, description, requester, null, priority, assigneeId);
-    }
-
-    private PageResponse page(UUID spaceId, AuthPrincipal owner, String title, String linkedTaskId, String body) {
-        return pageService.create(spaceId, new CreatePageRequest(title, body, null, linkedTaskId), owner);
+    private PageResponse page(UUID spaceId, AuthPrincipal owner, String title, String body) {
+        return pageService.create(spaceId, new CreatePageRequest(title, body, null, null), owner);
     }
 
     private String uniqueSlug(String name) {
@@ -1136,75 +993,65 @@ public class DemoSeedService {
 
     // ---- page bodies (Markdown) -------------------------------------------
 
-    private static String onboardingBody() {
+    private static String leavePolicyBody() {
         return """
-                # Welcome to Northwind Robotics 👋
+                # Leave policy
 
-                Glad you're here. This guide gets you productive in your first week.
+                Applies to every permanent employee of Northwind Robotics.
 
-                ## Day 1
-                - Get your laptop and sign in to **Atlas**.
-                - Read the [architecture principles](#) and the security docs in this space.
-                - Say hi in the team channel.
+                ## Entitlement
+                - **Vacation:** 21 days a year, accrued monthly.
+                - **Sick leave:** 8 days a year. A medical note is needed for more than 2 days in a row.
+                - **Comp-off:** a day off for every full day worked on a weekend or holiday, used within 60 days.
 
-                ## Your first week
-                1. Pair with your buddy on a starter task in the **Atlas Platform** project.
-                2. Ship one small PR — however tiny.
-                3. Book 1:1s with your manager and the leads.
+                ## How to apply
+                1. Open **Me → Time off** and choose the type and dates.
+                2. Your manager gets the request in their inbox and decides within 2 working days.
+                3. If your manager is away, anyone above them can approve.
 
-                > We optimize for **depth over breadth**. Build the foundation once, deeply.
+                ## Carry forward
+                Up to 10 unused vacation days carry into the next year. The rest lapse on 31 March.
                 """;
     }
 
-    private static String authDocBody() {
+    private static String conductBody() {
         return """
-                # Authentication: RS256, JWKS & Key Rotation
+                # Code of conduct
 
-                Atlas issues short-lived access tokens signed with **RS256** (asymmetric). Verifiers hold
-                only the public key — there is no shared signing secret to leak.
+                We treat each other, our customers and our partners with respect.
 
-                ## Key rotation
-                Every key has a `kid`. One key is *active* for signing; all configured keys stay trusted
-                for verification. To rotate with zero downtime:
-                1. Publish the new public key.
-                2. Flip the active `kid`.
-                3. Retire the old key once its last token has expired.
-
-                Public keys are discoverable at `/.well-known/jwks.json` (RFC 7517).
+                - No harassment or discrimination of any kind.
+                - Keep customer and employee data confidential.
+                - Declare any conflict of interest to HR.
+                - Raise concerns through the **Helpdesk** or directly with HR. Reports are handled in confidence.
                 """;
     }
 
-    private static String rlsDocBody() {
+    private static String wfhBody() {
         return """
-                # Multi-Tenant Isolation & Row-Level Security
+                # Work from home
 
-                Isolation is defense-in-depth. The application always filters by `company_id`, **and**
-                Postgres **Row-Level Security** enforces it beneath the app so a forgotten filter can't
-                leak another tenant's data.
+                You may work from home up to **2 days a week**, agreed with your manager.
 
-                ## How it works
-                - Every request binds its tenant to the connection as the `calyvora.company_id` GUC.
-                - Each tenant table has a policy: a row is visible only when its `company_id` matches.
-                - No tenant bound ⇒ **deny by default** (nothing is visible).
-
-                > The app's database role must be `NOSUPERUSER` — superusers bypass RLS by design.
+                - Check in on Orbit at the start of your day, as you would in the office.
+                - Be reachable during core hours, 11:00 to 16:00.
+                - Company equipment taken home stays covered by company insurance.
                 """;
     }
 
-    private static String runbookBody() {
+    private static String expensePolicyBody() {
         return """
-                # Incident Response Runbook
+                # Expense reimbursement
 
-                ## Severity levels
-                - **SEV-1** — customer-facing outage. Page on-call immediately.
-                - **SEV-2** — degraded experience; fix within the business day.
-                - **SEV-3** — minor; schedule in the next sprint.
+                Claim work expenses in **Finance → Expenses** within 30 days, with the receipt.
 
-                ## First 15 minutes
-                1. Acknowledge and open an incident channel.
-                2. Assign an incident commander.
-                3. Post a status update every 30 minutes until resolved.
-                4. Write the post-mortem within 48 hours — blameless.
+                | Category | Limit |
+                |---|---|
+                | Local travel | Actuals, economy |
+                | Client meals | ₹2,000 per person |
+                | Internet (WFH) | ₹1,000 a month |
+
+                Your manager approves the claim, and it is paid with the next payroll.
                 """;
     }
 }

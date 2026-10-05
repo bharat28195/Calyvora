@@ -52,25 +52,6 @@ class KnowledgeIntegrationTest extends IntegrationTestBase {
         return objectMapper.readTree(r.getResponse().getContentAsString()).get("id").asText();
     }
 
-    // Work OS helpers, so we can prove the doc<->task cross-app link.
-    private String createProject(Session s, String name, String key) throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/work/projects").header("Authorization", bearer(s))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("name", name, "key", key))))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return objectMapper.readTree(r.getResponse().getContentAsString()).get("id").asText();
-    }
-
-    private String createTask(Session s, String projectId, String title) throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/v1/work/projects/" + projectId + "/tasks").header("Authorization", bearer(s))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("title", title))))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return objectMapper.readTree(r.getResponse().getContentAsString()).get("id").asText();
-    }
-
     @Test
     void space_and_page_lifecycle() throws Exception {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
@@ -93,23 +74,6 @@ class KnowledgeIntegrationTest extends IntegrationTestBase {
         // it shows up in the space tree and bumps the space page count
         assertThat(getJson("/api/v1/knowledge/spaces/" + spaceId + "/pages", owner).size()).isEqualTo(1);
         assertThat(getJson("/api/v1/knowledge/spaces", owner).get(0).get("pageCount").asInt()).isEqualTo(1);
-    }
-
-    @Test
-    void page_links_to_a_work_task_cross_app() throws Exception {
-        Session owner = onboardOwner("Acme", "owner2@acme.com", PW);
-        String projectId = createProject(owner, "Platform", "PLT");
-        String taskId = createTask(owner, projectId, "Ship the thing");
-        String spaceId = createSpace(owner, "Docs", "DOC");
-
-        // create a page linked to the Work task (doc<->task), then read it back with the resolved ref
-        String pageId = createPage(owner, spaceId,
-                Map.of("title", "Ship notes", "body", "How we shipped it.", "linkedTaskId", taskId));
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/api/v1/knowledge/pages/" + pageId).header("Authorization", bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.linkedTaskId").value(taskId))
-                .andExpect(jsonPath("$.linkedTaskRef").value("PLT-1"));
     }
 
     @Test

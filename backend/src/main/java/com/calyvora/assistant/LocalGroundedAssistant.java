@@ -90,14 +90,10 @@ class LocalGroundedAssistant implements AssistantProvider {
             return new Wanted("openReviewCycles", "review cycle running");
         }
         if (q.contains("letter") || q.contains("template")) return new Wanted("letterTemplates", "letter template");
-        if (q.contains("client")) return new Wanted("clients", "client");
-        if (q.contains("helpdesk")) return new Wanted("openHelpdeskTickets", "open helpdesk ticket");
-        // --- work and knowledge (the original four) ---
-        if (q.contains("ticket")) return new Wanted("openTickets", "open support ticket");
-        if (q.contains("task")) return new Wanted("openTasks", "open task");
-        if (q.contains("project")) return new Wanted("projects", "project");
-        if (q.contains("page") || q.contains("doc")) return new Wanted("pages", "knowledge page");
-        if (q.contains("space")) return new Wanted("spaces", "knowledge space");
+        if (q.contains("helpdesk") || q.contains("ticket")) return new Wanted("openHelpdeskTickets", "open helpdesk ticket");
+        // --- company documents ---
+        if (q.contains("page") || q.contains("doc") || q.contains("policy")) return new Wanted("pages", "company document page");
+        if (q.contains("space")) return new Wanted("spaces", "document space");
         // Check people before departments so "team members" resolves to headcount, not departments.
         if (q.contains("employee") || q.contains("people") || q.contains("member")
                 || q.contains("staff") || q.contains("team")) {
@@ -133,9 +129,6 @@ class LocalGroundedAssistant implements AssistantProvider {
         StringBuilder sb = new StringBuilder("Here's your company at a glance:\n\n");
         sb.append("- **").append(m.getOrDefault("members", 0L)).append("** team members across **")
           .append(m.getOrDefault("departments", 0L)).append("** departments\n");
-        sb.append("- **").append(m.getOrDefault("openTasks", 0L)).append("** open tasks and **")
-          .append(m.getOrDefault("openTickets", 0L)).append("** open tickets in **")
-          .append(m.getOrDefault("projects", 0L)).append("** project(s)\n");
 
         if (m.containsKey("pendingLeaveRequests") || m.containsKey("pendingExpenseClaims")) {
             sb.append("- **").append(m.getOrDefault("pendingLeaveRequests", 0L))

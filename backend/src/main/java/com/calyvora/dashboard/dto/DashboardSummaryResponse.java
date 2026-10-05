@@ -1,8 +1,8 @@
 package com.calyvora.dashboard.dto;
 
 /**
- * Cross-app "command center" summary for the dashboard — one call that reaches into People, Work,
- * and Knowledge so the landing page proves the platform is one system, not three. Tenant-scoped.
+ * The dashboard's company summary. Tenant-scoped. The Work counts (projects, tasks, the active
+ * sprint) went with the work tracker, which is archived on branch archive/work-tracker-and-clients.
  */
 public record DashboardSummaryResponse(
         String companyName,
@@ -11,16 +11,8 @@ public record DashboardSummaryResponse(
         long memberCount,
         long pendingInviteCount,
         long departmentCount,
-        // Work
-        long projectCount,
-        long openTaskCount,
-        long doneTaskCount,
-        long openTicketCount,
-        // Knowledge
+        // Company documents
         long spaceCount,
-        long pageCount,
-        // The active sprint's progress, if one is running (else null)
-        ActiveSprint activeSprint
+        long pageCount
 ) {
-    public record ActiveSprint(String name, long total, long done) {}
 }

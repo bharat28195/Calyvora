@@ -3,9 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Plus, FileText, ArrowLeft, Trash2, Link2, Save, Eye, Pencil } from "lucide-react";
+import { Loader2, Plus, FileText, ArrowLeft, Trash2, Save, Eye, Pencil } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { Space, KnowledgePage, PageSummary, Project, Task } from "@/lib/types";
+import type { Space, KnowledgePage, PageSummary } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -172,7 +172,6 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [linkOpen, setLinkOpen] = useState(false);
 
   useEffect(() => {
     setEditing(false);
@@ -212,19 +211,6 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
     }
   }
 
-  async function linkTask(taskId: string | null) {
-    setBusy(true);
-    try {
-      const updated = await api.updatePage(pageId, { linkedTaskId: taskId ?? "" });
-      setPage(updated);
-      setLinkOpen(false);
-      await onChanged();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to link task");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function remove() {
     if (!confirm("Delete this page? This cannot be undone.")) return;
@@ -248,14 +234,8 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
         <div className="flex items-center gap-2 text-xs text-fg/40">
           <StatusChip status={page.status} />
           {page.authorName && <span>· by {page.authorName}</span>}
-          {page.linkedTaskRef && (
-            <span className="inline-flex items-center gap-1 rounded bg-aqua/15 px-1.5 py-0.5 font-medium text-aqua">
-              <Link2 className="h-3 w-3" /> {page.linkedTaskRef}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" onClick={() => setLinkOpen(true)}><Link2 className="h-4 w-4" /> Link task</Button>
           <Button variant="ghost" size="sm" onClick={togglePublish} disabled={busy}>
             {page.status === "PUBLISHED" ? "Unpublish" : "Publish"}
           </Button>
@@ -303,13 +283,6 @@ function PageEditor({ pageId, spaceId, siblings, onChanged, onDeleted }: {
           </div>
         </article>
       )}
-
-      <LinkTaskDialog
-        open={linkOpen}
-        onClose={() => setLinkOpen(false)}
-        current={page.linkedTaskId}
-        onPick={linkTask}
-      />
     </Card>
   );
 }
@@ -349,65 +322,6 @@ function NewPageButton({ onCreate, busy }: { onCreate: (title: string) => void; 
   );
 }
 
-// ---- link-a-task dialog (cross-app into Work OS) ----
-
-function LinkTaskDialog({ open, onClose, current, onPick }: {
-  open: boolean; onClose: () => void; current: string | null; onPick: (taskId: string | null) => void;
-}) {
-  const [projects, setProjects] = useState<Project[] | null>(null);
-  const [projectId, setProjectId] = useState<string>("");
-  const [tasks, setTasks] = useState<Task[] | null>(null);
-
-  useEffect(() => {
-    if (open) void api.listProjects().then((p) => setProjects(p.filter((x) => x.status === "ACTIVE")));
-  }, [open]);
-
-  useEffect(() => {
-    if (projectId) void api.listTasks(projectId).then(setTasks);
-    else setTasks(null);
-  }, [projectId]);
-
-  return (
-    <Modal open={open} onClose={onClose} title="Link a Work task">
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-fg/50">Connect this doc to a task in Work OS — the doc↔task link that ties knowledge to delivery.</p>
-        <Field label="Project" htmlFor="lt-project">
-          <select
-            id="lt-project"
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            className="w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg focus:border-violet focus:outline-none"
-          >
-            <option value="">Select a project…</option>
-            {projects?.map((p) => <option key={p.id} value={p.id}>{p.key} · {p.name}</option>)}
-          </select>
-        </Field>
-        {projectId && (
-          <div className="max-h-56 space-y-1 overflow-y-auto">
-            {tasks === null ? (
-              <Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" />
-            ) : tasks.length === 0 ? (
-              <p className="text-sm text-fg/40">No tasks in this project.</p>
-            ) : (
-              tasks.map((t) => (
-                <button key={t.id} onClick={() => onPick(t.id)}
-                  className={cn("flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-fg/5",
-                    t.id === current && "bg-violet/10")}>
-                  <span className="font-mono text-xs text-fg/40">{t.ref}</span>
-                  <span className="truncate">{t.title}</span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-        <div className="flex justify-between">
-          <Button variant="ghost" onClick={() => onPick(null)} disabled={!current}>Remove link</Button>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 // ---- minimal, safe Markdown renderer (headings, bold, italics, inline code, lists) ----
 

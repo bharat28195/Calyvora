@@ -4,7 +4,6 @@ import com.calyvora.analytics.dto.AnalyticsOverviewResponse;
 import com.calyvora.analytics.dto.AnalyticsOverviewResponse.Finance;
 import com.calyvora.analytics.dto.AnalyticsOverviewResponse.People;
 import com.calyvora.analytics.dto.AnalyticsOverviewResponse.Slice;
-import com.calyvora.analytics.dto.AnalyticsOverviewResponse.Work;
 import com.calyvora.common.security.TenantContext;
 import com.calyvora.expense.ExpenseClaim;
 import com.calyvora.expense.ExpenseClaimRepository;
@@ -21,17 +20,6 @@ import com.calyvora.people.LeaveRequest;
 import com.calyvora.people.LeaveRequestRepository;
 import com.calyvora.people.LeaveStatus;
 import com.calyvora.people.LeaveType;
-import com.calyvora.work.ProjectRepository;
-import com.calyvora.work.Sprint;
-import com.calyvora.work.SprintRepository;
-import com.calyvora.work.SprintStatus;
-import com.calyvora.work.Task;
-import com.calyvora.work.TaskPriority;
-import com.calyvora.work.TaskRepository;
-import com.calyvora.work.TaskStatus;
-import com.calyvora.work.Ticket;
-import com.calyvora.work.TicketRepository;
-import com.calyvora.work.TicketStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,7 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Company-wide analytics (Insights dashboard, Owner/Admin). Reaches across People, Work and Finance
+ * Company-wide analytics (Insights dashboard, Owner/Admin). Reaches across People and Finance
  * and returns chart-ready series. Everything is derived from data we actually store: headcount growth
  * comes from employee start dates, velocity from completed sprints, and so on — nothing is fabricated,
  * so an empty company yields empty series rather than invented numbers.
@@ -56,32 +44,22 @@ public class AnalyticsService {
     private final DepartmentRepository departmentRepository;
     private final LeaveRequestRepository leaveRepository;
     private final GoalRepository goalRepository;
-    private final ProjectRepository projectRepository;
-    private final TaskRepository taskRepository;
-    private final TicketRepository ticketRepository;
-    private final SprintRepository sprintRepository;
     private final ExpenseClaimRepository expenseRepository;
 
     public AnalyticsService(EmployeeRepository employeeRepository, DepartmentRepository departmentRepository,
                             LeaveRequestRepository leaveRepository, GoalRepository goalRepository,
-                            ProjectRepository projectRepository, TaskRepository taskRepository,
-                            TicketRepository ticketRepository, SprintRepository sprintRepository,
                             ExpenseClaimRepository expenseRepository) {
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
         this.leaveRepository = leaveRepository;
         this.goalRepository = goalRepository;
-        this.projectRepository = projectRepository;
-        this.taskRepository = taskRepository;
-        this.ticketRepository = ticketRepository;
-        this.sprintRepository = sprintRepository;
         this.expenseRepository = expenseRepository;
     }
 
     @Transactional(readOnly = true)
     public AnalyticsOverviewResponse overview() {
         UUID companyId = TenantContext.getCompanyId();
-        return new AnalyticsOverviewResponse(people(companyId), work(companyId), finance(companyId));
+        return new AnalyticsOverviewResponse(people(companyId), finance(companyId));
     }
 
     // ---------------- People ----------------
@@ -162,67 +140,6 @@ public class AnalyticsService {
                 slices(byDept), growth, ratings, leaveByType);
     }
 
-    // ---------------- Work ----------------
-
-    private Work work(UUID companyId) {
-        List<Task> tasks = taskRepository.findByCompanyId(companyId);
-
-        Map<TaskStatus, Long> byStatus = new EnumMap<>(TaskStatus.class);
-        Map<TaskPriority, Long> byPriority = new EnumMap<>(TaskPriority.class);
-        for (Task t : tasks) {
-            byStatus.merge(t.getStatus(), 1L, Long::sum);
-            byPriority.merge(t.getPriority(), 1L, Long::sum);
-        }
-        List<Slice> tasksByStatus = new ArrayList<>();
-        for (TaskStatus s : TaskStatus.values()) tasksByStatus.add(new Slice(title(s.name()), byStatus.getOrDefault(s, 0L)));
-        List<Slice> tasksByPriority = new ArrayList<>();
-        for (TaskPriority p : TaskPriority.values()) tasksByPriority.add(new Slice(title(p.name()), byPriority.getOrDefault(p, 0L)));
-
-        Map<TicketStatus, Long> ticketStatus = new EnumMap<>(TicketStatus.class);
-        for (Ticket t : ticketRepository.findByCompanyId(companyId)) {
-            ticketStatus.merge(t.getStatus(), 1L, Long::sum);
-        }
-        List<Slice> ticketsByStatus = new ArrayList<>();
-        for (TicketStatus s : TicketStatus.values()) ticketsByStatus.add(new Slice(title(s.name()), ticketStatus.getOrDefault(s, 0L)));
-
-        // Active sprint points and velocity from completed sprints — group tasks by sprint once.
-        Map<UUID, List<Task>> tasksBySprint = new java.util.HashMap<>();
-        for (Task t : tasks) {
-            if (t.getSprintId() != null) tasksBySprint.computeIfAbsent(t.getSprintId(), k -> new ArrayList<>()).add(t);
-        }
-        List<Sprint> sprints = sprintRepository.findByCompanyId(companyId);
-
-        Work.ActiveSprint active = null;
-        for (Sprint s : sprints) {
-            if (s.getStatus() != SprintStatus.ACTIVE) continue;
-            List<Task> st = tasksBySprint.getOrDefault(s.getId(), List.of());
-            int committed = 0, done = 0, unestimated = 0;
-            for (Task t : st) {
-                int pts = t.getStoryPoints() == null ? 0 : t.getStoryPoints();
-                if (t.getStoryPoints() == null) unestimated++;
-                committed += pts;
-                if (t.getStatus() == TaskStatus.DONE) done += pts;
-            }
-            active = new Work.ActiveSprint(s.getName(), committed, done, committed - done, unestimated);
-            break;
-        }
-
-        List<Slice> velocity = new ArrayList<>();
-        sprints.stream()
-                .filter(s -> s.getStatus() == SprintStatus.COMPLETED)
-                .sorted(java.util.Comparator.comparing(Sprint::getStartDate,
-                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
-                .forEach(s -> {
-                    int done = tasksBySprint.getOrDefault(s.getId(), List.of()).stream()
-                            .filter(t -> t.getStatus() == TaskStatus.DONE && t.getStoryPoints() != null)
-                            .mapToInt(Task::getStoryPoints).sum();
-                    velocity.add(new Slice(shortName(s.getName()), done));
-                });
-
-        return new Work(projectRepository.countByCompanyId(companyId),
-                tasksByStatus, tasksByPriority, ticketsByStatus, active, velocity);
-    }
-
     // ---------------- Finance ----------------
 
     private Finance finance(UUID companyId) {
@@ -267,14 +184,6 @@ public class AnalyticsService {
     private static String title(String enumName) {
         String s = enumName.replace('_', ' ').toLowerCase();
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
-    }
-
-    /** Sprint names can be long ("Sprint 12 — Security hardening"); keep the leading label for an axis. */
-    private static String shortName(String name) {
-        if (name == null) return "";
-        int dash = name.indexOf('—');
-        String head = dash > 0 ? name.substring(0, dash) : name;
-        return head.trim();
     }
 
     private static double round1(double v) { return Math.round(v * 10) / 10.0; }

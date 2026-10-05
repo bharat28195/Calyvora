@@ -19,13 +19,12 @@ class SearchIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void finds_matches_across_people_work_and_knowledge() throws Exception {
+    void finds_matches_across_people_and_company_documents() throws Exception {
         Session owner = demoOwner();
 
-        // A person (People), the Atlas project (Work), and an auth doc (Knowledge).
+        // A person (People) and a handbook policy (company documents).
         assertThat(kinds(owner, "priya")).contains("person");
-        assertThat(kinds(owner, "atlas")).contains("project");
-        assertThat(kinds(owner, "rotation")).contains("page");   // "…Key Rotation" page body/title
+        assertThat(kinds(owner, "conduct")).contains("page");   // the "Code of conduct" page
     }
 
     @Test
@@ -40,7 +39,7 @@ class SearchIntegrationTest extends IntegrationTestBase {
         demoOwner();   // seeds Northwind
         Session outsider = onboardOwner("Acme", "owner@acme.com", "password1234");
         // The outsider must not see Northwind's data.
-        JsonNode res = getJson("/api/v1/search?q=atlas", outsider);
+        JsonNode res = getJson("/api/v1/search?q=conduct", outsider);
         assertThat(res.get("total").asInt()).isZero();
     }
 

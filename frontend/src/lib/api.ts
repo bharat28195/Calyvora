@@ -40,21 +40,15 @@ import {
   type Department,
   type Employee,
   type EmployeeOption,
-  type WorkItem,
   type Goal,
   type ReviewCycle,
   type PerformanceReview,
   type CreateCycleInput,
   type SelfAssessmentInput,
   type ManagerReviewInput,
-  type Client,
-  type ClientDetail,
-  type ClientRequestItem,
   type AppNotification,
   type Post,
   type PostInput,
-  type SprintReport,
-  type Velocity,
   type ExpenseClaim,
   type ExpenseInput,
   type ExpenseSummary,
@@ -88,11 +82,6 @@ import {
   type LeaveTypeBalance,
   type LoginResult,
   type OnboardingTask,
-  type Project,
-  type Task,
-  type Sprint,
-  type Board,
-  type Ticket,
   type Space,
   type KnowledgePage,
   type PageSummary,
@@ -779,9 +768,6 @@ export const api = {
   },
 
   // --- People OS (employees) ---
-  employeeWork(employeeId: string): Promise<WorkItem[]> {
-    return LIVE ? http<WorkItem[]>(`/people/employees/${employeeId}/work`) : mockBackend.employeeWork(accessToken, employeeId);
-  },
   employeeGoals(employeeId: string): Promise<Goal[]> {
     return LIVE ? http<Goal[]>(`/people/employees/${employeeId}/goals`) : mockBackend.employeeGoals(accessToken, employeeId);
   },
@@ -1001,93 +987,6 @@ export const api = {
     return LIVE ? http<LeaveRequest>(`/people/leave/${id}/cancel`, { method: "POST" }) : mockBackend.cancelLeave(accessToken, id);
   },
 
-  // --- Work OS (projects) ---
-  listProjects(): Promise<Project[]> {
-    return LIVE ? http<Project[]>("/work/projects") : mockBackend.listProjects(accessToken);
-  },
-  getProject(id: string): Promise<Project> {
-    return LIVE ? http<Project>(`/work/projects/${id}`) : mockBackend.getProject(accessToken, id);
-  },
-  createProject(input: { name: string; key: string; description?: string }): Promise<Project> {
-    return LIVE
-      ? http<Project>("/work/projects", { method: "POST", body: JSON.stringify(input) })
-      : mockBackend.createProject(accessToken, input);
-  },
-  archiveProject(id: string): Promise<Project> {
-    return LIVE ? http<Project>(`/work/projects/${id}/archive`, { method: "POST" }) : mockBackend.archiveProject(accessToken, id);
-  },
-
-  // --- Work OS (tasks) ---
-  listTasks(projectId: string): Promise<Task[]> {
-    return LIVE ? http<Task[]>(`/work/projects/${projectId}/tasks`) : mockBackend.listTasks(accessToken, projectId);
-  },
-  createTask(projectId: string, input: { title: string; description?: string; priority?: string; assigneeId?: string; dueDate?: string; storyPoints?: number }) : Promise<Task> {
-    return LIVE
-      ? http<Task>(`/work/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify(input) })
-      : mockBackend.createTask(accessToken, projectId, input);
-  },
-  updateTask(id: string, patch: { title?: string; description?: string; status?: string; priority?: string; assigneeId?: string; sprintId?: string; dueDate?: string; storyPoints?: number }): Promise<Task> {
-    return LIVE
-      ? http<Task>(`/work/tasks/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
-      : mockBackend.updateTask(accessToken, id, patch);
-  },
-  deleteTask(id: string): Promise<void> {
-    return LIVE ? http<void>(`/work/tasks/${id}`, { method: "DELETE" }) : mockBackend.deleteTask(accessToken, id);
-  },
-  myTasks(): Promise<Task[]> {
-    return LIVE ? http<Task[]>("/work/tasks/mine") : mockBackend.myTasks(accessToken);
-  },
-
-  // --- Work OS (board & backlog) ---
-  board(projectId: string): Promise<Board> {
-    return LIVE ? http<Board>(`/work/projects/${projectId}/board`) : mockBackend.board(accessToken, projectId);
-  },
-  backlog(projectId: string): Promise<Task[]> {
-    return LIVE ? http<Task[]>(`/work/projects/${projectId}/backlog`) : mockBackend.backlog(accessToken, projectId);
-  },
-
-  // --- Work OS (sprints) ---
-  listSprints(projectId: string): Promise<Sprint[]> {
-    return LIVE ? http<Sprint[]>(`/work/projects/${projectId}/sprints`) : mockBackend.listSprints(accessToken, projectId);
-  },
-  createSprint(projectId: string, input: { name: string; goal?: string; startDate?: string; endDate?: string }): Promise<Sprint> {
-    return LIVE
-      ? http<Sprint>(`/work/projects/${projectId}/sprints`, { method: "POST", body: JSON.stringify(input) })
-      : mockBackend.createSprint(accessToken, projectId, input);
-  },
-  updateSprint(id: string, patch: { name?: string; goal?: string; startDate?: string; endDate?: string }): Promise<Sprint> {
-    return LIVE
-      ? http<Sprint>(`/work/sprints/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
-      : mockBackend.updateSprint(accessToken, id, patch);
-  },
-  startSprint(id: string): Promise<Sprint> {
-    return LIVE ? http<Sprint>(`/work/sprints/${id}/start`, { method: "POST" }) : mockBackend.startSprint(accessToken, id);
-  },
-  completeSprint(id: string): Promise<Sprint> {
-    return LIVE ? http<Sprint>(`/work/sprints/${id}/complete`, { method: "POST" }) : mockBackend.completeSprint(accessToken, id);
-  },
-  deleteSprint(id: string): Promise<void> {
-    return LIVE ? http<void>(`/work/sprints/${id}`, { method: "DELETE" }) : mockBackend.deleteSprint(accessToken, id);
-  },
-
-  // --- Work OS (support tickets) ---
-  listTickets(projectId: string): Promise<Ticket[]> {
-    return LIVE ? http<Ticket[]>(`/work/projects/${projectId}/tickets`) : mockBackend.listTickets(accessToken, projectId);
-  },
-  createTicket(projectId: string, input: { subject: string; description?: string; requesterName?: string; requesterEmail?: string; priority?: string; assigneeId?: string }): Promise<Ticket> {
-    return LIVE
-      ? http<Ticket>(`/work/projects/${projectId}/tickets`, { method: "POST", body: JSON.stringify(input) })
-      : mockBackend.createTicket(accessToken, projectId, input);
-  },
-  updateTicket(id: string, patch: { subject?: string; description?: string; requesterName?: string; requesterEmail?: string; status?: string; priority?: string; assigneeId?: string }): Promise<Ticket> {
-    return LIVE
-      ? http<Ticket>(`/work/tickets/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
-      : mockBackend.updateTicket(accessToken, id, patch);
-  },
-  deleteTicket(id: string): Promise<void> {
-    return LIVE ? http<void>(`/work/tickets/${id}`, { method: "DELETE" }) : mockBackend.deleteTicket(accessToken, id);
-  },
-
   // --- Knowledge OS (spaces) ---
   listSpaces(): Promise<Space[]> {
     return LIVE ? http<Space[]>("/knowledge/spaces") : mockBackend.listSpaces(accessToken);
@@ -1300,32 +1199,6 @@ export const api = {
       : mockBackend.globalSearch(accessToken, q);
   },
 
-  // --- clients (CRM module) ---
-  clients(): Promise<Client[]> {
-    return LIVE ? http<Client[]>("/clients") : mockBackend.clients(accessToken);
-  },
-  createClient(input: Partial<Client> & { name: string }): Promise<Client> {
-    return LIVE ? http<Client>("/clients", { method: "POST", body: JSON.stringify(input) }) : mockBackend.createClient(accessToken, input);
-  },
-  client(id: string): Promise<ClientDetail> {
-    return LIVE ? http<ClientDetail>(`/clients/${id}`) : mockBackend.client(accessToken, id);
-  },
-  updateClient(id: string, patch: Partial<Client>): Promise<Client> {
-    return LIVE ? http<Client>(`/clients/${id}`, { method: "PATCH", body: JSON.stringify(patch) }) : mockBackend.updateClient(accessToken, id, patch);
-  },
-  deleteClient(id: string): Promise<void> {
-    return LIVE ? http<void>(`/clients/${id}`, { method: "DELETE" }) : mockBackend.deleteClient(accessToken, id);
-  },
-  addClientRequest(clientId: string, input: { title: string; description?: string }): Promise<ClientRequestItem> {
-    return LIVE ? http<ClientRequestItem>(`/clients/${clientId}/requests`, { method: "POST", body: JSON.stringify(input) }) : mockBackend.addClientRequest(accessToken, clientId, input);
-  },
-  updateClientRequest(clientId: string, requestId: string, patch: Partial<ClientRequestItem>): Promise<ClientRequestItem> {
-    return LIVE ? http<ClientRequestItem>(`/clients/${clientId}/requests/${requestId}`, { method: "PATCH", body: JSON.stringify(patch) }) : mockBackend.updateClientRequest(accessToken, clientId, requestId, patch);
-  },
-  deleteClientRequest(clientId: string, requestId: string): Promise<void> {
-    return LIVE ? http<void>(`/clients/${clientId}/requests/${requestId}`, { method: "DELETE" }) : mockBackend.deleteClientRequest(accessToken, clientId, requestId);
-  },
-
   /** My own employee profile (auto-provisioned if missing) — the Me hub's anchor. */
   myEmployee(): Promise<Employee> {
     return LIVE ? http<Employee>("/people/me") : mockBackend.myEmployee(accessToken);
@@ -1334,14 +1207,6 @@ export const api = {
   async myGoals(): Promise<Goal[]> {
     const me = await this.myEmployee();
     return this.employeeGoals(me.id);
-  },
-
-  // --- sprint reporting ---
-  sprintReport(sprintId: string): Promise<SprintReport> {
-    return LIVE ? http<SprintReport>(`/work/sprints/${sprintId}/report`) : mockBackend.sprintReport(accessToken, sprintId);
-  },
-  velocity(projectId: string): Promise<Velocity> {
-    return LIVE ? http<Velocity>(`/work/projects/${projectId}/velocity`) : mockBackend.velocity(accessToken, projectId);
   },
 
   // --- company feed ---

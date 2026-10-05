@@ -38,15 +38,6 @@ class ProfileDepthIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void working_on_lists_assigned_open_tasks() throws Exception {
-        Session owner = demo();
-        String marcusId = employeeByEmail(owner, "marcus.reed@northwind.demo").get("id").asText();
-        JsonNode work = getJson("/api/v1/people/employees/" + marcusId + "/work", owner);
-        assertThat(work.size()).isGreaterThan(0);
-        assertThat(work.get(0).get("ref").asText()).startsWith("ATL-");
-    }
-
-    @Test
     void admin_can_update_skills_rating_and_end_date() throws Exception {
         Session owner = demo();
         String id = employeeByEmail(owner, "leo.martins@northwind.demo").get("id").asText();

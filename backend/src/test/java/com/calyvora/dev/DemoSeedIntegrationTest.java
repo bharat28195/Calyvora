@@ -33,15 +33,11 @@ class DemoSeedIntegrationTest extends IntegrationTestBase {
         assertThat(getJson("/api/v1/people/employees", owner).size()).isEqualTo(7);
         assertThat(getJson("/api/v1/people/departments", owner).size()).isEqualTo(4);
 
-        // Work: the Atlas project exists with an active sprint and tasks.
-        JsonNode projects = getJson("/api/v1/work/projects", owner);
-        assertThat(projects.size()).isEqualTo(1);
-        assertThat(projects.get(0).get("key").asText()).isEqualTo("ATL");
-
-        // Knowledge: the handbook space with pages, one linking a Work task.
+        // Company documents: the employee handbook, with the policies everyone reads.
         JsonNode spaces = getJson("/api/v1/knowledge/spaces", owner);
         assertThat(spaces.size()).isEqualTo(1);
-        assertThat(spaces.get(0).get("key").asText()).isEqualTo("ENG");
+        assertThat(spaces.get(0).get("key").asText()).isEqualTo("HR");
+        assertThat(spaces.get(0).get("pageCount").asInt()).isEqualTo(4);
     }
 
     @Test
