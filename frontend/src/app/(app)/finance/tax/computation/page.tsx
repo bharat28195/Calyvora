@@ -53,15 +53,36 @@ export default function TaxComputationPage() {
         </div>
       </div>
 
+      {/* Not withheld through Orbit: nothing has come off anybody's pay, so "deducted so far" would be
+          false. Show the year's tax as what to plan for, and say plainly who pays it. */}
+      {!data.withheldByPayroll && (
+        <Alert tone="info" className="mt-6">
+          Your employer does not deduct income tax through Orbit yet, so none has come off your payslips
+          here. These figures are an estimate of your tax for the year, to plan with and to compare the
+          two regimes.
+        </Alert>
+      )}
+
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <Tile label="Tax for the year" value={money(data.totalTax, data.currency)} tone="text-violet" />
-        <Tile label="Deducted so far" value={money(data.deductedSoFar, data.currency)}
-          hint={`${data.monthsElapsed} month${data.monthsElapsed === 1 ? "" : "s"} of the year gone`} />
-        <Tile label="Next month" value={money(data.projectedNextMonth, data.currency)}
-          tone="text-sky-400"
-          hint={monthsLeft > 0
-            ? `${money(data.remainingTax, data.currency)} left, over ${monthsLeft} pay run${monthsLeft === 1 ? "" : "s"}`
-            : "the year is complete"} />
+        <Tile label={data.withheldByPayroll ? "Tax for the year" : "Estimated tax for the year"}
+          value={money(data.totalTax, data.currency)} tone="text-violet" />
+        {data.withheldByPayroll ? (
+          <>
+            <Tile label="Deducted so far" value={money(data.deductedSoFar, data.currency)}
+              hint={`${data.monthsElapsed} month${data.monthsElapsed === 1 ? "" : "s"} of the year gone`} />
+            <Tile label="Next month" value={money(data.projectedNextMonth, data.currency)}
+              tone="text-sky-400"
+              hint={monthsLeft > 0
+                ? `${money(data.remainingTax, data.currency)} left, over ${monthsLeft} pay run${monthsLeft === 1 ? "" : "s"}`
+                : "the year is complete"} />
+          </>
+        ) : (
+          <>
+            <Tile label="About per month" value={money(data.monthlyTds, data.currency)}
+              tone="text-sky-400" hint="the year's tax spread evenly over 12 months" />
+            <Tile label="Withheld through payroll" value="Not yet" hint="switched on by your employer" />
+          </>
+        )}
       </div>
 
       <Card className="mt-6">

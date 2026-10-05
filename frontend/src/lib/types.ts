@@ -371,6 +371,8 @@ export interface TaxComputation {
   /** What the next pay run should withhold — what is left, over the months that are left. */
   projectedNextMonth: number;
   comparison: TaxRegimeComparison;
+  /** False while the employer does not withhold income tax through Orbit — the figures are an estimate. */
+  withheldByPayroll: boolean;
 }
 
 export interface TaxDeclarationRow {
