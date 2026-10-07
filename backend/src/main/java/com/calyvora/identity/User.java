@@ -60,6 +60,22 @@ public class User {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword;
 
+    /** The language the app is shown in; null follows the company (V68). */
+    @Column(length = 8)
+    private String language;
+
+    /** This person's own clock when they have no employee record to hold one; null follows the company. */
+    @Column(length = 64)
+    private String timezone;
+
+    /** DMY, MDY or YMD; null writes dates the way the language does. */
+    @Column(name = "date_format", length = 8)
+    private String dateFormat;
+
+    /** H12 or H24; null follows the language. */
+    @Column(name = "time_format", length = 8)
+    private String timeFormat;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -162,6 +178,29 @@ public class User {
 
     public void setMustChangePassword(boolean mustChangePassword) {
         this.mustChangePassword = mustChangePassword;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public String getDateFormat() {
+        return dateFormat;
+    }
+
+    public String getTimeFormat() {
+        return timeFormat;
+    }
+
+    public void setPreferences(String language, String timezone, String dateFormat, String timeFormat) {
+        this.language = language;
+        this.timezone = timezone;
+        this.dateFormat = dateFormat;
+        this.timeFormat = timeFormat;
     }
 
     public void setEmailVerifiedAt(Instant emailVerifiedAt) {

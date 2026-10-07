@@ -11,6 +11,7 @@ import { MARKABLE, STATUS, StatusChip, MyDay, MyMonth, hhmm } from "@/components
 import { AttendanceMonthGrid } from "@/components/attendance/month-grid";
 import { DayHeading } from "@/components/ui/month-calendar";
 import { can, canCompanyWide } from "@/lib/permissions";
+import { monthYear } from "@/lib/format";
 
 export default function AttendancePage() {
   const { me } = useSession();
@@ -35,7 +36,7 @@ export default function AttendancePage() {
 /* ---------------- team day sheet (admin) ---------------- */
 
 function monthName(date: string): string {
-  return new Date(date + "T00:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return monthYear(date.slice(0, 7));
 }
 
 /** The tile you can click to drill into. */

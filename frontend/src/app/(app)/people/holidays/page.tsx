@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { DayHeading, MonthCalendar } from "@/components/ui/month-calendar";
 import { can, canCompanyWide } from "@/lib/permissions";
+import { formatDateWith } from "@/lib/format";
 
 /** The company holiday calendar. Everyone reads it; Owner/Admin edits it. */
 export default function HolidaysPage() {
@@ -194,7 +195,7 @@ function HolidayList({
                   {h.optional && <span className="ml-2 rounded-full bg-fg/10 px-1.5 py-0.5 text-[10px] text-fg/50">optional</span>}
                 </p>
                 <p className="truncate text-xs text-fg/40">
-                  {h.note ?? new Date(`${h.date}T00:00:00`).toLocaleDateString(undefined, { month: "long", day: "numeric" })}
+                  {h.note ?? formatDateWith(h.date, { month: "long", day: "numeric" })}
                 </p>
               </div>
             </div>

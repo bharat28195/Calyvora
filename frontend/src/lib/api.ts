@@ -109,6 +109,7 @@ import {
   type TeamStanding,
   type TeamSummary,
   type Designation,
+  type UserPreferences,
 } from "@/lib/types";
 import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
@@ -460,6 +461,13 @@ export const api = {
     });
     auth.set(result.accessToken);
     return result;
+  },
+  /** Save your language, timezone and date/time style; answers with the /me you now get. */
+  async updatePreferences(prefs: UserPreferences): Promise<Me> {
+    if (!LIVE) {
+      throw new ApiError({ timestamp: "", status: 400, code: "VALIDATION_ERROR", message: "Preferences can't be saved in the offline demo." });
+    }
+    return http<Me>("/auth/preferences", { method: "PUT", body: JSON.stringify(prefs) });
   },
   /**
    * Restore a session on page load.

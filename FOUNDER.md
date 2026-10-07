@@ -1774,6 +1774,19 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Replaces** the old "your sign-in details are coming separately" email and the console's
   `demopass123` default.
 
+### PD-57 · 2026-10-07 · Profile menu; each person's language, timezone and date style
+- **Decision (founder):** clicking your name opens a menu (Account settings, Language & region, Change
+  password, Log out). Everyone can choose their own language, timezone and date/time format; English is
+  the default.
+- **Shape:** stored on the account (`users.language/timezone/date_format/time_format`, V68), null =
+  default. Language falls back to the company's, then English. The timezone is written to the employee
+  record when there is one — the same field that stamps attendance — and to the account only for people
+  without one (platform owner), so one person's clock never lives in two places. Languages: English,
+  Hindi, Spanish, French, German; the menus and account screens are translated, every other screen falls
+  back to English until translated (keys are the English text, so nothing ever shows a raw key).
+- **Next:** translate the remaining screens module by module, starting with the employee self-service
+  pages (Me, Finance, Time off).
+
 ## 4. Architecture Decision Log
 
 

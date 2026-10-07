@@ -9,6 +9,7 @@ import { KIND_LABELS } from "@/lib/documents";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { formatDate } from "@/lib/format";
 
 /** Every letter this company has issued (feedback D2). Newest first. */
 export default function DocumentsPage() {
@@ -76,7 +77,7 @@ export default function DocumentsPage() {
                     <p className="truncate text-xs text-fg/40">
                       {KIND_LABELS[d.kind]}
                       {d.employeeName && <> · <User className="inline h-3 w-3" /> {d.employeeName}</>}
-                      {" · "}{new Date(d.createdAt).toLocaleDateString()}
+                      {" · "}{formatDate(d.createdAt)}
                     </p>
                   </div>
                 </div>

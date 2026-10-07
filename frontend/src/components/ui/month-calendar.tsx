@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { monthYear, formatDateWith } from "@/lib/format";
 
 /**
  * The month grid, used by every calendar in Orbit.
@@ -64,8 +65,7 @@ export function shiftMonth(month: string, by: number): string {
 }
 
 export function monthLabel(month: string): string {
-    const [y, m] = month.split("-").map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    return monthYear(month);
 }
 
 /** "1 WED" — the heading over the detail panel, as on a phone calendar. */
@@ -73,7 +73,7 @@ export function dayLabel(date: string): { day: string; weekday: string } {
     const d = new Date(`${date}T00:00:00`);
     return {
         day: String(d.getDate()),
-        weekday: d.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase(),
+        weekday: formatDateWith(date, { weekday: "short" }).toUpperCase(),
     };
 }
 

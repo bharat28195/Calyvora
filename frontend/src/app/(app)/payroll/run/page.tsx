@@ -9,7 +9,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { BankFilePanel } from "@/components/payroll/bank-file";
-import { money } from "@/lib/format";
+import { money, formatDate } from "@/lib/format";
 
 /**
  * HR payroll run — every employee's net for a month, after attendance LOP. Finalising the month locks
@@ -193,7 +193,7 @@ export default function PayrollRunPage() {
                     </CardTitle>
                     <p className="mt-1 text-sm text-fg/60">
                       Payslips are stored exactly as issued
-                      {lock.finalizedAt && <> on {new Date(lock.finalizedAt).toLocaleDateString()}</>}. Salary
+                      {lock.finalizedAt && <> on {formatDate(lock.finalizedAt)}</>}. Salary
                       or attendance changes from now on do not alter them.
                     </p>
                   </div>

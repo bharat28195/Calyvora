@@ -7,7 +7,7 @@ import type { AttendanceEntry, AttendanceMonth, AttendanceStatus } from "@/lib/t
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
-import { currentTimezone } from "@/lib/format";
+import { currentTimezone, formatDateWith, hourCycle } from "@/lib/format";
 import { DayHeading, MonthCalendar } from "@/components/ui/month-calendar";
 import { cn } from "@/lib/utils";
 
@@ -114,12 +114,8 @@ export function MyDay() {
   const clockedOut = !!entry?.checkOut;
   const worked = fmtDuration(minutesBetween(entry?.checkIn ?? null, entry?.checkOut ?? (clockedIn ? nowHHmm(now) : null)));
   const zone = currentTimezone();
-  const dateLabel = now.toLocaleDateString(undefined, {
-    weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: zone,
-  });
-  const timeLabel = now.toLocaleTimeString(undefined, {
-    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: zone,
-  });
+  const dateLabel = formatDateWith(now, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const timeLabel = formatDateWith(now, { hour: "2-digit", minute: "2-digit", second: "2-digit", ...hourCycle() });
   // Named only when it is not the zone the person's own machine is on. Someone sitting in the
   // office never needs telling; someone whose company is set to UTC, or who is travelling, does —
   // and that is exactly when the number looks wrong.
@@ -342,9 +338,8 @@ export function DailyLog({ days }: { days: AttendanceEntry[] }) {
           {rows.map((d) => {
             const mins = minutesBetween(d.checkIn, d.checkOut);
             const pct = mins == null ? 0 : Math.min(100, Math.round((mins / (9 * 60)) * 100));
-            const dt = new Date(`${d.date}T00:00:00`);
-            const weekday = dt.toLocaleDateString(undefined, { weekday: "short" });
-            const nice = dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+            const weekday = formatDateWith(d.date, { weekday: "short" });
+            const nice = formatDateWith(d.date, { day: "numeric", month: "short" });
             const offDay = d.status === "WEEK_OFF" || d.status === "HOLIDAY" || !d.status;
             return (
               <tr key={d.date} className={cn("border-b border-fg/5 last:border-0 hover:bg-fg/[0.03]", offDay && "text-fg/40")}>

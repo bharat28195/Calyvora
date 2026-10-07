@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import {
-  Loader2, LogOut, LayoutDashboard, Users, UserCog, Settings, FileText,
+  Loader2, LayoutDashboard, Users, UserCog, Settings, FileText,
   CircleUser, Inbox, Receipt, ClipboardCheck, BarChart3, Wallet, CreditCard, UserPlus,
   CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network, Megaphone, FolderOpen,
 } from "lucide-react";
@@ -20,6 +20,8 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { Wordmark } from "@/components/layout/wordmark";
 import { can, canCompanyWide, type PermissionKey } from "@/lib/permissions";
+import { ProfileMenu } from "@/components/layout/profile-menu";
+import { useT } from "@/hooks/useT";
 
 interface NavChild {
   href: string;
@@ -270,6 +272,7 @@ function routeRule(pathname: string): { roles: Role[] | null; feature?: string; 
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const session = useRequireAuth();
+  const t = useT();
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -331,7 +334,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const { user, company } = session.me;
+  const { user } = session.me;
   const me = session.me;
   const seesWholeCompany = canCompanyWide(me, "ORG_VIEW_ALL");
   const allowed = (perm?: PermissionKey, wide?: boolean) => !perm || (wide ? canCompanyWide(me, perm) : can(me, perm));
@@ -382,7 +385,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
+                  {t(item.label)}
                 </Link>
                 {hasChildren && section && (
                   <div className="mt-1 space-y-0.5 border-l border-fg/10 pb-1 pl-3 ml-4">
@@ -397,7 +400,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             active ? "bg-violet/10 font-medium text-violet" : "text-fg/50 hover:bg-fg/5 hover:text-fg",
                           )}
                         >
-                          {c.label}
+                          {t(c.label)}
                         </Link>
                       );
                     })}
@@ -408,29 +411,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="border-t border-fg/10 p-3">
-          <div className="mb-2 flex items-center gap-2 px-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{user.firstName} {user.lastName}</p>
-              <p className="truncate text-xs text-fg/40">{company.name} · {user.role}</p>
-            </div>
-            <Link href="/account" aria-label="Account settings" title="Account settings"
-              className={cn("inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-fg/5 hover:text-fg",
-                pathname === "/account" ? "text-violet" : "text-fg/50")}>
-              <Settings className="h-4 w-4" />
-            </Link>
-          </div>
-          <Link href="/account"
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg/60 hover:bg-fg/5 hover:text-fg">
-            <UserCog className="h-4 w-4" /> Account settings
-          </Link>
-          <button
-            onClick={logout}
-            disabled={loggingOut}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg/60 hover:bg-fg/5 hover:text-fg disabled:opacity-50"
-          >
-            {loggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-            Log out
-          </button>
+          <ProfileMenu me={me} onLogout={logout} loggingOut={loggingOut} placement="up" />
         </div>
       </aside>
 
@@ -442,18 +423,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <CommandBar />
           <NotificationBell />
           <ThemeToggle />
-          <Link href="/account" aria-label="Account settings"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-fg/60 hover:bg-fg/5 hover:text-fg md:hidden">
-            <Settings className="h-4 w-4" />
-          </Link>
-          <button
-            onClick={logout}
-            disabled={loggingOut}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-fg/60 hover:bg-fg/5 hover:text-fg disabled:opacity-50 md:hidden"
-            aria-label="Log out"
-          >
-            {loggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-          </button>
+          <div className="md:hidden">
+            <ProfileMenu me={me} onLogout={logout} loggingOut={loggingOut} placement="down" />
+          </div>
         </header>
 
         {/* Mobile nav — horizontal scroll; sub-panes appear after the active section */}
@@ -470,14 +442,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     section ? "bg-violet/10 text-violet" : "text-fg/60",
                   )}
                 >
-                  <Icon className="h-4 w-4" /> {item.label}
+                  <Icon className="h-4 w-4" /> {t(item.label)}
                 </Link>
                 {item.children?.length && section &&
                   item.children.filter((c) => c.href !== item.href).map((c) => (
                     <Link key={c.href} href={c.href}
                       className={cn("inline-flex shrink-0 items-center rounded-lg px-3 py-1.5 text-sm",
                         pathname === c.href ? "bg-violet/10 text-violet" : "text-fg/50")}>
-                      {c.label}
+                      {t(c.label)}
                     </Link>
                   ))}
               </span>

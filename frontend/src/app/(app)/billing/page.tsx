@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, CheckCircle2, Users, CalendarClock, Sparkles } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { BillingOverview } from "@/lib/types";
-import { money as fmtMoney } from "@/lib/format";
+import { money as fmtMoney, monthYear, formatDate } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ export default function BillingPage() {
   }
   if (!data) return <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>;
 
-  const monthLabel = (m: string) => new Date(`${m}-01T00:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  const monthLabel = (m: string) => monthYear(m, "short");
 
   return (
     <div>
@@ -62,7 +62,7 @@ export default function BillingPage() {
 
       {data.trialActive && (
         <Alert tone="warning" className="mt-6">
-          You&apos;re on a free trial{data.trialEndsAt ? ` until ${new Date(data.trialEndsAt).toLocaleDateString()}` : ""}.
+          You&apos;re on a free trial{data.trialEndsAt ? ` until ${formatDate(data.trialEndsAt)}` : ""}.
           Activate to keep your team&apos;s HR running.
         </Alert>
       )}

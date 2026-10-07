@@ -17,6 +17,8 @@ export interface Me {
     status: UserStatus;
     /** Someone else chose this password (a new company's first admin); the app asks for a new one first. */
     mustChangePassword?: boolean;
+    /** What this person chose for themselves; null where they kept the default (V68). */
+    preferences?: UserPreferences;
   };
   company: {
     id: string;
@@ -34,12 +36,25 @@ export interface Me {
    * disagree. Set the app-wide formatters from this, not from company.timezone.
    */
   timezone: string;
+  /** The language to show the app in: theirs, else the company's, else English (V68). */
+  language?: string;
   /**
    * What this person may do, permission key → "COMPANY" or "TEAM" (PD-54). Optional only for a
    * session cached before roles existed; read it through lib/permissions, which falls back to the
    * built-in defaults for the role.
    */
   permissions?: Record<string, "COMPANY" | "TEAM">;
+}
+
+export type DateFormatPref = "DMY" | "MDY" | "YMD";
+export type TimeFormatPref = "H12" | "H24";
+
+/** A person's own display choices. Null means "use the default". */
+export interface UserPreferences {
+  language: string | null;
+  timezone: string | null;
+  dateFormat: DateFormatPref | null;
+  timeFormat: TimeFormatPref | null;
 }
 
 export interface CompanySettings {

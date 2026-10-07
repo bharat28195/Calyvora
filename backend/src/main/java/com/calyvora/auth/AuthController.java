@@ -111,6 +111,13 @@ public class AuthController {
                 .body(result.body());
     }
 
+    /** Your own language, timezone and date/time style (V68). Anybody signed in may set their own. */
+    @org.springframework.web.bind.annotation.PutMapping("/preferences")
+    public MeResponse updatePreferences(@CurrentUser AuthPrincipal principal,
+                                        @RequestBody com.calyvora.auth.dto.PreferencesRequest request) {
+        return authService.updatePreferences(principal.userId(), request);
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(
             @CookieValue(name = "${calyvora.security.refresh.cookie-name}", required = false) String refreshToken,

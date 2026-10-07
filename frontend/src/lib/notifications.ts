@@ -1,6 +1,7 @@
 import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck } from "lucide-react";
 import { createElement, type ReactNode } from "react";
 import type { NotificationType } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 
 /** One icon per notification type, so the inbox is scannable without reading every line. */
 export const NOTIFICATION_ICON: Record<NotificationType, ReactNode> = {
@@ -25,5 +26,5 @@ export function notificationAge(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }

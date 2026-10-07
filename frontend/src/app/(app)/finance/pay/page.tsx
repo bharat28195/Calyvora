@@ -8,7 +8,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
-import { money as fmtMoney } from "@/lib/format";
+import { money as fmtMoney, monthYear } from "@/lib/format";
 
 // Company-currency formatting (Settings → Localization); per-record currency is ignored for display.
 function money(n: number | null | undefined, _currency?: string) {
@@ -240,9 +240,7 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
 
 /** "2026-07" -> "July 2026", the way a payslip titles itself. */
 function formatMonth(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  if (!y || !m) return month;
-  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return monthYear(month);
 }
 
 /** BANK_TRANSFER -> "Bank transfer". */

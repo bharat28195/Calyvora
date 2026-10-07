@@ -7,7 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import type { TaxComputation, TaxDeclaration, TaxRegime } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { money } from "@/lib/format";
+import { money, formatDate } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
@@ -185,7 +185,7 @@ export default function TaxDeclarationPage() {
           {saved && <span className="text-sm text-emerald-400">Saved</span>}
           {data.status === "SUBMITTED" && data.submittedAt && (
             <span className="text-sm text-fg/40">
-              Declared on {new Date(data.submittedAt).toLocaleDateString()}
+              Declared on {formatDate(data.submittedAt)}
             </span>
           )}
         </div>

@@ -17,25 +17,13 @@ import { EmployeeStatutory } from "@/components/people/employee-statutory";
 import { EmployeeProfileExtras } from "@/components/people/employee-profile-extras";
 import { EmployeeGoals } from "@/components/people/employee-goals";
 import { EmployeeDocuments } from "@/components/people/employee-documents";
+import { TIMEZONES } from "@/lib/timezones";
 import { can, canCompanyWide } from "@/lib/permissions";
 
 const TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"] as const;
 const STATUSES = ["ONBOARDING", "ACTIVE", "TERMINATED"] as const;
 const typeLabel = (t: string | null) => (t ? t.replace(/_/g, " ").toLowerCase() : "—");
 
-/**
- * Every zone the browser knows, so the list is the same one the server validates against. Falls
- * back to a short hand-written list on the rare runtime that lacks the API, rather than an empty
- * dropdown that makes the field look broken.
- */
-const TIMEZONES: string[] = (() => {
-  try {
-    const all = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone");
-    if (all && all.length > 0) return all;
-  } catch { /* fall through */ }
-  return ["Asia/Kolkata", "Asia/Dubai", "Asia/Singapore", "Europe/London", "Europe/Berlin",
-    "America/New_York", "America/Los_Angeles", "Australia/Sydney"];
-})();
 
 export default function PeoplePage() {
   const { me } = useSession();

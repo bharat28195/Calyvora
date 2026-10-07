@@ -254,6 +254,28 @@ public class AuthService {
         }
     }
 
+    /**
+     * Save a person's language, clock and date style, and answer with the /me they now get.
+     *
+     * <p>The timezone goes where the rest of the app already reads it: onto the employee record for
+     * anybody who has one — the same field My profile edits, and the one that stamps their
+     * attendance — and onto the account only for somebody without one. Two places holding one
+     * person's clock is how the attendance screen and the server come to disagree.
+     */
+    @Transactional
+    public MeResponse updatePreferences(UUID userId, com.calyvora.auth.dto.PreferencesRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Invalid session"));
+        String zone = com.calyvora.people.Timezones.validOrNull(request.timezone());
+        com.calyvora.people.Employee employee = employeeRepository.findByUserId(userId).orElse(null);
+        if (employee != null) {
+            employee.setTimezone(zone);
+        }
+        user.setPreferences(Preferences.validLanguage(request.language()), employee == null ? zone : null,
+                Preferences.validDateFormat(request.dateFormat()), Preferences.validTimeFormat(request.timeFormat()));
+        return me(userId);
+    }
+
     @Transactional(readOnly = true)
     public MeResponse me(UUID userId) {
         User user = userRepository.findById(userId)

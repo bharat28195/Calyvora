@@ -10,6 +10,7 @@ import { KIND_LABELS } from "@/lib/documents";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { LetterSheet } from "@/components/documents/letter";
+import { formatDate } from "@/lib/format";
 
 /** A single issued letter — frozen at generation time, ready to print or copy (feedback D2). */
 export default function DocumentPage() {
@@ -57,7 +58,7 @@ export default function DocumentPage() {
           <p className="mt-1 text-sm text-fg/50">
             {KIND_LABELS[doc.kind]}
             {doc.employeeName && <> · {doc.employeeName}</>}
-            {" · issued "}{new Date(doc.createdAt).toLocaleDateString()}
+            {" · issued "}{formatDate(doc.createdAt)}
           </p>
         </div>
         <div className="flex gap-2">
