@@ -489,8 +489,11 @@ public class CompensationService {
             // in the company by roughly a factor of two, and it would look plausible on the payslip.
             PfCalculator.Result pf = null;
             if ("ENABLED".equals(financeForPf.getPfStatus())) {
+                // The Pension Scheme stops at 58; from then the employer's whole share goes to EPF.
+                boolean pensionMember = financeForPf.getDateOfBirth() == null
+                        || financeForPf.getDateOfBirth().plusYears(58).isAfter(ym.atDay(1));
                 pf = PfCalculator.compute(earnedBasic,
-                        ctx != null ? ctx.pfSettings() : pfSettingsService.effective(companyId));
+                        ctx != null ? ctx.pfSettings() : pfSettingsService.effective(companyId), pensionMember);
                 if (pf.employee().signum() > 0) {
                     deductions.add(new PayslipResponse.Line("Provident Fund (employee)", pf.employee()));
                     totalDed = totalDed.add(pf.employee());

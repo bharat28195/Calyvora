@@ -74,6 +74,8 @@ import {
   type PfSettings,
   type StatutorySettings,
   type PayrollMonthStatus,
+  type FilingFile,
+  type FilingIssue,
   type LeavePolicy,
   type CompanyFile,
   type CursorPage,
@@ -1200,6 +1202,22 @@ export const api = {
   },
   reopenPayrollMonth(month: string): Promise<PayrollMonthStatus> {
     return http<PayrollMonthStatus>(`/payroll/months/${month}/reopen`, { method: "POST" });
+  },
+  /** Every finalised month, newest first. */
+  payrollMonths(): Promise<PayrollMonthStatus[]> {
+    return LIVE ? http<PayrollMonthStatus[]>("/payroll/months") : Promise.resolve([]);
+  },
+  /** What will stop a statutory return from being filed. */
+  filingReadiness(): Promise<FilingIssue[]> {
+    return http<FilingIssue[]>("/payroll/filings/readiness");
+  },
+  /** A return file for a finalised month, with who was left out and why. */
+  filingFile(kind: "ecr" | "esi" | "pt", month: string): Promise<FilingFile> {
+    return http<FilingFile>(`/payroll/filings/${month}/${kind}?format=json`);
+  },
+  /** Form 24Q deductee data for a financial-year quarter, e.g. "2026-27-Q3". */
+  form24q(quarter: string): Promise<FilingFile> {
+    return http<FilingFile>(`/payroll/filings/24q/${quarter}?format=json`);
   },
   statutorySettings(): Promise<StatutorySettings> {
     return http<StatutorySettings>("/payroll/statutory-settings");

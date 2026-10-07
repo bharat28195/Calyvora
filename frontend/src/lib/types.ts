@@ -1403,6 +1403,22 @@ export interface PayrollMonthStatus {
   totalEmployer: number | null;
 }
 
+/** A statutory return file, with the people who could not be included and why. */
+export interface FilingFile {
+  filename: string;
+  contentType: string;
+  content: string;
+  skipped: { employeeId: string; name: string; reason: string }[];
+}
+
+/** Something that will stop a return being filed. `employeeId` null = a company-level gap. */
+export interface FilingIssue {
+  employeeId: string | null;
+  name: string;
+  severity: "ERROR" | "WARNING";
+  message: string;
+}
+
 /** ESI / professional-tax settings and the registration numbers statutory files carry. */
 export interface StatutorySettings {
   /** The vendor's switch. Without it neither ESI nor PT has any effect. */

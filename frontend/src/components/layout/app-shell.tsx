@@ -193,6 +193,7 @@ const NAV: NavItem[] = [
       // says which, so HR can check the rates before asking us to turn it on. Hiding it would leave
       // somebody told "PF starts next month" with nowhere to look.
       { href: "/payroll/statutory", label: "Statutory" },
+      { href: "/payroll/filings", label: "Returns" },
     ],
   },
   // Admins and HR, matching ExpenseController (HR manages expenses since 2026-10-05). Approving their

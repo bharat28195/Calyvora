@@ -27,6 +27,16 @@ class PfCalculatorTest {
     }
 
     @Test
+    void past_58_the_whole_employer_share_goes_to_epf() {
+        // Basic 10,000, not a pension member: EPS 0, EPF takes the full 1,200. Employee still 1,200.
+        PfCalculator.Result r = PfCalculator.compute(rupees(10_000), settings(), false);
+        assertThat(r.employerEps()).isEqualByComparingTo(rupees(0));
+        assertThat(r.employerEpf()).isEqualByComparingTo(rupees(1_200));
+        assertThat(r.employee()).isEqualByComparingTo(rupees(1_200));
+        assertThat(r.employerTotal()).isEqualByComparingTo(rupees(1_300));
+    }
+
+    @Test
     void a_wage_below_the_ceiling_splits_the_standard_way() {
         // Basic 10,000. Employee 12% = 1,200. Employer 12% = 1,200, of which EPS 8.33% = 833 and the
         // rest to EPF = 367. Admin 0.5% = 50, EDLI 0.5% = 50.

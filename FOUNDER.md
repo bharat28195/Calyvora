@@ -1740,8 +1740,14 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   months actually withheld) ÷ months left, as Keka/Zoho do — a raise or late declaration no longer
   leaves a lump in March. Unlocked earlier months count as an even twelfth, so a company that never
   locks sees no change.
-- **Next:** ECR (PF), ESI contribution file, PT summary, Form 24Q data, Form 16 Part B, challan
-  register, compliance calendar and a readiness check (missing UAN/PAN/ESI numbers).
+- **Built, step 3 — the return files (Payroll → Returns):** PF ECR v2 (eleven `#~#` fields per
+  member), ESI monthly contribution file (ESIC template column order, as CSV), professional-tax
+  state-wise summary, Form 24Q Annexure I deductee data per quarter (missing PAN flagged under 206AA),
+  and a readiness check that names what will keep someone out of a return (no UAN, no ESI IP number,
+  no PAN, no PT state, missing PF/ESI codes or TAN). All built from finalised months only; anyone a
+  file cannot include is listed with the reason, never silently dropped. PF also stops EPS at 58.
+- **Next:** Form 16 Part B, challan register, Labour Welfare Fund, TDS opening balance for companies
+  joining mid-year / previous-employer income (Form 12B), compliance calendar reminders.
 - **Before selling it as "full compliance":** a CA reviews every rule, then one parallel-run month
   against a real client's existing payroll.
 
