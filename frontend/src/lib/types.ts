@@ -1357,6 +1357,10 @@ export interface Payslip {
    * holding the payslip; an absent section reads as "not applicable", which is the truth.
    */
   statutory: PayslipStatutory | null;
+  /** Income tax (TDS) withheld this month; null when the company does not withhold it here. */
+  incomeTax?: number | null;
+  /** From a finalised month — will never change. */
+  finalized?: boolean;
 }
 
 /**
@@ -1366,15 +1370,53 @@ export interface Payslip {
  * so the statutory block can be read on its own.
  */
 export interface PayslipStatutory {
+  // Each scheme's fields are null when it does not apply to this person (not enrolled in PF, above
+  // the ESI ceiling, a state without professional tax) — "not applicable", never "0".
   /** The wages PF was computed on, after any ceiling. Printed because it answers the most common
    *  payslip question in India: "why is my PF 1,800 when my basic is 50,000?" */
-  pfWages: number;
-  employeePf: number;
-  employerEps: number;
-  employerEpf: number;
-  employerAdminCharges: number;
-  employerEdli: number;
+  pfWages: number | null;
+  employeePf: number | null;
+  employerEps: number | null;
+  employerEpf: number | null;
+  employerAdminCharges: number | null;
+  employerEdli: number | null;
+  /** Gross wages ESI was computed on, after loss of pay. */
+  esiWages: number | null;
+  /** Zero (not null) for a low earner whose own share is waived. */
+  employeeEsi: number | null;
+  employerEsi: number | null;
+  professionalTax: number | null;
+  /** Two-letter code of the state the professional tax was computed for. */
+  ptState: string | null;
+  /** PF and ESI employer contributions together. */
   employerTotal: number;
+}
+
+/** A payroll month's lock. Once finalised, its payslips are read back as issued and never change. */
+export interface PayrollMonthStatus {
+  month: string;
+  finalized: boolean;
+  finalizedAt: string | null;
+  employees: number | null;
+  totalGross: number | null;
+  totalNet: number | null;
+  totalEmployer: number | null;
+}
+
+/** ESI / professional-tax settings and the registration numbers statutory files carry. */
+export interface StatutorySettings {
+  /** The vendor's switch. Without it neither ESI nor PT has any effect. */
+  statutoryEnabled: boolean;
+  esiEnabled: boolean;
+  esiEmployeeRate: number;
+  esiEmployerRate: number;
+  esiWageCeiling: number;
+  ptEnabled: boolean;
+  pfEstablishmentCode: string | null;
+  esiEmployerCode: string | null;
+  tan: string | null;
+  companyPan: string | null;
+  ptRegistrationNo: string | null;
 }
 
 /** One company's Provident Fund rates, plus whether statutory payroll is switched on at all. */
@@ -1462,6 +1504,8 @@ export interface EmployeeFinance {
   panVerified: boolean;
   dateOfBirth: string | null;
   parentName: string | null;
+  /** Read by professional tax — Maharashtra's slabs differ by it. */
+  gender: "MALE" | "FEMALE" | "OTHER" | null;
 }
 
 export interface PayrollRunRow {
@@ -1475,6 +1519,10 @@ export interface PayrollRunRow {
   employeePf: number;
   /** Paid by the company on top — outside both `gross` and `net`. */
   employerContribution: number;
+  /** Deducted from this person, already inside `net`. */
+  employeeEsi: number;
+  /** Deducted from this person, already inside `net`. */
+  professionalTax: number;
 }
 /** A payroll run in flight or finished. `result` only for DONE, `error` only for FAILED. */
 export interface PayrollJob {

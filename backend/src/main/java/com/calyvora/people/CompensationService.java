@@ -41,6 +41,10 @@ public class CompensationService {
     private final DepartmentRepository departmentRepository;
     private final com.calyvora.feature.FeatureService featureService;
     private final com.calyvora.payroll.PfSettingsService pfSettingsService;
+    private final com.calyvora.payroll.StatutorySettingsService statutorySettingsService;
+    private final com.calyvora.payroll.PayrollMonthRepository payrollMonthRepository;
+    private final com.calyvora.payroll.PayslipSnapshotRepository payslipSnapshotRepository;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final com.calyvora.tax.TaxService taxService;
     private final EmployeeFinanceRepository employeeFinanceRepository;
 
@@ -55,8 +59,16 @@ public class CompensationService {
                                com.calyvora.feature.FeatureService featureService,
                                com.calyvora.payroll.PfSettingsService pfSettingsService,
                                EmployeeFinanceRepository employeeFinanceRepository,
-                               com.calyvora.tax.TaxService taxService) {
+                               com.calyvora.tax.TaxService taxService,
+                               com.calyvora.payroll.StatutorySettingsService statutorySettingsService,
+                               com.calyvora.payroll.PayrollMonthRepository payrollMonthRepository,
+                               com.calyvora.payroll.PayslipSnapshotRepository payslipSnapshotRepository,
+                               com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.taxService = taxService;
+        this.statutorySettingsService = statutorySettingsService;
+        this.payrollMonthRepository = payrollMonthRepository;
+        this.payslipSnapshotRepository = payslipSnapshotRepository;
+        this.objectMapper = objectMapper;
         this.employeeFinanceRepository = employeeFinanceRepository;
         this.financeService = financeService;
         this.departmentRepository = departmentRepository;
@@ -148,10 +160,66 @@ public class CompensationService {
     public com.calyvora.people.dto.PayrollRunResponse payrollRun(String month) {
         java.time.YearMonth ym = month == null || month.isBlank()
                 ? java.time.YearMonth.now() : java.time.YearMonth.parse(month);
+        UUID companyId = TenantContext.getCompanyId();
+        // A finalised month is read back exactly as it was paid, never recomputed (V65).
+        List<PayslipResponse> slips = payrollMonthRepository.existsByCompanyIdAndMonth(companyId, ym.toString())
+                ? finalizedPayslips(companyId, ym.toString())
+                : computeRunPayslips(ym);
+        return toRun(ym.toString(), companyCurrency(companyId), slips);
+    }
+
+    /** The run's rows and totals from its payslips — the same arithmetic for open and locked months. */
+    private static com.calyvora.people.dto.PayrollRunResponse toRun(String month, String currency,
+                                                                   List<PayslipResponse> slips) {
         List<com.calyvora.people.dto.PayrollRunResponse.Row> rows = new java.util.ArrayList<>();
-        BigDecimal totalGross = BigDecimal.ZERO, totalNet = BigDecimal.ZERO;
-        BigDecimal totalEmployer = BigDecimal.ZERO;
+        BigDecimal totalGross = BigDecimal.ZERO, totalNet = BigDecimal.ZERO, totalEmployer = BigDecimal.ZERO;
         double totalLop = 0;
+        for (PayslipResponse p : slips) {
+            // Absent statutory block = the feature is off or this person is not enrolled. Zero rather
+            // than null so the row arithmetic works without every caller null-checking.
+            var st = p.statutory();
+            BigDecimal employeePf = st == null || st.employeePf() == null ? BigDecimal.ZERO : st.employeePf();
+            BigDecimal employeeEsi = st == null || st.employeeEsi() == null ? BigDecimal.ZERO : st.employeeEsi();
+            BigDecimal professionalTax = st == null || st.professionalTax() == null
+                    ? BigDecimal.ZERO : st.professionalTax();
+            BigDecimal employerContribution = st == null ? BigDecimal.ZERO : st.employerTotal();
+            rows.add(new com.calyvora.people.dto.PayrollRunResponse.Row(
+                    p.employeeId(), p.employeeName(), p.designation(), p.gross(), p.lopDays(), p.net(),
+                    employeePf, employerContribution, employeeEsi, professionalTax));
+            totalGross = totalGross.add(p.gross());
+            totalNet = totalNet.add(p.net());
+            totalEmployer = totalEmployer.add(employerContribution);
+            totalLop += p.lopDays();
+        }
+        return new com.calyvora.people.dto.PayrollRunResponse(
+                month, currency, rows, totalGross, totalNet, totalLop, rows.size(), totalEmployer);
+    }
+
+    /** A finalised month's payslips, as issued, in directory order of who they are for. */
+    @Transactional(readOnly = true)
+    public List<PayslipResponse> finalizedPayslips(UUID companyId, String month) {
+        List<PayslipResponse> out = new ArrayList<>();
+        for (com.calyvora.payroll.PayslipSnapshot s : payslipSnapshotRepository.findByCompanyIdAndMonth(companyId, month)) {
+            out.add(readSnapshot(s));
+        }
+        out.sort(java.util.Comparator.comparing(PayslipResponse::employeeName, String.CASE_INSENSITIVE_ORDER));
+        return out;
+    }
+
+    private PayslipResponse readSnapshot(com.calyvora.payroll.PayslipSnapshot s) {
+        try {
+            return objectMapper.readValue(s.getPayload(), PayslipResponse.class).asFinalized();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Unreadable payslip snapshot " + s.getId(), e);
+        }
+    }
+
+    /**
+     * Every payslip for a month, computed now from current salaries, attendance and settings — what an
+     * open month shows, and what finalising a month freezes.
+     */
+    @Transactional
+    public List<PayslipResponse> computeRunPayslips(java.time.YearMonth ym) {
         UUID runCompanyId = TenantContext.getCompanyId();
         String currency = companyCurrency(runCompanyId);
 
@@ -179,10 +247,12 @@ public class CompensationService {
         // question again, once per employee.
         java.util.Set<UUID> paid = new java.util.HashSet<>();
         java.util.Map<UUID, CompensationRecord> currentSalary = new java.util.HashMap<>();
+        java.util.Map<UUID, List<CompensationRecord>> salaryHistory = new java.util.HashMap<>();
         for (CompensationRecord r : compensationRepository
                 .findByCompanyIdOrderByEffectiveDateDescCreatedAtDesc(runCompanyId)) {
             paid.add(r.getEmployeeId());
             currentSalary.putIfAbsent(r.getEmployeeId(), r);
+            salaryHistory.computeIfAbsent(r.getEmployeeId(), k -> new ArrayList<>()).add(r);
         }
         java.util.Map<UUID, com.calyvora.people.dto.AttendanceMonthResponse> attendanceByEmployee =
                 attendanceService.monthForEveryone(ym, paid);
@@ -221,8 +291,7 @@ public class CompensationService {
             for (java.util.Map.Entry<UUID, CompensationRecord> e : currentSalary.entrySet()) {
                 annual.put(e.getKey(), e.getValue().getAnnualAmount());
             }
-            tdsByEmployee = taxService.monthlyTdsFor(runCompanyId,
-                    com.calyvora.tax.FinancialYear.of(ym.atDay(1)), annual);
+            tdsByEmployee = taxService.monthlyTdsFor(runCompanyId, ym, annual);
         }
 
         RunContext ctx = new RunContext(currency,
@@ -230,6 +299,7 @@ public class CompensationService {
                 featureService.isEnabled(runCompanyId, Feature.STATUTORY_PAYROLL),
                 incomeTaxOn, tdsByEmployee,
                 pfSettingsService.effective(runCompanyId),
+                statutorySettingsService.effective(runCompanyId), salaryHistory,
                 employeesById, usersById, currentSalary, financeByEmployee,
                 runCompanyName,
                 runSettings == null ? null : runSettings.getAddress(),
@@ -238,31 +308,19 @@ public class CompensationService {
 
         // Resolved once and reused: directory() builds a DTO per employee, and it was being called
         // twice for the same list.
+        List<PayslipResponse> slips = new ArrayList<>();
         for (var e : employeeService.directory()) {
             if (!paid.contains(UUID.fromString(e.id()))) {
                 continue;   // nobody to pay — the run has never included them
             }
             try {
-                PayslipResponse p = payslip(UUID.fromString(e.id()), ym.toString(),
-                        attendanceByEmployee.get(UUID.fromString(e.id())), ctx);
-                // Absent statutory block = the feature is off or this person is not enrolled. Zero
-                // rather than null so the row arithmetic works without every caller null-checking.
-                BigDecimal employeePf = p.statutory() == null ? BigDecimal.ZERO : p.statutory().employeePf();
-                BigDecimal employerContribution =
-                        p.statutory() == null ? BigDecimal.ZERO : p.statutory().employerTotal();
-                rows.add(new com.calyvora.people.dto.PayrollRunResponse.Row(
-                        e.id(), p.employeeName(), e.jobTitle(), p.gross(), p.lopDays(), p.net(),
-                        employeePf, employerContribution));
-                totalGross = totalGross.add(p.gross());
-                totalNet = totalNet.add(p.net());
-                totalEmployer = totalEmployer.add(employerContribution);
-                totalLop += p.lopDays();
+                slips.add(payslip(UUID.fromString(e.id()), ym.toString(),
+                        attendanceByEmployee.get(UUID.fromString(e.id())), ctx));
             } catch (NotFoundException noSalary) {
                 // Employee has no salary on record yet — not part of this run.
             }
         }
-        return new com.calyvora.people.dto.PayrollRunResponse(
-                ym.toString(), currency, rows, totalGross, totalNet, totalLop, rows.size(), totalEmployer);
+        return slips;
     }
 
     /**
@@ -301,6 +359,14 @@ public class CompensationService {
     @Transactional(readOnly = true)
     public PayslipResponse payslip(UUID employeeId, String month,
                                    com.calyvora.people.dto.AttendanceMonthResponse prefetchedAttendance) {
+        // A finalised month's payslip is the one that was issued, whatever has changed since (V65).
+        UUID companyId = TenantContext.getCompanyId();
+        String ym = month == null || month.isBlank() ? YearMonth.now().toString() : YearMonth.parse(month).toString();
+        var snapshot = payslipSnapshotRepository.findByCompanyIdAndMonthAndEmployeeId(companyId, ym, employeeId);
+        if (snapshot.isPresent()) {
+            requireEmployee(employeeId, companyId);
+            return readSnapshot(snapshot.get());
+        }
         return payslip(employeeId, month, prefetchedAttendance, null);
     }
 
@@ -324,6 +390,9 @@ public class CompensationService {
                               /** Employee id to the month's TDS, worked out once for the whole run. */
                               java.util.Map<UUID, java.math.BigDecimal> monthlyTds,
                               com.calyvora.payroll.PfSettings pfSettings,
+                              com.calyvora.payroll.StatutorySettings statutorySettings,
+                              /** Every salary row per employee, newest first — ESI coverage reads it. */
+                              java.util.Map<UUID, List<CompensationRecord>> salaryHistory,
                               java.util.Map<UUID, Employee> employees,
                               java.util.Map<UUID, com.calyvora.identity.User> users,
                               java.util.Map<UUID, CompensationRecord> currentSalary,
@@ -386,31 +455,95 @@ public class CompensationService {
         BigDecimal totalDed = c.totalDeductions();
         BigDecimal net = c.net();
 
-        // --- Provident Fund, when the company has statutory payroll switched on ------------------
+        // What was actually EARNED this month. Statutory contributions are levied on wages paid, not
+        // on the contracted figure: PF on the basic earned, ESI and professional tax on the gross
+        // earned. Computing them on the full month overstated every one of them for anybody with a
+        // day of loss of pay — the same wrong-but-plausible shape as computing PF on gross.
+        BigDecimal lopAmount = BigDecimal.ZERO;
+        if (lopDays > 0 && workingDays > 0) {
+            BigDecimal perDay = gross.divide(BigDecimal.valueOf(workingDays), 2, RoundingMode.HALF_UP);
+            lopAmount = perDay.multiply(BigDecimal.valueOf(lopDays)).setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal earnedGross = gross.subtract(lopAmount).max(BigDecimal.ZERO);
+        BigDecimal earnedBasic = workingDays > 0 && lopDays > 0
+                ? c.basic().multiply(BigDecimal.valueOf(payableDays))
+                        .divide(BigDecimal.valueOf(workingDays), 2, RoundingMode.HALF_UP)
+                : c.basic();
+
+        // --- Statutory deductions, when the company has statutory payroll switched on ------------
         //
-        // Two switches, both of which must be on: the company-level feature (the vendor's decision,
-        // off for everybody until their numbers have been checked) and this employee's own PF status.
-        // Neither implies the other — a company can run PF and still have employees who are not
-        // enrolled, and an employee marked ENABLED at a company without the feature must not suddenly
-        // see a deduction appear.
-        //
-        // Computed on BASIC, not gross. Using gross here would overstate every PF deduction in the
-        // company by roughly a factor of two, and it would look plausible on the payslip.
+        // The company-level feature is the vendor's switch, off for everybody until their numbers
+        // have been checked against a real payroll. Beneath it, each scheme has its own condition:
+        // PF needs this employee's PF status enabled; ESI needs the company's ESI switch and the
+        // employee marked eligible (and then the wage test); professional tax needs the company's PT
+        // switch and the employee's PT state. None implies another.
         EmployeeFinance financeForPf = ctx != null ? ctx.finance().get(employeeId) : financeService.rawOrNull(employeeId);
         PayslipResponse.Statutory statutory = null;
         boolean statutoryOn = ctx != null ? ctx.statutoryEnabled()
                 : featureService.isEnabled(companyId, Feature.STATUTORY_PAYROLL);
-        if (statutoryOn
-                && financeForPf != null && "ENABLED".equals(financeForPf.getPfStatus())) {
-            PfCalculator.Result pf = PfCalculator.compute(c.basic(),
-                    ctx != null ? ctx.pfSettings() : pfSettingsService.effective(companyId));
-            if (pf.employee().signum() > 0) {
-                deductions.add(new PayslipResponse.Line("Provident Fund (employee)", pf.employee()));
-                totalDed = totalDed.add(pf.employee());
-                net = net.subtract(pf.employee());
+        if (statutoryOn && financeForPf != null) {
+            com.calyvora.payroll.StatutorySettings ss = ctx != null ? ctx.statutorySettings()
+                    : statutorySettingsService.effective(companyId);
+
+            // Provident Fund — on BASIC, never gross. Using gross would overstate every PF deduction
+            // in the company by roughly a factor of two, and it would look plausible on the payslip.
+            PfCalculator.Result pf = null;
+            if ("ENABLED".equals(financeForPf.getPfStatus())) {
+                pf = PfCalculator.compute(earnedBasic,
+                        ctx != null ? ctx.pfSettings() : pfSettingsService.effective(companyId));
+                if (pf.employee().signum() > 0) {
+                    deductions.add(new PayslipResponse.Line("Provident Fund (employee)", pf.employee()));
+                    totalDed = totalDed.add(pf.employee());
+                    net = net.subtract(pf.employee());
+                }
             }
-            statutory = new PayslipResponse.Statutory(pf.pfWages(), pf.employee(), pf.employerEps(),
-                    pf.employerEpf(), pf.adminCharges(), pf.edli(), pf.employerTotal());
+
+            // ESI — coverage is fixed for the contribution period by the gross at its start.
+            com.calyvora.payroll.EsiCalculator.Result esi = null;
+            if (ss.isEsiEnabled() && "ELIGIBLE".equals(financeForPf.getEsiStatus())) {
+                List<CompensationRecord> history = ctx != null
+                        ? ctx.salaryHistory().getOrDefault(employeeId, List.of(current))
+                        : compensationRepository.findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(employeeId);
+                BigDecimal periodStartGross = monthlyGrossAt(history,
+                        com.calyvora.payroll.EsiCalculator.periodStart(ym));
+                esi = com.calyvora.payroll.EsiCalculator.compute(earnedGross, periodStartGross, payableDays,
+                        ss.getEsiEmployeeRate(), ss.getEsiEmployerRate(), ss.getEsiWageCeiling());
+                if (esi.covered() && esi.employee().signum() > 0) {
+                    deductions.add(new PayslipResponse.Line("ESI (employee)", esi.employee()));
+                    totalDed = totalDed.add(esi.employee());
+                    net = net.subtract(esi.employee());
+                }
+                if (!esi.covered()) {
+                    esi = null;   // above the ceiling this period: not applicable, not "ESI 0"
+                }
+            }
+
+            // Professional tax — by the state the employee works in.
+            BigDecimal pt = null;
+            String ptState = null;
+            if (ss.isPtEnabled()) {
+                var ptResult = com.calyvora.payroll.ProfessionalTaxCalculator.compute(financeForPf.getPtState(),
+                        financeForPf.getGender(), financeForPf.getDateOfBirth(), earnedGross, gross, ym);
+                ptState = ptResult.stateCode();
+                if (ptResult.amount().signum() > 0) {
+                    pt = ptResult.amount();
+                    deductions.add(new PayslipResponse.Line("Professional tax", pt));
+                    totalDed = totalDed.add(pt);
+                    net = net.subtract(pt);
+                }
+            }
+
+            if (pf != null || esi != null || pt != null) {
+                BigDecimal employerTotal = (pf == null ? BigDecimal.ZERO : pf.employerTotal())
+                        .add(esi == null ? BigDecimal.ZERO : esi.employer());
+                statutory = new PayslipResponse.Statutory(
+                        pf == null ? null : pf.pfWages(), pf == null ? null : pf.employee(),
+                        pf == null ? null : pf.employerEps(), pf == null ? null : pf.employerEpf(),
+                        pf == null ? null : pf.adminCharges(), pf == null ? null : pf.edli(),
+                        esi == null ? null : esi.wages(), esi == null ? null : esi.employee(),
+                        esi == null ? null : esi.employer(),
+                        pt, ptState, employerTotal);
+            }
         }
         // --- Income tax (TDS), when the company withholds it here -------------------------------
         //
@@ -424,13 +557,14 @@ public class CompensationService {
         // from exactly the people who did not get round to declaring.
         boolean incomeTaxOn = ctx != null ? ctx.incomeTaxEnabled()
                 : featureService.isEnabled(companyId, Feature.INCOME_TAX);
+        BigDecimal incomeTax = null;
         if (incomeTaxOn) {
             BigDecimal tds = ctx != null
                     ? ctx.monthlyTds().getOrDefault(employeeId, BigDecimal.ZERO)
-                    : taxService.monthlyTdsFor(companyId,
-                            com.calyvora.tax.FinancialYear.of(ym.atDay(1)),
+                    : taxService.monthlyTdsFor(companyId, ym,
                             java.util.Map.of(employeeId, current.getAnnualAmount()))
                             .getOrDefault(employeeId, BigDecimal.ZERO);
+            incomeTax = tds;
             if (tds.signum() > 0) {
                 deductions.add(new PayslipResponse.Line("Income tax (TDS)", tds));
                 totalDed = totalDed.add(tds);
@@ -438,13 +572,11 @@ public class CompensationService {
             }
         }
 
-        if (lopDays > 0 && workingDays > 0) {
-            BigDecimal perDay = gross.divide(BigDecimal.valueOf(workingDays), 2, RoundingMode.HALF_UP);
-            BigDecimal lop = perDay.multiply(BigDecimal.valueOf(lopDays)).setScale(2, RoundingMode.HALF_UP);
+        if (lopAmount.signum() > 0) {
             deductions.add(new PayslipResponse.Line(
-                    "Loss of pay (" + trimNum(lopDays) + " day" + (lopDays == 1 ? "" : "s") + ")", lop));
-            totalDed = totalDed.add(lop);
-            net = net.subtract(lop);
+                    "Loss of pay (" + trimNum(lopDays) + " day" + (lopDays == 1 ? "" : "s") + ")", lopAmount));
+            totalDed = totalDed.add(lopAmount);
+            net = net.subtract(lopAmount);
         }
 
         // Payslip header — legal name (falling back to company name), address and logo. One company,
@@ -490,7 +622,25 @@ public class CompensationService {
                 finance == null ? null : maskPan(finance.getPanNumber()),
                 c.earnings(), deductions, c.gross(), totalDed, net,
                 AmountInWords.of(net, cur),
-                workingDays, lopDays, payableDays, statutory);
+                workingDays, lopDays, payableDays, statutory, incomeTax, false);
+    }
+
+    /**
+     * Monthly gross in force on {@code date}: the newest salary that took effect on or before it, or —
+     * for somebody who joined after it — their first salary, which is what ESI coverage is decided on
+     * for a mid-period joiner. {@code history} is newest-first, as every repository call returns it.
+     */
+    static BigDecimal monthlyGrossAt(List<CompensationRecord> history, LocalDate date) {
+        if (history.isEmpty()) {
+            return null;
+        }
+        for (CompensationRecord r : history) {
+            if (!r.getEffectiveDate().isAfter(date)) {
+                return r.getAnnualAmount().divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+            }
+        }
+        return history.get(history.size() - 1).getAnnualAmount()
+                .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
     }
 
     /** PAN as {@code XXXXXX894N} — a payslip identifies the PAN without reprinting it in full. */

@@ -13,6 +13,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { EmployeeCompensation } from "@/components/people/employee-compensation";
+import { EmployeeStatutory } from "@/components/people/employee-statutory";
 import { EmployeeProfileExtras } from "@/components/people/employee-profile-extras";
 import { EmployeeGoals } from "@/components/people/employee-goals";
 import { EmployeeDocuments } from "@/components/people/employee-documents";
@@ -293,6 +294,8 @@ function EmployeeDetailModal({
           <EmployeeCompensation employeeId={employee.id} />
         </div>
       )}
+
+      {admin && <EmployeeStatutory employeeId={employee.id} />}
 
       {admin && <EmployeeDocuments employeeId={employee.id} />}
 

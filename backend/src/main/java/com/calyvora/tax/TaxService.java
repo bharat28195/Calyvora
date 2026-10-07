@@ -51,6 +51,7 @@ public class TaxService {
     private final com.calyvora.feature.FeatureService featureService;
 
     private final com.calyvora.access.PermissionService permissions;
+    private final com.calyvora.payroll.PayslipSnapshotRepository snapshotRepository;
 
     public TaxService(TaxDeclarationRepository declarationRepository,
                       TaxDeclarationItemRepository itemRepository,
@@ -60,8 +61,10 @@ public class TaxService {
                       CompanySettingsRepository settingsRepository,
                       OrgScope orgScope,
                       com.calyvora.feature.FeatureService featureService,
-            com.calyvora.access.PermissionService permissions) {
+            com.calyvora.access.PermissionService permissions,
+            com.calyvora.payroll.PayslipSnapshotRepository snapshotRepository) {
         this.permissions = permissions;
+        this.snapshotRepository = snapshotRepository;
         this.declarationRepository = declarationRepository;
         this.itemRepository = itemRepository;
         this.employeeRepository = employeeRepository;
@@ -273,17 +276,62 @@ public class TaxService {
      * the year and their items, both keyed up front. A thousand-person run asking per person is two
      * thousand round trips to work out a deduction.
      *
-     * <p>Spread evenly — the year's tax over twelve — rather than using the "what is left over the
-     * months that remain" figure the screen shows. A payslip is for a particular month and may be
-     * re-run for a month long past, so it cannot depend on today's date; an even twelfth is also
-     * what makes a payslip reproducible, which matters when it is the document an employee takes to
-     * a bank.
+     * <p>Depends on the month being paid, never on today's date, so a payslip recomputed for an open
+     * month gives the same answer whenever it is opened — and a finalised month is never recomputed
+     * at all; its payslip is read back as issued.
      *
      * @param annualSalary employee id to annual gross; employees absent from it get nothing
      */
     @Transactional(readOnly = true)
-    public Map<UUID, BigDecimal> monthlyTdsFor(UUID companyId, FinancialYear fy,
+    public Map<UUID, BigDecimal> monthlyTdsFor(UUID companyId, java.time.YearMonth month,
                                                Map<UUID, BigDecimal> annualSalary) {
+        FinancialYear fy = FinancialYear.of(month.atDay(1));
+        Map<UUID, IncomeTaxCalculator.Result> annual = annualTaxFor(companyId, fy, annualSalary);
+        if (annual.isEmpty()) {
+            return Map.of();
+        }
+
+        // What was actually withheld in the locked months of this year before this one (V65).
+        //
+        // With no locked month the answer is the even twelfth, exactly as before — a company that has
+        // not started finalising months sees no change. Once months are locked, the year corrects
+        // itself: (the year's tax − what has been withheld) over the months that remain. Months before
+        // this one that are NOT locked count as an even twelfth withheld, which is what an open month
+        // shows and what a company moving to Orbit mid-year was withholding elsewhere.
+        java.time.YearMonth fyStart = java.time.YearMonth.from(fy.start());
+        Map<UUID, Map<String, BigDecimal>> withheld = new HashMap<>();
+        if (month.isAfter(fyStart)) {
+            for (com.calyvora.payroll.PayslipSnapshot s : snapshotRepository.findByCompanyIdAndMonthBetween(
+                    companyId, fyStart.toString(), month.minusMonths(1).toString())) {
+                withheld.computeIfAbsent(s.getEmployeeId(), k -> new HashMap<>())
+                        .put(s.getMonth(), s.getIncomeTax() == null ? BigDecimal.ZERO : s.getIncomeTax());
+            }
+        }
+        int monthsBefore = (int) java.time.temporal.ChronoUnit.MONTHS.between(fyStart, month);
+        int monthsLeft = 12 - monthsBefore;
+
+        Map<UUID, BigDecimal> out = new HashMap<>();
+        for (Map.Entry<UUID, IncomeTaxCalculator.Result> e : annual.entrySet()) {
+            BigDecimal twelfth = e.getValue().monthlyTds();
+            Map<String, BigDecimal> locked = withheld.get(e.getKey());
+            if (locked == null || locked.isEmpty()) {
+                out.put(e.getKey(), twelfth);
+                continue;
+            }
+            BigDecimal soFar = BigDecimal.ZERO;
+            for (int i = 0; i < monthsBefore; i++) {
+                String m = fyStart.plusMonths(i).toString();
+                soFar = soFar.add(locked.getOrDefault(m, twelfth));
+            }
+            BigDecimal remaining = e.getValue().totalTax().subtract(soFar).max(BigDecimal.ZERO);
+            out.put(e.getKey(), remaining.divide(BigDecimal.valueOf(monthsLeft), 0, RoundingMode.HALF_UP));
+        }
+        return out;
+    }
+
+    /** The year's tax per employee, from their declaration or the default regime with nothing claimed. */
+    private Map<UUID, IncomeTaxCalculator.Result> annualTaxFor(UUID companyId, FinancialYear fy,
+                                                               Map<UUID, BigDecimal> annualSalary) {
         if (annualSalary.isEmpty()) {
             return Map.of();
         }
@@ -303,7 +351,7 @@ public class TaxService {
             }
         }
 
-        Map<UUID, BigDecimal> out = new HashMap<>();
+        Map<UUID, IncomeTaxCalculator.Result> out = new HashMap<>();
         for (Map.Entry<UUID, BigDecimal> e : annualSalary.entrySet()) {
             TaxDeclaration d = byEmployee.get(e.getKey());
             // No declaration is not "no tax" — it is the statutory default regime with nothing
@@ -313,9 +361,8 @@ public class TaxService {
             Map<TaxDeduction, BigDecimal> declared = d == null
                     ? Map.of()
                     : itemsByDeclaration.getOrDefault(d.getId(), Map.of());
-            IncomeTaxCalculator.Result result = IncomeTaxCalculator.compute(
-                    new IncomeTaxCalculator.Input(e.getValue(), regime, declared));
-            out.put(e.getKey(), result.monthlyTds());
+            out.put(e.getKey(), IncomeTaxCalculator.compute(
+                    new IncomeTaxCalculator.Input(e.getValue(), regime, declared)));
         }
         return out;
     }

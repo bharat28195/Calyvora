@@ -2,22 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle2, Lock, LockOpen } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { PayrollJob, PayrollRun } from "@/lib/types";
+import type { PayrollJob, PayrollMonthStatus, PayrollRun } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { BankFilePanel } from "@/components/payroll/bank-file";
 import { money } from "@/lib/format";
 
-/** HR payroll run — every employee's net for a month, after attendance LOP. "Publish" makes payslips
- *  available to employees (they're computed on demand, so this confirms the run). */
+/**
+ * HR payroll run — every employee's net for a month, after attendance LOP. Finalising the month locks
+ * it: the payslips are stored as issued and never change afterwards, and statutory returns and later
+ * months' income tax are built on them.
+ */
 export default function PayrollRunPage() {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [published, setPublished] = useState(false);
+  const [lock, setLock] = useState<PayrollMonthStatus | null>(null);
+  const [locking, setLocking] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  // Bumped after finalising or reopening, so the run reloads from (or stops reading) the locked copy.
+  const [reload, setReload] = useState(0);
   // How long the current run has been going, so a big company sees a clock rather than a spinner
   // that might as well be hung.
   const [elapsed, setElapsed] = useState(0);
@@ -27,7 +34,8 @@ export default function PayrollRunPage() {
   useEffect(() => {
     let cancelled = false;
     let timer: number | undefined;
-    setRun(null); setPublished(false); setError(null); setElapsed(0);
+    setRun(null); setLock(null); setConfirming(false); setError(null); setElapsed(0);
+    api.payrollMonthStatus(month).then((s) => { if (!cancelled) setLock(s); }).catch(() => {});
     const startedAt = Date.now();
     const tick = window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
 
@@ -51,12 +59,42 @@ export default function PayrollRunPage() {
       window.clearInterval(tick);
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [month]);
+  }, [month, reload]);
+
+  async function finalizeMonth() {
+    setLocking(true);
+    setError(null);
+    try {
+      setLock(await api.finalizePayrollMonth(month));
+      setConfirming(false);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not finalise the month");
+    } finally {
+      setLocking(false);
+    }
+  }
+
+  async function reopenMonth() {
+    setLocking(true);
+    setError(null);
+    try {
+      setLock(await api.reopenPayrollMonth(month));
+      setReload((n) => n + 1);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not reopen the month");
+    } finally {
+      setLocking(false);
+    }
+  }
 
   // Whether to show the statutory columns at all. Driven by the run's own numbers rather than by a
   // separate call for the feature flag: if nothing was contributed, an empty PF column is noise, and
   // a company with the feature on but nobody enrolled is in exactly that position.
-  const hasPf = (run?.totalEmployerContribution ?? 0) > 0;
+  const hasPf = (run?.rows ?? []).some((r) => r.employeePf > 0);
+  const hasEsi = (run?.rows ?? []).some((r) => (r.employeeEsi ?? 0) > 0);
+  const hasPt = (run?.rows ?? []).some((r) => (r.professionalTax ?? 0) > 0);
+  const columns = 4 + (hasPf ? 1 : 0) + (hasEsi ? 1 : 0) + (hasPt ? 1 : 0);
 
   return (
     <div>
@@ -92,7 +130,7 @@ export default function PayrollRunPage() {
               rather than as "not applicable", which is what it would actually mean. */}
           {run.totalEmployerContribution > 0 && (
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Kpi label="Employer PF" value={money(run.totalEmployerContribution)} />
+              <Kpi label="Employer PF + ESI" value={money(run.totalEmployerContribution)} />
               <Kpi label="Total cost" value={money(run.totalGross + run.totalEmployerContribution)} />
             </div>
           )}
@@ -105,12 +143,14 @@ export default function PayrollRunPage() {
                   <th className="px-3 py-3 font-medium text-right">Gross</th>
                   <th className="px-3 py-3 font-medium text-right">LOP</th>
                   {hasPf && <th className="px-3 py-3 font-medium text-right">PF</th>}
+                  {hasEsi && <th className="px-3 py-3 font-medium text-right">ESI</th>}
+                  {hasPt && <th className="px-3 py-3 font-medium text-right">Prof. tax</th>}
                   <th className="px-5 py-3 font-medium text-right">Net</th>
                 </tr>
               </thead>
               <tbody>
                 {run.rows.length === 0 ? (
-                  <tr><td colSpan={hasPf ? 5 : 4} className="px-5 py-8 text-center text-fg/50">No salaries on record for this month.</td></tr>
+                  <tr><td colSpan={columns} className="px-5 py-8 text-center text-fg/50">No salaries on record for this month.</td></tr>
                 ) : run.rows.map((r) => (
                   <tr key={r.employeeId} className="border-b border-fg/5 last:border-0">
                     <td className="px-5 py-3">
@@ -124,6 +164,16 @@ export default function PayrollRunPage() {
                         {r.employeePf > 0 ? money(r.employeePf) : <span className="text-fg/30">—</span>}
                       </td>
                     )}
+                    {hasEsi && (
+                      <td className="px-3 py-3 text-right tabular-nums text-fg/70">
+                        {(r.employeeEsi ?? 0) > 0 ? money(r.employeeEsi) : <span className="text-fg/30">—</span>}
+                      </td>
+                    )}
+                    {hasPt && (
+                      <td className="px-3 py-3 text-right tabular-nums text-fg/70">
+                        {(r.professionalTax ?? 0) > 0 ? money(r.professionalTax) : <span className="text-fg/30">—</span>}
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-right tabular-nums font-semibold text-emerald-400">{money(r.net)}</td>
                   </tr>
                 ))}
@@ -133,16 +183,46 @@ export default function PayrollRunPage() {
 
           {run.rows.length > 0 && <BankFilePanel month={run.month} currency={run.currency} />}
 
-          {run.rows.length > 0 && (
-            <Card className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle>Publish payslips</CardTitle>
-                <p className="mt-1 text-sm text-fg/60">Make {run.month} payslips available to employees under My pay.</p>
-              </div>
-              {published ? (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-400"><CheckCircle2 className="h-4 w-4" /> Published</span>
+          {run.rows.length > 0 && lock && (
+            <Card className="mt-4">
+              {lock.finalized ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-emerald-400" /> {run.month} is finalised
+                    </CardTitle>
+                    <p className="mt-1 text-sm text-fg/60">
+                      Payslips are stored exactly as issued
+                      {lock.finalizedAt && <> on {new Date(lock.finalizedAt).toLocaleDateString()}</>}. Salary
+                      or attendance changes from now on do not alter them.
+                    </p>
+                  </div>
+                  <Button variant="secondary" onClick={reopenMonth} disabled={locking}>
+                    {locking ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockOpen className="h-4 w-4" />}
+                    Reopen
+                  </Button>
+                </div>
               ) : (
-                <Button onClick={() => setPublished(true)}>Publish payslips</Button>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>Finalise {run.month}</CardTitle>
+                    <p className="mt-1 text-sm text-fg/60">
+                      Locks these figures. Payslips are stored as issued, PF/ESI/TDS returns are built on
+                      them, and later months&apos; income tax counts what was withheld here.
+                    </p>
+                  </div>
+                  {confirming ? (
+                    <div className="flex gap-2">
+                      <Button onClick={finalizeMonth} disabled={locking}>
+                        {locking ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        Yes, finalise
+                      </Button>
+                      <Button variant="secondary" onClick={() => setConfirming(false)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <Button onClick={() => setConfirming(true)}><Lock className="h-4 w-4" /> Finalise month</Button>
+                  )}
+                </div>
               )}
             </Card>
           )}

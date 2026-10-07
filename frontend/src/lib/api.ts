@@ -72,6 +72,8 @@ import {
   type Plan,
   type LeaveBalance,
   type PfSettings,
+  type StatutorySettings,
+  type PayrollMonthStatus,
   type LeavePolicy,
   type CompanyFile,
   type CursorPage,
@@ -1186,6 +1188,24 @@ export const api = {
   },
   updatePfSettings(patch: Partial<Omit<PfSettings, "enabled">>): Promise<PfSettings> {
     return http<PfSettings>("/payroll/pf-settings", { method: "PATCH", body: JSON.stringify(patch) });
+  },
+  /** Whether a month's payroll is finalised. The demo backend has no locking: every month is open. */
+  payrollMonthStatus(month: string): Promise<PayrollMonthStatus> {
+    return LIVE
+      ? http<PayrollMonthStatus>(`/payroll/months/${month}`)
+      : Promise.resolve({ month, finalized: false, finalizedAt: null, employees: null, totalGross: null, totalNet: null, totalEmployer: null });
+  },
+  finalizePayrollMonth(month: string): Promise<PayrollMonthStatus> {
+    return http<PayrollMonthStatus>(`/payroll/months/${month}/finalize`, { method: "POST" });
+  },
+  reopenPayrollMonth(month: string): Promise<PayrollMonthStatus> {
+    return http<PayrollMonthStatus>(`/payroll/months/${month}/reopen`, { method: "POST" });
+  },
+  statutorySettings(): Promise<StatutorySettings> {
+    return http<StatutorySettings>("/payroll/statutory-settings");
+  },
+  updateStatutorySettings(patch: Partial<Omit<StatutorySettings, "statutoryEnabled">>): Promise<StatutorySettings> {
+    return http<StatutorySettings>("/payroll/statutory-settings", { method: "PATCH", body: JSON.stringify(patch) });
   },
   /**
    * Which capabilities are on for my own company.

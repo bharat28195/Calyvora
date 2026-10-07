@@ -1714,6 +1714,37 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   - Holidays and leave policy are edited by whoever holds LEAVE_POLICY_MANAGE (HR could already via
     the API; the screens only offered it to admins).
 
+### PD-55 · 2026-10-07 · Full statutory compliance, built to the Keka/Zoho standard (demo first)
+- **Decision (founder):** build the statutory payroll that Keka and Zoho sell — PF, ESI,
+  professional tax, monthly TDS and the government filing files — instead of leaving compliance to
+  the client's accountant. Market research (PD pricing discussion, same day) showed this is what lets
+  Orbit charge mid-market prices. Mobile app parked until this is done. Demo only until the founder
+  says otherwise.
+- **Filing reality:** EPFO, ESIC and the TDS system offer no filing API to third parties, so
+  "filings" means Orbit produces the exact upload files and the company uploads and pays them —
+  the same thing Keka and Zoho do. A done-for-you filing service with a partner CA is a later upsell.
+- **Built, step 1 — ESI and professional tax (V64):** `EsiCalculator` (0.75% / 3.25%, ₹21,000
+  ceiling decided per April/October contribution period, ₹176/day low-wage waiver, rounded up to the
+  rupee) and `ProfessionalTaxCalculator` (every levying state, FY 2026-27 slabs: monthly, annual and
+  half-yearly bases, February top-ups, Maharashtra by gender, Karnataka 60+ exemption, Odisha repealed
+  April 2026; Meghalaya/Tripura reported as unsupported rather than silently zero). Company switches and
+  registration numbers (PF code, ESI code, TAN, PAN, PT reg) in `statutory_settings`. HR can finally
+  enrol employees in PF/ESI and set their PT state from the People screen.
+- **Behaviour change:** PF, ESI and PT are now computed on wages actually *earned* (after loss of
+  pay), not the contracted month. PF on full basic for someone with unpaid days was an over-deduction.
+- **Built, step 2 — the month lock (V65):** payroll was recomputed on every view, so changing a salary
+  rewrote last month's payslip and anything filed from it. Finalising a month now stores every
+  payslip as issued (`payslip_snapshots`); the run, the payslip and future returns read the stored
+  copy. Only the latest locked month can be reopened. The fake "Publish payslips" button is gone.
+- **TDS now corrects itself:** once months are locked, each month withholds (year's tax − what locked
+  months actually withheld) ÷ months left, as Keka/Zoho do — a raise or late declaration no longer
+  leaves a lump in March. Unlocked earlier months count as an even twelfth, so a company that never
+  locks sees no change.
+- **Next:** ECR (PF), ESI contribution file, PT summary, Form 24Q data, Form 16 Part B, challan
+  register, compliance calendar and a readiness check (missing UAN/PAN/ESI numbers).
+- **Before selling it as "full compliance":** a CA reviews every rule, then one parallel-run month
+  against a real client's existing payroll.
+
 ## 4. Architecture Decision Log
 
 

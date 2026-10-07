@@ -231,6 +231,132 @@ class StatutoryPayrollIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isBadRequest());
     }
 
+    // ---- ESI and professional tax (V64) ---------------------------------------------------------
+
+    private void patchFinance(Session owner, String employeeId, Map<String, Object> body) throws Exception {
+        mockMvc.perform(patch("/api/v1/people/employees/" + employeeId + "/finance")
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk());
+    }
+
+    private void statutorySettings(Session owner, Map<String, Object> body) throws Exception {
+        mockMvc.perform(patch("/api/v1/payroll/statutory-settings")
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk());
+    }
+
+    private JsonNode payslipFor(Session owner, String employeeId, String month) throws Exception {
+        MvcResult r = mockMvc.perform(get("/api/v1/people/employees/" + employeeId + "/payslip")
+                        .param("month", month)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(r.getResponse().getContentAsString());
+    }
+
+    @Test
+    void esi_is_deducted_for_an_eligible_employee_under_the_ceiling() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        String employeeId = employeeOnSalary(owner, 216_000);   // 18,000 a month
+        patchFinance(owner, employeeId, Map.of("esiStatus", "ELIGIBLE"));
+        statutorySettings(owner, Map.of("esiEnabled", true));
+        Session platform = platformOwner();
+        setFeature(platform, companyIdOf(platform, "Acme"), true);
+
+        JsonNode slip = payslipFor(owner, employeeId, "2026-11");
+        JsonNode st = slip.get("statutory");
+        assertThat(st.get("employeeEsi").decimalValue().intValue()).as("0.75% of 18,000").isEqualTo(135);
+        assertThat(st.get("employerEsi").decimalValue().intValue()).as("3.25% of 18,000").isEqualTo(585);
+        assertThat(slip.get("deductions").toString()).contains("ESI (employee)");
+        // PF (enrolled by employeeOnSalary) and ESI employer shares together.
+        int pfEmployer = st.get("employerEps").decimalValue().intValue() + st.get("employerEpf").decimalValue().intValue()
+                + st.get("employerAdminCharges").decimalValue().intValue() + st.get("employerEdli").decimalValue().intValue();
+        assertThat(st.get("employerTotal").decimalValue().intValue()).isEqualTo(pfEmployer + 585);
+    }
+
+    @Test
+    void esi_does_not_apply_above_the_ceiling_and_says_so_with_null_not_zero() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        String employeeId = employeeOnSalary(owner, 1_200_000);
+        patchFinance(owner, employeeId, Map.of("esiStatus", "ELIGIBLE"));
+        statutorySettings(owner, Map.of("esiEnabled", true));
+        Session platform = platformOwner();
+        setFeature(platform, companyIdOf(platform, "Acme"), true);
+
+        JsonNode st = payslipFor(owner, employeeId, "2026-11").get("statutory");
+        assertThat(st.get("employeeEsi").isNull()).isTrue();
+        assertThat(st.get("employerEsi").isNull()).isTrue();
+    }
+
+    @Test
+    void professional_tax_follows_the_employees_state() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        String employeeId = employeeOnSalary(owner, 1_200_000);
+        patchFinance(owner, employeeId, Map.of("ptState", "Karnataka"));
+        statutorySettings(owner, Map.of("ptEnabled", true));
+        Session platform = platformOwner();
+        setFeature(platform, companyIdOf(platform, "Acme"), true);
+
+        JsonNode nov = payslipFor(owner, employeeId, "2026-11");
+        assertThat(nov.get("statutory").get("professionalTax").decimalValue().intValue()).isEqualTo(200);
+        assertThat(nov.get("statutory").get("ptState").asText()).isEqualTo("KA");
+        assertThat(payslipFor(owner, employeeId, "2027-02").get("statutory").get("professionalTax")
+                .decimalValue().intValue()).as("Karnataka collects 300 in February").isEqualTo(300);
+
+        int netBefore = nov.get("gross").decimalValue().intValue()
+                - nov.get("totalDeductions").decimalValue().intValue();
+        assertThat(nov.get("net").decimalValue().intValue()).isEqualTo(netBefore);
+    }
+
+    @Test
+    void esi_and_pt_switches_do_nothing_until_the_vendor_turns_statutory_on() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        String employeeId = employeeOnSalary(owner, 216_000);
+        patchFinance(owner, employeeId, Map.of("esiStatus", "ELIGIBLE", "ptState", "Karnataka"));
+        statutorySettings(owner, Map.of("esiEnabled", true, "ptEnabled", true));
+
+        assertThat(payslipFor(owner, employeeId, "2026-11").get("statutory").isNull()).isTrue();
+        JsonNode settings = getJson("/api/v1/payroll/statutory-settings", owner);
+        assertThat(settings.get("statutoryEnabled").asBoolean()).isFalse();
+        assertThat(settings.get("esiEnabled").asBoolean()).isTrue();
+    }
+
+    @Test
+    void registration_numbers_are_validated_and_normalised() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        mockMvc.perform(patch("/api/v1/payroll/statutory-settings")
+                        .header("Authorization", "Bearer " + owner.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("tan", "not-a-tan"))))
+                .andExpect(status().isBadRequest());
+
+        statutorySettings(owner, Map.of("tan", "dela12345b", "companyPan", "abcde1234f",
+                "pfEstablishmentCode", "mhban0012345000"));
+        JsonNode s = getJson("/api/v1/payroll/statutory-settings", owner);
+        assertThat(s.get("tan").asText()).isEqualTo("DELA12345B");
+        assertThat(s.get("companyPan").asText()).isEqualTo("ABCDE1234F");
+        assertThat(s.get("pfEstablishmentCode").asText()).isEqualTo("MHBAN0012345000");
+    }
+
+    @Test
+    void the_run_carries_esi_and_professional_tax_per_person() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        String employeeId = employeeOnSalary(owner, 216_000);
+        patchFinance(owner, employeeId, Map.of("esiStatus", "ELIGIBLE", "ptState", "West Bengal"));
+        statutorySettings(owner, Map.of("esiEnabled", true, "ptEnabled", true));
+        Session platform = platformOwner();
+        setFeature(platform, companyIdOf(platform, "Acme"), true);
+
+        JsonNode run = getJson("/api/v1/payroll/run?month=2026-11", owner);
+        JsonNode row = run.get("rows").get(0);
+        assertThat(row.get("employeeEsi").decimalValue().intValue()).isEqualTo(135);
+        assertThat(row.get("professionalTax").decimalValue().intValue()).as("West Bengal, 15,001–25,000").isEqualTo(130);
+    }
+
     @Test
     void the_payroll_run_reports_what_the_month_costs_the_employer() throws Exception {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);

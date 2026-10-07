@@ -594,7 +594,7 @@ export const mockBackend = {
       const p = await this.payslip(accessToken, e.id, month);
       // Statutory payroll is a live-backend feature; the mock reports zero rather than inventing
       // contributions, and the payroll screen hides the columns when the total is zero.
-      rows.push({ employeeId: e.id, name: p.employeeName, jobTitle: e.jobTitle ?? null, gross: p.gross, lopDays: p.lopDays, net: p.net, employeePf: 0, employerContribution: 0 });
+      rows.push({ employeeId: e.id, name: p.employeeName, jobTitle: e.jobTitle ?? null, gross: p.gross, lopDays: p.lopDays, net: p.net, employeePf: 0, employerContribution: 0, employeeEsi: 0, professionalTax: 0 });
       totalGross = round2(totalGross + p.gross); totalNet = round2(totalNet + p.net); totalLopDays += p.lopDays; currency = p.currency;
     }
     return { month: month || new Date().toISOString().slice(0, 7), currency, rows, totalGross, totalNet, totalLopDays, employees: rows.length, totalEmployerContribution: 0 };
@@ -2899,6 +2899,7 @@ function mockFinance(db: DB, employeeId: string): EmployeeFinance {
     panVerified: false,
     dateOfBirth: null,
     parentName: null,
+    gender: null,
   };
   mockFinanceStore.set(employeeId, created);
   return created;

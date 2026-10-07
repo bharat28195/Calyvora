@@ -860,7 +860,7 @@ public class DemoSeedService {
                 pfStatus, pfNumber, uan, pfJoinDate, (e.firstName() + " " + e.lastName()).toUpperCase(),
                 "NOT_ELIGIBLE", null,
                 "Gujarat", "Gujarat",
-                pan, true, dob, parent));
+                pan, true, dob, parent, null));
     }
 
     private User createUser(UUID companyId, String email, String first, String last, Role role) {
