@@ -56,6 +56,10 @@ public class User {
     @Column(name = "email_verified_at")
     private Instant emailVerifiedAt;
 
+    /** Set when somebody else chose this password (a company's first admin, V67); cleared when they change it. */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -150,6 +154,14 @@ public class User {
 
     public Instant getEmailVerifiedAt() {
         return emailVerifiedAt;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    public void setMustChangePassword(boolean mustChangePassword) {
+        this.mustChangePassword = mustChangePassword;
     }
 
     public void setEmailVerifiedAt(Instant emailVerifiedAt) {

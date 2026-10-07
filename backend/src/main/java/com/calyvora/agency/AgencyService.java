@@ -91,8 +91,10 @@ public class AgencyService {
     public CompanySummaryResponse createCompany(CreateCompanyRequest req) {
         // The request's own agencyId is ignored on purpose — an agency can only ever create under
         // itself, so the id comes from the caller's tenant rather than from anything they can set.
-        Company created = platformService.provision(req, myAgencyId(), false);
-        return platformService.summarize(created);
+        // Locked until the vendor activates it, so no welcome email goes out: the agency is handed the
+        // admin's temporary password here and passes it on to its client itself.
+        PlatformService.Provisioned created = platformService.provision(req, myAgencyId(), false);
+        return platformService.summarize(created.company()).withWelcome(created);
     }
 
     /**

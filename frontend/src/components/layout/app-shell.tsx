@@ -307,7 +307,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const role = session.me?.user.role;
   const rule = routeRule(pathname);
   const blocked = !!role && (
-    (role === "OWNER" && !pathname.startsWith("/platform")) ||
+    (role === "OWNER" && !pathname.startsWith("/platform") && pathname !== "/account") ||
     (rule?.roles != null && !rule.roles.includes(role)) ||
     (!!rule && !!session.me && !rule.allows(session.me)) ||
     // Only once features are known, and only an explicit "off": never hide a paid module on a slow load.
@@ -316,7 +316,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (blocked && role) router.replace(homeFor(role));
   }, [blocked, role, router]);
 
-  if (session.status !== "authenticated" || !session.me || blocked) {
+  // A password somebody else chose (a new company's first admin, emailed by Calyvora) is replaced
+  // before anything else — every page leads to Account settings until it is (V67).
+  const mustChangePassword = !!session.me?.user.mustChangePassword && pathname !== "/account";
+  useEffect(() => {
+    if (mustChangePassword) router.replace("/account");
+  }, [mustChangePassword, router]);
+
+  if (session.status !== "authenticated" || !session.me || blocked || mustChangePassword) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-violet" />
@@ -401,10 +408,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="border-t border-fg/10 p-3">
-          <div className="mb-2 px-2">
-            <p className="truncate text-sm font-medium">{user.firstName} {user.lastName}</p>
-            <p className="truncate text-xs text-fg/40">{company.name} · {user.role}</p>
+          <div className="mb-2 flex items-center gap-2 px-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{user.firstName} {user.lastName}</p>
+              <p className="truncate text-xs text-fg/40">{company.name} · {user.role}</p>
+            </div>
+            <Link href="/account" aria-label="Account settings" title="Account settings"
+              className={cn("inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-fg/5 hover:text-fg",
+                pathname === "/account" ? "text-violet" : "text-fg/50")}>
+              <Settings className="h-4 w-4" />
+            </Link>
           </div>
+          <Link href="/account"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg/60 hover:bg-fg/5 hover:text-fg">
+            <UserCog className="h-4 w-4" /> Account settings
+          </Link>
           <button
             onClick={logout}
             disabled={loggingOut}
@@ -424,6 +442,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <CommandBar />
           <NotificationBell />
           <ThemeToggle />
+          <Link href="/account" aria-label="Account settings"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-fg/60 hover:bg-fg/5 hover:text-fg md:hidden">
+            <Settings className="h-4 w-4" />
+          </Link>
           <button
             onClick={logout}
             disabled={loggingOut}

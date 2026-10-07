@@ -99,6 +99,18 @@ public class AuthController {
                 .body(result.body());
     }
 
+    /** Change your own password. Signs every other session out; this one gets a fresh session. */
+    @PostMapping("/change-password")
+    public ResponseEntity<LoginResponse> changePassword(@CurrentUser AuthPrincipal principal,
+                                                        @Valid @RequestBody com.calyvora.auth.dto.ChangePasswordRequest request,
+                                                        HttpServletRequest httpRequest) {
+        AuthService.LoginResult result = authService.changePassword(principal.userId(), request.currentPassword(),
+                request.newPassword(), httpRequest.getHeader(HttpHeaders.USER_AGENT));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, buildRefreshCookie(result.refreshToken()).toString())
+                .body(result.body());
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(
             @CookieValue(name = "${calyvora.security.refresh.cookie-name}", required = false) String refreshToken,

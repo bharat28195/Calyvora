@@ -19,8 +19,9 @@ public record MeResponse(UserView user, CompanyView company, String timezone,
                          /** What this person may do, permission key → COMPANY or TEAM (PD-54). Drives the menu. */
                          java.util.Map<String, String> permissions) {
 
+    /** @param mustChangePassword the password was chosen by someone else; the app asks for a new one first (V67) */
     public record UserView(String id, String email, String firstName, String lastName,
-                           String role, String status) {
+                           String role, String status, boolean mustChangePassword) {
     }
 
     public record CompanyView(String id, String name, String slug, String status,
@@ -41,7 +42,8 @@ public record MeResponse(UserView user, CompanyView company, String timezone,
         String effectiveZone = Timezones.resolve(employee, settings).getId();
         return new MeResponse(
                 new UserView(user.getId().toString(), user.getEmail(), user.getFirstName(),
-                        user.getLastName(), user.getRole().name(), user.getStatus().name()),
+                        user.getLastName(), user.getRole().name(), user.getStatus().name(),
+                        user.isMustChangePassword()),
                 new CompanyView(company.getId().toString(), company.getName(), company.getSlug(),
                         company.getStatus().name(), currency, companyZone,
                         settings == null ? null : settings.getSessionIdleMinutes()),

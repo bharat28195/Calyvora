@@ -54,6 +54,7 @@ public class AuthService {
 
     private final com.calyvora.common.security.TenantBinder tenantBinder;
     private final com.calyvora.access.PermissionService permissionService;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     public AuthService(CompanyRepository companyRepository,
                        CompanySettingsRepository companySettingsRepository,
@@ -67,7 +68,9 @@ public class AuthService {
                        com.calyvora.people.EmployeeService employeeService,
                        com.calyvora.people.EmployeeRepository employeeRepository,
                        com.calyvora.common.security.TenantBinder tenantBinder,
-                       com.calyvora.access.PermissionService permissionService) {
+                       com.calyvora.access.PermissionService permissionService,
+                       RefreshTokenRepository refreshTokenRepository) {
+        this.refreshTokenRepository = refreshTokenRepository;
         this.tenantBinder = tenantBinder;
         this.permissionService = permissionService;
         this.employeeService = employeeService;
@@ -201,6 +204,32 @@ public class AuthService {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new ForbiddenException("Your account is not active");
         }
+        return issueSession(user, refreshTokenService.issueNewFamily(user.getId(), userAgent));
+    }
+
+    /**
+     * Change your own password while signed in.
+     *
+     * <p>Every other session is signed out — the likeliest reason to change a password is that
+     * somebody else may know it — and this one is re-issued, so the person changing it stays in.
+     * Clears the first-sign-in flag (V67). A wrong current password is a 400, not a 401: the person is
+     * signed in, and a 401 would make the app sign them out for a typo.
+     */
+    @Transactional
+    public LoginResult changePassword(UUID userId, String currentPassword, String newPassword, String userAgent) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Invalid session"));
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new com.calyvora.common.error.ApiException(com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
+                    "Your current password isn't right");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new com.calyvora.common.error.ApiException(com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
+                    "Choose a different password from your current one");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        refreshTokenRepository.revokeAllForUser(user.getId(), java.time.Instant.now());
         return issueSession(user, refreshTokenService.issueNewFamily(user.getId(), userAgent));
     }
 

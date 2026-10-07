@@ -71,8 +71,10 @@ public class RecordingEmailService implements EmailService {
     }
 
     @Override
-    public EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl) {
-        trialApprovals.add(new Sent(to, loginUrl));
+    public EmailResult sendWelcomeEmail(String to, String firstName, String companyName,
+                                        String temporaryPassword, String loginUrl) {
+        // The password is what a test needs to sign in as the new admin, so it is what is recorded.
+        trialApprovals.add(new Sent(to, temporaryPassword));
         return EmailResult.ok("RECORDING");
     }
 
@@ -82,6 +84,11 @@ public class RecordingEmailService implements EmailService {
 
     public List<Sent> trialAcknowledgements() {
         return trialAcknowledgements;
+    }
+
+    /** Welcome emails to new company admins; {@code url} holds the temporary password. */
+    public List<Sent> welcomes() {
+        return trialApprovals;
     }
 
     public List<Sent> trialApprovals() {

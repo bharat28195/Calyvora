@@ -27,5 +27,7 @@ public interface EmailService {
     EmailResult sendTrialRequestAcknowledgement(String to, String contactName);
 
     /** To the customer, once the vendor approves: the workspace exists and here is where to sign in. */
-    EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl);
+    /** A new company's first admin: sign-in email and temporary password (changed at first sign-in). */
+    EmailResult sendWelcomeEmail(String to, String firstName, String companyName, String temporaryPassword,
+                                 String loginUrl);
 }

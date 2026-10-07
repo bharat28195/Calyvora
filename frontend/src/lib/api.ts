@@ -448,6 +448,20 @@ export const api = {
     return result;
   },
   /**
+   * Change your own password. The server signs every other session out and hands this one a fresh
+   * session, so the new access token replaces the old.
+   */
+  async changePassword(currentPassword: string, newPassword: string): Promise<LoginResult> {
+    if (!LIVE) {
+      throw new ApiError({ timestamp: "", status: 400, code: "VALIDATION_ERROR", message: "Passwords can't be changed in the offline demo." });
+    }
+    const result = await http<LoginResult>("/auth/change-password", {
+      method: "POST", body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    auth.set(result.accessToken);
+    return result;
+  },
+  /**
    * Restore a session on page load.
    *
    * <p>Shares {@link refreshSession}'s single in-flight promise with the transport's 401 retry.
@@ -649,7 +663,7 @@ export const api = {
     return LIVE ? http<TrialRequest[]>("/platform/trial-requests") : liveOnly("The trial queue");
   },
   /** Approving provisions the company on these terms — this is the moment a login starts existing. */
-  approveTrialRequest(id: string, terms: { password: string; seats: number; months: number; currency?: string }): Promise<CompanySummary> {
+  approveTrialRequest(id: string, terms: { password?: string; seats: number; months: number; currency?: string }): Promise<CompanySummary> {
     return LIVE
       ? http<CompanySummary>(`/platform/trial-requests/${id}/approve`, { method: "POST", body: JSON.stringify(terms) })
       : liveOnly("Approving a trial");

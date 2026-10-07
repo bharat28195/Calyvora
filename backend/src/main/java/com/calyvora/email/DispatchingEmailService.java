@@ -82,8 +82,10 @@ public class DispatchingEmailService implements EmailService {
     }
 
     @Override
-    public EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl) {
-        EmailMessages.Message message = EmailMessages.trialApproved(companyName, loginUrl);
+    public EmailResult sendWelcomeEmail(String to, String firstName, String companyName,
+                                        String temporaryPassword, String loginUrl) {
+        EmailMessages.Message message = EmailMessages.welcome(firstName, companyName, to, temporaryPassword, loginUrl);
+        // The dev mailbox keeps the link, never the password: it is readable on a demo deployment.
         record(to, message.subject(), loginUrl);
         return send(to, message.subject(), message.body(), message.html());
     }

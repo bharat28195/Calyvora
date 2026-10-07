@@ -61,14 +61,20 @@ public class PlatformService {
     private final com.calyvora.people.EmployeeService employeeService;
 
     private final com.calyvora.common.security.TenantBinder tenantBinder;
+    private final com.calyvora.email.EmailService emailService;
+    private final com.calyvora.common.config.AppProperties props;
 
     public PlatformService(CompanyRepository companyRepository, CompanySettingsRepository settingsRepository,
                            UserRepository userRepository, SubscriptionRepository subscriptionRepository,
                            SeatRequestRepository seatRequestRepository, PasswordEncoder passwordEncoder,
                            com.calyvora.billing.PricingService pricingService,
                            com.calyvora.people.EmployeeService employeeService,
-                           com.calyvora.common.security.TenantBinder tenantBinder) {
+                           com.calyvora.common.security.TenantBinder tenantBinder,
+                           com.calyvora.email.EmailService emailService,
+                           com.calyvora.common.config.AppProperties props) {
         this.tenantBinder = tenantBinder;
+        this.emailService = emailService;
+        this.props = props;
         this.employeeService = employeeService;
         this.pricingService = pricingService;
         this.companyRepository = companyRepository;
@@ -104,7 +110,38 @@ public class PlatformService {
     public CompanySummaryResponse createCompany(CreateCompanyRequest req) {
         UUID agencyId = req.agencyId() == null || req.agencyId().isBlank()
                 ? null : requireAgency(UUID.fromString(req.agencyId())).getId();
-        return summarize(provision(req, agencyId, true));
+        Provisioned p = provision(req, agencyId, true);
+        return summarize(p.company()).withWelcome(p);
+    }
+
+    /**
+     * A freshly provisioned company, and how its admin hears about it.
+     *
+     * @param temporaryPassword the admin's starting password — generated when the owner left it blank
+     * @param welcomeEmailSent  whether the welcome email (with that password) was delivered. When it
+     *                          was not, the console shows the password once so it can be passed on by
+     *                          hand; when it was, the console never sees it again.
+     */
+    public record Provisioned(Company company, String temporaryPassword, boolean welcomeEmailSent) {
+    }
+
+    private static final String PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    /**
+     * A temporary password a person can read off an email and type: three groups of four from an
+     * alphabet without the look-alikes (0/O, 1/l/I). About 70 bits — long enough to be safe for the
+     * hours it lives before the admin replaces it at first sign-in.
+     */
+    static String temporaryPassword() {
+        StringBuilder sb = new StringBuilder();
+        for (int group = 0; group < 3; group++) {
+            if (group > 0) sb.append('-');
+            for (int i = 0; i < 4; i++) {
+                sb.append(PASSWORD_ALPHABET.charAt(RANDOM.nextInt(PASSWORD_ALPHABET.length())));
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -115,7 +152,7 @@ public class PlatformService {
      * — until the platform owner activates it. Selling is the vendor's to do, in both routes.
      */
     @Transactional
-    public Company provision(CreateCompanyRequest req, UUID agencyId, boolean activate) {
+    public Provisioned provision(CreateCompanyRequest req, UUID agencyId, boolean activate) {
         String email = req.adminEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(email)) {
             throw new ConflictException("That email is already registered");
@@ -138,9 +175,14 @@ public class PlatformService {
         // V30 could not make, and the reason it switched this table's RLS off (V57 puts it back).
         tenantBinder.callAs(company.getId(), () -> settingsRepository.save(settings));
 
+        // The owner may type a password or leave it blank for Orbit to choose one. Either way somebody
+        // other than the admin chose it, so the admin replaces it at first sign-in (V67).
+        String password = req.password() == null || req.password().isBlank()
+                ? temporaryPassword() : req.password();
         User admin = new User(UUID.randomUUID(), company.getId(), email,
                 req.adminFirstName().trim(), req.adminLastName().trim(), Role.ADMIN, UserStatus.ACTIVE);
-        admin.setPasswordHash(passwordEncoder.encode(req.password()));
+        admin.setPasswordHash(passwordEncoder.encode(password));
+        admin.setMustChangePassword(true);
         admin.setEmailVerifiedAt(Instant.now());
         userRepository.save(admin);
         // Bound to the NEW company, not the platform's own — which is precisely why this goes through
@@ -159,7 +201,15 @@ public class PlatformService {
         }
         subscriptionRepository.save(sub);
 
-        return company;
+        // Tell the admin, with the password. Only for a workspace that is live: an agency-created one
+        // stays locked until the vendor activates it, and an email saying "you're in" to a locked door
+        // is worse than none — the agency hands the details over itself.
+        boolean sent = false;
+        if (activate) {
+            sent = emailService.sendWelcomeEmail(email, admin.getFirstName(), company.getName(), password,
+                    props.frontendBaseUrl() + "/login").delivered();
+        }
+        return new Provisioned(company, password, sent);
     }
 
     // ---- agencies ----
@@ -428,7 +478,7 @@ public class PlatformService {
                 price, sub != null && sub.isCustomPrice(), revenue, sub == null ? "INR" : sub.getCurrency(),
                 company.getCreatedAt() == null ? null : company.getCreatedAt().toString(),
                 agency == null ? null : agency.getId().toString(),
-                agency == null ? null : agency.getName());
+                agency == null ? null : agency.getName(), null, null);
     }
 
     private Company requireCompany(UUID companyId) {

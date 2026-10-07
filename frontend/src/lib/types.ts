@@ -15,6 +15,8 @@ export interface Me {
     lastName: string;
     role: Role;
     status: UserStatus;
+    /** Someone else chose this password (a new company's first admin); the app asks for a new one first. */
+    mustChangePassword?: boolean;
   };
   company: {
     id: string;
@@ -778,6 +780,10 @@ export interface CompanySummary {
   /** Null for a company sold direct; set when it belongs to an agency. */
   agencyId: string | null;
   agencyName: string | null;
+  /** Only on the answer to a create: whether the new admin's welcome email went out. */
+  welcomeEmailSent?: boolean | null;
+  /** Only on the answer to a create, and only when the email did not go out: pass it on by hand. */
+  temporaryPassword?: string | null;
 }
 
 /** An agency (a customer running several companies) as the platform owner sees it. */
@@ -817,7 +823,8 @@ export interface CreateCompanyInput {
   adminFirstName: string;
   adminLastName: string;
   adminEmail: string;
-  password: string;
+  /** Optional — blank lets Orbit generate a temporary password. */
+  password?: string;
   seats: number;
   months: number;
   /** Owner console only: file the company under an agency. Omit to sell direct. */

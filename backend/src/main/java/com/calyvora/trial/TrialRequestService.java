@@ -115,7 +115,7 @@ public class TrialRequestService {
         TrialRequest request = require(id);
         requireOpen(request);
 
-        Company company = platformService.provision(new CreateCompanyRequest(
+        PlatformService.Provisioned provisioned = platformService.provision(new CreateCompanyRequest(
                 request.getCompanyName(),
                 firstName(request.getContactName()),
                 lastName(request.getContactName()),
@@ -125,11 +125,11 @@ public class TrialRequestService {
                 terms.months(),
                 null,
                 terms.currency()), null, true);
+        Company company = provisioned.company();
 
+        // The welcome email — sign-in email and temporary password — went out from provision().
         request.decide(TrialRequestStatus.APPROVED, company.getId());
-        emailService.sendTrialApprovedEmail(request.getEmail(), company.getName(),
-                props.frontendBaseUrl() + "/login");
-        return platformService.summarize(company);
+        return platformService.summarize(company).withWelcome(provisioned);
     }
 
     @Transactional

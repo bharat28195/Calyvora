@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
+import { WelcomeOutcome } from "@/components/platform/welcome-outcome";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
 
@@ -444,9 +445,10 @@ function InlineEditor({ label, type, initial, busy, onSet, onCancel }: {
 }
 
 function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
-  const [f, setF] = useState({ companyName: "", adminFirstName: "", adminLastName: "", adminEmail: "", password: "demopass123", seats: "10", months: "12", currency: "INR" });
+  const [f, setF] = useState({ companyName: "", adminFirstName: "", adminLastName: "", adminEmail: "", password: "", seats: "10", months: "12", currency: "INR" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<CompanySummary | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function submit(e: React.FormEvent) {
@@ -454,27 +456,37 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
     if (!f.companyName.trim() || !f.adminEmail.trim()) return;
     setBusy(true); setError(null);
     try {
-      await api.createCompany({
+      setCreated(await api.createCompany({
         companyName: f.companyName.trim(), adminFirstName: f.adminFirstName.trim() || "Admin",
         adminLastName: f.adminLastName.trim() || "User", adminEmail: f.adminEmail.trim(),
-        password: f.password, seats: Number(f.seats) || 5, months: Number(f.months) || 12,
+        password: f.password.trim() || undefined, seats: Number(f.seats) || 5, months: Number(f.months) || 12,
         currency: f.currency,
-      });
-      onCreated();
+      }));
+      setBusy(false);
     } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't create the company"); setBusy(false); }
   }
 
   return (
     <Card className="mt-6">
       <CardTitle>New company</CardTitle>
-      <p className="mt-1 text-sm text-fg/50">Provisions the company and its first admin. Share the login with them.</p>
+      <p className="mt-1 text-sm text-fg/50">
+        Creates the company and its first admin, and emails the admin a welcome with their sign-in email and
+        a temporary password. They choose their own password the first time they sign in.
+      </p>
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+      {created && (
+        <div className="mt-3 flex flex-col gap-3">
+          <WelcomeOutcome company={created} />
+          <div><Button type="button" onClick={onCreated}>Done</Button></div>
+        </div>
+      )}
+      {!created && (
       <form onSubmit={submit} className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2"><Field label="Company name" htmlFor="c-name"><Input id="c-name" value={f.companyName} onChange={set("companyName")} placeholder="e.g. Acme Logistics" autoFocus /></Field></div>
         <Field label="Admin first name" htmlFor="c-first"><Input id="c-first" value={f.adminFirstName} onChange={set("adminFirstName")} /></Field>
         <Field label="Admin last name" htmlFor="c-last"><Input id="c-last" value={f.adminLastName} onChange={set("adminLastName")} /></Field>
         <div className="sm:col-span-2"><Field label="Admin email" htmlFor="c-email"><Input id="c-email" type="email" value={f.adminEmail} onChange={set("adminEmail")} placeholder="admin@company.com" /></Field></div>
-        <Field label="Temp password" htmlFor="c-pw"><Input id="c-pw" value={f.password} onChange={set("password")} /></Field>
+        <Field label="Temporary password (optional)" htmlFor="c-pw"><Input id="c-pw" value={f.password} onChange={set("password")} placeholder="Leave blank — Orbit creates one" autoComplete="off" /></Field>
         <div className="grid grid-cols-3 gap-3">
           <Field label="Seats" htmlFor="c-seats"><Input id="c-seats" type="number" min={1} value={f.seats} onChange={set("seats")} /></Field>
           <Field label="Months" htmlFor="c-months"><Input id="c-months" type="number" min={1} value={f.months} onChange={set("months")} /></Field>
@@ -495,6 +507,7 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
         </div>
       </form>
+      )}
     </Card>
   );
 }
