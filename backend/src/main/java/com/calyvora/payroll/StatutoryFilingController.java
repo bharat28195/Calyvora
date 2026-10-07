@@ -50,6 +50,11 @@ public class StatutoryFilingController {
         return respond(service.professionalTax(month), format);
     }
 
+    @GetMapping("/{month}/lwf")
+    public ResponseEntity<?> lwf(@PathVariable String month, @RequestParam(required = false) String format) {
+        return respond(service.labourWelfareFund(month), format);
+    }
+
     @GetMapping("/24q/{quarter}")
     public ResponseEntity<?> form24q(@PathVariable String quarter, @RequestParam(required = false) String format) {
         return respond(service.form24q(quarter), format);

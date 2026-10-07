@@ -15,6 +15,7 @@ public record StatutorySettingsPayload(
         BigDecimal esiEmployerRate,
         BigDecimal esiWageCeiling,
         Boolean ptEnabled,
+        Boolean lwfEnabled,
         @Size(max = 32) String pfEstablishmentCode,
         // ESI employer codes are 17 digits; checked loosely so a code typed with spaces is accepted.
         @Size(max = 32) String esiEmployerCode,

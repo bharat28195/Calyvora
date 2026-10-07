@@ -17,6 +17,7 @@ public record StatutorySettingsResponse(
         BigDecimal esiEmployerRate,
         BigDecimal esiWageCeiling,
         boolean ptEnabled,
+        boolean lwfEnabled,
         String pfEstablishmentCode,
         String esiEmployerCode,
         String tan,
@@ -25,7 +26,7 @@ public record StatutorySettingsResponse(
 ) {
     public static StatutorySettingsResponse of(StatutorySettings s, boolean statutoryEnabled) {
         return new StatutorySettingsResponse(statutoryEnabled, s.isEsiEnabled(), s.getEsiEmployeeRate(),
-                s.getEsiEmployerRate(), s.getEsiWageCeiling(), s.isPtEnabled(), s.getPfEstablishmentCode(),
+                s.getEsiEmployerRate(), s.getEsiWageCeiling(), s.isPtEnabled(), s.isLwfEnabled(), s.getPfEstablishmentCode(),
                 s.getEsiEmployerCode(), s.getTan(), s.getCompanyPan(), s.getPtRegistrationNo());
     }
 }

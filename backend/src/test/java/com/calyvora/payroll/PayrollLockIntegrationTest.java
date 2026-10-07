@@ -142,15 +142,19 @@ class PayrollLockIntegrationTest extends IntegrationTestBase {
         raise(owner, employeeId, 2_400_000, "2026-06-01");
         int june = payslip(owner, employeeId, "2026-06").get("incomeTax").decimalValue().intValue();
 
-        // The year's tax at the new salary, less what April and May actually withheld, over the ten
-        // months that remain. A plain twelfth of the new tax would leave the shortfall for March.
+        // The year's income is what April and May actually paid (1,25,000 each) plus ten months at the
+        // new 2,00,000; the tax on it, less what April and May withheld, is spread over the ten months
+        // that remain. A plain twelfth of the new salary's tax would leave the shortfall for March.
         var newYear = com.calyvora.tax.IncomeTaxCalculator.compute(com.calyvora.tax.IncomeTaxCalculator.Input
-                .of(java.math.BigDecimal.valueOf(2_400_000), com.calyvora.tax.TaxRegime.DEFAULT));
+                .of(java.math.BigDecimal.valueOf(2 * 125_000 + 10 * 200_000), com.calyvora.tax.TaxRegime.DEFAULT));
         int expected = newYear.totalTax().subtract(java.math.BigDecimal.valueOf(2L * aprilTds))
                 .divide(java.math.BigDecimal.TEN, 0, java.math.RoundingMode.HALF_UP).intValue();
         assertThat(june).isEqualTo(expected);
         assertThat(june).as("more than an even twelfth, to make up April and May")
                 .isGreaterThan(newYear.monthlyTds().intValue());
+
+        // And the employee's tax screen says the same as the payslip for the month being paid.
+        assertThat(payslip(owner, employeeId, "2026-06").get("incomeTax").decimalValue().intValue()).isEqualTo(june);
 
         // The locked months themselves never move.
         assertThat(payslip(owner, employeeId, "2026-04").get("incomeTax").decimalValue().intValue())

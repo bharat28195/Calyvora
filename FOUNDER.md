@@ -1746,8 +1746,18 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   and a readiness check that names what will keep someone out of a return (no UAN, no ESI IP number,
   no PAN, no PT state, missing PF/ESI codes or TAN). All built from finalised months only; anyone a
   file cannot include is listed with the reason, never silently dropped. PF also stops EPS at 58.
-- **Next:** Form 16 Part B, challan register, Labour Welfare Fund, TDS opening balance for companies
-  joining mid-year / previous-employer income (Form 12B), compliance calendar reminders.
+- **Built, step 4 — the year, by date (V66):** payroll took the newest salary for every month, so a
+  June raise re-priced May, and tax assumed today's salary all year. Now `SalaryCalendar` pays each
+  day at the salary in force that day (the first salary applies backwards — typing it in today must
+  not halve the month; the start/end date decides when pay begins and ends), and nobody is paid for
+  a month they were not employed. TDS projects the real year: opening balance + what locked months
+  paid + salary by date for the rest, and spreads the remaining tax over the months actually worked —
+  a mid-year joiner is no longer taxed as if on twelve months' salary. **Opening balances** (Form 12B
+  / the old system's year-to-date) are entered per employee under People → Statutory.
+- **Behaviour change worth knowing:** a payslip for a past open month now uses the salary in force
+  then, not today's; and an employee with an end date gets no payslip after it.
+- **Labour Welfare Fund:** fixed amounts on each state's calendar (June/December, December, or monthly) for the 12 states where 2026 amounts are confirmed; Madhya Pradesh, Haryana, Chhattisgarh and Kerala are reported as unsupported because published sources disagree. LWF summary file on the Returns page.
+- **Next:** Form 16 Part B, challan register, compliance calendar reminders.
 - **Before selling it as "full compliance":** a CA reviews every rule, then one parallel-run month
   against a real client's existing payroll.
 

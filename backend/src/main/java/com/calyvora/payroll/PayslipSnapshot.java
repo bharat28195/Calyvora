@@ -44,6 +44,10 @@ public class PayslipSnapshot {
     @Column(name = "lop_days", nullable = false)
     private BigDecimal lopDays;
 
+    /** Gross actually paid after loss of pay (V66). */
+    @Column(name = "earned_gross", nullable = false)
+    private BigDecimal earnedGross;
+
     @Column(name = "pf_wages")
     private BigDecimal pfWages;
 
@@ -70,6 +74,12 @@ public class PayslipSnapshot {
 
     @Column(name = "pt_state", length = 4)
     private String ptState;
+
+    @Column(name = "lwf_employee")
+    private BigDecimal lwfEmployee;
+
+    @Column(name = "lwf_employer")
+    private BigDecimal lwfEmployer;
 
     @Column(name = "income_tax")
     private BigDecimal incomeTax;
@@ -98,6 +108,8 @@ public class PayslipSnapshot {
     public void setGross(BigDecimal v) { this.gross = v; }
     public BigDecimal getNet() { return net; }
     public void setNet(BigDecimal v) { this.net = v; }
+    public BigDecimal getEarnedGross() { return earnedGross; }
+    public void setEarnedGross(BigDecimal v) { this.earnedGross = v; }
     public int getWorkingDays() { return workingDays; }
     public void setWorkingDays(int v) { this.workingDays = v; }
     public BigDecimal getLopDays() { return lopDays; }
@@ -120,6 +132,10 @@ public class PayslipSnapshot {
     public void setProfessionalTax(BigDecimal v) { this.professionalTax = v; }
     public String getPtState() { return ptState; }
     public void setPtState(String v) { this.ptState = v; }
+    public BigDecimal getLwfEmployee() { return lwfEmployee; }
+    public void setLwfEmployee(BigDecimal v) { this.lwfEmployee = v; }
+    public BigDecimal getLwfEmployer() { return lwfEmployer; }
+    public void setLwfEmployer(BigDecimal v) { this.lwfEmployer = v; }
     public BigDecimal getIncomeTax() { return incomeTax; }
     public void setIncomeTax(BigDecimal v) { this.incomeTax = v; }
 }

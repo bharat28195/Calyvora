@@ -69,6 +69,17 @@ public record PayslipResponse(
 ) {
     public record Line(String label, BigDecimal amount) {}
 
+    /** Gross actually paid: the month's gross less the loss-of-pay line(s). */
+    public BigDecimal earnedGross() {
+        BigDecimal lop = BigDecimal.ZERO;
+        for (Line l : deductions) {
+            if (l.label() != null && l.label().startsWith("Loss of pay")) {
+                lop = lop.add(l.amount());
+            }
+        }
+        return gross.subtract(lop);
+    }
+
     /** The same payslip, marked as coming from a locked month. */
     public PayslipResponse asFinalized() {
         return new PayslipResponse(employeeId, employeeName, month, currency, companyName, companyAddress,
@@ -106,5 +117,7 @@ public record PayslipResponse(
                             BigDecimal employerEdli,
                             BigDecimal esiWages, BigDecimal employeeEsi, BigDecimal employerEsi,
                             BigDecimal professionalTax, String ptState,
+                            /** Labour Welfare Fund: deducted / paid on top, only in a collection month. */
+                            BigDecimal lwfEmployee, BigDecimal lwfEmployer,
                             BigDecimal employerTotal) {}
 }

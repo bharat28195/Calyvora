@@ -52,6 +52,7 @@ public class TaxService {
 
     private final com.calyvora.access.PermissionService permissions;
     private final com.calyvora.payroll.PayslipSnapshotRepository snapshotRepository;
+    private final TdsOpeningBalanceRepository openingRepository;
 
     public TaxService(TaxDeclarationRepository declarationRepository,
                       TaxDeclarationItemRepository itemRepository,
@@ -62,9 +63,11 @@ public class TaxService {
                       OrgScope orgScope,
                       com.calyvora.feature.FeatureService featureService,
             com.calyvora.access.PermissionService permissions,
-            com.calyvora.payroll.PayslipSnapshotRepository snapshotRepository) {
+            com.calyvora.payroll.PayslipSnapshotRepository snapshotRepository,
+            TdsOpeningBalanceRepository openingRepository) {
         this.permissions = permissions;
         this.snapshotRepository = snapshotRepository;
+        this.openingRepository = openingRepository;
         this.declarationRepository = declarationRepository;
         this.itemRepository = itemRepository;
         this.employeeRepository = employeeRepository;
@@ -201,8 +204,17 @@ public class TaxService {
      */
     private TaxDtos.ComputationResponse computationFor(UUID companyId, Employee employee, FinancialYear fy) {
         CompensationRecord current = currentSalary(employee.getId());
-        BigDecimal gross = current == null ? BigDecimal.ZERO : current.getAnnualAmount();
         String currency = current == null || current.getCurrency() == null ? "INR" : current.getCurrency();
+        // The same year the payslip sees (yearPositions): salary by date, locked months as paid, and
+        // any opening balance — so the screen and the payslip can never disagree.
+        java.time.YearMonth asOf = java.time.YearMonth.now();
+        java.time.YearMonth fyFirst = java.time.YearMonth.from(fy.start());
+        java.time.YearMonth fyLast = fyFirst.plusMonths(11);
+        if (asOf.isBefore(fyFirst)) asOf = fyFirst;
+        if (asOf.isAfter(fyLast)) asOf = fyLast;
+        YearPosition position = yearPositions(companyId, asOf, List.of(employee.getId())).get(employee.getId());
+        BigDecimal gross = position != null ? position.income()
+                : current == null ? BigDecimal.ZERO : current.getAnnualAmount();
 
         TaxDeclaration declaration = declarationRepository
                 .findByCompanyIdAndEmployeeIdAndFinancialYear(companyId, employee.getId(), fy.label())
@@ -226,19 +238,21 @@ public class TaxService {
         BigDecimal saving = oldTax.subtract(newTax).abs();
 
         int elapsed = fy.monthsElapsed(LocalDate.now());
-        BigDecimal perMonth = result.monthlyTds();
+        // The month's withholding, exactly as the payslip computes it.
+        BigDecimal perMonth = position == null ? result.monthlyTds() : position.thisMonth(result.totalTax());
         // Whether this company withholds income tax through Orbit at all (off until switched on per
         // customer). When it does not, nothing has been "deducted so far" — the page showed a projected
         // figure under that label to people whose payslips carried no tax line, so it says zero and the
         // screen presents the rest as an estimate to plan with.
         boolean withheld = featureService.isEnabled(companyId, com.calyvora.feature.Feature.INCOME_TAX);
-        BigDecimal deductedSoFar = withheld ? perMonth.multiply(BigDecimal.valueOf(elapsed)) : BigDecimal.ZERO;
+        BigDecimal deductedSoFar = !withheld ? BigDecimal.ZERO
+                : position == null ? perMonth.multiply(BigDecimal.valueOf(elapsed))
+                : position.withheld().add(perMonth.multiply(BigDecimal.valueOf(position.openPastMonths())));
         if (deductedSoFar.compareTo(result.totalTax()) > 0) {
             deductedSoFar = result.totalTax();
         }
         BigDecimal remaining = result.totalTax().subtract(deductedSoFar).max(BigDecimal.ZERO);
-        int monthsLeft = Math.max(1, 12 - elapsed);
-        BigDecimal nextMonth = remaining.divide(BigDecimal.valueOf(monthsLeft), 0, RoundingMode.HALF_UP);
+        BigDecimal nextMonth = perMonth;
 
         return new TaxDtos.ComputationResponse(
                 fy.label(), regime, currency,
@@ -284,47 +298,115 @@ public class TaxService {
      */
     @Transactional(readOnly = true)
     public Map<UUID, BigDecimal> monthlyTdsFor(UUID companyId, java.time.YearMonth month,
-                                               Map<UUID, BigDecimal> annualSalary) {
-        FinancialYear fy = FinancialYear.of(month.atDay(1));
-        Map<UUID, IncomeTaxCalculator.Result> annual = annualTaxFor(companyId, fy, annualSalary);
-        if (annual.isEmpty()) {
+                                               java.util.Collection<UUID> employeeIds) {
+        Map<UUID, YearPosition> positions = yearPositions(companyId, month, employeeIds);
+        if (positions.isEmpty()) {
             return Map.of();
         }
+        Map<UUID, BigDecimal> income = new HashMap<>();
+        positions.forEach((id, p) -> income.put(id, p.income()));
+        Map<UUID, IncomeTaxCalculator.Result> annual = annualTaxFor(companyId, FinancialYear.of(month.atDay(1)), income);
 
-        // What was actually withheld in the locked months of this year before this one (V65).
-        //
-        // With no locked month the answer is the even twelfth, exactly as before — a company that has
-        // not started finalising months sees no change. Once months are locked, the year corrects
-        // itself: (the year's tax − what has been withheld) over the months that remain. Months before
-        // this one that are NOT locked count as an even twelfth withheld, which is what an open month
-        // shows and what a company moving to Orbit mid-year was withholding elsewhere.
+        Map<UUID, BigDecimal> out = new HashMap<>();
+        for (Map.Entry<UUID, YearPosition> e : positions.entrySet()) {
+            out.put(e.getKey(), e.getValue().thisMonth(annual.get(e.getKey()).totalTax()));
+        }
+        return out;
+    }
+
+    /**
+     * Where one employee stands in the financial year, as of a month being paid.
+     *
+     * @param income        the year's income: opening balance + what locked months actually paid +
+     *                      the salary by date for every other month they are employed
+     * @param withheld      tax actually withheld before this month — the opening balance's TDS plus
+     *                      every locked month's
+     * @param spreadMonths  months the rest of the tax is spread over: this month, the rest of the
+     *                      year, and earlier months that are neither locked nor covered by an opening
+     *                      balance (an open month withholds the same share as this one)
+     */
+    public record YearPosition(BigDecimal income, BigDecimal withheld, int spreadMonths, int openPastMonths) {
+        /** (year's tax − already withheld) ÷ months it is spread over, in whole rupees. */
+        public BigDecimal thisMonth(BigDecimal yearTax) {
+            if (spreadMonths <= 0) {
+                return BigDecimal.ZERO;
+            }
+            return yearTax.subtract(withheld).max(BigDecimal.ZERO)
+                    .divide(BigDecimal.valueOf(spreadMonths), 0, RoundingMode.HALF_UP);
+        }
+    }
+
+    /**
+     * The year so far and ahead, per employee, in a handful of queries for the whole company.
+     *
+     * <p>For a full-year employee on one salary with nothing locked this is twelve months of the same
+     * salary spread over twelve — an even twelfth, as before. It differs exactly where the old
+     * figure was wrong: a raise (each month at its own salary), a mid-year joiner or leaver (only the
+     * months they are employed, and the tax spread over those months), a locked month (what was
+     * actually paid and withheld), and income from before Orbit (the opening balance).
+     */
+    private Map<UUID, YearPosition> yearPositions(UUID companyId, java.time.YearMonth month,
+                                                  java.util.Collection<UUID> employeeIds) {
+        if (employeeIds.isEmpty()) {
+            return Map.of();
+        }
+        FinancialYear fy = FinancialYear.of(month.atDay(1));
         java.time.YearMonth fyStart = java.time.YearMonth.from(fy.start());
-        Map<UUID, Map<String, BigDecimal>> withheld = new HashMap<>();
+
+        Map<UUID, List<CompensationRecord>> history = new HashMap<>();
+        for (CompensationRecord r : compensationRepository.findByCompanyIdOrderByEffectiveDateDescCreatedAtDesc(companyId)) {
+            if (employeeIds.contains(r.getEmployeeId())) {
+                history.computeIfAbsent(r.getEmployeeId(), k -> new ArrayList<>()).add(r);
+            }
+        }
+        Map<UUID, Employee> employees = new HashMap<>();
+        for (Employee e : employeeRepository.findByCompanyId(companyId)) {
+            employees.put(e.getId(), e);
+        }
+        Map<UUID, Map<String, com.calyvora.payroll.PayslipSnapshot>> locked = new HashMap<>();
         if (month.isAfter(fyStart)) {
             for (com.calyvora.payroll.PayslipSnapshot s : snapshotRepository.findByCompanyIdAndMonthBetween(
                     companyId, fyStart.toString(), month.minusMonths(1).toString())) {
-                withheld.computeIfAbsent(s.getEmployeeId(), k -> new HashMap<>())
-                        .put(s.getMonth(), s.getIncomeTax() == null ? BigDecimal.ZERO : s.getIncomeTax());
+                locked.computeIfAbsent(s.getEmployeeId(), k -> new HashMap<>()).put(s.getMonth(), s);
             }
         }
-        int monthsBefore = (int) java.time.temporal.ChronoUnit.MONTHS.between(fyStart, month);
-        int monthsLeft = 12 - monthsBefore;
+        Map<UUID, TdsOpeningBalance> openings = new HashMap<>();
+        for (TdsOpeningBalance o : openingRepository.findByCompanyIdAndFinancialYear(companyId, fy.label())) {
+            openings.put(o.getEmployeeId(), o);
+        }
 
-        Map<UUID, BigDecimal> out = new HashMap<>();
-        for (Map.Entry<UUID, IncomeTaxCalculator.Result> e : annual.entrySet()) {
-            BigDecimal twelfth = e.getValue().monthlyTds();
-            Map<String, BigDecimal> locked = withheld.get(e.getKey());
-            if (locked == null || locked.isEmpty()) {
-                out.put(e.getKey(), twelfth);
+        Map<UUID, YearPosition> out = new HashMap<>();
+        for (UUID id : employeeIds) {
+            List<CompensationRecord> h = history.get(id);
+            Employee emp = employees.get(id);
+            if (h == null || h.isEmpty() || emp == null) {
                 continue;
             }
-            BigDecimal soFar = BigDecimal.ZERO;
-            for (int i = 0; i < monthsBefore; i++) {
-                String m = fyStart.plusMonths(i).toString();
-                soFar = soFar.add(locked.getOrDefault(m, twelfth));
+            TdsOpeningBalance opening = openings.get(id);
+            java.time.YearMonth coveredThrough = opening == null ? null : java.time.YearMonth.parse(opening.getCoveredThrough());
+            BigDecimal income = opening == null ? BigDecimal.ZERO : opening.getIncome();
+            BigDecimal withheld = opening == null ? BigDecimal.ZERO : opening.getTds();
+            int spread = 0, openPast = 0;
+            Map<String, com.calyvora.payroll.PayslipSnapshot> mine = locked.getOrDefault(id, Map.of());
+            for (int i = 0; i < 12; i++) {
+                java.time.YearMonth m = fyStart.plusMonths(i);
+                if (coveredThrough != null && !m.isAfter(coveredThrough)) {
+                    continue;   // paid and taxed before Orbit; in the opening balance
+                }
+                com.calyvora.payroll.PayslipSnapshot snap = m.isBefore(month) ? mine.get(m.toString()) : null;
+                if (snap != null) {
+                    income = income.add(snap.getEarnedGross());
+                    withheld = withheld.add(snap.getIncomeTax() == null ? BigDecimal.ZERO : snap.getIncomeTax());
+                    continue;
+                }
+                BigDecimal g = com.calyvora.people.SalaryCalendar.grossForMonth(h, m, emp.getStartDate(), emp.getEndDate());
+                if (g != null && g.signum() > 0) {
+                    income = income.add(g);
+                    spread++;
+                    if (m.isBefore(month)) openPast++;
+                }
             }
-            BigDecimal remaining = e.getValue().totalTax().subtract(soFar).max(BigDecimal.ZERO);
-            out.put(e.getKey(), remaining.divide(BigDecimal.valueOf(monthsLeft), 0, RoundingMode.HALF_UP));
+            out.put(id, new YearPosition(income, withheld, spread, openPast));
         }
         return out;
     }

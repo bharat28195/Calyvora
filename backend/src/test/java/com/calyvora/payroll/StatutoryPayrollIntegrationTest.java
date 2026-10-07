@@ -313,6 +313,24 @@ class StatutoryPayrollIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    void labour_welfare_fund_is_deducted_in_the_states_collection_month() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        String employeeId = employeeOnSalary(owner, 1_200_000);
+        patchFinance(owner, employeeId, Map.of("ptState", "Maharashtra", "gender", "MALE"));
+        statutorySettings(owner, Map.of("lwfEnabled", true));
+        Session platform = platformOwner();
+        setFeature(platform, companyIdOf(platform, "Acme"), true);
+
+        JsonNode june = payslipFor(owner, employeeId, "2026-06");
+        assertThat(june.get("statutory").get("lwfEmployee").decimalValue().intValue()).isEqualTo(25);
+        assertThat(june.get("statutory").get("lwfEmployer").decimalValue().intValue()).isEqualTo(75);
+        assertThat(june.get("deductions").toString()).contains("Labour welfare fund");
+
+        JsonNode july = payslipFor(owner, employeeId, "2026-07");
+        assertThat(july.get("statutory").get("lwfEmployee").isNull()).as("not a collection month").isTrue();
+    }
+
+    @Test
     void esi_and_pt_switches_do_nothing_until_the_vendor_turns_statutory_on() throws Exception {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
         String employeeId = employeeOnSalary(owner, 216_000);

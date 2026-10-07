@@ -185,6 +185,36 @@ public class StatutoryFilingService {
         return new FilingFile("PT_" + ym + ".csv", "text/csv", out.toString(), List.of());
     }
 
+    // ---- Labour Welfare Fund: the contribution summary -------------------------------------------
+
+    /** Employee and employer LWF for the month, by state, with a total per state. */
+    @Transactional(readOnly = true)
+    public FilingFile labourWelfareFund(String month) {
+        UUID companyId = TenantContext.getCompanyId();
+        String ym = requireFinalized(companyId, month);
+        Map<String, List<Slip>> byState = new TreeMap<>();
+        for (Slip s : slips(companyId, ym)) {
+            if (s.snapshot().getLwfEmployee() != null || s.snapshot().getLwfEmployer() != null) {
+                String state = s.snapshot().getPtState() == null ? "??" : s.snapshot().getPtState();
+                byState.computeIfAbsent(state, k -> new ArrayList<>()).add(s);
+            }
+        }
+        StringBuilder out = new StringBuilder("State,Employee,Employee share,Employer share\n");
+        for (Map.Entry<String, List<Slip>> e : byState.entrySet()) {
+            BigDecimal ee = BigDecimal.ZERO, er = BigDecimal.ZERO;
+            for (Slip s : e.getValue()) {
+                BigDecimal a = nz(s.snapshot().getLwfEmployee()), b = nz(s.snapshot().getLwfEmployer());
+                out.append(e.getKey()).append(',').append(csv(s.payslip().employeeName())).append(',')
+                        .append(a.toPlainString()).append(',').append(b.toPlainString()).append("\n");
+                ee = ee.add(a);
+                er = er.add(b);
+            }
+            out.append(e.getKey()).append(",TOTAL (").append(e.getValue().size()).append(" employees),")
+                    .append(ee.toPlainString()).append(',').append(er.toPlainString()).append("\n");
+        }
+        return new FilingFile("LWF_" + ym + ".csv", "text/csv", out.toString(), List.of());
+    }
+
     // ---- TDS: Form 24Q deductee data -------------------------------------------------------------
 
     /**
@@ -294,6 +324,12 @@ public class StatutoryFilingService {
                     issues.add(new Issue(id, name, "WARNING", "Orbit does not hold this state's PT schedule yet — add PT as a template deduction"));
                 }
             }
+            if (statutory && ss.isLwfEnabled()) {
+                var lwf = LwfCalculator.compute(f.getPtState(), BigDecimal.ONE, YearMonth.of(2026, 12));
+                if (!lwf.supported()) {
+                    issues.add(new Issue(id, name, "WARNING", "Orbit does not hold this state's Labour Welfare Fund amounts yet — add LWF as a template deduction"));
+                }
+            }
             if (incomeTax && (f.getPanNumber() == null || !f.getPanNumber().matches("[A-Z]{5}[0-9]{4}[A-Z]"))) {
                 issues.add(new Issue(id, name, "ERROR", "No valid PAN — TDS must be deducted at the higher rate and 24Q will flag it"));
             }
@@ -350,15 +386,8 @@ public class StatutoryFilingService {
         return ym;
     }
 
-    /** Gross actually paid: contracted gross less the loss-of-pay line. */
     static BigDecimal earnedGross(PayslipResponse p) {
-        BigDecimal lop = BigDecimal.ZERO;
-        for (PayslipResponse.Line l : p.deductions()) {
-            if (l.label() != null && l.label().startsWith("Loss of pay")) {
-                lop = lop.add(l.amount());
-            }
-        }
-        return p.gross().subtract(lop);
+        return p.earnedGross();
     }
 
     static List<String> quarterMonths(String quarter) {

@@ -133,11 +133,15 @@ export default function FilingsPage() {
               <Button variant="secondary" disabled={busy !== null} onClick={() => download("pt", () => api.filingFile("pt", month))}>
                 {busy === "pt" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Professional tax
               </Button>
+              <Button variant="secondary" disabled={busy !== null} onClick={() => download("lwf", () => api.filingFile("lwf", month))}>
+                {busy === "lwf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Labour welfare fund
+              </Button>
             </div>
             <ul className="mt-4 list-disc space-y-1 pl-5 text-xs text-fg/50">
               <li><strong>PF ECR</strong> — upload on the EPFO Unified Portal (ECR/Return Filing). Pay by the 15th of the next month.</li>
               <li><strong>ESI</strong> — open in a spreadsheet and paste into the ESIC monthly contribution template. Pay by the 15th.</li>
               <li><strong>Professional tax</strong> — the state-wise summary for your PT return; due dates differ by state.</li>
+              <li><strong>Labour welfare fund</strong> — June and December in most states (December only in Karnataka and Tamil Nadu); pay by the 15th of the next month.</li>
             </ul>
           </>
         )}

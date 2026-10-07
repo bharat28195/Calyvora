@@ -44,6 +44,9 @@ public class StatutorySettings {
     @Column(name = "pt_enabled", nullable = false)
     private boolean ptEnabled;
 
+    @Column(name = "lwf_enabled", nullable = false)
+    private boolean lwfEnabled;
+
     @Column(name = "pf_establishment_code", length = 32)
     private String pfEstablishmentCode;
 
@@ -94,6 +97,9 @@ public class StatutorySettings {
 
     public boolean isPtEnabled() { return ptEnabled; }
     public void setPtEnabled(boolean ptEnabled) { this.ptEnabled = ptEnabled; }
+
+    public boolean isLwfEnabled() { return lwfEnabled; }
+    public void setLwfEnabled(boolean lwfEnabled) { this.lwfEnabled = lwfEnabled; }
 
     public String getPfEstablishmentCode() { return pfEstablishmentCode; }
     public void setPfEstablishmentCode(String v) { this.pfEstablishmentCode = v; }

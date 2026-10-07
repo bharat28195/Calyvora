@@ -194,6 +194,9 @@ export default function MyPayslipPage() {
                     {slip.statutory.employerEsi != null && (
                       <Row label="ESI (employer)" value={money(slip.statutory.employerEsi, currency)} />
                     )}
+                    {slip.statutory.lwfEmployer != null && (
+                      <Row label="Labour welfare fund (employer)" value={money(slip.statutory.lwfEmployer, currency)} />
+                    )}
                     <Row label="Total contributed for you" value={money(slip.statutory.employerTotal, currency)} strong />
                     <p className="mt-2 border-t border-fg/10 pt-2 text-[11px] text-fg/40">
                       {slip.statutory.pfWages != null && (

@@ -287,11 +287,7 @@ public class CompensationService {
         boolean incomeTaxOn = featureService.isEnabled(runCompanyId, Feature.INCOME_TAX);
         java.util.Map<UUID, java.math.BigDecimal> tdsByEmployee = java.util.Map.of();
         if (incomeTaxOn) {
-            java.util.Map<UUID, java.math.BigDecimal> annual = new java.util.HashMap<>();
-            for (java.util.Map.Entry<UUID, CompensationRecord> e : currentSalary.entrySet()) {
-                annual.put(e.getKey(), e.getValue().getAnnualAmount());
-            }
-            tdsByEmployee = taxService.monthlyTdsFor(runCompanyId, ym, annual);
+            tdsByEmployee = taxService.monthlyTdsFor(runCompanyId, ym, currentSalary.keySet());
         }
 
         RunContext ctx = new RunContext(currency,
@@ -412,25 +408,24 @@ public class CompensationService {
         String name = ctx != null ? nameOf(employee, ctx.users()) : nameOf(employee);
         YearMonth ym = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
 
-        CompensationRecord current;
-        if (ctx != null) {
-            current = ctx.currentSalary().get(employeeId);
-            if (current == null) {
-                throw new NotFoundException("No salary on record for this employee");
-            }
-        } else {
-            List<CompensationRecord> records = compensationRepository
-                    .findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(employeeId);
-            if (records.isEmpty()) {
-                throw new NotFoundException("No salary on record for this employee");
-            }
-            current = records.get(0);
+        List<CompensationRecord> salaryHistory = ctx != null
+                ? ctx.salaryHistory().getOrDefault(employeeId, List.of())
+                : compensationRepository.findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(employeeId);
+        if (salaryHistory.isEmpty()) {
+            throw new NotFoundException("No salary on record for this employee");
+        }
+        // The month's pay by date: the salary in force on each day, and nothing for days before the
+        // start date or after the end date (SalaryCalendar). Zero means not employed that month at
+        // all — not on this month's payroll, rather than a payslip for nothing.
+        BigDecimal gross = SalaryCalendar.grossForMonth(salaryHistory, ym,
+                employee.getStartDate(), employee.getEndDate());
+        if (gross == null || gross.signum() <= 0) {
+            throw new NotFoundException("Not employed in " + ym);
         }
         // The company's configured currency is the single source of truth for what money on a payslip
         // means. A salary row carries its own code only as history (and older rows default to USD), so
         // reading it here printed "USD" on an INR company's payslip.
         String cur = ctx != null ? ctx.currency() : companyCurrency(companyId);
-        BigDecimal gross = current.getAnnualAmount().divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
 
         // Generate the lines from the company's configurable payslip template.
         PayslipTemplateService.Computed c = ctx != null
@@ -504,10 +499,7 @@ public class CompensationService {
             // ESI — coverage is fixed for the contribution period by the gross at its start.
             com.calyvora.payroll.EsiCalculator.Result esi = null;
             if (ss.isEsiEnabled() && "ELIGIBLE".equals(financeForPf.getEsiStatus())) {
-                List<CompensationRecord> history = ctx != null
-                        ? ctx.salaryHistory().getOrDefault(employeeId, List.of(current))
-                        : compensationRepository.findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(employeeId);
-                BigDecimal periodStartGross = monthlyGrossAt(history,
+                BigDecimal periodStartGross = monthlyGrossAt(salaryHistory,
                         com.calyvora.payroll.EsiCalculator.periodStart(ym));
                 esi = com.calyvora.payroll.EsiCalculator.compute(earnedGross, periodStartGross, payableDays,
                         ss.getEsiEmployeeRate(), ss.getEsiEmployerRate(), ss.getEsiWageCeiling());
@@ -536,16 +528,34 @@ public class CompensationService {
                 }
             }
 
-            if (pf != null || esi != null || pt != null) {
+            // Labour Welfare Fund — fixed amounts on the work state's own calendar (June/December,
+            // December only, or monthly). Same state field as professional tax.
+            com.calyvora.payroll.LwfCalculator.Result lwf = null;
+            if (ss.isLwfEnabled()) {
+                var r = com.calyvora.payroll.LwfCalculator.compute(financeForPf.getPtState(), earnedGross, ym);
+                if (r.employee().signum() > 0 || r.employer().signum() > 0) {
+                    lwf = r;
+                    if (r.employee().signum() > 0) {
+                        deductions.add(new PayslipResponse.Line("Labour welfare fund", r.employee()));
+                        totalDed = totalDed.add(r.employee());
+                        net = net.subtract(r.employee());
+                    }
+                }
+            }
+
+            if (pf != null || esi != null || pt != null || lwf != null) {
                 BigDecimal employerTotal = (pf == null ? BigDecimal.ZERO : pf.employerTotal())
-                        .add(esi == null ? BigDecimal.ZERO : esi.employer());
+                        .add(esi == null ? BigDecimal.ZERO : esi.employer())
+                        .add(lwf == null ? BigDecimal.ZERO : lwf.employer());
                 statutory = new PayslipResponse.Statutory(
                         pf == null ? null : pf.pfWages(), pf == null ? null : pf.employee(),
                         pf == null ? null : pf.employerEps(), pf == null ? null : pf.employerEpf(),
                         pf == null ? null : pf.adminCharges(), pf == null ? null : pf.edli(),
                         esi == null ? null : esi.wages(), esi == null ? null : esi.employee(),
                         esi == null ? null : esi.employer(),
-                        pt, ptState, employerTotal);
+                        pt, ptState,
+                        lwf == null ? null : lwf.employee(), lwf == null ? null : lwf.employer(),
+                        employerTotal);
             }
         }
         // --- Income tax (TDS), when the company withholds it here -------------------------------
@@ -564,8 +574,7 @@ public class CompensationService {
         if (incomeTaxOn) {
             BigDecimal tds = ctx != null
                     ? ctx.monthlyTds().getOrDefault(employeeId, BigDecimal.ZERO)
-                    : taxService.monthlyTdsFor(companyId, ym,
-                            java.util.Map.of(employeeId, current.getAnnualAmount()))
+                    : taxService.monthlyTdsFor(companyId, ym, java.util.Set.of(employeeId))
                             .getOrDefault(employeeId, BigDecimal.ZERO);
             incomeTax = tds;
             if (tds.signum() > 0) {

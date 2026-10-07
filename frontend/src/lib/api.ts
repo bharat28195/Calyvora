@@ -76,6 +76,7 @@ import {
   type PayrollMonthStatus,
   type FilingFile,
   type FilingIssue,
+  type TdsOpening,
   type LeavePolicy,
   type CompanyFile,
   type CursorPage,
@@ -1203,6 +1204,18 @@ export const api = {
   reopenPayrollMonth(month: string): Promise<PayrollMonthStatus> {
     return http<PayrollMonthStatus>(`/payroll/months/${month}/reopen`, { method: "POST" });
   },
+  /** Income and TDS from before Orbit this financial year (previous employer or old payroll). */
+  tdsOpenings(year?: string): Promise<TdsOpening[]> {
+    return http<TdsOpening[]>(`/payroll/tds-openings${year ? `?year=${year}` : ""}`);
+  },
+  saveTdsOpening(employeeId: string, body: { coveredThrough: string; income: number; tds: number; note?: string },
+                 year?: string): Promise<TdsOpening> {
+    return http<TdsOpening>(`/payroll/tds-openings/${employeeId}${year ? `?year=${year}` : ""}`,
+      { method: "PUT", body: JSON.stringify(body) });
+  },
+  deleteTdsOpening(employeeId: string, year?: string): Promise<void> {
+    return http<void>(`/payroll/tds-openings/${employeeId}${year ? `?year=${year}` : ""}`, { method: "DELETE" });
+  },
   /** Every finalised month, newest first. */
   payrollMonths(): Promise<PayrollMonthStatus[]> {
     return LIVE ? http<PayrollMonthStatus[]>("/payroll/months") : Promise.resolve([]);
@@ -1212,7 +1225,7 @@ export const api = {
     return http<FilingIssue[]>("/payroll/filings/readiness");
   },
   /** A return file for a finalised month, with who was left out and why. */
-  filingFile(kind: "ecr" | "esi" | "pt", month: string): Promise<FilingFile> {
+  filingFile(kind: "ecr" | "esi" | "pt" | "lwf", month: string): Promise<FilingFile> {
     return http<FilingFile>(`/payroll/filings/${month}/${kind}?format=json`);
   },
   /** Form 24Q deductee data for a financial-year quarter, e.g. "2026-27-Q3". */

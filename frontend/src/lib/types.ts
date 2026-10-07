@@ -1388,6 +1388,9 @@ export interface PayslipStatutory {
   professionalTax: number | null;
   /** Two-letter code of the state the professional tax was computed for. */
   ptState: string | null;
+  /** Labour Welfare Fund, only in the state's collection month. */
+  lwfEmployee: number | null;
+  lwfEmployer: number | null;
   /** PF and ESI employer contributions together. */
   employerTotal: number;
 }
@@ -1401,6 +1404,17 @@ export interface PayrollMonthStatus {
   totalGross: number | null;
   totalNet: number | null;
   totalEmployer: number | null;
+}
+
+/** Income and TDS for one employee this financial year from before Orbit took over. */
+export interface TdsOpening {
+  employeeId: string;
+  financialYear: string;
+  /** Last month these figures cover, YYYY-MM. Orbit takes over from the month after. */
+  coveredThrough: string;
+  income: number;
+  tds: number;
+  note: string | null;
 }
 
 /** A statutory return file, with the people who could not be included and why. */
@@ -1428,6 +1442,7 @@ export interface StatutorySettings {
   esiEmployerRate: number;
   esiWageCeiling: number;
   ptEnabled: boolean;
+  lwfEnabled: boolean;
   pfEstablishmentCode: string | null;
   esiEmployerCode: string | null;
   tan: string | null;

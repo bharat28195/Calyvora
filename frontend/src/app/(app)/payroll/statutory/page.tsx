@@ -192,6 +192,7 @@ function EsiPtSettings() {
   const [esiEmployer, setEsiEmployer] = useState("");
   const [esiCeiling, setEsiCeiling] = useState("");
   const [ptEnabled, setPtEnabled] = useState(false);
+  const [lwfEnabled, setLwfEnabled] = useState(false);
   const [pfCode, setPfCode] = useState("");
   const [esiCode, setEsiCode] = useState("");
   const [tan, setTan] = useState("");
@@ -205,6 +206,7 @@ function EsiPtSettings() {
     setEsiEmployer(String(v.esiEmployerRate));
     setEsiCeiling(String(v.esiWageCeiling));
     setPtEnabled(v.ptEnabled);
+    setLwfEnabled(v.lwfEnabled);
     setPfCode(v.pfEstablishmentCode ?? "");
     setEsiCode(v.esiEmployerCode ?? "");
     setTan(v.tan ?? "");
@@ -228,6 +230,7 @@ function EsiPtSettings() {
         esiEmployerRate: Number(esiEmployer),
         esiWageCeiling: Number(esiCeiling),
         ptEnabled,
+        lwfEnabled,
         pfEstablishmentCode: pfCode,
         esiEmployerCode: esiCode,
         tan,
@@ -287,6 +290,16 @@ function EsiPtSettings() {
               By the state on each employee&apos;s finance record, using that state&apos;s slabs —
               monthly in most states, twice a year in Tamil Nadu and Kerala, and in instalments in
               Madhya Pradesh, Jharkhand and Bihar. States without professional tax deduct nothing.
+            </span>
+          </span>
+        </label>
+        <label className="mt-4 flex items-start gap-3 text-sm">
+          <input type="checkbox" className="mt-1" checked={lwfEnabled} onChange={(e) => setLwfEnabled(e.target.checked)} />
+          <span>
+            <span className="font-medium">Deduct Labour Welfare Fund</span>
+            <span className="mt-0.5 block text-xs text-fg/50">
+              Fixed amounts by work state, in the state&apos;s collection month — June and December in
+              Maharashtra, Gujarat and West Bengal, December in Karnataka and Tamil Nadu, monthly in Punjab.
             </span>
           </span>
         </label>

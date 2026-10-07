@@ -53,6 +53,7 @@ public class StatutorySettingsService {
             s.setEsiWageCeiling(p.esiWageCeiling());
         }
         if (p.ptEnabled() != null) s.setPtEnabled(p.ptEnabled());
+        if (p.lwfEnabled() != null) s.setLwfEnabled(p.lwfEnabled());
         if (p.pfEstablishmentCode() != null) s.setPfEstablishmentCode(blankToNull(p.pfEstablishmentCode()));
         if (p.esiEmployerCode() != null) s.setEsiEmployerCode(blankToNull(p.esiEmployerCode()));
         if (p.tan() != null) s.setTan(blankToNull(p.tan()));

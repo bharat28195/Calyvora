@@ -122,6 +122,7 @@ public class PayrollLockService {
         }
         PayslipSnapshot s = new PayslipSnapshot(companyId, month, UUID.fromString(p.employeeId()), payload);
         s.setGross(p.gross());
+        s.setEarnedGross(p.earnedGross());
         s.setNet(p.net());
         s.setWorkingDays(p.workingDays());
         s.setLopDays(BigDecimal.valueOf(p.lopDays()));
@@ -137,6 +138,8 @@ public class PayrollLockService {
             s.setEmployerEsi(st.employerEsi());
             s.setProfessionalTax(st.professionalTax());
             s.setPtState(st.ptState());
+            s.setLwfEmployee(st.lwfEmployee());
+            s.setLwfEmployer(st.lwfEmployer());
         }
         return s;
     }
