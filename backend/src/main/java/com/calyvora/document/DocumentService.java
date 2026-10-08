@@ -152,9 +152,13 @@ public class DocumentService {
         UUID employeeId = req.employeeId() == null || req.employeeId().isBlank()
                 ? null : UUID.fromString(req.employeeId());
 
+        // Edited by hand after the fields filled in: the issuer's text is the letter.
+        String body = req.body() != null && !req.body().isBlank()
+                ? req.body().strip()
+                : MergeFields.render(t.getBody(), values);
         GeneratedDocument doc = new GeneratedDocument(UUID.randomUUID(), companyId, t.getId(), employeeId,
-                titleFor(t, req, values), t.getKind(), MergeFields.render(t.getBody(), values),
-                t.isUseLetterhead(), principal.userId());
+                titleFor(t, req, values), t.getKind(), body, t.isUseLetterhead(), principal.userId());
+        doc.setRecipientName(recipientName(employeeId, values));
         documentRepository.save(doc);
         return DocumentResponse.of(doc, values.get("employee.fullName"), values.get("signatory.name"));
     }
@@ -184,6 +188,7 @@ public class DocumentService {
                     GeneratedDocument doc = new GeneratedDocument(UUID.randomUUID(), companyId, t.getId(),
                             employeeId, titleFor(t, req, values), t.getKind(),
                             MergeFields.render(t.getBody(), values), t.isUseLetterhead(), principal.userId());
+                    doc.setRecipientName(recipientName(employeeId, values));
                     documentRepository.save(doc);
                     return DocumentResponse.of(doc, values.get("employee.fullName"), values.get("signatory.name"));
                 });
@@ -322,7 +327,42 @@ public class DocumentService {
             });
         }
         v.values().removeIf(java.util.Objects::isNull);
+        completeName(v);
         return v;
+    }
+
+    /**
+     * For somebody typed in by hand, one name fills the others: "Priya Sharma" as the full name gives
+     * "Dear Priya" in a template that greets by first name, and a first and last name give the full one.
+     * Never overwrites what was given.
+     */
+    static void completeName(Map<String, String> v) {
+        String full = v.get("employee.fullName");
+        String first = v.get("employee.firstName");
+        String last = v.get("employee.lastName");
+        if ((full == null || full.isBlank()) && first != null && !first.isBlank()) {
+            v.put("employee.fullName", (first + " " + (last == null ? "" : last)).trim());
+        } else if (full != null && !full.isBlank()) {
+            String[] parts = full.trim().split("\\s+", 2);
+            v.putIfAbsent("employee.firstName", parts[0]);
+            if (parts.length > 1) {
+                v.putIfAbsent("employee.lastName", parts[1]);
+            }
+        }
+    }
+
+    /** The typed name, kept only for somebody with no employee record (V69). */
+    private static String recipientName(UUID employeeId, Map<String, String> values) {
+        if (employeeId != null) {
+            return null;
+        }
+        String name = values.get("employee.fullName");
+        if (name == null || name.isBlank()) {
+            String first = values.getOrDefault("employee.firstName", "");
+            String last = values.getOrDefault("employee.lastName", "");
+            name = (first + " " + last).trim();
+        }
+        return name.isBlank() ? null : name.length() > 200 ? name.substring(0, 200) : name;
     }
 
     private String titleFor(DocumentTemplate t, GenerateRequest req, Map<String, String> values) {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, FileSignature, Sparkles, AlertTriangle, Plus, X } from "lucide-react";
+import { Loader2, FileSignature, Sparkles, AlertTriangle, Plus, X, Pencil, RotateCcw, Eye, UserRound, UserPlus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { DocumentPreview, DocumentTemplate, Employee, Letterhead, MergeField } from "@/lib/types";
 import { KIND_LABELS } from "@/lib/documents";
@@ -18,7 +18,25 @@ import { LetterSheet } from "@/components/documents/letter";
  * Generate a letter: pick a template, pick the person, and the merge fields fill themselves from the
  * People profile (feedback D2 — "fill in name → a proper document is generated"). The preview is
  * live, and anything the profile couldn't supply is called out *before* the letter is issued.
+ *
+ * <p>An offer letter goes to somebody who is not in the company yet, so there is no profile to read:
+ * "Someone new" types the name, designation and the rest straight onto the letter. And whatever the
+ * template says, the issuer can edit the finished text by hand before issuing it.
  */
+
+/** Filled in by Orbit whoever the letter is for; still changeable under "Override a field". */
+const AUTOMATIC = new Set(["company.name", "today", "signatory.name", "signatory.title", "employee.tenure"]);
+/** Derived from the full name, so not asked for separately. */
+const FROM_FULL_NAME = new Set(["employee.firstName", "employee.lastName"]);
+const DATE_FIELDS = new Set(["employee.startDate", "employee.endDate", "salary.effectiveDate"]);
+
+/** "2026-11-01" → "1 November 2026", the way the server writes dates into letters. */
+function letterDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(y, m - 1, d)));
+}
 export default function GenerateDocumentPage() {
   const router = useRouter();
 
@@ -28,6 +46,13 @@ export default function GenerateDocumentPage() {
   // Deep links from People ("generate a letter for this person") arrive as ?employee=…
   const [employeeId, setEmployeeId] = useState("");
   const [title, setTitle] = useState("");
+  // Somebody in the company, or somebody typed in by hand (a candidate getting an offer).
+  const [mode, setMode] = useState<"employee" | "new">("employee");
+  // Raw yyyy-mm-dd for the date pickers; the letter gets the written-out form via overrides.
+  const [dates, setDates] = useState<Record<string, string>>({});
+  // The letter text as edited by hand, once the issuer starts editing. Null = the template's text.
+  const [customBody, setCustomBody] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<DocumentPreview | null>(null);
   const [letterhead, setLetterhead] = useState<Letterhead | null>(null);
@@ -37,6 +62,7 @@ export default function GenerateDocumentPage() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (q.get("employee")) setEmployeeId(q.get("employee")!);
+    if (q.get("for") === "new") setMode("new");
     const wanted = q.get("template");
     // No employee list here: the picker searches the server as you type. Fetching every employee to
     // fill one dropdown was a whole-company download on a page that issues a single letter.
@@ -71,13 +97,44 @@ export default function GenerateDocumentPage() {
   }, [refresh]);
 
   const template = useMemo(() => templates?.find((t) => t.id === templateId) ?? null, [templates, templateId]);
-  const missing = preview?.missing ?? [];
+  // A new template is a new letter: hand edits to the old one don't carry over.
+  useEffect(() => { setCustomBody(null); setEditing(false); }, [templateId]);
+
+  // What to ask for when the person is typed in: the name always (it labels the letter), then every
+  // field this template uses, in catalogue order, except those Orbit fills itself.
+  const newPersonFields = useMemo(() => {
+    const used = new Set(template?.placeholders ?? []);
+    const rest = fields.filter((f) => used.has(f.key) && f.key !== "employee.fullName"
+      && !AUTOMATIC.has(f.key) && !FROM_FULL_NAME.has(f.key));
+    return [{ key: "employee.fullName", label: "Full name" }, ...rest];
+  }, [template, fields]);
+  const asked = new Set(mode === "new" ? newPersonFields.map((f) => f.key) : []);
+  const missing = (preview?.missing ?? []).filter((k) => !asked.has(k) && !(mode === "new" && FROM_FULL_NAME.has(k)));
+
+  function switchMode(next: "employee" | "new") {
+    if (next === mode) return;
+    setMode(next);
+    setEmployeeId("");
+    setOverrides({});
+    setDates({});
+  }
+
+  function setField(key: string, value: string) {
+    setOverrides((o) => ({ ...o, [key]: value }));
+  }
 
   async function issue() {
     if (!templateId) return;
+    if (mode === "new" && !overrides["employee.fullName"]?.trim()) {
+      setError("Type the name of the person this letter is for.");
+      return;
+    }
     setIssuing(true);
     try {
-      const doc = await api.generateDoc({ templateId, employeeId: employeeId || null, title, overrides });
+      const doc = await api.generateDoc({
+        templateId, employeeId: mode === "employee" ? employeeId || null : null, title, overrides,
+        body: customBody ?? undefined,
+      });
       router.push(`/documents/${doc.id}`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to generate the document");
@@ -124,14 +181,48 @@ export default function GenerateDocumentPage() {
 
             <Card>
               <CardTitle>For</CardTitle>
+              <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-fg/5 p-1 text-sm">
+                <button type="button" onClick={() => switchMode("employee")}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 ${mode === "employee" ? "bg-surface font-medium text-violet shadow-sm" : "text-fg/60 hover:text-fg"}`}>
+                  <UserRound className="h-3.5 w-3.5" /> Employee
+                </button>
+                <button type="button" onClick={() => switchMode("new")}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 ${mode === "new" ? "bg-surface font-medium text-violet shadow-sm" : "text-fg/60 hover:text-fg"}`}>
+                  <UserPlus className="h-3.5 w-3.5" /> Someone new
+                </button>
+              </div>
               <div className="mt-3 flex flex-col gap-3">
-                <Field label="Employee" htmlFor="doc-emp">
-                  <MemberSelect
-                    value={employeeId}
-                    onChange={setEmployeeId}
-                    placeholder="Nobody selected"
-                  />
-                </Field>
+                {mode === "employee" ? (
+                  <Field label="Employee" htmlFor="doc-emp">
+                    <MemberSelect
+                      value={employeeId}
+                      onChange={setEmployeeId}
+                      placeholder="Nobody selected"
+                    />
+                  </Field>
+                ) : (
+                  <>
+                    <p className="text-xs text-fg/50">
+                      For somebody who isn&apos;t in Orbit yet — a candidate getting an offer, say. Type the
+                      details that go on the letter.
+                    </p>
+                    {newPersonFields.map((f) => (
+                      <Field key={f.key} label={f.label} htmlFor={`new-${f.key}`}>
+                        {DATE_FIELDS.has(f.key) ? (
+                          <Input id={`new-${f.key}`} type="date" value={dates[f.key] ?? ""}
+                            onChange={(e) => {
+                              setDates((d) => ({ ...d, [f.key]: e.target.value }));
+                              setField(f.key, e.target.value ? letterDate(e.target.value) : "");
+                            }} />
+                        ) : (
+                          <Input id={`new-${f.key}`} value={overrides[f.key] ?? ""}
+                            onChange={(e) => setField(f.key, e.target.value)}
+                            placeholder={PLACEHOLDERS[f.key] ?? ""} />
+                        )}
+                      </Field>
+                    ))}
+                  </>
+                )}
                 <Field label="Title (optional)" htmlFor="doc-title">
                   <Input
                     id="doc-title"
@@ -149,7 +240,9 @@ export default function GenerateDocumentPage() {
                   <AlertTriangle className="h-4 w-4" /> {missing.length} field{missing.length === 1 ? "" : "s"} unfilled
                 </p>
                 <p className="mt-1 text-xs text-fg/50">
-                  Not on this profile yet. Fill them in below, or update the person in People.
+                  {mode === "new"
+                    ? "Fill them in below — they go on the letter only."
+                    : "Not on this profile yet. Fill them in below, or update the person in People."}
                 </p>
                 <div className="mt-3 flex flex-col gap-2">
                   {missing.map((key) => (
@@ -180,13 +273,43 @@ export default function GenerateDocumentPage() {
               <p className="text-sm font-medium uppercase tracking-wide text-fg/40">
                 <Sparkles className="mr-1 inline h-3.5 w-3.5" /> Live preview
               </p>
-              <Button onClick={issue} disabled={issuing || !templateId}>
-                {issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
-                Issue document
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {preview && !editing && (
+                  <Button variant="secondary" onClick={() => { setCustomBody((b) => b ?? preview.body); setEditing(true); }}>
+                    <Pencil className="h-4 w-4" /> Edit text
+                  </Button>
+                )}
+                {editing && (
+                  <Button variant="secondary" onClick={() => setEditing(false)}>
+                    <Eye className="h-4 w-4" /> Preview
+                  </Button>
+                )}
+                <Button onClick={issue} disabled={issuing || !templateId}>
+                  {issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
+                  Issue document
+                </Button>
+              </div>
             </div>
-            {preview ? (
-              <LetterSheet body={preview.body} letterhead={preview.useLetterhead ? letterhead : null} />
+            {customBody !== null && (
+              <Alert tone="info" className="mb-3">
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span>Edited by hand — this text is issued exactly as written. Changing the fields on the left won&apos;t update it.</span>
+                  <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-violet hover:underline"
+                    onClick={() => { setCustomBody(null); setEditing(false); }}>
+                    <RotateCcw className="h-3.5 w-3.5" /> Back to the template
+                  </button>
+                </span>
+              </Alert>
+            )}
+            {editing && customBody !== null ? (
+              <textarea
+                aria-label="Letter text"
+                value={customBody}
+                onChange={(e) => setCustomBody(e.target.value)}
+                className="min-h-[36rem] w-full rounded-xl border border-fg/15 bg-surface p-5 font-mono text-sm leading-relaxed text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+              />
+            ) : preview ? (
+              <LetterSheet body={customBody ?? preview.body} letterhead={preview.useLetterhead ? letterhead : null} />
             ) : (
               <Card className="text-sm text-fg/50">
                 {template ? "Rendering…" : "Pick a template to see the letter."}
@@ -198,6 +321,21 @@ export default function GenerateDocumentPage() {
     </div>
   );
 }
+
+/** Example values, so the form says what kind of answer each field wants. */
+const PLACEHOLDERS: Record<string, string> = {
+  "employee.fullName": "e.g. Priya Sharma",
+  "employee.jobTitle": "e.g. Senior Designer",
+  "employee.department": "e.g. Design",
+  "employee.manager": "e.g. Arjun Rao",
+  "employee.employmentType": "e.g. Full time",
+  "employee.workLocation": "e.g. Bengaluru",
+  "employee.email": "e.g. priya@example.com",
+  "employee.phone": "e.g. +91 98765 43210",
+  "salary.annual": "e.g. 12,00,000",
+  "salary.monthly": "e.g. 1,00,000",
+  "salary.currency": "e.g. INR",
+};
 
 function labelFor(fields: MergeField[], key: string): string {
   return fields.find((f) => f.key === key)?.label ?? key;

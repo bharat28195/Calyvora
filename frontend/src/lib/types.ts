@@ -603,6 +603,8 @@ export interface GenerateDocInput {
   employeeId?: string | null;
   title?: string;
   overrides?: Record<string, string>;
+  /** The letter as edited by hand; issued exactly as written. */
+  body?: string;
 }
 
 export interface Goal {

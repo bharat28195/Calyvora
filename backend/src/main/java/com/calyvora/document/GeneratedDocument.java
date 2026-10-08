@@ -45,6 +45,10 @@ public class GeneratedDocument {
     @Column(name = "use_letterhead", nullable = false)
     private boolean useLetterhead = true;
 
+    /** Whom the letter is addressed to when there is no employee record — a candidate, say (V69). */
+    @Column(name = "recipient_name", length = 200)
+    private String recipientName;
+
     @Column(name = "generated_by")
     private UUID generatedBy;
 
@@ -77,6 +81,8 @@ public class GeneratedDocument {
     public UUID getCompanyId() { return companyId; }
     public UUID getTemplateId() { return templateId; }
     public UUID getEmployeeId() { return employeeId; }
+    public String getRecipientName() { return recipientName; }
+    public void setRecipientName(String recipientName) { this.recipientName = recipientName; }
     public String getTitle() { return title; }
     public DocumentKind getKind() { return kind; }
     public String getBody() { return body; }

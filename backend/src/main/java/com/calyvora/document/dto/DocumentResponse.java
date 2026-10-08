@@ -17,7 +17,8 @@ public record DocumentResponse(
 ) {
     public static DocumentResponse of(GeneratedDocument d, String employeeName, String generatedBy) {
         return new DocumentResponse(d.getId().toString(), d.getTitle(), d.getKind().name(),
-                d.getEmployeeId() == null ? null : d.getEmployeeId().toString(), employeeName,
+                d.getEmployeeId() == null ? null : d.getEmployeeId().toString(),
+                employeeName != null ? employeeName : d.getRecipientName(),
                 d.getTemplateId() == null ? null : d.getTemplateId().toString(),
                 d.getBody(), d.isUseLetterhead(), generatedBy, d.getCreatedAt().toString());
     }

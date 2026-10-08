@@ -1787,6 +1787,18 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Next:** translate the remaining screens module by module, starting with the employee self-service
   pages (Me, Finance, Time off).
 
+### PD-58 · 2026-10-08 · Letters for people who aren't employees; hand-edited letters
+- **Decision (founder):** an offer letter goes to someone who is not part of the company yet, so the
+  issuer must be able to type the name, designation and anything else by hand.
+- **Shape:** Documents → Generate has an **Employee / Someone new** switch. "Someone new" shows a form
+  of exactly the fields the chosen template uses (full name always; dates as date pickers; company,
+  today and signatory still automatic), sent as merge overrides — no employee row is created. A full
+  name fills first/last name and vice versa. **Edit text** turns the rendered letter into an editable
+  text box; the edited text is issued exactly as written (`body` on the generate request), with a
+  "Back to the template" reset. The typed name is stored on the letter (`generated_documents.
+  recipient_name`, V69) so the Issued list shows who it was for — this also fixes recruitment's
+  automatic offer letters, which used to appear with no name.
+
 ## 4. Architecture Decision Log
 
 
