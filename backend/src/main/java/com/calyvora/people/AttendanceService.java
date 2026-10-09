@@ -50,12 +50,21 @@ public class AttendanceService {
     private final UserRepository userRepository;
     private final LeaveRequestRepository leaveRepository;
     private final com.calyvora.company.CompanySettingsRepository companySettingsRepository;
+    private final AttendancePunchRepository punchRepository;
+    private final com.calyvora.shift.ShiftRepository shiftRepository;
+    private final com.calyvora.shift.ShiftAssignmentRepository assignmentRepository;
 
     public AttendanceService(AttendanceRepository attendanceRepository, EmployeeRepository employeeRepository,
                              EmployeeService employeeService, DepartmentRepository departmentRepository,
                              HolidayRepository holidayRepository,
                              UserRepository userRepository, LeaveRequestRepository leaveRepository,
-                             com.calyvora.company.CompanySettingsRepository companySettingsRepository) {
+                             com.calyvora.company.CompanySettingsRepository companySettingsRepository,
+                             AttendancePunchRepository punchRepository,
+                             com.calyvora.shift.ShiftRepository shiftRepository,
+                             com.calyvora.shift.ShiftAssignmentRepository assignmentRepository) {
+        this.punchRepository = punchRepository;
+        this.shiftRepository = shiftRepository;
+        this.assignmentRepository = assignmentRepository;
         this.holidayRepository = holidayRepository;
         this.attendanceRepository = attendanceRepository;
         this.employeeRepository = employeeRepository;
@@ -133,7 +142,7 @@ public class AttendanceService {
         for (Holiday h : holidayRepository.findByCompanyIdAndDateBetweenOrderByDateAsc(companyId, date, date)) {
             holidays.putIfAbsent(h.getDate(), h);
         }
-        Prefetch prefetch = new Prefetch(holidays, departmentNames(companyId));
+        Prefetch prefetch = new Prefetch(holidays, departmentNames(companyId), workFacts(companyId, date, date));
 
         List<AttendanceEntryResponse> entries = new ArrayList<>();
         long present = 0, onLeave = 0, absent = 0, unmarked = 0;
@@ -176,6 +185,9 @@ public class AttendanceService {
         UUID companyId = TenantContext.getCompanyId();
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
+        if (only != null && only.isEmpty()) {
+            return new HashMap<>();
+        }
 
         // The company's holidays for the month, once. resolve() otherwise queries them per DAY per
         // EMPLOYEE — thirty thousand queries for a thousand people, which is the whole cost of this.
@@ -187,15 +199,44 @@ public class AttendanceService {
         // Only the people the caller actually needs. A payroll run skips anybody without a salary, and
         // computing a month for them is work whose result is thrown away — at a thousand employees
         // with no compensation on record that was the entire request.
-        List<Employee> employees = employeeRepository.findByCompanyId(companyId).stream()
-                .filter(e -> only == null || only.contains(e.getId()))
-                .toList();
-        Map<UUID, User> usersById = usersById(companyId);
-        Map<UUID, List<LeaveRequest>> leaveByEmployee = approvedLeaveByEmployee(companyId, from, to);
-        Prefetch prefetch = new Prefetch(holidays, departmentNames(companyId));
+        // A named group (a lead's team) is read by id: the people, their accounts and their leave,
+        // never the company's — a team of fifty out of a thousand must cost a team of fifty.
+        List<Employee> employees = only == null
+                ? employeeRepository.findByCompanyId(companyId)
+                : employeeRepository.findByCompanyIdAndIdIn(companyId, only);
+        Map<UUID, User> usersById;
+        if (only == null) {
+            usersById = usersById(companyId);
+        } else {
+            usersById = new HashMap<>();
+            for (User u : userRepository.findAllById(employees.stream().map(Employee::getUserId).toList())) {
+                usersById.put(u.getId(), u);
+            }
+        }
+        Map<UUID, List<LeaveRequest>> leaveByEmployee;
+        if (only == null) {
+            leaveByEmployee = approvedLeaveByEmployee(companyId, from, to);
+        } else {
+            leaveByEmployee = new HashMap<>();
+            for (LeaveRequest lr : leaveRepository.findByCompanyIdAndEmployeeIdInAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                    companyId, only, LeaveStatus.APPROVED, to, from)) {
+                if (!lr.getStartDate().isAfter(to) && !lr.getEndDate().isBefore(from)) {
+                    leaveByEmployee.computeIfAbsent(lr.getEmployeeId(), k -> new ArrayList<>()).add(lr);
+                }
+            }
+        }
+        // A named group (a lead's team) is filtered in the database: reading the company's month to
+        // draw a team of ten out of a thousand is the cost the team screens were rewritten to avoid.
+        WorkFacts work = only == null ? workFacts(companyId, from, to)
+                : workFacts(companyId, punchRepository.findByCompanyIdAndEmployeeIdInAndDateBetween(companyId, only, from, to),
+                        assignmentRepository.slotsFor(companyId, only, from, to));
+        Prefetch prefetch = new Prefetch(holidays, departmentNames(companyId), work);
 
         Map<UUID, Map<LocalDate, AttendanceRecord>> markedByEmployee = new HashMap<>();
-        for (AttendanceRecord r : attendanceRepository.findByCompanyIdAndDateBetween(companyId, from, to)) {
+        List<AttendanceRecord> records = only == null
+                ? attendanceRepository.findByCompanyIdAndDateBetween(companyId, from, to)
+                : attendanceRepository.findByCompanyIdAndEmployeeIdInAndDateBetween(companyId, only, from, to);
+        for (AttendanceRecord r : records) {
             markedByEmployee.computeIfAbsent(r.getEmployeeId(), k -> new HashMap<>()).put(r.getDate(), r);
         }
 
@@ -288,7 +329,7 @@ public class AttendanceService {
             holidays.putIfAbsent(h.getDate(), h);
         }
         return buildMonth(employee, user, month, marked, leave,
-                new Prefetch(holidays, departmentNames(companyId)));
+                new Prefetch(holidays, departmentNames(companyId), workFactsFor(employee, from, to)));
     }
 
     /**
@@ -364,25 +405,78 @@ public class AttendanceService {
                 .findByIdAndCompanyId(UUID.fromString(req.employeeId()), companyId)
                 .orElseThrow(() -> new NotFoundException("Employee not found"));
         LocalDate date = req.date() == null || req.date().isBlank() ? today(employee) : LocalDate.parse(req.date());
-        if (date.isAfter(today(employee))) {
-            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Attendance can't be marked for a future date");
-        }
-
-        AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), date)
-                .orElseGet(() -> attendanceRepository.save(new AttendanceRecord(UUID.randomUUID(), companyId,
-                        employee.getId(), date, AttendanceStatus.valueOf(req.status()), principal.userId())));
-        record.setStatus(AttendanceStatus.valueOf(req.status()));
-        record.setMarkedBy(principal.userId());
-        if (req.checkIn() != null) record.setCheckIn(parseTime(req.checkIn()));
-        if (req.checkOut() != null) record.setCheckOut(parseTime(req.checkOut()));
-        if (req.note() != null) record.setNote(req.note().isBlank() ? null : req.note().trim());
-        validateTimes(record);
-
+        AttendanceRecord record = writeDay(employee, date, AttendanceStatus.valueOf(req.status()),
+                req.checkIn(), req.checkOut(), req.note(), principal.userId());
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
         return of(employee, user, date, record, false, null);
     }
 
-    /** The signed-in employee clocks in for today. Idempotent â€” a second call won't move the time. */
+    /**
+     * A manager or HR corrects many days at once — several people, several dates, one status — and
+     * it applies straight away. They hold the right to change attendance, so routing their own change
+     * through an approval queue would only make them approve themselves. The reason is required and
+     * kept on every day it touched. The caller has already checked whose days these may be.
+     */
+    @Transactional
+    public List<AttendanceEntryResponse> correctMany(List<UUID> employeeIds, List<LocalDate> dates,
+                                                     AttendanceStatus status, String checkIn, String checkOut,
+                                                     String reason, AuthPrincipal principal) {
+        UUID companyId = TenantContext.getCompanyId();
+        if (reason == null || reason.isBlank()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Give a reason for the correction");
+        }
+        Map<UUID, User> users = usersById(companyId);
+        List<AttendanceEntryResponse> out = new ArrayList<>();
+        for (UUID employeeId : new java.util.LinkedHashSet<>(employeeIds)) {
+            Employee employee = employeeRepository.findByIdAndCompanyId(employeeId, companyId)
+                    .orElseThrow(() -> new NotFoundException("Employee not found"));
+            for (LocalDate date : new java.util.TreeSet<>(dates)) {
+                AttendanceRecord record = writeDay(employee, date, status, checkIn, checkOut, reason, principal.userId());
+                out.add(of(employee, users.get(employee.getUserId()), date, record, false, null));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Sets one person's day by hand: the single place a manual change is written, so a mark, a bulk
+     * correction and an approved regularization cannot disagree about what a correction does.
+     * {@code markedBy} is what exempts the day from the automatic absent and half-day rules.
+     */
+    AttendanceRecord writeDay(Employee employee, LocalDate date, AttendanceStatus status,
+                              String checkIn, String checkOut, String note, UUID markedBy) {
+        UUID companyId = employee.getCompanyId();
+        if (date.isAfter(today(employee))) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Attendance can't be marked for a future date");
+        }
+        AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), date)
+                .orElseGet(() -> attendanceRepository.save(new AttendanceRecord(UUID.randomUUID(), companyId,
+                        employee.getId(), date, status, markedBy)));
+        record.setStatus(status);
+        record.setMarkedBy(markedBy);
+        if (checkIn != null) record.setCheckIn(parseTime(checkIn));
+        if (checkOut != null) record.setCheckOut(parseTime(checkOut));
+        if (note != null) record.setNote(note.isBlank() ? null : note.trim());
+        validateTimes(record);
+        // Typing the day's times states the whole day: it becomes one session, replacing whatever
+        // check-ins were recorded, so effective hours follow what was entered.
+        if (checkIn != null || checkOut != null) {
+            punchRepository.deleteByEmployeeIdAndDate(employee.getId(), date);
+            if (record.getCheckIn() != null) {
+                AttendancePunch session = new AttendancePunch(UUID.randomUUID(), companyId, employee.getId(),
+                        date, record.getCheckIn());
+                session.setCheckOut(record.getCheckOut());
+                punchRepository.save(session);
+            }
+        }
+        return record;
+    }
+
+    /**
+     * The signed-in employee checks in. Each check-in after a check-out opens a new session (V70), so
+     * a lunch break is recorded as the gap between two sessions rather than counted as work. While a
+     * session is open a second call does nothing: it never moves the time.
+     */
     @Transactional
     public AttendanceEntryResponse checkIn(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
@@ -391,8 +485,16 @@ public class AttendanceService {
         AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .orElseGet(() -> attendanceRepository.save(new AttendanceRecord(UUID.randomUUID(), companyId,
                         employee.getId(), today, AttendanceStatus.PRESENT, null)));
-        if (record.getCheckIn() == null) {
-            record.setCheckIn(nowTime(employee));
+        List<AttendancePunch> sessions = punchRepository.findByEmployeeIdAndDateOrderByCheckInAsc(employee.getId(), today);
+        boolean open = !sessions.isEmpty() && sessions.get(sessions.size() - 1).getCheckOut() == null;
+        if (!open) {
+            LocalTime now = nowTime(employee);
+            punchRepository.save(new AttendancePunch(UUID.randomUUID(), companyId, employee.getId(), today, now));
+            if (record.getCheckIn() == null) {
+                record.setCheckIn(now);
+            }
+            // Back in: the day's last check-out is now whichever comes next.
+            record.setCheckOut(null);
             // Someone clocking in is present, unless an admin deliberately marked the day otherwise.
             if (record.getStatus() == AttendanceStatus.ABSENT) {
                 record.setStatus(AttendanceStatus.PRESENT);
@@ -402,7 +504,7 @@ public class AttendanceService {
         return of(employee, user, today, record, false, null);
     }
 
-    /** The signed-in employee clocks out. Later calls overwrite â€” leaving twice means the later one. */
+    /** The signed-in employee checks out, closing the open session. The day's check-out is the last one. */
     @Transactional
     public AttendanceEntryResponse checkOut(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
@@ -410,7 +512,22 @@ public class AttendanceService {
         LocalDate today = today(employee);
         AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_ERROR, "Check in first"));
-        record.setCheckOut(nowTime(employee));
+        List<AttendancePunch> sessions = punchRepository.findByEmployeeIdAndDateOrderByCheckInAsc(employee.getId(), today);
+        AttendancePunch last = sessions.isEmpty() ? null : sessions.get(sessions.size() - 1);
+        LocalTime now = nowTime(employee);
+        if (last == null && record.getCheckIn() != null) {
+            // A day an admin opened with a check-in time but no session: that time starts the session.
+            last = punchRepository.save(new AttendancePunch(UUID.randomUUID(), companyId, employee.getId(),
+                    today, record.getCheckIn()));
+        }
+        if (last == null || last.getCheckOut() != null) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "You're not checked in");
+        }
+        if (now.isBefore(last.getCheckIn())) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Check-out can't be before check-in");
+        }
+        last.setCheckOut(now);
+        record.setCheckOut(now);
         validateTimes(record);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
         return of(employee, user, today, record, false, null);
@@ -424,6 +541,7 @@ public class AttendanceService {
         LocalDate today = today(employee);
         attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .ifPresent(attendanceRepository::delete);
+        punchRepository.deleteByEmployeeIdAndDate(employee.getId(), today);
         User user = userRepository.findByIdAndCompanyId(employee.getUserId(), companyId).orElse(null);
         return resolve(employee, user, today, Optional.empty(),
                 approvedLeaveFor(employee.getId(), today, today));
@@ -469,7 +587,68 @@ public class AttendanceService {
      * <p>Null means "look it up", which is what every single-row caller does and should: one query for
      * one row is the right trade.
      */
-    private record Prefetch(Map<LocalDate, Holiday> holidays, Map<UUID, String> departmentNames) {}
+    private record Prefetch(Map<LocalDate, Holiday> holidays, Map<UUID, String> departmentNames,
+                            WorkFacts work) {}
+
+    /**
+     * Check-in sessions, rostered shifts and the company's attendance rules for a window, fetched
+     * once (V70). Same reason as {@link Prefetch}: a day sheet must not ask the database for each
+     * person's sessions in turn.
+     *
+     * @param punches  employee -> date -> that day's sessions, in check-in order
+     * @param rostered employee -> date -> the shift they are rostered on
+     * @param settings the company's settings: standard day, grace, and when the rules start
+     */
+    private record WorkFacts(Map<UUID, Map<LocalDate, List<AttendancePunch>>> punches,
+                             Map<UUID, Map<LocalDate, ShiftFact>> rostered,
+                             com.calyvora.company.CompanySettings settings) {}
+
+    /** What a rostered shift says about one day. */
+    private record ShiftFact(LocalTime start, int workMinutes) {}
+
+    /** Everyone's sessions and rostered shifts over a window — four queries whatever the headcount. */
+    private WorkFacts workFacts(UUID companyId, LocalDate from, LocalDate to) {
+        return workFacts(companyId, punchRepository.findByCompanyIdAndDateBetween(companyId, from, to),
+                assignmentRepository.slots(companyId, from, to));
+    }
+
+    /** One person's sessions and rostered shifts over a window. */
+    private WorkFacts workFactsFor(Employee employee, LocalDate from, LocalDate to) {
+        return workFacts(employee.getCompanyId(),
+                punchRepository.findByEmployeeIdAndDateBetween(employee.getId(), from, to),
+                assignmentRepository.slotsOf(employee.getId(), from, to));
+    }
+
+    private WorkFacts workFacts(UUID companyId, List<AttendancePunch> punchList,
+                                List<com.calyvora.shift.ShiftSlot> assignments) {
+        Map<UUID, Map<LocalDate, List<AttendancePunch>>> punches = new HashMap<>();
+        for (AttendancePunch p : punchList) {
+            punches.computeIfAbsent(p.getEmployeeId(), k -> new HashMap<>())
+                    .computeIfAbsent(p.getDate(), k -> new ArrayList<>()).add(p);
+        }
+        for (Map<LocalDate, List<AttendancePunch>> days : punches.values()) {
+            for (List<AttendancePunch> day : days.values()) {
+                day.sort(java.util.Comparator.comparing(AttendancePunch::getCheckIn));
+            }
+        }
+        Map<UUID, Map<LocalDate, ShiftFact>> rostered = new HashMap<>();
+        if (!assignments.isEmpty()) {
+            Map<UUID, ShiftFact> shifts = new HashMap<>();
+            for (com.calyvora.shift.Shift s : shiftRepository.findByCompanyIdOrderByStartTimeAsc(companyId)) {
+                shifts.put(s.getId(), new ShiftFact(s.getStartTime(), s.getWorkMinutes()));
+            }
+            for (com.calyvora.shift.ShiftSlot a : assignments) {
+                ShiftFact fact = shifts.get(a.shiftId());
+                if (fact != null) {
+                    rostered.computeIfAbsent(a.employeeId(), k -> new HashMap<>()).put(a.onDate(), fact);
+                }
+            }
+        }
+        // A company that never opened its settings behaves exactly like one that saved the defaults.
+        com.calyvora.company.CompanySettings settings = companySettingsRepository.findById(companyId)
+                .orElseGet(() -> new com.calyvora.company.CompanySettings(companyId));
+        return new WorkFacts(punches, rostered, settings);
+    }
 
     /**
      * As above, with the company's holidays and departments for the period already in hand.
@@ -506,24 +685,130 @@ public class AttendanceService {
         if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
             return entry(employee, user, date, AttendanceStatus.WEEK_OFF.name(), null, null, null, true, prefetch);
         }
+        // A working day with nothing recorded: absent once shift start plus the company's grace has
+        // passed (V70). Before that — or before the rules were switched on — it is still unmarked.
+        WorkFacts work = workFor(employee, date, prefetch);
+        // Nobody is absent from a job they had not started yet, or had already left.
+        boolean employed = (employee.getStartDate() == null || !date.isBefore(employee.getStartDate()))
+                && (employee.getEndDate() == null || !date.isAfter(employee.getEndDate()));
+        if (employed && rulesApply(work, date)) {
+            java.time.ZoneId zone = Timezones.resolve(employee, work.settings());
+            LocalDate today = LocalDate.now(zone);
+            LocalTime cutoff = shiftStart(employee, date, work).plusMinutes(work.settings().getAbsentGraceMinutes());
+            boolean pastCutoff = date.isBefore(today)
+                    || (date.equals(today) && !LocalTime.now(zone).isBefore(cutoff));
+            if (pastCutoff) {
+                return entry(employee, user, date, AttendanceStatus.ABSENT.name(), null, null,
+                        "No check-in by " + cutoff, true, prefetch);
+            }
+        }
         return entry(employee, user, date, null, null, null, null, true, prefetch);
+    }
+
+    /** Whether absent-after-grace and short-day-is-half-day reach this date. */
+    private static boolean rulesApply(WorkFacts work, LocalDate date) {
+        LocalDate from = work.settings().getAttendanceRulesFrom();
+        return from != null && !date.isBefore(from);
+    }
+
+    /** When this person's day starts: their rostered shift, else the company's standard start. */
+    private static LocalTime shiftStart(Employee employee, LocalDate date, WorkFacts work) {
+        ShiftFact shift = work.rostered().getOrDefault(employee.getId(), Map.of()).get(date);
+        return shift != null ? shift.start() : work.settings().getWorkDayStart();
     }
 
     private AttendanceEntryResponse of(Employee employee, User user, LocalDate date,
                                        AttendanceRecord r, boolean derived, Prefetch prefetch) {
-        return entry(employee, user, date, r.getStatus().name(),
+        WorkFacts work = workFor(employee, date, prefetch);
+        List<AttendancePunch> punches = work.punches().getOrDefault(employee.getId(), Map.of())
+                .getOrDefault(date, List.of());
+
+        // Effective time is what was spent checked in: the closed sessions added up. A day an admin
+        // entered by hand has no sessions, only a first in and a last out, and that span is the day.
+        List<AttendanceEntryResponse.Session> sessions = new ArrayList<>();
+        int effective = 0;
+        String openSince = null;
+        for (AttendancePunch p : punches) {
+            sessions.add(new AttendanceEntryResponse.Session(p.getCheckIn().toString(),
+                    p.getCheckOut() == null ? null : p.getCheckOut().toString()));
+            if (p.getCheckOut() == null) {
+                openSince = p.getCheckIn().toString();
+            } else {
+                effective += minutesBetween(p.getCheckIn(), p.getCheckOut());
+            }
+        }
+        Integer gross = r.getCheckIn() != null && r.getCheckOut() != null
+                ? minutesBetween(r.getCheckIn(), r.getCheckOut()) : null;
+        if (punches.isEmpty() && gross != null) {
+            effective = gross;
+        }
+        boolean anyTime = !punches.isEmpty() || r.getCheckIn() != null;
+        int required = requiredMinutes(employee, date, work);
+
+        // A finished day the employee clocked themselves, short of the required hours, is a half day
+        // — and a half day costs half a day's pay. A day a manager or HR set by hand (markedBy) is
+        // their decision and stands, which is how a short day is regularized.
+        AttendanceStatus status = r.getStatus();
+        String note = r.getNote();
+        boolean dayOver = date.isBefore(LocalDate.now(Timezones.resolve(employee, work.settings())));
+        if (status == AttendanceStatus.PRESENT && r.getMarkedBy() == null && anyTime && dayOver
+                && rulesApply(work, date) && effective < required) {
+            status = AttendanceStatus.HALF_DAY;
+            derived = true;
+            note = "Short by " + hoursAndMinutes(required - effective);
+        }
+
+        return new AttendanceEntryResponse(employee.getId().toString(), displayName(user), employee.getJobTitle(),
+                departmentName(employee, prefetch == null ? null : prefetch.departmentNames()),
+                date.toString(), status.name(),
                 r.getCheckIn() == null ? null : r.getCheckIn().toString(),
                 r.getCheckOut() == null ? null : r.getCheckOut().toString(),
-                r.getNote(), derived, prefetch);
+                note, derived, sessions, gross, anyTime ? effective : null, openSince,
+                status.isWorking() ? required : null);
+    }
+
+    private static String hoursAndMinutes(int minutes) {
+        return minutes / 60 + "h " + String.format("%02d", minutes % 60) + "m";
     }
 
     private AttendanceEntryResponse entry(Employee employee, User user, LocalDate date, String status,
                                           String checkIn, String checkOut, String note, boolean derived,
                                           Prefetch prefetch) {
-        String name = user == null ? "Employee" : (user.getFirstName() + " " + user.getLastName()).trim();
-        return new AttendanceEntryResponse(employee.getId().toString(), name, employee.getJobTitle(),
+        // Only a working day still has hours owed; leave, holidays and weekends do not.
+        Integer required = status == null || AttendanceStatus.ABSENT.name().equals(status)
+                ? requiredMinutes(employee, date, workFor(employee, date, prefetch)) : null;
+        return new AttendanceEntryResponse(employee.getId().toString(), displayName(user), employee.getJobTitle(),
                 departmentName(employee, prefetch == null ? null : prefetch.departmentNames()),
-                date.toString(), status, checkIn, checkOut, note, derived);
+                date.toString(), status, checkIn, checkOut, note, derived, List.of(), null, null, null, required);
+    }
+
+    private static String displayName(User user) {
+        return user == null ? "Employee" : (user.getFirstName() + " " + user.getLastName()).trim();
+    }
+
+    /** The bulk facts when the caller fetched them, else this one person's for this one day. */
+    private WorkFacts workFor(Employee employee, LocalDate date, Prefetch prefetch) {
+        return prefetch != null && prefetch.work() != null ? prefetch.work() : workFactsFor(employee, date, date);
+    }
+
+    /** The rostered shift's hours that day, else the company's standard day. */
+    private static int requiredMinutes(Employee employee, LocalDate date, WorkFacts work) {
+        ShiftFact shift = work.rostered().getOrDefault(employee.getId(), Map.of()).get(date);
+        return shift != null ? shift.workMinutes() : work.settings().getWorkDayMinutes();
+    }
+
+    private static int minutesBetween(LocalTime from, LocalTime to) {
+        return to.isBefore(from) ? 0 : (int) java.time.Duration.between(from, to).toMinutes();
+    }
+
+    /**
+     * Today on the company's clock. The day sheet and dashboard used the server's date, and the
+     * server runs on UTC: from midnight to 05:30 in India every admin was looking at yesterday.
+     */
+    @Transactional(readOnly = true)
+    public LocalDate companyToday() {
+        return LocalDate.now(Timezones.forCompany(
+                companySettingsRepository.findById(TenantContext.getCompanyId()).orElse(null)));
     }
 
     /**

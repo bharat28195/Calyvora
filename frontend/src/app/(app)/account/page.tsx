@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Globe, KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Globe, KeyRound, Loader2, ShieldCheck, UserRound } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
 import { useT } from "@/hooks/useT";
@@ -18,19 +18,37 @@ import type { DateFormatPref, TimeFormatPref } from "@/lib/types";
 
 const SELECT = "h-11 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet";
 
+type Tab = "profile" | "preferences" | "password";
+
 /**
  * Account settings: who you are signed in as, your language and region, and changing your password.
+ * One section at a time, in tabs, so nothing here needs scrolling; the profile menu deep-links
+ * straight to a tab (?tab=password).
  *
  * <p>Also where a company's first admin lands on first sign-in: their password was chosen by Calyvora
- * and emailed, so the app holds them here until they choose their own (V67).
+ * and emailed, so the app holds them on the password tab until they choose their own (V67).
  */
 export default function AccountPage() {
   const session = useSession();
   const me = session.me;
   const t = useT();
+  const params = useSearchParams();
   const forced = !!me?.user.mustChangePassword;
+  const [tab, setTab] = useState<Tab>("profile");
+
+  useEffect(() => {
+    const asked = params.get("tab") ?? (typeof window !== "undefined" ? window.location.hash.slice(1) : "");
+    if (forced) setTab("password");
+    else if (asked === "preferences" || asked === "password" || asked === "profile") setTab(asked);
+  }, [params, forced]);
 
   if (!me) return null;
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "profile", label: t("Profile"), icon: <UserRound className="h-4 w-4" /> },
+    { id: "preferences", label: t("Language & region"), icon: <Globe className="h-4 w-4" /> },
+    { id: "password", label: t("Password"), icon: <KeyRound className="h-4 w-4" /> },
+  ];
 
   return (
     <div className="max-w-xl">
@@ -44,7 +62,18 @@ export default function AccountPage() {
         </Alert>
       )}
 
-      <Card className="mt-6">
+      <div role="tablist" className="mt-6 flex gap-1 border-b border-fg/10">
+        {tabs.map((x) => (
+          <button key={x.id} role="tab" aria-selected={tab === x.id} disabled={forced && x.id !== "password"}
+            onClick={() => setTab(x.id)}
+            className={"-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors disabled:opacity-40 "
+              + (tab === x.id ? "border-violet font-medium text-fg" : "border-transparent text-fg/50 hover:text-fg")}>
+            {x.icon}{x.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "profile" && <Card className="mt-6">
         <CardTitle>{t("Signed in as")}</CardTitle>
         <dl className="mt-3 grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
           <dt className="text-fg/50">{t("Name")}</dt><dd>{me.user.firstName} {me.user.lastName}</dd>
@@ -52,10 +81,9 @@ export default function AccountPage() {
           <dt className="text-fg/50">{t("Company")}</dt><dd>{me.company.name}</dd>
           <dt className="text-fg/50">{t("Role")}</dt><dd className="capitalize">{me.user.role.toLowerCase()}</dd>
         </dl>
-      </Card>
-
-      {/* Choosing a language comes after the new password for a first sign-in, not before it. */}
-      {forced ? <><PasswordCard /><PreferencesCard /></> : <><PreferencesCard /><PasswordCard /></>}
+      </Card>}
+      {tab === "preferences" && <PreferencesCard />}
+      {tab === "password" && <PasswordCard />}
     </div>
   );
 }
@@ -67,7 +95,8 @@ function PreferencesCard() {
   const t = useT();
   const prefs = me.user.preferences;
 
-  const [language, setLanguage] = useState<string>(me.language ?? prefs?.language ?? DEFAULT_LANGUAGE);
+  // English unless this person picked otherwise.
+  const [language, setLanguage] = useState<string>(prefs?.language ?? me.language ?? DEFAULT_LANGUAGE);
   const [timezone, setTimezone] = useState<string>(prefs?.timezone ?? "");
   const [dateFormat, setDateFormat] = useState<DateFormatPref | "">(prefs?.dateFormat ?? "");
   const [timeFormat, setTimeFormat] = useState<TimeFormatPref | "">(prefs?.timeFormat ?? "");
@@ -78,7 +107,9 @@ function PreferencesCard() {
   // Labels in the language being chosen, so the person sees what they are about to get.
   const tt = (text: string, values?: Record<string, string | number>) => translate(language, text, values);
   const now = new Date();
-  const zone = timezone || me.company.timezone;
+  // India time unless the company or this person chose another zone.
+  const companyZone = me.company.timezone || "Asia/Kolkata";
+  const zone = timezone || companyZone;
   const preview = (d: DateFormatPref | null, h: TimeFormatPref | null) =>
     withLocale({ language, timezone: zone, dateFormat: d, timeFormat: h }, () => ({ date: formatDate(now), time: formatTime(now) }));
   const example = preview(dateFormat || null, timeFormat || null);
@@ -127,7 +158,7 @@ function PreferencesCard() {
         <Field label={tt("Timezone")} htmlFor="timezone"
           hint={tt("Your timezone also sets the clock your attendance is recorded in.")}>
           <select id="timezone" value={timezone} onChange={(e) => { setTimezone(e.target.value); setSaved(false); }} className={SELECT}>
-            <option value="" className="bg-surface">{tt("Company default ({zone})", { zone: zoneLabel(me.company.timezone) })}</option>
+            <option value="" className="bg-surface">{tt("{zone} (default)", { zone: zoneLabel(companyZone) })}</option>
             <optgroup label={tt("Common timezones")}>
               {COMMON_TIMEZONES.map((z) => <option key={z} value={z} className="bg-surface">{zoneLabel(z)}</option>)}
             </optgroup>

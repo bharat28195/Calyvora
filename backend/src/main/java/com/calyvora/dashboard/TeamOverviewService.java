@@ -7,6 +7,7 @@ import com.calyvora.common.security.TenantContext;
 import com.calyvora.dashboard.dto.TeamOverviewResponse;
 import com.calyvora.dashboard.dto.TeamOverviewResponse.CalendarLeave;
 import com.calyvora.dashboard.dto.TeamOverviewResponse.LeaveToday;
+import com.calyvora.dashboard.dto.TeamOverviewResponse.Absentee;
 import com.calyvora.identity.UserRepository;
 import com.calyvora.identity.UserStatus;
 import com.calyvora.people.AttendanceService;
@@ -81,7 +82,9 @@ public class TeamOverviewService {
             }
         }
 
-        LocalDate today = LocalDate.now();
+        // The company's today, not the server's: the host runs on UTC, which until 05:30 in India is
+        // still yesterday, and the panel showed yesterday's attendance every early morning.
+        LocalDate today = attendanceService.companyToday();
         LocalDate monthStart = today.withDayOfMonth(1);
         LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
 
@@ -109,20 +112,17 @@ public class TeamOverviewService {
             }
         }
 
-        // The day sheet already resolves each person: a marked row wins, an unmarked day falls back to
-        // approved leave. Unmarked people are still counted as in (the phase-1 assumption), but we
-        // report how many that is — so the owner can see how much of "present" is assumed.
+        // The day sheet resolves each person: a marked row wins, then approved leave, then — once shift
+        // start plus the company's grace has passed — absent. Present counts only people who actually
+        // checked in or were marked in; it used to add everyone unmarked, so it read "7 present" at
+        // dawn with nobody in the building. Those people are now "not in yet", then absent.
         AttendanceDayResponse sheet = attendanceService.day(today);
-        if (scope == null) {
-            return new TeamOverviewResponse(headcount, sheet.present() + sheet.unmarked(), sheet.onLeave(),
-                    sheet.unmarked(), outToday, monthLeaves);
-        }
-        // The sheet is company-wide; a lead's counts come from their own rows on it.
         long present = 0;
         long onLeave = 0;
         long unmarked = 0;
+        List<Absentee> absentees = new ArrayList<>();
         for (var entry : sheet.entries()) {
-            if (!scope.contains(UUID.fromString(entry.employeeId()))) {
+            if (scope != null && !scope.contains(UUID.fromString(entry.employeeId()))) {
                 continue;
             }
             if (entry.status() == null) {
@@ -132,7 +132,11 @@ public class TeamOverviewService {
             var s = com.calyvora.people.AttendanceStatus.valueOf(entry.status());
             if (s.isWorking()) present++;
             else if (s == com.calyvora.people.AttendanceStatus.ON_LEAVE) onLeave++;
+            else if (s == com.calyvora.people.AttendanceStatus.ABSENT) {
+                absentees.add(new Absentee(entry.employeeName(), entry.jobTitle(), entry.note()));
+            }
         }
-        return new TeamOverviewResponse(headcount, present + unmarked, onLeave, unmarked, outToday, monthLeaves);
+        return new TeamOverviewResponse(headcount, present, onLeave, unmarked, absentees.size(), absentees,
+                outToday, monthLeaves);
     }
 }

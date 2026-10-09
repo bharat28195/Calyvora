@@ -87,13 +87,14 @@ const NAV: NavItem[] = [
   // An agency sees only this — no company surface at all, because it holds no employees of its own.
   { href: "/agency", label: "My companies", icon: Building2, roles: ["AGENCY_OWNER"] },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: COMPANY },
+  // Insights sits right under the dashboard: the two are where an admin or a lead reads the company.
+  { href: "/analytics", label: "Insights", icon: BarChart3, roles: COMPANY, perm: "INSIGHTS_VIEW", feature: "ANALYTICS" },
   // The company feed: announcements, celebrations and questions, company-wide or to one team — the
   // place to post something everyone sees. Open to every company user; who can post company-wide
   // vs team-only is enforced on the server. Not feature-gated, so a new company has it from day one.
   { href: "/feed", label: "Announcements", icon: Megaphone, roles: COMPANY },
   // Everyone reads the company's policies and handbook; HR and admins publish them (DocumentAccess).
   { href: "/knowledge", label: "Company documents", icon: FolderOpen, roles: COMPANY, feature: "KNOWLEDGE" },
-  { href: "/analytics", label: "Insights", icon: BarChart3, roles: COMPANY, perm: "INSIGHTS_VIEW", feature: "ANALYTICS" },
   // "Me" is attendance and time off. Everything that is really about money went to Finance and
   // everything about other people went to My team — this section is what I did, not what I am owed
   // or who I work with.
@@ -173,6 +174,7 @@ const NAV: NavItem[] = [
     href: "/people", label: "People", icon: Users, roles: COMPANY, perm: "ORG_VIEW_ALL", permWide: true,
     children: [
       { href: "/people", label: "Directory" },
+      { href: "/people/departments", label: "Departments" },
       { href: "/people/designations", label: "Designations", perm: "PEOPLE_MANAGE" },
       { href: "/people/attendance", label: "Attendance", perm: "ATTENDANCE_MANAGE", permWide: true },
       { href: "/people/time-off", label: "Time off", perm: "LEAVE_APPROVE", permWide: true },

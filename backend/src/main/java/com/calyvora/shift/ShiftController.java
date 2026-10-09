@@ -58,6 +58,19 @@ public class ShiftController {
         service.deleteShift(id);
     }
 
+    // ---- the standard working day (V70) ----
+
+    @GetMapping("/work-day")
+    public com.calyvora.shift.dto.WorkDayPayload workDay() {
+        return service.workDay();
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/work-day")
+    public com.calyvora.shift.dto.WorkDayPayload setWorkDay(
+            @Valid @RequestBody com.calyvora.shift.dto.WorkDayPayload req) {
+        return service.setWorkDay(req);
+    }
+
     // ---- roster ----
 
     @GetMapping("/roster")

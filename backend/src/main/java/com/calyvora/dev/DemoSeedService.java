@@ -556,11 +556,11 @@ public class DemoSeedService {
      */
     private void seedShifts(Map<String, EmployeeResponse> emp, User sara, User tom) {
         var morning = shiftService.createShift(
-                new com.calyvora.shift.dto.ShiftPayload("Morning", "09:00", "17:00", "#22d3ee"));
+                new com.calyvora.shift.dto.ShiftPayload("Morning", "09:00", "17:00", "#22d3ee", 480));
         var evening = shiftService.createShift(
-                new com.calyvora.shift.dto.ShiftPayload("Evening", "13:00", "21:00", "#8b5cf6"));
+                new com.calyvora.shift.dto.ShiftPayload("Evening", "13:00", "21:00", "#8b5cf6", 480));
         shiftService.createShift(
-                new com.calyvora.shift.dto.ShiftPayload("Night", "21:00", "05:00", "#fbbf24"));
+                new com.calyvora.shift.dto.ShiftPayload("Night", "21:00", "05:00", "#fbbf24", 480));
 
         UUID saraId = UUID.fromString(emp.get(sara.getEmail()).id());
         UUID tomId = UUID.fromString(emp.get(tom.getEmail()).id());

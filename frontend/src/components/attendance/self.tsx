@@ -111,8 +111,15 @@ export function MyDay() {
   }
 
   const clockedIn = !!entry?.checkIn;
-  const clockedOut = !!entry?.checkOut;
-  const worked = fmtDuration(minutesBetween(entry?.checkIn ?? null, entry?.checkOut ?? (clockedIn ? nowHHmm(now) : null)));
+  // In right now: a session is running. Checked out for a break, the button offers a fresh check-in.
+  const working = !!entry?.openSince || (clockedIn && !entry?.checkOut && entry?.sessions === undefined);
+  const sessions = entry?.sessions ?? [];
+  const nowT = nowHHmm(now);
+  // Effective = closed sessions + the running one, ticking with the clock.
+  const effective = (entry?.effectiveMinutes ?? 0) + (entry?.openSince ? minutesBetween(entry.openSince, nowT) ?? 0 : 0);
+  const gross = clockedIn ? minutesBetween(entry!.checkIn, working ? nowT : entry!.checkOut) : null;
+  const required = entry?.requiredMinutes ?? null;
+  const left = required != null ? Math.max(0, required - effective) : null;
   const zone = currentTimezone();
   const dateLabel = formatDateWith(now, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   const timeLabel = formatDateWith(now, { hour: "2-digit", minute: "2-digit", second: "2-digit", ...hourCycle() });
@@ -136,24 +143,19 @@ export function MyDay() {
           </p>
           <p className="mt-2 font-mono text-4xl font-semibold tabular-nums tracking-tight">{timeLabel}</p>
           <p className="mt-2 text-sm text-fg/60">
-            {clockedIn ? (
-              <>
-                In at <span className="font-medium text-fg">{hhmm(entry!.checkIn!)}</span>
-                {clockedOut
-                  ? <> · out at <span className="font-medium text-fg">{hhmm(entry!.checkOut!)}</span> · <span className="text-fg/80">{worked}</span></>
-                  : <> · <span className="text-emerald-400">working now</span> · {worked}</>}
-              </>
-            ) : "You haven't clocked in yet."}
+            {!clockedIn ? "You haven't checked in yet."
+              : working ? <span className="text-emerald-400">Checked in since {hhmm(entry!.openSince ?? entry!.checkIn!)}</span>
+              : <>On a break · last out at <span className="font-medium text-fg">{hhmm(entry!.checkOut!)}</span></>}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          {!clockedIn ? (
-            <Button onClick={() => act("in")} disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} Check in
+          {working ? (
+            <Button onClick={() => act("out")} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} Check out
             </Button>
           ) : (
-            <Button variant={clockedOut ? "ghost" : "primary"} onClick={() => act("out")} disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} {clockedOut ? "Update check-out" : "Check out"}
+            <Button onClick={() => act("in")} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} {clockedIn ? "Check in again" : "Check in"}
             </Button>
           )}
           {clockedIn && (
@@ -164,6 +166,43 @@ export function MyDay() {
           )}
         </div>
       </div>
+
+      {clockedIn && (
+        <div className="mt-5 grid gap-4 border-t border-fg/10 pt-4 sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-fg/50">Effective hours</p>
+            <p className="mt-0.5 text-lg font-semibold tabular-nums">{fmtDuration(effective)}</p>
+            {required != null && (
+              <div className="mt-1.5 h-1.5 w-full rounded-full bg-fg/10">
+                <div className={cn("h-1.5 rounded-full", effective >= required ? "bg-emerald-500" : "bg-violet")}
+                  style={{ width: `${Math.min(100, Math.round((effective / required) * 100))}%` }} />
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-xs text-fg/50">Gross hours</p>
+            <p className="mt-0.5 text-lg font-semibold tabular-nums">{fmtDuration(gross)}</p>
+            <p className="text-xs text-fg/40">first in to {working ? "now" : "last out"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-fg/50">Required</p>
+            <p className="mt-0.5 text-lg font-semibold tabular-nums">{fmtDuration(required)}</p>
+            <p className={cn("text-xs", left ? "text-amber-400" : "text-emerald-400")}>
+              {left == null ? "" : left > 0 ? `${fmtDuration(left)} to go` : "Done for the day"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {sessions.length > 1 && (
+        <div className="mt-4 flex flex-wrap gap-2 text-xs">
+          {sessions.map((s, i) => (
+            <span key={i} className="rounded-full bg-fg/5 px-2.5 py-1 tabular-nums text-fg/70">
+              {hhmm(s.checkIn)} – {s.checkOut ? hhmm(s.checkOut) : "now"}
+            </span>
+          ))}
+        </div>
+      )}
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}
     </Card>
   );
@@ -271,8 +310,14 @@ export function MyMonth() {
                   <div>
                     <p className="font-medium">Sign-in / out</p>
                     <p className="text-fg/50">
-                      {day.checkIn ? hhmm(day.checkIn) : "—"} &ndash; {day.checkOut ? hhmm(day.checkOut) : "—"}
-                      <span className="ml-2 text-fg/40">{fmtDuration(minutesBetween(day.checkIn, day.checkOut))}</span>
+                      {(day.sessions && day.sessions.length > 0
+                        ? day.sessions.map((s) => `${hhmm(s.checkIn)} – ${s.checkOut ? hhmm(s.checkOut) : "…"}`).join(", ")
+                        : `${day.checkIn ? hhmm(day.checkIn) : "—"} – ${day.checkOut ? hhmm(day.checkOut) : "—"}`)}
+                    </p>
+                    <p className="text-xs text-fg/40">
+                      Effective {fmtDuration(day.effectiveMinutes ?? minutesBetween(day.checkIn, day.checkOut))}
+                      {" · "}gross {fmtDuration(day.grossMinutes ?? minutesBetween(day.checkIn, day.checkOut))}
+                      {day.requiredMinutes != null && ` · required ${fmtDuration(day.requiredMinutes)}`}
                     </p>
                   </div>
                 </div>
@@ -328,16 +373,19 @@ export function DailyLog({ days }: { days: AttendanceEntry[] }) {
           <tr className="border-y border-fg/10 text-left text-xs uppercase tracking-wide text-fg/40">
             <th className="px-5 py-2 font-medium">Date</th>
             <th className="px-3 py-2 font-medium">Status</th>
-            <th className="px-3 py-2 font-medium">Check in</th>
-            <th className="px-3 py-2 font-medium">Check out</th>
-            <th className="px-3 py-2 font-medium">Hours</th>
+            <th className="px-3 py-2 font-medium">First in</th>
+            <th className="px-3 py-2 font-medium">Last out</th>
+            <th className="px-3 py-2 font-medium">Gross</th>
+            <th className="px-3 py-2 font-medium">Effective</th>
             <th className="w-32 px-5 py-2 font-medium">&nbsp;</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((d) => {
-            const mins = minutesBetween(d.checkIn, d.checkOut);
-            const pct = mins == null ? 0 : Math.min(100, Math.round((mins / (9 * 60)) * 100));
+            const gross = d.grossMinutes ?? minutesBetween(d.checkIn, d.checkOut);
+            const effective = d.effectiveMinutes ?? gross;
+            const required = d.requiredMinutes ?? 9 * 60;
+            const pct = effective == null ? 0 : Math.min(100, Math.round((effective / required) * 100));
             const weekday = formatDateWith(d.date, { weekday: "short" });
             const nice = formatDateWith(d.date, { day: "numeric", month: "short" });
             const offDay = d.status === "WEEK_OFF" || d.status === "HOLIDAY" || !d.status;
@@ -350,10 +398,11 @@ export function DailyLog({ days }: { days: AttendanceEntry[] }) {
                 <td className="px-3 py-2.5">{d.status ? <StatusChip status={d.status} derived={d.derived} /> : <span className="text-xs text-fg/30">not marked</span>}</td>
                 <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkIn ? hhmm(d.checkIn) : "—"}</td>
                 <td className="px-3 py-2.5 tabular-nums text-fg/80">{d.checkOut ? hhmm(d.checkOut) : "—"}</td>
-                <td className="px-3 py-2.5 tabular-nums font-medium">{fmtDuration(mins)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-fg/70">{fmtDuration(gross)}</td>
+                <td className="px-3 py-2.5 tabular-nums font-medium" title={d.note ?? undefined}>{fmtDuration(effective)}</td>
                 <td className="px-5 py-2.5">
-                  <div className="h-1.5 w-full rounded-full bg-fg/10">
-                    <div className="h-1.5 rounded-full bg-violet" style={{ width: `${pct}%` }} />
+                  <div className="h-1.5 w-full rounded-full bg-fg/10" title={`of ${fmtDuration(required)} required`}>
+                    <div className={cn("h-1.5 rounded-full", pct >= 100 ? "bg-emerald-500" : "bg-violet")} style={{ width: `${pct}%` }} />
                   </div>
                 </td>
               </tr>

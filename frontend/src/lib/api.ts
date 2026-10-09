@@ -16,6 +16,7 @@ import {
   type CandidateInput,
   type Shift,
   type ShiftInput,
+  type WorkDayPolicy,
   type Roster,
   type RosterEntry,
   type CompanySummary,
@@ -200,9 +201,53 @@ async function renewSession(): Promise<boolean> {
 export const auth = {
   get: () => accessToken,
   set: (t: string | null) => {
+    // A different session (sign-out, another person signing in on this tab) must never be shown the
+    // previous one's cached screens.
+    if (t === null) readCache.clear();
     accessToken = t;
   },
 };
+
+/**
+ * Recently read screens, so moving between pages is instant.
+ *
+ * <p>Every click was a fresh round trip to the backend — 150 to 500 ms each on the hosted plan, and
+ * a dashboard makes five — so going back to a page you just left waited as long as the first visit.
+ * A GET answered in the last {@link READ_CACHE_MS} is served from here instead.
+ *
+ * <p>Any write clears the whole cache, not just the path it touched: one check-in changes the
+ * dashboard, the day sheet, the month and the team overview, and working out which reads a write
+ * affects is exactly the bookkeeping that goes wrong. Short-lived on purpose — another person's
+ * check-in shows up within the TTL rather than never.
+ */
+const READ_CACHE_MS = 20_000;
+const readCache = new Map<string, { at: number; body: unknown }>();
+const inFlight = new Map<string, Promise<unknown>>();
+
+async function http<T>(path: string, init?: HttpInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method !== "GET") {
+    readCache.clear();
+    try {
+      return await httpRaw<T>(path, init);
+    } finally {
+      readCache.clear();   // and again after: a read that raced the write may have cached the old state
+    }
+  }
+  const hit = readCache.get(path);
+  if (hit && Date.now() - hit.at < READ_CACHE_MS) return structuredClone(hit.body) as T;
+  // Two components asking for the same thing at once share one request.
+  const pending = inFlight.get(path);
+  if (pending) return structuredClone(await pending) as T;
+  const request = httpRaw<T>(path, init)
+    .then((body) => {
+      if (body !== undefined) readCache.set(path, { at: Date.now(), body });
+      return body;
+    })
+    .finally(() => inFlight.delete(path));
+  inFlight.set(path, request);
+  return structuredClone(await request) as T;
+}
 
 /**
  * How long to keep trying while the backend is waking up. The hosted backend sleeps when idle and
@@ -250,7 +295,7 @@ function shouldRetry(attempt: number): boolean {
 /** {@code skipAuthRetry} marks the refresh call itself — retrying a 401 there would loop. */
 type HttpInit = RequestInit & { skipAuthRetry?: boolean };
 
-async function http<T>(path: string, init?: HttpInit): Promise<T> {
+async function httpRaw<T>(path: string, init?: HttpInit): Promise<T> {
   let renewed = false;
   // Whether this call is the one doing the waiting, and whether it is still entitled to retry.
   let leading = false;
@@ -717,6 +762,15 @@ export const api = {
   },
 
   // --- shift scheduling / rostering ---
+  /** The standard day (hours, start) and the absence grace, for anyone not rostered (V70). */
+  workDay(): Promise<WorkDayPolicy> {
+    return LIVE ? http<WorkDayPolicy>("/shifts/work-day")
+      : Promise.resolve({ workDayMinutes: 540, workDayStart: "09:30", absentGraceMinutes: 120 });
+  },
+  setWorkDay(input: WorkDayPolicy): Promise<WorkDayPolicy> {
+    return LIVE ? http<WorkDayPolicy>("/shifts/work-day", { method: "PUT", body: JSON.stringify(input) })
+      : liveOnly("Changing the working day");
+  },
   shifts(): Promise<Shift[]> {
     return LIVE ? http<Shift[]>("/shifts") : mockBackend.shifts(accessToken);
   },
@@ -1515,6 +1569,15 @@ export const api = {
   },
   markAttendance(input: MarkAttendanceInput): Promise<AttendanceEntry> {
     return LIVE ? http<AttendanceEntry>("/people/attendance/mark", { method: "POST", body: JSON.stringify(input) }) : mockBackend.markAttendance(accessToken, input);
+  },
+  /** A manager or HR sets many people's days at once, applied immediately (V70). Reason required. */
+  correctAttendance(input: {
+    employeeIds: string[]; dates: string[]; status: import("@/lib/types").AttendanceStatus;
+    checkIn?: string; checkOut?: string; reason: string;
+  }): Promise<AttendanceEntry[]> {
+    return LIVE
+      ? http<AttendanceEntry[]>("/people/attendance/correct", { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Correcting attendance");
   },
   employeeAttendance(employeeId: string, month?: string): Promise<AttendanceMonth> {
     const qs = month ? `?month=${month}` : "";

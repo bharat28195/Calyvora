@@ -69,8 +69,10 @@ function RaiseForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // Your manager decides on the reason, so a request without one is not sent.
+    if (!reason.trim()) { setError("Give a reason so your manager can decide."); return; }
     setBusy(true); setError(null);
-    try { await api.raiseRegularization({ date, checkIn, checkOut, reason: reason || undefined }); onDone(); }
+    try { await api.raiseRegularization({ date, checkIn, checkOut, reason: reason.trim() }); onDone(); }
     catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't submit"); setBusy(false); }
   }
 
@@ -80,9 +82,9 @@ function RaiseForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
       <Field label="Date" htmlFor="r-date"><Input id="r-date" type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} /></Field>
       <Field label="Check in" htmlFor="r-in"><Input id="r-in" type="time" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} /></Field>
       <Field label="Check out" htmlFor="r-out"><Input id="r-out" type="time" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></Field>
-      <div className="sm:col-span-3"><Field label="Reason" htmlFor="r-reason"><Input id="r-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. forgot to check in — was in office" /></Field></div>
+      <div className="sm:col-span-3"><Field label="Reason (required)" htmlFor="r-reason"><Input id="r-reason" required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. forgot to check in — was in office" /></Field></div>
       <div className="flex gap-2 sm:col-span-3">
-        <Button type="submit" disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Submit request</Button>
+        <Button type="submit" disabled={busy || !reason.trim()}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Submit request</Button>
         <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </form>

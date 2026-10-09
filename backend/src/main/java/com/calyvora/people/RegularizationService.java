@@ -39,13 +39,15 @@ public class RegularizationService {
     private final OrgScope orgScope;
 
     private final com.calyvora.access.PermissionService permissions;
+    private final AttendanceService attendanceService;
 
     public RegularizationService(AttendanceRegularizationRepository repository,
                                  AttendanceRepository attendanceRepository, EmployeeRepository employeeRepository,
                                  EmployeeService employeeService, UserRepository userRepository,
                                  NotificationService notifications, OrgScope orgScope,
-            com.calyvora.access.PermissionService permissions) {
+            com.calyvora.access.PermissionService permissions, AttendanceService attendanceService) {
         this.permissions = permissions;
+        this.attendanceService = attendanceService;
         this.orgScope = orgScope;
         this.repository = repository;
         this.attendanceRepository = attendanceRepository;
@@ -62,6 +64,10 @@ public class RegularizationService {
         UUID companyId = TenantContext.getCompanyId();
         UUID employeeId = employeeService.ensureEmployeeId(companyId, principal.userId());
         LocalDate date = parseDate(req.date());
+        // The reason is what the approver decides on; a request without one cannot be judged.
+        if (req.reason() == null || req.reason().isBlank()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Give a reason for the correction");
+        }
         if (date.isAfter(LocalDate.now())) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Can't regularize a future date");
         }
@@ -133,13 +139,13 @@ public class RegularizationService {
 
         if (approve) {
             // Write the attendance record for that day (present, with the requested times).
-            AttendanceRecord rec = attendanceRepository.findByEmployeeIdAndDate(r.getEmployeeId(), r.getOnDate())
-                    .orElseGet(() -> attendanceRepository.save(new AttendanceRecord(UUID.randomUUID(), companyId,
-                            r.getEmployeeId(), r.getOnDate(), AttendanceStatus.PRESENT, principal.userId())));
-            rec.setStatus(AttendanceStatus.PRESENT);
-            rec.setMarkedBy(principal.userId());
-            if (r.getCheckIn() != null) rec.setCheckIn(r.getCheckIn());
-            if (r.getCheckOut() != null) rec.setCheckOut(r.getCheckOut());
+            // Through the one place manual days are written, so the requested times replace the day's
+            // check-in sessions and the day is exempt from the automatic absent and half-day rules.
+            Employee subject = employeeRepository.findByIdAndCompanyId(r.getEmployeeId(), companyId)
+                    .orElseThrow(() -> new NotFoundException("Employee not found"));
+            attendanceService.writeDay(subject, r.getOnDate(), AttendanceStatus.PRESENT,
+                    r.getCheckIn() == null ? null : r.getCheckIn().toString(),
+                    r.getCheckOut() == null ? null : r.getCheckOut().toString(), null, principal.userId());
         }
 
         // Tell the employee.

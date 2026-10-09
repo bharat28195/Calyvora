@@ -452,8 +452,18 @@ export interface AttendanceEntry {
   checkIn: string | null;
   checkOut: string | null;
   note: string | null;
-  /** True when the status was inferred (approved leave or a weekend) rather than marked. */
+  /** True when the status was inferred (leave, a weekend, or the absent/half-day rules) rather than marked. */
   derived: boolean;
+  /** Each check-in/check-out pair; checkOut is null while it is still running (V70). */
+  sessions?: { checkIn: string; checkOut: string | null }[];
+  /** First check-in to last check-out, in minutes. */
+  grossMinutes?: number | null;
+  /** Time actually checked in (closed sessions), in minutes. */
+  effectiveMinutes?: number | null;
+  /** Set while checked in: when the running session started. */
+  openSince?: string | null;
+  /** Hours owed that day, from the rostered shift or the company standard (9 h by default). */
+  requiredMinutes?: number | null;
 }
 export interface AttendanceDay {
   date: string;
@@ -748,12 +758,21 @@ export interface Shift {
   startTime: string;
   endTime: string;
   color: string | null;
+  /** Hours of work the shift expects, in minutes (breaks excluded). */
+  workMinutes?: number;
 }
 export interface ShiftInput {
   name: string;
   startTime: string;
   endTime: string;
   color?: string;
+  workMinutes?: number;
+}
+/** The company's standard day and absence rule, set on the Shifts page (V70). */
+export interface WorkDayPolicy {
+  workDayMinutes: number;
+  workDayStart: string;
+  absentGraceMinutes: number;
 }
 export interface RosterEmployee {
   employeeId: string;
@@ -1318,8 +1337,11 @@ export interface TeamOverview {
   headcount: number;
   presentToday: number;
   onLeaveToday: number;
-  /** How many of `presentToday` are assumed rather than recorded (nobody marked them). */
+  /** Working today, not checked in yet, still inside shift start + grace. */
   unmarkedToday: number;
+  /** No check-in by shift start + grace, and no approved leave. */
+  absentToday?: number;
+  absentees?: { employeeName: string; jobTitle: string | null; reason: string | null }[];
   outToday: LeaveTodayEntry[];
   monthLeaves: CalendarLeave[];
 }

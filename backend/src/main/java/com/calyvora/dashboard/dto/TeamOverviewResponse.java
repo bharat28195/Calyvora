@@ -16,9 +16,14 @@ public record TeamOverviewResponse(
         long presentToday,
         long onLeaveToday,
         long unmarkedToday,
+        long absentToday,
+        List<Absentee> absentees,
         List<LeaveToday> outToday,
         List<CalendarLeave> monthLeaves
 ) {
+    /** Someone absent today: a working day, no approved leave, no check-in by shift start + grace. */
+    public record Absentee(String employeeName, String jobTitle, String reason) {}
+
     /** Someone out today, with the reason so the owner sees why. */
     public record LeaveToday(String employeeName, String type, String reason, String startDate, String endDate) {}
 

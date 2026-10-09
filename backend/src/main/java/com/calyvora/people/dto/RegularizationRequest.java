@@ -8,6 +8,6 @@ public record RegularizationRequest(
         @NotBlank String date,     // YYYY-MM-DD
         String checkIn,
         String checkOut,
-        @Size(max = 500) String reason
+        @NotBlank(message = "Give a reason for the correction") @Size(max = 500) String reason
 ) {
 }

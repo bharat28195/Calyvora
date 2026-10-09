@@ -1799,6 +1799,40 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   recipient_name`, V69) so the Issued list shows who it was for — this also fixes recruitment's
   automatic offer letters, which used to appear with no name.
 
+### PD-59 · 2026-10-10 · Attendance that measures the day: sessions, required hours, absent and half day
+- **Trigger (founder QA as Ava + Priya):** Priya checked in and Ava's day sheet never showed it; the
+  dashboard said everyone was present at dawn; there was no absent count; a lunch break could not be
+  recorded; a regularization could be sent without a reason.
+- **Root cause of the missing check-in:** Priya's own clock was UTC, so a 03:25 IST check-in was
+  filed on the previous date. The server also answered "today" on its UTC clock, so admins saw
+  yesterday until 05:30 IST. Fix: India time is the default everywhere (V70 moves anyone pinned to
+  UTC back to the company zone; deliberate other zones are kept), and "today" is the company's.
+- **Decision (founder):** every check-in/check-out pair is a session (`attendance_punches`, V70).
+  Gross = first in to last out; effective = time actually checked in. Required hours come from the
+  rostered shift (`shifts.work_minutes`) or the company's standard day — **9 h**, set by the admin on
+  the Shifts page with the day's start time and an **absent grace** (default 2 h).
+- **Rules, both of which cost pay (founder: "half day should affect the pay"):** a finished,
+  self-clocked day short of its required hours is a **half day** (0.5 LOP); a working day with no
+  check-in by shift start + grace and no approved leave is **absent** (1 LOP). Derived at read time
+  in one place, so the day sheet, dashboard, month and payroll cannot disagree.
+- **Safety:** the rules apply only from `attendance_rules_from` (set to the release date by V70), so
+  switching them on never docks pay for months already worked. Null turns them off per company.
+- **Managers/HR correct directly (founder):** many people × many dates in one action, applied
+  immediately with a required reason, no approval — they hold the right. Leads are limited to their
+  own downline (PD-32). A hand-set day is exempt from both automatic rules; that is how a short or
+  absent day is regularized.
+- **Also:** Present today counts only people actually in (was: everyone not on leave); new Absent
+  tile and list; Departments page (the tile opened the org chart); Insights under Dashboard; account
+  settings in tabs; regularization reason required server-side.
+- **Speed:** a 20 s in-memory read cache in the API client makes going back to a page instant;
+  any write clears it. The remaining cost is the hosting: the demo backend is on Render's free plan
+  and the frontend proxies to it over the public URL (150–500 ms a call). Upgrading the plan and
+  using Render's private network are the next lever — a cost decision, not yet taken.
+- **Next (founder-approved order, PD-59 follow-ups):** attendance stats + automatic overtime;
+  full-depth tax declarations (Keka parity on sections, proofs + HR review, Form 16/12BB); manager
+  leave insights as charts for scale plus a short ranked "needs attention" list; expense advances;
+  referrals; 1:1s and feedback.
+
 ## 4. Architecture Decision Log
 
 

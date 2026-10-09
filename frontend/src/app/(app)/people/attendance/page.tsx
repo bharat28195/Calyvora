@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { MARKABLE, STATUS, StatusChip, MyDay, MyMonth, hhmm } from "@/components/attendance/self";
 import { AttendanceMonthGrid } from "@/components/attendance/month-grid";
+import { CorrectAttendance } from "@/components/attendance/correct";
+import { Button } from "@/components/ui/button";
 import { DayHeading } from "@/components/ui/month-calendar";
 import { can, canCompanyWide } from "@/lib/permissions";
 import { monthYear } from "@/lib/format";
@@ -54,6 +56,7 @@ function TeamDaySheet() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter | null>(null);
+  const [correcting, setCorrecting] = useState(false);
 
   const filtered = useMemo(() => {
     const entries = sheet?.entries ?? [];
@@ -91,7 +94,14 @@ function TeamDaySheet() {
 
   return (
     <div className="mt-8">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Team attendance</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Team attendance</h2>
+        <Button size="sm" onClick={() => setCorrecting(true)} disabled={!sheet}>Correct attendance</Button>
+      </div>
+      {correcting && sheet && (
+        <CorrectAttendance open onClose={() => setCorrecting(false)} onDone={load}
+          people={sheet.entries.map((e) => ({ id: e.employeeId, name: e.employeeName }))} />
+      )}
 
       {/* The grid answers "which day", which is the question people arrive with — the Tuesday half
           the team was out. The sheet under it answers "who". */}

@@ -69,6 +69,28 @@ public class CompanySettings {
     @Column(name = "tax_declarations_open", nullable = false)
     private boolean taxDeclarationsOpen = true;
 
+    /**
+     * How long a working day is, for anyone not rostered onto a shift that says otherwise (V70).
+     * Effective hours below this mark the day short.
+     */
+    @Column(name = "work_day_minutes", nullable = false)
+    private int workDayMinutes = 540;
+
+    /** When the standard day starts, for anyone not rostered onto a shift. */
+    @Column(name = "work_day_start", nullable = false)
+    private java.time.LocalTime workDayStart = java.time.LocalTime.of(9, 30);
+
+    /** Not checked in by shift start plus this many minutes means absent for the day. */
+    @Column(name = "absent_grace_minutes", nullable = false)
+    private int absentGraceMinutes = 120;
+
+    /**
+     * The first day absent-after-grace and short-day-is-half-day apply. New companies start today;
+     * null switches both rules off. Both cost pay, so they never reach back before this date.
+     */
+    @Column(name = "attendance_rules_from")
+    private java.time.LocalDate attendanceRulesFrom = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -95,6 +117,38 @@ public class CompanySettings {
 
     public void setTimezone(String timezone) {
         this.timezone = timezone;
+    }
+
+    public int getWorkDayMinutes() {
+        return workDayMinutes;
+    }
+
+    public void setWorkDayMinutes(int workDayMinutes) {
+        this.workDayMinutes = workDayMinutes;
+    }
+
+    public java.time.LocalTime getWorkDayStart() {
+        return workDayStart;
+    }
+
+    public void setWorkDayStart(java.time.LocalTime workDayStart) {
+        this.workDayStart = workDayStart;
+    }
+
+    public int getAbsentGraceMinutes() {
+        return absentGraceMinutes;
+    }
+
+    public void setAbsentGraceMinutes(int absentGraceMinutes) {
+        this.absentGraceMinutes = absentGraceMinutes;
+    }
+
+    public java.time.LocalDate getAttendanceRulesFrom() {
+        return attendanceRulesFrom;
+    }
+
+    public void setAttendanceRulesFrom(java.time.LocalDate attendanceRulesFrom) {
+        this.attendanceRulesFrom = attendanceRulesFrom;
     }
 
     public String getLocale() {
