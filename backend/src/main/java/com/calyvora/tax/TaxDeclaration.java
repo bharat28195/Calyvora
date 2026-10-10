@@ -54,6 +54,29 @@ public class TaxDeclaration {
     @Column(name = "submitted_at")
     private Instant submittedAt;
 
+    /** Either parent 60 or older — raises their Section 126 ceiling to ₹50,000 (V71). */
+    @Column(name = "parents_senior", nullable = false)
+    private boolean parentsSenior;
+
+    // Income from an earlier employer this year — what their Form 130 (Form 16) shows (V71).
+    @Column(name = "prev_employer_name", length = 160)
+    private String prevEmployerName;
+    @Column(name = "prev_employer_tan", length = 10)
+    private String prevEmployerTan;
+    @Column(name = "prev_income", precision = 14, scale = 2)
+    private java.math.BigDecimal prevIncome;
+    @Column(name = "prev_tds", precision = 14, scale = 2)
+    private java.math.BigDecimal prevTds;
+    @Column(name = "prev_pf", precision = 14, scale = 2)
+    private java.math.BigDecimal prevPf;
+    @Column(name = "prev_pt", precision = 14, scale = 2)
+    private java.math.BigDecimal prevPt;
+    /** NONE, SUBMITTED, ACCEPTED or REJECTED — a rejected block is left out of the computation. */
+    @Column(name = "prev_status", nullable = false, length = 16)
+    private String prevStatus = "NONE";
+    @Column(name = "prev_review_note", length = 400)
+    private String prevReviewNote;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -120,6 +143,31 @@ public class TaxDeclaration {
     public void submit() {
         this.status = Status.SUBMITTED;
         this.submittedAt = Instant.now();
+    }
+
+    public boolean isParentsSenior() { return parentsSenior; }
+    public void setParentsSenior(boolean v) { this.parentsSenior = v; }
+    public String getPrevEmployerName() { return prevEmployerName; }
+    public void setPrevEmployerName(String v) { this.prevEmployerName = v; }
+    public String getPrevEmployerTan() { return prevEmployerTan; }
+    public void setPrevEmployerTan(String v) { this.prevEmployerTan = v; }
+    public java.math.BigDecimal getPrevIncome() { return prevIncome; }
+    public void setPrevIncome(java.math.BigDecimal v) { this.prevIncome = v; }
+    public java.math.BigDecimal getPrevTds() { return prevTds; }
+    public void setPrevTds(java.math.BigDecimal v) { this.prevTds = v; }
+    public java.math.BigDecimal getPrevPf() { return prevPf; }
+    public void setPrevPf(java.math.BigDecimal v) { this.prevPf = v; }
+    public java.math.BigDecimal getPrevPt() { return prevPt; }
+    public void setPrevPt(java.math.BigDecimal v) { this.prevPt = v; }
+    public String getPrevStatus() { return prevStatus; }
+    public void setPrevStatus(String v) { this.prevStatus = v; }
+    public String getPrevReviewNote() { return prevReviewNote; }
+    public void setPrevReviewNote(String v) { this.prevReviewNote = v; }
+
+    /** Whether there is an earlier employer's income on this declaration that counts. */
+    public boolean hasPreviousEmployer() {
+        return !"REJECTED".equals(prevStatus)
+                && ((prevIncome != null && prevIncome.signum() > 0) || (prevTds != null && prevTds.signum() > 0));
     }
 
     /** Back to editable — what HR does when it reopens the window for somebody. */

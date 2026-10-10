@@ -12,10 +12,11 @@ public record PayslipComponentResponse(
         String calc,
         BigDecimal value,
         boolean basis,
-        int sortOrder
+        int sortOrder,
+        String taxTag
 ) {
     public static PayslipComponentResponse of(PayslipComponent c) {
         return new PayslipComponentResponse(c.getId().toString(), c.getName(), c.getKind().name(),
-                c.getCalc().name(), c.getValue(), c.isBasis(), c.getSortOrder());
+                c.getCalc().name(), c.getValue(), c.isBasis(), c.getSortOrder(), c.getTaxTag());
     }
 }

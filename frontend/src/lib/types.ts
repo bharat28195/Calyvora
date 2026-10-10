@@ -296,27 +296,153 @@ export interface ExpenseClaim {
 // --- income tax (India) -----------------------------------------------------------------------
 
 export type TaxRegime = "OLD" | "NEW";
+export type AgeBand = "BELOW_60" | "SENIOR" | "SUPER_SENIOR";
+export type ProofStatus = "NONE" | "SUBMITTED" | "ACCEPTED" | "PARTIAL" | "REJECTED";
 
-/** One section of the declaration form, with the statutory ceiling so the form can show it. */
-export interface TaxDeductionOption {
+/** One line the declaration form can show (Income-tax Act, 2025 numbering, the 1961 one alongside). */
+export interface TaxCatalogEntry {
   key: string;
-  section: string;
+  section: string | null;
+  oldSection: string | null;
+  /** "Sec 123 (80C)" */
+  sectionLabel: string;
   label: string;
-  /** null where the Act sets no ceiling — 80E, for instance. */
-  cap: number | null;
+  hint: string | null;
+  group: string;
+  /** Income to be taxed, rather than a relief. */
+  income: boolean;
   allowedInNewRegime: boolean;
 }
 
+export interface TaxProofFile {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+export interface TaxItem {
+  key: string;
+  amount: number;
+  detail: string | null;
+  proofStatus: ProofStatus;
+  acceptedAmount: number | null;
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
+export interface TaxRent {
+  id: string;
+  fromMonth: string;
+  toMonth: string;
+  monthlyRent: number;
+  city: string;
+  metro: boolean;
+  landlordName: string | null;
+  landlordPan: string | null;
+  landlordAddress: string | null;
+  landlordRelationship: string | null;
+  proofStatus: ProofStatus;
+  acceptedRent: number | null;
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
+export interface TaxHouse {
+  id: string;
+  letOut: boolean;
+  address: string | null;
+  lenderName: string | null;
+  lenderPan: string | null;
+  interest: number;
+  annualRent: number;
+  municipalTax: number;
+  proofStatus: ProofStatus;
+  acceptedInterest: number | null;
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
+export interface TaxPrevious {
+  employerName: string | null;
+  tan: string | null;
+  income: number | null;
+  tds: number | null;
+  pf: number | null;
+  pt: number | null;
+  status: "NONE" | "SUBMITTED" | "ACCEPTED" | "REJECTED";
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
 export interface TaxDeclaration {
+  employeeId: string;
+  employeeName: string;
   financialYear: string;
   regime: TaxRegime;
   status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
   submittedAt: string | null;
-  /** Section key to the amount claimed, uncapped — what the employee typed. */
-  declared: Record<string, number>;
-  /** Whether HR still accepts changes for this year. */
+  /** Whether HR still accepts changes for this year (and so whether the regime can change). */
   windowOpen: boolean;
-  options: TaxDeductionOption[];
+  proofsOpen: boolean;
+  proofDeadline: string | null;
+  /** Past the proof deadline: only what HR accepted reduces the tax now. */
+  proofsDue: boolean;
+  parentsSenior: boolean;
+  ageBand: AgeBand;
+  dateOfBirthKnown: boolean;
+  salaryHasHra: boolean;
+  salaryHasLta: boolean;
+  /** Line key to the amount claimed (the older flat shape). */
+  declared: Record<string, number>;
+  items: TaxItem[];
+  rent: TaxRent[];
+  houses: TaxHouse[];
+  previous: TaxPrevious | null;
+  catalog: TaxCatalogEntry[];
+}
+
+export interface TaxRentInput {
+  id?: string | null;
+  fromMonth: string;
+  toMonth: string;
+  monthlyRent: number;
+  city: string;
+  landlordName?: string | null;
+  landlordPan?: string | null;
+  landlordAddress?: string | null;
+  landlordRelationship?: string | null;
+}
+
+export interface TaxHouseInput {
+  id?: string | null;
+  letOut: boolean;
+  address?: string | null;
+  lenderName?: string | null;
+  lenderPan?: string | null;
+  interest: number;
+  annualRent?: number;
+  municipalTax?: number;
+}
+
+export interface TaxPreviousInput {
+  employerName?: string | null;
+  tan?: string | null;
+  income?: number;
+  tds?: number;
+  pf?: number;
+  pt?: number;
+}
+
+/** What is saved. Every part is optional; a missing part is left as it is. */
+export interface TaxDeclarationInput {
+  regime?: TaxRegime;
+  parentsSenior?: boolean;
+  items?: { key: string; amount: number; detail?: string | null }[];
+  rent?: TaxRentInput[];
+  houses?: TaxHouseInput[];
+  previous?: TaxPreviousInput;
 }
 
 export interface TaxBandRow {
@@ -335,6 +461,28 @@ export interface TaxDeductionRow {
   allowed: number;
 }
 
+export interface TaxGroupRow {
+  group: string;
+  claimed: number;
+  cap: number;
+  allowed: number;
+}
+
+export interface TaxMonthRow {
+  month: string;
+  source: "OPENING" | "LOCKED" | "PROJECTED" | "NONE";
+  gross: number;
+  tds: number | null;
+}
+
+export interface TaxHraMonthRow {
+  month: string;
+  hraReceived: number;
+  rentLessTenPercent: number;
+  percentOfBasic: number;
+  exempt: number;
+}
+
 export interface TaxRegimeComparison {
   oldRegimeTax: number;
   newRegimeTax: number;
@@ -345,10 +493,19 @@ export interface TaxRegimeComparison {
 export interface TaxComputation {
   financialYear: string;
   regime: TaxRegime;
+  ageBand: AgeBand;
   currency: string;
   grossSalary: number;
+  previousEmployerIncome: number;
+  exemptions: TaxDeductionRow[];
   standardDeduction: number;
+  professionalTax: number;
+  salaryIncome: number;
+  houseProperty: number;
+  otherIncome: number;
+  grossTotalIncome: number;
   deductions: TaxDeductionRow[];
+  groups: TaxGroupRow[];
   totalDeductions: number;
   taxableIncome: number;
   bands: TaxBandRow[];
@@ -366,6 +523,9 @@ export interface TaxComputation {
   comparison: TaxRegimeComparison;
   /** False while the employer does not withhold income tax through Orbit — the figures are an estimate. */
   withheldByPayroll: boolean;
+  proofsDue: boolean;
+  months: TaxMonthRow[];
+  hraMonths: TaxHraMonthRow[];
 }
 
 export interface TaxDeclarationRow {
@@ -375,6 +535,36 @@ export interface TaxDeclarationRow {
   status: string;
   totalDeclared: number;
   annualTax: number;
+  proofs: number;
+  awaitingReview: number;
+}
+
+export interface TaxSettings {
+  declarationsOpen: boolean;
+  proofsOpen: boolean;
+  proofDeadline: string | null;
+}
+
+export interface TaxReviewInput {
+  type: "ITEM" | "RENT" | "HOUSE" | "PREVIOUS";
+  id?: string | null;
+  status: "ACCEPTED" | "PARTIAL" | "REJECTED";
+  acceptedAmount?: number | null;
+  note?: string | null;
+}
+
+export interface Form130 {
+  financialYear: string;
+  employerName: string;
+  employerAddress: string | null;
+  employerTan: string | null;
+  employeeName: string;
+  employeePan: string | null;
+  designation: string | null;
+  periodFrom: string;
+  periodTo: string;
+  quarters: { quarter: string; tds: number }[];
+  computation: TaxComputation;
 }
 
 export interface ExpenseSummary {
@@ -1027,6 +1217,8 @@ export interface PayslipComponent {
   value: number | null;
   basis: boolean;
   sortOrder?: number;
+  /** HRA or LTA when this earning is that allowance for income tax. */
+  taxTag?: "HRA" | "LTA" | null;
 }
 
 /** Analytics / Insights dashboard (Owner/Admin). A chart series is a list of these. */
@@ -1461,6 +1653,9 @@ export interface TdsOpening {
   income: number;
   tds: number;
   note: string | null;
+  /** Employee PF and professional tax in those months (count for Sections 123 and 19). */
+  employeePf: number;
+  professionalTax: number;
 }
 
 /** A statutory return file, with the people who could not be included and why. */

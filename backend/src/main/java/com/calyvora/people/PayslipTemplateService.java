@@ -40,7 +40,13 @@ public class PayslipTemplateService {
      */
     public record Computed(List<Line> earnings, List<Line> deductions,
                            BigDecimal gross, BigDecimal totalDeductions, BigDecimal net,
-                           BigDecimal basic) {}
+                           BigDecimal basic, BigDecimal hra, BigDecimal lta) {
+
+        public Computed(List<Line> earnings, List<Line> deductions, BigDecimal gross,
+                        BigDecimal totalDeductions, BigDecimal net, BigDecimal basic) {
+            this(earnings, deductions, gross, totalDeductions, net, basic, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+    }
 
     @Transactional
     public List<PayslipComponentResponse> template() {
@@ -73,11 +79,13 @@ public class PayslipTemplateService {
      * two from companies still carrying them unmodified.
      */
     private List<PayslipComponent> defaultComponents(UUID companyId) {
+        PayslipComponent hra = new PayslipComponent(UUID.randomUUID(), companyId, "House rent allowance",
+                PayComponentKind.EARNING, PayComponentCalc.PERCENT_OF_GROSS, new BigDecimal("25"), false, 1);
+        hra.setTaxTag("HRA");
         return List.of(
                 new PayslipComponent(UUID.randomUUID(), companyId, "Basic", PayComponentKind.EARNING,
                         PayComponentCalc.PERCENT_OF_GROSS, new BigDecimal("50"), true, 0),
-                new PayslipComponent(UUID.randomUUID(), companyId, "House rent allowance", PayComponentKind.EARNING,
-                        PayComponentCalc.PERCENT_OF_GROSS, new BigDecimal("25"), false, 1),
+                hra,
                 new PayslipComponent(UUID.randomUUID(), companyId, "Special allowance", PayComponentKind.EARNING,
                         PayComponentCalc.REMAINDER, null, false, 2));
     }
@@ -117,6 +125,8 @@ public class PayslipTemplateService {
 
         // Earnings — everything except the remainder first, so we know how much of gross is left.
         BigDecimal basisAmount = BigDecimal.ZERO;
+        BigDecimal hraAmount = BigDecimal.ZERO;
+        BigDecimal ltaAmount = BigDecimal.ZERO;
         BigDecimal earnedSoFar = BigDecimal.ZERO;
         List<Line> earnings = new ArrayList<>();
         PayslipComponent remainder = null;
@@ -129,6 +139,8 @@ public class PayslipTemplateService {
                 default -> BigDecimal.ZERO; // PERCENT_OF_BASIC not valid on an earning (rejected on save)
             };
             if (c.isBasis()) basisAmount = amt;
+            if ("HRA".equals(c.getTaxTag())) hraAmount = hraAmount.add(amt);
+            if ("LTA".equals(c.getTaxTag())) ltaAmount = ltaAmount.add(amt);
             earnedSoFar = earnedSoFar.add(amt);
             earnings.add(new Line(c.getName(), amt));
         }
@@ -137,6 +149,8 @@ public class PayslipTemplateService {
             if (left.signum() < 0) {
                 throw new ApiException(ErrorCode.VALIDATION_ERROR, "Payslip earnings exceed gross pay — check the template");
             }
+            if ("HRA".equals(remainder.getTaxTag())) hraAmount = hraAmount.add(left);
+            if ("LTA".equals(remainder.getTaxTag())) ltaAmount = ltaAmount.add(left);
             // Slot the remainder back into its ordered position.
             for (int i = 0; i < earnings.size(); i++) {
                 if (earnings.get(i) == null) { earnings.set(i, new Line(remainder.getName(), left)); break; }
@@ -162,7 +176,7 @@ public class PayslipTemplateService {
         if (net.signum() < 0) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Payslip deductions exceed gross pay — check the template");
         }
-        return new Computed(earnings, deductions, gross, totalDed, net, basisAmount);
+        return new Computed(earnings, deductions, gross, totalDed, net, basisAmount, hraAmount, ltaAmount);
     }
 
     // ---- validation ----
@@ -207,8 +221,13 @@ public class PayslipTemplateService {
                 if (calc == PayComponentCalc.PERCENT_OF_GROSS) deductionPct = deductionPct.add(value);
             }
 
-            out.add(new PayslipComponent(UUID.randomUUID(), companyId, p.name().trim(), kind, calc,
-                    value == null ? null : scale(value), p.basis() && kind == PayComponentKind.EARNING, i));
+            PayslipComponent built = new PayslipComponent(UUID.randomUUID(), companyId, p.name().trim(), kind, calc,
+                    value == null ? null : scale(value), p.basis() && kind == PayComponentKind.EARNING, i);
+            String tag = p.taxTag() == null || p.taxTag().isBlank() ? null : p.taxTag().trim().toUpperCase(java.util.Locale.ROOT);
+            if (tag != null && !tag.equals("HRA") && !tag.equals("LTA")) throw invalid(p, "tax treatment must be HRA, LTA or none");
+            if (tag != null && kind != PayComponentKind.EARNING) throw invalid(p, "only an earning can be HRA or LTA");
+            built.setTaxTag(tag);
+            out.add(built);
         }
 
         if (earnings == 0) throw new ApiException(ErrorCode.VALIDATION_ERROR, "Add at least one earning");

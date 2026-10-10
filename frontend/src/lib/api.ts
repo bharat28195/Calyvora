@@ -84,7 +84,10 @@ import {
   type TaxComputation,
   type TaxDeclaration,
   type TaxDeclarationRow,
-  type TaxRegime,
+  type TaxDeclarationInput,
+  type TaxSettings,
+  type TaxReviewInput,
+  type Form130,
   type LeaveRequest,
   type LeaveTypeBalance,
   type LoginResult,
@@ -222,6 +225,11 @@ export const auth = {
  */
 const READ_CACHE_MS = 20_000;
 const readCache = new Map<string, { at: number; body: unknown }>();
+
+/** For the writes that do not go through `http` (multipart uploads): they change what reads return too. */
+function forgetReads() {
+  readCache.clear();
+}
 const inFlight = new Map<string, Promise<unknown>>();
 
 async function http<T>(path: string, init?: HttpInit): Promise<T> {
@@ -1119,6 +1127,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     if (title) form.append("title", title);
+    forgetReads();
     const res = await fetch(`${BASE}/knowledge/spaces/${spaceId}/files`, {
       method: "POST",
       credentials: "include",
@@ -1284,7 +1293,8 @@ export const api = {
   tdsOpenings(year?: string): Promise<TdsOpening[]> {
     return http<TdsOpening[]>(`/payroll/tds-openings${year ? `?year=${year}` : ""}`);
   },
-  saveTdsOpening(employeeId: string, body: { coveredThrough: string; income: number; tds: number; note?: string },
+  saveTdsOpening(employeeId: string, body: { coveredThrough: string; income: number; tds: number; note?: string;
+                   employeePf?: number; professionalTax?: number },
                  year?: string): Promise<TdsOpening> {
     return http<TdsOpening>(`/payroll/tds-openings/${employeeId}${year ? `?year=${year}` : ""}`,
       { method: "PUT", body: JSON.stringify(body) });
@@ -1432,7 +1442,7 @@ export const api = {
       ? http<TaxDeclaration>(`/tax/me/declaration${year ? `?year=${year}` : ""}`)
       : liveOnly("Income tax");
   },
-  saveTaxDeclaration(input: { regime?: TaxRegime; declared?: Record<string, number> }, year?: string): Promise<TaxDeclaration> {
+  saveTaxDeclaration(input: TaxDeclarationInput, year?: string): Promise<TaxDeclaration> {
     return LIVE
       ? http<TaxDeclaration>(`/tax/me/declaration${year ? `?year=${year}` : ""}`,
           { method: "PUT", body: JSON.stringify(input) })
@@ -1457,6 +1467,77 @@ export const api = {
   setTaxWindow(open: boolean): Promise<{ open: boolean }> {
     return LIVE
       ? http<{ open: boolean }>("/tax/window", { method: "POST", body: JSON.stringify({ open }) })
+      : liveOnly("Income tax");
+  },
+  /** The computation for a form not yet saved — the live figures beside it while typing. */
+  taxPreview(input: TaxDeclarationInput, year?: string): Promise<TaxComputation> {
+    return LIVE
+      ? http<TaxComputation>(`/tax/me/preview${year ? `?year=${year}` : ""}`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Income tax");
+  },
+  /** Attach a proof (PDF, PNG or JPEG, up to 5 MB) to a line, a rent period, a house or the previous employer. */
+  async uploadTaxProof(ownerType: "ITEM" | "RENT" | "HOUSE" | "PREVIOUS", ownerId: string, file: File,
+                       year?: string): Promise<TaxDeclaration> {
+    if (!LIVE) return liveOnly("Income tax");
+    const form = new FormData();
+    form.append("file", file);
+    form.append("ownerType", ownerType);
+    form.append("ownerId", ownerId);
+    if (year) form.append("year", year);
+    forgetReads();
+    const res = await fetch(`${BASE}/tax/me/proofs`, {
+      method: "POST",
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    return body as TaxDeclaration;
+  },
+  deleteTaxProof(proofId: string, year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/me/proofs/${proofId}${year ? `?year=${year}` : ""}`, { method: "DELETE" })
+      : liveOnly("Income tax");
+  },
+  /** A proof's bytes, for viewing — a plain link would not carry the bearer token. */
+  async taxProofBlob(proofId: string): Promise<Blob> {
+    const res = await fetch(`${BASE}/tax/proofs/${proofId}`, {
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    }
+    return res.blob();
+  },
+  myForm130(year?: string): Promise<Form130> {
+    return LIVE ? http<Form130>(`/tax/me/form130${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  taxSettings(): Promise<TaxSettings> {
+    return LIVE ? http<TaxSettings>("/tax/settings") : liveOnly("Income tax");
+  },
+  saveTaxSettings(input: TaxSettings): Promise<TaxSettings> {
+    return LIVE ? http<TaxSettings>("/tax/settings", { method: "PUT", body: JSON.stringify(input) }) : liveOnly("Income tax");
+  },
+  employeeTaxDeclaration(employeeId: string, year?: string): Promise<TaxDeclaration> {
+    return LIVE ? http<TaxDeclaration>(`/tax/declarations/${employeeId}${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  employeeTaxComputation(employeeId: string, year?: string): Promise<TaxComputation> {
+    return LIVE ? http<TaxComputation>(`/tax/declarations/${employeeId}/computation${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  employeeForm130(employeeId: string, year?: string): Promise<Form130> {
+    return LIVE ? http<Form130>(`/tax/declarations/${employeeId}/form130${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  reviewTax(employeeId: string, input: TaxReviewInput, year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/declarations/${employeeId}/review${year ? `?year=${year}` : ""}`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Income tax");
+  },
+  reopenTaxDeclaration(employeeId: string, year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/declarations/${employeeId}/reopen${year ? `?year=${year}` : ""}`, { method: "POST" })
       : liveOnly("Income tax");
   },
 
@@ -1639,6 +1720,7 @@ export const api = {
     if (!LIVE) return liveOnly("The letterpad");
     const form = new FormData();
     form.append("file", file);
+    forgetReads();
     const res = await fetch(`${BASE}/documents/letterhead/background`, {
       method: "POST",
       credentials: "include",

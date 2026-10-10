@@ -43,6 +43,14 @@ public class TdsOpeningBalance {
     @Column(length = 200)
     private String note;
 
+    /** Employee PF deducted in the covered months — part of Section 123 (V71). */
+    @Column(name = "employee_pf", nullable = false)
+    private BigDecimal employeePf = BigDecimal.ZERO;
+
+    /** Professional tax deducted in the covered months — part of the ₹2,500 under Section 19 (V71). */
+    @Column(name = "professional_tax", nullable = false)
+    private BigDecimal professionalTax = BigDecimal.ZERO;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
@@ -71,6 +79,10 @@ public class TdsOpeningBalance {
     public void setIncome(BigDecimal v) { this.income = v; }
     public BigDecimal getTds() { return tds; }
     public void setTds(BigDecimal v) { this.tds = v; }
+    public BigDecimal getEmployeePf() { return employeePf; }
+    public void setEmployeePf(BigDecimal v) { this.employeePf = v == null ? BigDecimal.ZERO : v; }
+    public BigDecimal getProfessionalTax() { return professionalTax; }
+    public void setProfessionalTax(BigDecimal v) { this.professionalTax = v == null ? BigDecimal.ZERO : v; }
     public String getNote() { return note; }
     public void setNote(String v) { this.note = v; }
     public Instant getUpdatedAt() { return updatedAt; }

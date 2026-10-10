@@ -48,14 +48,18 @@ public class TdsOpeningController {
     public record OpeningPayload(@NotBlank String coveredThrough,
                                  @NotNull @PositiveOrZero BigDecimal income,
                                  @NotNull @PositiveOrZero BigDecimal tds,
-                                 @Size(max = 200) String note) {
+                                 @Size(max = 200) String note,
+                                 /** Employee PF and professional tax in those months — they count for Sections 123 and 19. */
+                                 @PositiveOrZero BigDecimal employeePf,
+                                 @PositiveOrZero BigDecimal professionalTax) {
     }
 
     public record OpeningResponse(String employeeId, String financialYear, String coveredThrough,
-                                  BigDecimal income, BigDecimal tds, String note) {
+                                  BigDecimal income, BigDecimal tds, String note,
+                                  BigDecimal employeePf, BigDecimal professionalTax) {
         static OpeningResponse of(TdsOpeningBalance o) {
             return new OpeningResponse(o.getEmployeeId().toString(), o.getFinancialYear(), o.getCoveredThrough(),
-                    o.getIncome(), o.getTds(), o.getNote());
+                    o.getIncome(), o.getTds(), o.getNote(), o.getEmployeePf(), o.getProfessionalTax());
         }
     }
 
@@ -89,6 +93,8 @@ public class TdsOpeningController {
         o.setCoveredThrough(through.toString());
         o.setIncome(p.income());
         o.setTds(p.tds());
+        o.setEmployeePf(p.employeePf());
+        o.setProfessionalTax(p.professionalTax());
         o.setNote(p.note() == null || p.note().isBlank() ? null : p.note().trim());
         return OpeningResponse.of(repository.save(o));
     }

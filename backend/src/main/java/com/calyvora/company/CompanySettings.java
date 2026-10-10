@@ -69,6 +69,17 @@ public class CompanySettings {
     @Column(name = "tax_declarations_open", nullable = false)
     private boolean taxDeclarationsOpen = true;
 
+    /** Whether employees may upload proofs for their declarations (V71). */
+    @Column(name = "tax_proofs_open", nullable = false)
+    private boolean taxProofsOpen;
+
+    /**
+     * The last day for proofs (V71). From the first payroll month after it, only what HR accepted
+     * reduces the tax; until then, what was declared does.
+     */
+    @Column(name = "tax_proof_deadline")
+    private java.time.LocalDate taxProofDeadline;
+
     /**
      * How long a working day is, for anyone not rostered onto a shift that says otherwise (V70).
      * Effective hours below this mark the day short.
@@ -117,6 +128,22 @@ public class CompanySettings {
 
     public void setTimezone(String timezone) {
         this.timezone = timezone;
+    }
+
+    public boolean isTaxProofsOpen() {
+        return taxProofsOpen;
+    }
+
+    public void setTaxProofsOpen(boolean taxProofsOpen) {
+        this.taxProofsOpen = taxProofsOpen;
+    }
+
+    public java.time.LocalDate getTaxProofDeadline() {
+        return taxProofDeadline;
+    }
+
+    public void setTaxProofDeadline(java.time.LocalDate taxProofDeadline) {
+        this.taxProofDeadline = taxProofDeadline;
     }
 
     public int getWorkDayMinutes() {

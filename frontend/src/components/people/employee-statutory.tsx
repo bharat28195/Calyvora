@@ -174,6 +174,8 @@ export function TdsOpeningEditor({ employeeId }: { employeeId: string }) {
   const [through, setThrough] = useState("");
   const [income, setIncome] = useState("");
   const [tds, setTds] = useState("");
+  const [pf, setPf] = useState("");
+  const [pt, setPt] = useState("");
 
   useEffect(() => {
     api.tdsOpenings()
@@ -185,6 +187,8 @@ export function TdsOpeningEditor({ employeeId }: { employeeId: string }) {
     setThrough(opening?.coveredThrough ?? "");
     setIncome(opening ? String(opening.income) : "");
     setTds(opening ? String(opening.tds) : "");
+    setPf(opening?.employeePf ? String(opening.employeePf) : "");
+    setPt(opening?.professionalTax ? String(opening.professionalTax) : "");
     setEditing(true);
   }
 
@@ -193,7 +197,8 @@ export function TdsOpeningEditor({ employeeId }: { employeeId: string }) {
     setBusy(true);
     setError(null);
     try {
-      setOpening(await api.saveTdsOpening(employeeId, { coveredThrough: through, income: Number(income), tds: Number(tds) }));
+      setOpening(await api.saveTdsOpening(employeeId, { coveredThrough: through, income: Number(income), tds: Number(tds),
+        employeePf: Number(pf || 0), professionalTax: Number(pt || 0) }));
       setEditing(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save");
@@ -240,6 +245,12 @@ export function TdsOpeningEditor({ employeeId }: { employeeId: string }) {
           </Field>
           <Field label="TDS deducted (₹)" htmlFor="opTds">
             <Input id="opTds" type="number" min={0} required value={tds} onChange={(e) => setTds(e.target.value)} />
+          </Field>
+          <Field label="Employee PF (₹)" htmlFor="opPf" hint="Counts towards Section 123">
+            <Input id="opPf" type="number" min={0} value={pf} onChange={(e) => setPf(e.target.value)} />
+          </Field>
+          <Field label="Professional tax (₹)" htmlFor="opPt" hint="Counts towards the ₹2,500">
+            <Input id="opPt" type="number" min={0} value={pt} onChange={(e) => setPt(e.target.value)} />
           </Field>
           <div className="flex gap-2 sm:col-span-3">
             <Button type="submit" size="sm" disabled={busy}>Save</Button>

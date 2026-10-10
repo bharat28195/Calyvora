@@ -1833,6 +1833,37 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   leave insights as charts for scale plus a short ranked "needs attention" list; expense advances;
   referrals; 1:1s and feedback.
 
+### PD-60 · 2026-10-10 · Tax declarations at full depth, under the Income-tax Act, 2025
+- **Decision (founder):** tax declarations first, at Keka's depth but simpler to use, and correct to
+  the rupee because they drive monthly TDS. No third-party tax-filing marketplace.
+- **The law as built (tax year 2026-27, verified against published sources, Budget 2026 changed no
+  slab):** new regime 0/5/10/15/20/25/30% with the ₹60,000 rebate to ₹12 lakh and marginal relief;
+  old regime 0/5/20/30% (₹3L / ₹5L free for 60+ / 80+); standard deduction ₹75,000 / ₹50,000;
+  surcharge with relief at every threshold; 4% cess; income and tax rounded to ₹10 (Section 516).
+  Sections shown with the 2025 Act's numbers and the 1961 ones beside them (Sec 123 (80C), 126
+  (80D), 129 (80E), 133 (80G), 153 (80TTA/TTB), 154 (80U)…). Forms are Form 124 (was 12BB) and
+  Form 130 (was Form 16). HRA metros are eight from 2026-27 (Bengaluru, Hyderabad, Pune, Ahmedabad
+  added by the draft Rules, 2026 — to be re-checked when the Rules are notified).
+- **Correctness fixes found on the way:** surcharge relief above ₹1 crore compared against bare tax
+  instead of tax plus the lower surcharge (over-relieved); 80D parents was a flat ₹50,000; employer
+  NPS had no ceiling; employee PF and professional tax did not reach the old-regime computation; HRA
+  was typed in rather than computed. All fixed and pinned by hand-worked tests (41 calculator cases,
+  HRA month by month, the whole flow end to end).
+- **Shape:** granular lines grouped under shared ceilings (one ₹1.5L across a dozen Section 123
+  items); rent by month range with city (HRA = least of three, every month); houses (self-occupied
+  ₹2L, let-out loss set-off ₹2L, none in the new regime); other income; previous employer (Form
+  12B equivalent); age from date of birth (born 1 April → senior that year). One year model
+  (`TaxYear`) feeds the payslip, the employee's screen and HR's alike.
+- **Proofs (founder-approved defaults):** declared amounts count until the proof deadline; from the
+  month after it, only what HR accepted. The regime can change only while declarations are open.
+  A claim whose amount changes after review goes back to HR. Rejecting needs a reason.
+- **Screens:** a nine-step guided declaration with both regimes priced live beside it (server-side
+  preview — no tax arithmetic in the browser); "How it's calculated"; HR list with proofs waiting and
+  a review screen per person; printable Form 124 and Form 130 Part B (Part A comes from TRACES).
+- **Data (V71):** old declaration keys mapped onto the new lines (80C → "Other Section 123",
+  home-loan interest → a house, a >₹25,000 parents' claim read as "parent is a senior"); salary
+  template lines tagged HRA / LTA. Tenant-bound per company, with a data test.
+
 ## 4. Architecture Decision Log
 
 

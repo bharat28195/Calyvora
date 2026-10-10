@@ -125,6 +125,17 @@ function Row({ c, onChange, onRemove, onBasis }: {
           <span className="text-xs text-fg/40">{c.calc === "FIXED" ? "amt" : "%"}</span>
         </div>
       )}
+      {c.kind === "EARNING" && (
+        // Which earning is HRA or LTA for tax: the HRA exemption needs the HRA received, and LTA is
+        // exempt only up to the LTA paid. Without the tag neither can be worked out.
+        <select value={c.taxTag ?? ""} onChange={(e) => onChange({ taxTag: (e.target.value || null) as "HRA" | "LTA" | null })}
+          title="How this earning is treated for income tax"
+          className="rounded-md border border-fg/15 bg-fg/5 px-2 py-2 text-xs text-fg">
+          <option value="">Taxable</option>
+          <option value="HRA">HRA (for tax)</option>
+          <option value="LTA">LTA (for tax)</option>
+        </select>
+      )}
       {c.kind === "EARNING" && c.calc !== "REMAINDER" && (
         <button onClick={onBasis} title="Use as basis for percent-of-basic deductions"
           className={"rounded-md px-2 py-1.5 text-xs " + (c.basis ? "bg-violet/15 font-medium text-violet" : "text-fg/50 hover:bg-fg/5")}>

@@ -49,6 +49,14 @@ public class PayslipComponent {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    /**
+     * HRA or LTA when this earning is that allowance for tax (V71). The HRA exemption is the least of
+     * three amounts, one of which is the HRA actually received, and LTA is exempt only up to the LTA
+     * paid — neither can be worked out without knowing which line is which. Null for everything else.
+     */
+    @Column(name = "tax_tag", length = 8)
+    private String taxTag;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -80,6 +88,8 @@ public class PayslipComponent {
     public PayComponentCalc getCalc() { return calc; }
     public BigDecimal getValue() { return value; }
     public boolean isBasis() { return basis; }
+    public String getTaxTag() { return taxTag; }
+    public void setTaxTag(String taxTag) { this.taxTag = taxTag; }
     public int getSortOrder() { return sortOrder; }
     public Instant getCreatedAt() { return createdAt; }
 }
