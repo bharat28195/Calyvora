@@ -67,6 +67,18 @@ export default function LetterheadPage() {
         showDivider: draft.showDivider,
         signatureName: draft.signatureName ?? "",
         signatureTitle: draft.signatureTitle ?? "",
+        cin: draft.cin ?? "",
+        gstin: draft.gstin ?? "",
+        website: draft.website ?? "",
+        email: draft.email ?? "",
+        dateStyle: draft.dateStyle ?? "LONG",
+        probationDays: draft.probationDays ?? 0,
+        noticeProbation: draft.noticeProbation ?? "",
+        noticePeriod: draft.noticePeriod ?? "",
+        workingDays: draft.workingDays ?? "",
+        workingHours: draft.workingHours ?? "",
+        payDay: draft.payDay ?? "",
+        jurisdiction: draft.jurisdiction ?? "",
       });
       setSaved(l);
       setDraft(l);
@@ -193,14 +205,82 @@ export default function LetterheadPage() {
 
           <Card>
             <CardTitle>The footer</CardTitle>
-            <div className="mt-4">
-              <Field label="Footer" htmlFor="lh-footer"
-                hint="Registration number, GST, registered office — whatever your letters must carry.">
+            <p className="mt-1 text-xs text-fg/45">Printed at the foot of every page.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Field label="CIN" htmlFor="lh-cin">
+                <Input id="lh-cin" value={draft.cin ?? ""} placeholder="U62091GJ2025PTC000000" onChange={(e) => set("cin", e.target.value.toUpperCase())} />
+              </Field>
+              <Field label="GSTIN" htmlFor="lh-gstin">
+                <Input id="lh-gstin" value={draft.gstin ?? ""} placeholder="24ABCDE1234F1Z5" onChange={(e) => set("gstin", e.target.value.toUpperCase())} />
+              </Field>
+              <Field label="Website" htmlFor="lh-web">
+                <Input id="lh-web" value={draft.website ?? ""} placeholder="www.example.com" onChange={(e) => set("website", e.target.value)} />
+              </Field>
+              <Field label="Email" htmlFor="lh-email">
+                <Input id="lh-email" value={draft.email ?? ""} placeholder="hr@example.com" onChange={(e) => set("email", e.target.value)} />
+              </Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Anything else" htmlFor="lh-footer"
+                hint="Registered office or other lines your letters must carry.">
                 <textarea id="lh-footer" rows={2} className={textareaCls}
                   value={draft.footerText ?? ""}
                   placeholder={"Northwind Robotics Pvt Ltd · CIN U72900KA2019PTC000000\nconnect@northwind.example · northwind.example"}
                   onChange={(e) => set("footerText", e.target.value)} />
               </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Who signs</CardTitle>
+            <p className="mt-1 text-xs text-fg/45">Printed under &quot;For {draft.heading ?? "the company"}&quot;. Leave blank to sign as whoever issues the letter.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Field label="Name" htmlFor="lh-sig-name">
+                <Input id="lh-sig-name" value={draft.signatureName ?? ""} placeholder="e.g. Raunak Agarwal" onChange={(e) => set("signatureName", e.target.value)} />
+              </Field>
+              <Field label="Title" htmlFor="lh-sig-title">
+                <Input id="lh-sig-title" value={draft.signatureTitle ?? ""} placeholder="e.g. Director" onChange={(e) => set("signatureTitle", e.target.value)} />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Your standard terms</CardTitle>
+            <p className="mt-1 text-xs text-fg/45">Written once, quoted by every letter that needs them — appointment, confirmation, internship.</p>
+            <div className="mt-4 flex flex-col gap-3">
+              <Field label="Dates on letters" htmlFor="lh-date">
+                <div className="flex flex-wrap gap-1.5">
+                  {([["LONG", "1 August 2026"], ["SHORT", "01 Aug, 2026"], ["NUMERIC", "01/08/2026"]] as const).map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => set("dateStyle", k)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm ${(draft.dateStyle ?? "LONG") === k ? "border-violet/40 bg-violet/10 font-medium" : "border-fg/10 hover:bg-fg/5"}`}>{l}</button>
+                  ))}
+                </div>
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Probation (days)" htmlFor="lh-prob">
+                  <Input id="lh-prob" type="number" min={0} value={draft.probationDays ?? ""} placeholder="90"
+                    onChange={(e) => set("probationDays", e.target.value === "" ? null : Number(e.target.value))} />
+                </Field>
+                <Field label="Notice in probation" htmlFor="lh-np">
+                  <Input id="lh-np" value={draft.noticeProbation ?? ""} placeholder="ten (10) working days" onChange={(e) => set("noticeProbation", e.target.value)} />
+                </Field>
+                <Field label="Notice period" htmlFor="lh-n">
+                  <Input id="lh-n" value={draft.noticePeriod ?? ""} placeholder="three (3) months" onChange={(e) => set("noticePeriod", e.target.value)} />
+                </Field>
+                <Field label="Working days" htmlFor="lh-wd">
+                  <Input id="lh-wd" value={draft.workingDays ?? ""} placeholder="Monday to Friday" onChange={(e) => set("workingDays", e.target.value)} />
+                </Field>
+                <Field label="Working hours" htmlFor="lh-wh">
+                  <Input id="lh-wh" value={draft.workingHours ?? ""} placeholder="8 to 9 hours a day" onChange={(e) => set("workingHours", e.target.value)} />
+                </Field>
+                <Field label="Salary paid" htmlFor="lh-pay">
+                  <Input id="lh-pay" value={draft.payDay ?? ""} placeholder="on or before the 7th of the following month" onChange={(e) => set("payDay", e.target.value)} />
+                </Field>
+              </div>
+              <Field label="Courts of (jurisdiction)" htmlFor="lh-jur">
+                <Input id="lh-jur" value={draft.jurisdiction ?? ""} placeholder="Ahmedabad, Gujarat" onChange={(e) => set("jurisdiction", e.target.value)} />
+              </Field>
+              <p className="text-xs text-fg/45">Leave entitlement is read from your leave policies, so it never disagrees with them.</p>
             </div>
           </Card>
         </div>
@@ -239,12 +319,21 @@ We are delighted to offer you the position of **Senior Engineer** at Northwind R
 - **Role:** Senior Engineer
 - **Department:** Engineering
 - **Start date:** 1 September 2026
-- **Annual compensation:** INR 1,450,000
+- **Annual compensation:** INR 14,50,000.00 (Fourteen Lakh Fifty Thousand Rupees)
+
+| EARNINGS | MONTHLY (INR) | YEARLY (INR) |
+|---|---|---|
+| Basic Salary | 60,416.67 | 7,25,000.00 |
+| House Rent Allowance | 30,208.33 | 3,62,500.00 |
+| Special Allowance | 30,208.33 | 3,62,500.00 |
+| **TOTAL** | **1,20,833.33** | **14,50,000.00** |
 
 Your appointment is subject to our standard terms of employment. Please confirm your acceptance
 by signing and returning a copy of this letter.
 
-Warm regards,
+Yours faithfully,
+
+**For Northwind Robotics**
 
 Ava Chen
 Head of People

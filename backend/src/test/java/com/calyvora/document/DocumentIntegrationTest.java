@@ -26,11 +26,12 @@ class DocumentIntegrationTest extends IntegrationTestBase {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
 
         JsonNode first = getJson("/api/v1/documents/templates", owner);
-        assertThat(first.size()).isEqualTo(5);
+        // The original five and the rest of the letter library (PD-63).
+        assertThat(first.size()).isEqualTo(StarterTemplates.all().size());
         assertThat(first.get(0).get("builtIn").asBoolean()).isTrue();
 
         // a second open must not duplicate the library
-        assertThat(getJson("/api/v1/documents/templates", owner).size()).isEqualTo(5);
+        assertThat(getJson("/api/v1/documents/templates", owner).size()).isEqualTo(StarterTemplates.all().size());
     }
 
     @Test

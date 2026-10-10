@@ -40,7 +40,23 @@ public record LetterheadPayload(
         String signatureTitle,
 
         /** Print on the uploaded letterpad. Null leaves the choice alone, like every field here. */
-        Boolean useBackground
+        Boolean useBackground,
+
+        // ---- V73: identity and standard terms ----
+        @Size(max = 32) String cin,
+        @Size(max = 20) String gstin,
+        @Size(max = 160) String website,
+        @Size(max = 160) String email,
+        @Pattern(regexp = "^(LONG|SHORT|NUMERIC)$", message = "Choose a date style") String dateStyle,
+        @jakarta.validation.constraints.Min(value = 0, message = "Probation cannot be negative")
+        @jakarta.validation.constraints.Max(value = 730, message = "Probation is at most two years")
+        Integer probationDays,
+        @Size(max = 80) String noticeProbation,
+        @Size(max = 80) String noticePeriod,
+        @Size(max = 80) String workingDays,
+        @Size(max = 80) String workingHours,
+        @Size(max = 80) String payDay,
+        @Size(max = 80) String jurisdiction
 ) {
     public LetterheadPayload {
         logoUrl = trim(logoUrl);
@@ -49,6 +65,17 @@ public record LetterheadPayload(
         footerText = trim(footerText);
         signatureName = trim(signatureName);
         signatureTitle = trim(signatureTitle);
+        cin = cin == null ? null : cin.trim().toUpperCase(java.util.Locale.ENGLISH);
+        gstin = gstin == null ? null : gstin.trim().toUpperCase(java.util.Locale.ENGLISH);
+        website = trim(website);
+        email = trim(email);
+        dateStyle = dateStyle == null ? null : dateStyle.trim().toUpperCase(java.util.Locale.ENGLISH);
+        noticeProbation = trim(noticeProbation);
+        noticePeriod = trim(noticePeriod);
+        workingDays = trim(workingDays);
+        workingHours = trim(workingHours);
+        payDay = trim(payDay);
+        jurisdiction = trim(jurisdiction);
         brandColor = normalizeColor(brandColor);
         fontFamily = fontFamily == null ? null : fontFamily.trim().toUpperCase(java.util.Locale.ENGLISH);
     }

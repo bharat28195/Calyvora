@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, FileSignature, Sparkles, AlertTriangle, Plus, X, Pencil, RotateCcw, Eye, UserRound, UserPlus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { DocumentPreview, DocumentTemplate, Employee, Letterhead, MergeField } from "@/lib/types";
-import { KIND_LABELS } from "@/lib/documents";
+import { KIND_LABELS, KIND_STAGES } from "@/lib/documents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -161,22 +161,22 @@ export default function GenerateDocumentPage() {
           <div className="flex flex-col gap-4">
             <Card>
               <CardTitle>Template</CardTitle>
-              <div className="mt-3 flex flex-col gap-1.5">
-                {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTemplateId(t.id)}
-                    className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                      t.id === templateId
-                        ? "border-violet/40 bg-violet/10 text-violet"
-                        : "border-fg/10 text-fg/70 hover:bg-fg/5"
-                    }`}
-                  >
-                    <span className="block font-medium">{t.name}</span>
-                    <span className="block text-xs text-fg/40">{KIND_LABELS[t.kind]}</span>
-                  </button>
-                ))}
-              </div>
+              {/* A grouped picker: two dozen letters as buttons would push everything else off the screen. */}
+              <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}
+                className="mt-3 w-full rounded-lg border border-fg/15 bg-fg/5 px-3 py-2.5 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet">
+                {KIND_STAGES.map(({ stage, kinds }) => {
+                  const inStage = templates.filter((t) => kinds.includes(t.kind));
+                  return inStage.length === 0 ? null : (
+                    <optgroup key={stage} label={stage} className="bg-surface">
+                      {inStage.map((t) => <option key={t.id} value={t.id} className="bg-surface">{t.name}</option>)}
+                    </optgroup>
+                  );
+                })}
+              </select>
+              {(() => {
+                const t = templates.find((x) => x.id === templateId);
+                return t ? <p className="mt-2 text-xs text-fg/50">{t.description ?? KIND_LABELS[t.kind]}</p> : null;
+              })()}
             </Card>
 
             <Card>
@@ -335,6 +335,31 @@ const PLACEHOLDERS: Record<string, string> = {
   "salary.annual": "e.g. 12,00,000",
   "salary.monthly": "e.g. 1,00,000",
   "salary.currency": "e.g. INR",
+  "letter.reason": "e.g. repeated late arrival in March",
+  "letter.details": "A sentence or two — you can edit the letter after",
+  "letter.effectiveDate": "e.g. 1 November 2026",
+  "letter.responseDays": "e.g. 7",
+  "letter.purpose": "e.g. a Schengen visa application",
+  "letter.addressedTo": "e.g. The Branch Manager, HDFC Bank",
+  "letter.residentialAddress": "House, street, city, PIN",
+  "transfer.fromLocation": "e.g. Ahmedabad",
+  "transfer.toLocation": "e.g. Pune",
+  "transfer.reportingTo": "e.g. Arjun Rao",
+  "probation.extendedUntil": "e.g. 31 January 2027",
+  "probation.extensionMonths": "e.g. three (3) months",
+  "pip.startDate": "e.g. 1 November 2026",
+  "pip.endDate": "e.g. 31 December 2026",
+  "pip.goals": "Measurable goals, one after another",
+  "bonus.amount": "e.g. 1,00,000.00",
+  "bonus.period": "e.g. 2025-26",
+  "bonus.payoutDate": "e.g. November 2026",
+  "intern.stipend": "e.g. 25,000.00",
+  "intern.duration": "e.g. six (6) months",
+  "intern.mentor": "e.g. Priya Nair",
+  "intern.project": "e.g. the mobile app's onboarding",
+  "resignation.date": "e.g. 3 October 2026",
+  "fnf.salaryDue": "e.g. 1,15,368.00",
+  "fnf.netPayable": "e.g. 2,40,000.00",
 };
 
 function labelFor(fields: MergeField[], key: string): string {

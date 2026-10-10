@@ -52,9 +52,17 @@ export function LetterSheet({
       } ${className}`}
       style={{ ...(letterhead ? { fontFamily: font } : {}), ...paper }}
     >
-      {letterhead && !printed && <Letterpad letterhead={letterhead} accent={accent} />}
-      <div dangerouslySetInnerHTML={{ __html: html }} />
-      {letterhead && !printed && <Footer letterhead={letterhead} accent={accent} />}
+      {/* A table so the browser repeats the header and footer on every printed page — a three-page
+          appointment letter carries the company's name and CIN on each page, as paper ones do. */}
+      <table className="w-full border-collapse">
+        {letterhead && !printed && (
+          <thead><tr><td className="p-0"><Letterpad letterhead={letterhead} accent={accent} /></td></tr></thead>
+        )}
+        <tbody><tr><td className="p-0 align-top"><div dangerouslySetInnerHTML={{ __html: html }} /></td></tr></tbody>
+        {letterhead && !printed && (
+          <tfoot><tr><td className="p-0"><Footer letterhead={letterhead} accent={accent} /></td></tr></tfoot>
+        )}
+      </table>
     </div>
   );
 }
@@ -96,7 +104,12 @@ function Letterpad({ letterhead, accent }: { letterhead: Letterhead; accent: str
 }
 
 function Footer({ letterhead, accent }: { letterhead: Letterhead; accent: string }) {
-  const lines = splitLines(letterhead.footerText);
+  // The legal identity Indian letterheads carry, then whatever the company wrote itself.
+  const identity = [
+    [letterhead.cin && `CIN: ${letterhead.cin}`, letterhead.gstin && `GSTIN: ${letterhead.gstin}`].filter(Boolean).join("  ·  "),
+    [letterhead.website && `Website: ${letterhead.website}`, letterhead.email && `Email: ${letterhead.email}`].filter(Boolean).join("  ·  "),
+  ].filter(Boolean);
+  const lines = [...identity, ...splitLines(letterhead.footerText)];
   if (lines.length === 0) return null;
   return (
     <footer className="mt-10 border-t pt-4" style={{ borderColor: `${accent}33` }}>
@@ -147,7 +160,34 @@ function renderLetter(body: string): string {
     }
   };
 
+  let table: string[][] | null = null;
+  const flushTable = () => {
+    if (!table) return;
+    const rows = table.filter((cells) => !cells.every((c) => /^:?-{3,}:?$/.test(c)));
+    const [head, ...rest] = rows;
+    const cell = (c: string, tag: "th" | "td") => {
+      const numeric = /^[*\s]*[-+]?[\d,]+(\.\d+)?%?[*\s]*$/.test(c);
+      return `<${tag} class="border border-neutral-300 px-3 py-1.5 ${numeric ? "text-right tabular-nums" : "text-left"} ${tag === "th" ? "bg-neutral-100 font-semibold text-neutral-900" : ""}">${inline(c)}</${tag}>`;
+    };
+    out.push(`<table class="my-4 w-full border-collapse text-[13.5px]"><thead><tr>${head.map((c) => cell(c, "th")).join("")}</tr></thead><tbody>${
+      rest.map((r) => `<tr>${r.map((c) => cell(c, "td")).join("")}</tr>`).join("")}</tbody></table>`);
+    table = null;
+  };
+
   for (const line of lines) {
+    // A pipe table — the salary annexure, a settlement statement.
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      flush();
+      (table ??= []).push(line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim()));
+      continue;
+    }
+    flushTable();
+    // "--- page ---" starts a new printed page (an annexure on its own sheet).
+    if (/^\s*---\s*page\s*---\s*$/i.test(line)) {
+      flush();
+      out.push('<div class="letter-page-break my-8 border-t border-dashed border-neutral-300 text-center text-[11px] uppercase tracking-widest text-neutral-400"><span class="relative -top-2 bg-white px-2">new page</span></div>');
+      continue;
+    }
     if (/^\s*[-*]\s+/.test(line)) {
       if (numbers) flush();
       (bullets ??= []).push(`<li>${inline(line.replace(/^\s*[-*]\s+/, ""))}</li>`);
@@ -172,5 +212,6 @@ function renderLetter(body: string): string {
     }
   }
   flush();
+  flushTable();
   return out.join("\n");
 }

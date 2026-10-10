@@ -1907,6 +1907,30 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   professional tax month by month; slab bars; HRA table highlighting which of the three won.
 - **Kept on purpose:** taxable income rounded to ₹10 (Section 516), which Keka skips; tax to the rupee.
 
+### PD-63 · 2026-10-10 · The whole letter library, written to Indian practice
+- **Trigger (founder):** a real appointment letter and increment letter as references; "whatever letters
+  are not in Orbit, add them all as templates". Researched the set Indian HR issues across the
+  employee lifecycle and added every one missing: appointment, internship offer, confirmation,
+  probation extension, increment, transfer, bonus, appreciation, salary certificate, employment /
+  address verification, NOC, warning, show-cause, PIP, termination, resignation acceptance, no dues,
+  full and final settlement, internship certificate — 24 starters in all.
+- **What the references taught (now built in):** a salary annexure table (earnings, then employer
+  contributions for CTC or deductions for take-home), monthly and yearly, from the same template and
+  PF / ESI calculators as payroll, the yearly column always adding up to the annual figure exactly;
+  amounts in Indian grouping (27,68,832.00) and in words (lakh / crore); company CIN / GSTIN / website
+  / email in a footer repeated on every printed page; a company date style ("01 Aug, 2026"); the
+  signatory named once on the letterpad.
+- **Company terms written once:** probation days (and the computed probation end date), notice in and
+  after probation, working days and hours, pay day, jurisdiction — on the letterpad screen; leave
+  entitlement read from the leave policies, so a letter can never disagree with them.
+- **Better than the reference:** increment letters state the previous salary and the % increase
+  automatically; salary certificates quote the last three payslips; offers to people not yet employed
+  build the annexure from the typed salary; no starter uses "his/her" (a test enforces it).
+- **Existing companies** get the new letters once, beside their own (company_settings
+  .letter_starters_seeded, V73); a template a company deleted is never put back.
+- **Next (not built):** the employee accepting a letter in Orbit (name and date stamped on it), a
+  signature image, and the F&F figures computed from payroll instead of typed.
+
 ## 4. Architecture Decision Log
 
 

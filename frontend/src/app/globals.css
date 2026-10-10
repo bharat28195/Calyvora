@@ -63,6 +63,15 @@ body {
   .letter-sheet * {
     visibility: visible;
   }
+  /* "--- page ---" in a letter: the rule and label on screen, a real page break on paper. */
+  .letter-page-break {
+    break-after: page;
+    border: 0 !important;
+    margin: 0 !important;
+  }
+  .letter-page-break span {
+    display: none;
+  }
   .letter-sheet {
     position: absolute;
     inset: 0 auto auto 0;

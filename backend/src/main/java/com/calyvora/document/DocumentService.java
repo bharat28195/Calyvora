@@ -55,6 +55,12 @@ public class DocumentService {
     private final DepartmentRepository departmentRepository;
     private final CompensationRepository compensationRepository;
     private final CompanyRepository companyRepository;
+    private final LetterheadRepository letterheadRepository;
+    private final com.calyvora.company.CompanySettingsRepository settingsRepository;
+    private final com.calyvora.people.LeavePolicyRepository leavePolicyRepository;
+    private final com.calyvora.people.EmployeeFinanceRepository financeRepository;
+    private final com.calyvora.people.CompensationService compensationService;
+    private final SalaryTables salaryTables;
 
     public DocumentService(DocumentTemplateRepository templateRepository,
                            GeneratedDocumentRepository documentRepository,
@@ -62,7 +68,13 @@ public class DocumentService {
                            UserRepository userRepository,
                            DepartmentRepository departmentRepository,
                            CompensationRepository compensationRepository,
-                           CompanyRepository companyRepository) {
+                           CompanyRepository companyRepository,
+                           LetterheadRepository letterheadRepository,
+                           com.calyvora.company.CompanySettingsRepository settingsRepository,
+                           com.calyvora.people.LeavePolicyRepository leavePolicyRepository,
+                           com.calyvora.people.EmployeeFinanceRepository financeRepository,
+                           @org.springframework.context.annotation.Lazy com.calyvora.people.CompensationService compensationService,
+                           SalaryTables salaryTables) {
         this.templateRepository = templateRepository;
         this.documentRepository = documentRepository;
         this.employeeRepository = employeeRepository;
@@ -70,6 +82,12 @@ public class DocumentService {
         this.departmentRepository = departmentRepository;
         this.compensationRepository = compensationRepository;
         this.companyRepository = companyRepository;
+        this.letterheadRepository = letterheadRepository;
+        this.settingsRepository = settingsRepository;
+        this.leavePolicyRepository = leavePolicyRepository;
+        this.financeRepository = financeRepository;
+        this.compensationService = compensationService;
+        this.salaryTables = salaryTables;
     }
 
     // ---- templates ----
@@ -78,9 +96,7 @@ public class DocumentService {
     @Transactional
     public List<TemplateResponse> listTemplates(AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
-        if (templateRepository.countByCompanyId(companyId) == 0) {
-            seedStarters(companyId, principal.userId());
-        }
+        ensureStarters(companyId, principal.userId());
         return templateRepository.findByCompanyIdOrderByNameAsc(companyId).stream()
                 .map(TemplateResponse::of).toList();
     }
@@ -177,9 +193,7 @@ public class DocumentService {
                                                             Map<String, String> overrides,
                                                             AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
-        if (templateRepository.countByCompanyId(companyId) == 0) {
-            seedStarters(companyId, principal.userId());
-        }
+        ensureStarters(companyId, principal.userId());
         return templateRepository.findFirstByCompanyIdAndKindOrderByBuiltInAscNameAsc(companyId, kind)
                 .map(t -> {
                     GenerateRequest req = new GenerateRequest(t.getId().toString(),
@@ -274,18 +288,57 @@ public class DocumentService {
     private Map<String, String> resolve(DocumentTemplate t, GenerateRequest req, AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
         Map<String, String> v = new LinkedHashMap<>();
+        java.util.List<String> wanted = MergeFields.placeholdersIn(t.getBody());
+        Letterhead lh = letterheadRepository.findById(companyId).orElse(null);
+        String style = lh == null ? "LONG" : lh.getDateStyle();
+        java.util.function.Function<LocalDate, String> d = x -> MergeFields.date(x, style);
+        String currency = settingsRepository.findById(companyId)
+                .map(com.calyvora.company.CompanySettings::getCurrency)
+                .filter(c -> c != null && !c.isBlank()).orElse("INR");
 
-        v.put("today", MergeFields.date(LocalDate.now()));
+        v.put("today", d.apply(LocalDate.now()));
         companyRepository.findById(companyId).ifPresent(c -> v.put("company.name", c.getName()));
 
-        userRepository.findByIdAndCompanyId(principal.userId(), companyId).ifPresent(u -> {
-            v.put("signatory.name", u.getFirstName() + " " + u.getLastName());
-            v.put("signatory.title", "OWNER".equals(principal.role()) ? "Founder" : "People Operations");
-        });
+        // The company's identity and standard terms, from the letterpad screen.
+        if (lh != null) {
+            if (lh.getAddressLines() != null) {
+                v.put("company.address", String.join(", ", lh.getAddressLines().lines()
+                        .map(String::trim).filter(s -> !s.isEmpty()).toList()));
+            }
+            v.put("company.cin", lh.getCin());
+            v.put("company.gstin", lh.getGstin());
+            v.put("company.website", lh.getWebsite());
+            v.put("company.email", lh.getEmail());
+            v.put("terms.probationDays", lh.getProbationDays() == null ? null : String.valueOf(lh.getProbationDays()));
+            v.put("terms.noticeProbation", lh.getNoticeProbation());
+            v.put("terms.noticePeriod", lh.getNoticePeriod());
+            v.put("terms.workingDays", lh.getWorkingDays());
+            v.put("terms.workingHours", lh.getWorkingHours());
+            v.put("terms.payDay", lh.getPayDay());
+            v.put("terms.jurisdiction", lh.getJurisdiction());
+        }
+        if (wanted.contains("leave.summary")) {
+            v.put("leave.summary", leaveSummary(companyId));
+        }
 
+        // Who signs: the signatory named on the letterpad, or else whoever is issuing the letter.
+        if (lh != null && lh.getSignatureName() != null) {
+            v.put("signatory.name", lh.getSignatureName());
+            v.put("signatory.title", lh.getSignatureTitle());
+        } else {
+            userRepository.findByIdAndCompanyId(principal.userId(), companyId).ifPresent(u -> {
+                v.put("signatory.name", u.getFirstName() + " " + u.getLastName());
+                v.put("signatory.title", "OWNER".equals(principal.role()) ? "Founder" : "People Operations");
+            });
+        }
+
+        BigDecimal annual = null;
+        BigDecimal previousAnnual = null;
+        Employee employee = null;
         if (req.employeeId() != null && !req.employeeId().isBlank()) {
             Employee e = employeeRepository.findByIdAndCompanyId(UUID.fromString(req.employeeId()), companyId)
                     .orElseThrow(() -> new NotFoundException("Employee not found"));
+            employee = e;
             userRepository.findByIdAndCompanyId(e.getUserId(), companyId).ifPresent(u -> {
                 v.put("employee.fullName", u.getFirstName() + " " + u.getLastName());
                 v.put("employee.firstName", u.getFirstName());
@@ -297,12 +350,15 @@ public class DocumentService {
             v.put("employee.workLocation", e.getWorkLocation());
             v.put("employee.phone", e.getPhone());
             v.put("employee.employmentType", pretty(e.getEmploymentType() == null ? null : e.getEmploymentType().name()));
-            v.put("employee.startDate", MergeFields.date(e.getStartDate()));
-            v.put("employee.endDate", MergeFields.date(e.getEndDate()));
+            v.put("employee.startDate", d.apply(e.getStartDate()));
+            v.put("employee.endDate", d.apply(e.getEndDate()));
             v.put("employee.tenure", MergeFields.tenure(e.getStartDate(), e.getEndDate()));
+            if (e.getStartDate() != null && lh != null && lh.getProbationDays() != null) {
+                v.put("employee.probationEndDate", d.apply(e.getStartDate().plusDays(lh.getProbationDays() - 1L)));
+            }
             if (e.getDepartmentId() != null) {
                 departmentRepository.findByIdAndCompanyId(e.getDepartmentId(), companyId)
-                        .ifPresent(d -> v.put("employee.department", d.getName()));
+                        .ifPresent(dep -> v.put("employee.department", dep.getName()));
             }
             if (e.getManagerId() != null) {
                 employeeRepository.findByIdAndCompanyId(e.getManagerId(), companyId)
@@ -313,22 +369,118 @@ public class DocumentService {
                     .findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(e.getId());
             if (!pay.isEmpty()) {
                 CompensationRecord current = pay.get(0);
-                v.put("salary.currency", current.getCurrency());
-                v.put("salary.annual", money(current.getAnnualAmount()));
-                v.put("salary.monthly", money(current.getAnnualAmount()
-                        .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP)));
-                v.put("salary.effectiveDate", MergeFields.date(current.getEffectiveDate()));
+                annual = current.getAnnualAmount();
+                v.put("salary.effectiveDate", d.apply(current.getEffectiveDate()));
+                for (CompensationRecord r : pay.subList(1, pay.size())) {
+                    if (r.getAnnualAmount() != null && r.getAnnualAmount().compareTo(annual) != 0) {
+                        previousAnnual = r.getAnnualAmount();
+                        break;
+                    }
+                }
+            }
+            if (wanted.contains("payslips.recent")) {
+                v.put("payslips.recent", recentPayslips(e.getId(), currency));
             }
         }
 
-        if (req.overrides() != null) {
-            req.overrides().forEach((key, value) -> {
-                if (value != null && !value.isBlank()) v.put(key, value.trim());
-            });
+        // Somebody typed in by hand (an offer): the salary they typed drives every derived figure.
+        Map<String, String> overrides = req.overrides() == null ? Map.of() : req.overrides();
+        BigDecimal typed = parseAmount(overrides.get("salary.annual"));
+        if (typed != null) annual = typed;
+
+        if (annual != null) {
+            v.put("salary.currency", currency);
+            v.put("salary.annual", amount(annual, currency));
+            v.put("salary.monthly", amount(annual.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP), currency));
+            if ("INR".equals(currency)) v.put("salary.annualInWords", MergeFields.inWords(annual) + " Rupees");
+            if (previousAnnual != null && previousAnnual.signum() > 0) {
+                BigDecimal increase = annual.subtract(previousAnnual);
+                v.put("salary.previousAnnual", amount(previousAnnual, currency));
+                v.put("salary.increase", amount(increase, currency));
+                v.put("salary.increasePercent", increase.multiply(BigDecimal.valueOf(100))
+                        .divide(previousAnnual, 2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + "%");
+            }
+            boolean tables = wanted.contains("salary.structure") || wanted.contains("salary.takeHome")
+                    || wanted.contains("salary.ctc") || wanted.contains("salary.ctcInWords");
+            if (tables) {
+                com.calyvora.people.EmployeeFinance fin = employee == null ? null
+                        : financeRepository.findByEmployeeIdAndCompanyId(employee.getId(), companyId).orElse(null);
+                SalaryTables.Structure s = salaryTables.structure(companyId, annual, fin);
+                v.put("salary.structure", SalaryTables.ctcTable(s, currency));
+                v.put("salary.takeHome", SalaryTables.takeHomeTable(s, currency));
+                v.put("salary.ctc", amount(s.annualCtc(), currency));
+                if ("INR".equals(currency)) v.put("salary.ctcInWords", MergeFields.inWords(s.annualCtc()) + " Rupees");
+            }
         }
+
+        overrides.forEach((key, value) -> {
+            if (value != null && !value.isBlank()) v.put(key, value.trim());
+        });
+        if (typed != null) v.put("salary.annual", amount(typed, currency));
         v.values().removeIf(java.util.Objects::isNull);
         completeName(v);
         return v;
+    }
+
+    /** "26 days a year — 12 privilege / earned leave, 7 sick leave and 7 casual leave", from the policies. */
+    private String leaveSummary(UUID companyId) {
+        List<String> parts = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (com.calyvora.people.LeavePolicy p : leavePolicyRepository.findByCompanyIdOrderByTypeAsc(companyId)) {
+            if (!p.isPaid() || p.getDaysPerYear() == null || p.getDaysPerYear().signum() <= 0) continue;
+            String label = switch (p.getType()) {
+                case VACATION -> "privilege / earned leave";
+                case SICK -> "sick leave";
+                case PERSONAL -> "casual leave";
+                default -> null;
+            };
+            if (label == null) continue;
+            total = total.add(p.getDaysPerYear());
+            parts.add(p.getDaysPerYear().stripTrailingZeros().toPlainString() + " days of " + label);
+        }
+        if (parts.isEmpty()) return null;
+        String list = parts.size() == 1 ? parts.get(0)
+                : String.join(", ", parts.subList(0, parts.size() - 1)) + " and " + parts.get(parts.size() - 1);
+        return total.stripTrailingZeros().toPlainString() + " days a year — " + list;
+    }
+
+    /** The last three months' payslips as a table, newest first — what a salary certificate quotes. */
+    private String recentPayslips(UUID employeeId, String currency) {
+        StringBuilder t = new StringBuilder("| MONTH | GROSS (" + currency + ") | DEDUCTIONS (" + currency + ") | NET PAY ("
+                + currency + ") |\n|---|---|---|---|\n");
+        int found = 0;
+        java.time.YearMonth m = java.time.YearMonth.now().minusMonths(1);
+        for (int i = 0; i < 6 && found < 3; i++, m = m.minusMonths(1)) {
+            try {
+                com.calyvora.people.dto.PayslipResponse p = compensationService.payslip(employeeId, m.toString());
+                BigDecimal deductions = p.totalDeductions().add(p.incomeTax() == null ? BigDecimal.ZERO : p.incomeTax());
+                t.append("| ").append(m.atDay(1).format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)))
+                        .append(" | ").append(MergeFields.inr(p.gross()))
+                        .append(" | ").append(MergeFields.inr(deductions))
+                        .append(" | ").append(MergeFields.inr(p.net())).append(" |\n");
+                found++;
+            } catch (ApiException e) {
+                // Not employed or no salary that month: not a row.
+            }
+        }
+        return found == 0 ? null : t.toString().stripTrailing();
+    }
+
+    /** "27,68,832.00" for rupees, the US grouping otherwise. */
+    private static String amount(BigDecimal value, String currency) {
+        return "INR".equals(currency) ? MergeFields.inr(value) : money(value);
+    }
+
+    /** A typed salary: "27,68,832", "2768832.00" and "₹ 27,68,832" all read the same. Null if not a number. */
+    static BigDecimal parseAmount(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String digits = raw.replaceAll("[^0-9.]", "");
+        if (digits.isEmpty()) return null;
+        try {
+            return new BigDecimal(digits);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
@@ -375,8 +527,29 @@ public class DocumentService {
 
     // ---- helpers ----
 
-    private void seedStarters(UUID companyId, UUID createdBy) {
+    /**
+     * Gives a company the starter templates it has not had yet. A company new to Documents gets the
+     * whole library; one that already had the first set gets only what was added since. A template a
+     * company deleted is never put back: what was handed over is remembered, not what still exists.
+     */
+    private void ensureStarters(UUID companyId, UUID createdBy) {
+        com.calyvora.company.CompanySettings settings = settingsRepository.findById(companyId)
+                .orElseGet(() -> settingsRepository.save(new com.calyvora.company.CompanySettings(companyId)));
+        int had = settings.getLetterStartersSeeded();
+        if (had >= StarterTemplates.CURRENT_SET && templateRepository.countByCompanyId(companyId) > 0) {
+            return;
+        }
+        if (templateRepository.countByCompanyId(companyId) == 0 && had < StarterTemplates.CURRENT_SET) {
+            had = 0;   // never opened Documents: everything
+        }
+        seedStarters(companyId, createdBy, had);
+        settings.setLetterStartersSeeded(StarterTemplates.CURRENT_SET);
+        settingsRepository.save(settings);
+    }
+
+    private void seedStarters(UUID companyId, UUID createdBy, int after) {
         for (StarterTemplates.Starter s : StarterTemplates.all()) {
+            if (s.set() <= after) continue;
             DocumentTemplate t = new DocumentTemplate(UUID.randomUUID(), companyId, s.name(), s.kind(),
                     s.body(), createdBy);
             t.setDescription(s.description());

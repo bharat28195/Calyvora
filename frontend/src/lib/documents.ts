@@ -124,12 +124,42 @@ export const DEFAULT_LETTERHEAD: Letterhead = {
 /** Human labels for the document kinds. */
 export const KIND_LABELS: Record<DocumentKind, string> = {
   OFFER_LETTER: "Offer letter",
+  APPOINTMENT_LETTER: "Appointment letter",
+  INTERNSHIP_OFFER: "Internship offer",
   JOINING_LETTER: "Joining letter",
+  CONFIRMATION_LETTER: "Confirmation",
+  PROBATION_EXTENSION: "Probation extension",
+  INCREMENT_LETTER: "Increment",
+  PROMOTION_LETTER: "Promotion",
+  TRANSFER_LETTER: "Transfer",
+  BONUS_LETTER: "Bonus",
+  APPRECIATION_LETTER: "Appreciation",
+  SALARY_CERTIFICATE: "Salary certificate",
+  EMPLOYMENT_VERIFICATION: "Employment / address proof",
+  NOC: "No objection certificate",
+  WARNING_LETTER: "Warning",
+  SHOW_CAUSE_NOTICE: "Show-cause notice",
+  PIP_LETTER: "Performance improvement plan",
+  TERMINATION_LETTER: "Termination",
+  RESIGNATION_ACCEPTANCE: "Resignation acceptance",
   RELIEVING_LETTER: "Relieving letter",
   EXPERIENCE_LETTER: "Experience certificate",
-  PROMOTION_LETTER: "Promotion / increment",
+  NO_DUES_CERTIFICATE: "No dues certificate",
+  FNF_STATEMENT: "Full and final settlement",
+  INTERNSHIP_CERTIFICATE: "Internship certificate",
   CUSTOM: "Custom",
 };
+
+/** Where in somebody's time at the company each kind of letter belongs — how the library is grouped. */
+export const KIND_STAGES: { stage: string; kinds: DocumentKind[] }[] = [
+  { stage: "Hiring", kinds: ["OFFER_LETTER", "APPOINTMENT_LETTER", "INTERNSHIP_OFFER", "JOINING_LETTER"] },
+  { stage: "Probation", kinds: ["CONFIRMATION_LETTER", "PROBATION_EXTENSION"] },
+  { stage: "Growth", kinds: ["INCREMENT_LETTER", "PROMOTION_LETTER", "TRANSFER_LETTER", "BONUS_LETTER", "APPRECIATION_LETTER"] },
+  { stage: "Certificates and verification", kinds: ["SALARY_CERTIFICATE", "EMPLOYMENT_VERIFICATION", "NOC"] },
+  { stage: "Discipline", kinds: ["WARNING_LETTER", "SHOW_CAUSE_NOTICE", "PIP_LETTER", "TERMINATION_LETTER"] },
+  { stage: "Exit", kinds: ["RESIGNATION_ACCEPTANCE", "RELIEVING_LETTER", "EXPERIENCE_LETTER", "NO_DUES_CERTIFICATE", "FNF_STATEMENT", "INTERNSHIP_CERTIFICATE"] },
+  { stage: "Your own", kinds: ["CUSTOM"] },
+];
 
 export interface StarterTemplate {
   name: string;

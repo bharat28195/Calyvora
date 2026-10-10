@@ -47,6 +47,18 @@ public class LetterheadService {
         if (p.showDivider() != null) l.setShowDivider(p.showDivider());
         if (p.signatureName() != null) l.setSignatureName(blankToNull(p.signatureName()));
         if (p.signatureTitle() != null) l.setSignatureTitle(blankToNull(p.signatureTitle()));
+        if (p.cin() != null) l.setCin(blankToNull(p.cin()));
+        if (p.gstin() != null) l.setGstin(blankToNull(p.gstin()));
+        if (p.website() != null) l.setWebsite(blankToNull(p.website()));
+        if (p.email() != null) l.setEmail(blankToNull(p.email()));
+        if (p.dateStyle() != null) l.setDateStyle(p.dateStyle());
+        if (p.probationDays() != null) l.setProbationDays(p.probationDays() == 0 ? null : p.probationDays());
+        if (p.noticeProbation() != null) l.setNoticeProbation(blankToNull(p.noticeProbation()));
+        if (p.noticePeriod() != null) l.setNoticePeriod(blankToNull(p.noticePeriod()));
+        if (p.workingDays() != null) l.setWorkingDays(blankToNull(p.workingDays()));
+        if (p.workingHours() != null) l.setWorkingHours(blankToNull(p.workingHours()));
+        if (p.payDay() != null) l.setPayDay(blankToNull(p.payDay()));
+        if (p.jurisdiction() != null) l.setJurisdiction(blankToNull(p.jurisdiction()));
         if (p.useBackground() != null) {
             if (p.useBackground() && l.getBackgroundName() == null) {
                 throw new com.calyvora.common.error.ApiException(
@@ -132,6 +144,12 @@ public class LetterheadService {
 
     /** @param version the letterpad's last-modified stamp, used to bust a cached image. */
     public record StoredImage(byte[] bytes, String contentType, long version) {}
+
+    /** The stored letterpad, created on first use — for the letter renderer's merge values. */
+    @Transactional
+    public Letterhead entity() {
+        return getOrCreate();
+    }
 
     private Letterhead getOrCreate() {
         UUID companyId = TenantContext.getCompanyId();

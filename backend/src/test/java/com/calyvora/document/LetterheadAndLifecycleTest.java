@@ -268,7 +268,7 @@ class LetterheadAndLifecycleTest extends IntegrationTestBase {
         // to read as a letter — no dashes where the salary should be.
         String body = getJson("/api/v1/documents/" + result.get("documentId").asText(), admin)
                 .get("body").asText();
-        assertThat(body).contains("Dana").contains("Senior Engineer").contains("1,450,000");
+        assertThat(body).contains("Dana").contains("Senior Engineer").contains("14,50,000.00");   // Indian grouping (PD-63)
     }
 
     @Test

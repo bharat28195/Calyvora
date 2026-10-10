@@ -105,6 +105,10 @@ public class CompanySettings {
     @Column(name = "work_day_minutes", nullable = false)
     private int workDayMinutes = 540;
 
+    /** Which set of starter letter templates this company has been given (V73). */
+    @Column(name = "letter_starters_seeded", nullable = false)
+    private int letterStartersSeeded = 1;
+
     /** When the standard day starts, for anyone not rostered onto a shift. */
     @Column(name = "work_day_start", nullable = false)
     private java.time.LocalTime workDayStart = java.time.LocalTime.of(9, 30);
@@ -178,6 +182,9 @@ public class CompanySettings {
     public int getWorkDayMinutes() {
         return workDayMinutes;
     }
+
+    public int getLetterStartersSeeded() { return letterStartersSeeded; }
+    public void setLetterStartersSeeded(int v) { this.letterStartersSeeded = v; }
 
     public void setWorkDayMinutes(int workDayMinutes) {
         this.workDayMinutes = workDayMinutes;

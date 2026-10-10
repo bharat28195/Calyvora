@@ -75,6 +75,34 @@ public class Letterhead {
     @Column(name = "use_background", nullable = false)
     private boolean useBackground;
 
+    // ---- V73: the company's identity and standard terms, quoted by its letters ----
+
+    @Column(length = 32)
+    private String cin;
+    @Column(length = 20)
+    private String gstin;
+    @Column(length = 160)
+    private String website;
+    @Column(length = 160)
+    private String email;
+    /** LONG "4 March 2026", SHORT "04 Mar, 2026", NUMERIC "04/03/2026". */
+    @Column(name = "date_style", nullable = false, length = 10)
+    private String dateStyle = "LONG";
+    @Column(name = "probation_days")
+    private Integer probationDays;
+    @Column(name = "notice_probation", length = 80)
+    private String noticeProbation;
+    @Column(name = "notice_period", length = 80)
+    private String noticePeriod;
+    @Column(name = "working_days", length = 80)
+    private String workingDays;
+    @Column(name = "working_hours", length = 80)
+    private String workingHours;
+    @Column(name = "pay_day", length = 80)
+    private String payDay;
+    @Column(length = 80)
+    private String jurisdiction;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
@@ -127,4 +155,29 @@ public class Letterhead {
     public String getSignatureTitle() { return signatureTitle; }
     public void setSignatureTitle(String signatureTitle) { this.signatureTitle = signatureTitle; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    public String getCin() { return cin; }
+    public void setCin(String v) { this.cin = v; }
+    public String getGstin() { return gstin; }
+    public void setGstin(String v) { this.gstin = v; }
+    public String getWebsite() { return website; }
+    public void setWebsite(String v) { this.website = v; }
+    public String getEmail() { return email; }
+    public void setEmail(String v) { this.email = v; }
+    public String getDateStyle() { return dateStyle; }
+    public void setDateStyle(String v) { this.dateStyle = v; }
+    public Integer getProbationDays() { return probationDays; }
+    public void setProbationDays(Integer v) { this.probationDays = v; }
+    public String getNoticeProbation() { return noticeProbation; }
+    public void setNoticeProbation(String v) { this.noticeProbation = v; }
+    public String getNoticePeriod() { return noticePeriod; }
+    public void setNoticePeriod(String v) { this.noticePeriod = v; }
+    public String getWorkingDays() { return workingDays; }
+    public void setWorkingDays(String v) { this.workingDays = v; }
+    public String getWorkingHours() { return workingHours; }
+    public void setWorkingHours(String v) { this.workingHours = v; }
+    public String getPayDay() { return payDay; }
+    public void setPayDay(String v) { this.payDay = v; }
+    public String getJurisdiction() { return jurisdiction; }
+    public void setJurisdiction(String v) { this.jurisdiction = v; }
 }

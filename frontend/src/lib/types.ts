@@ -793,12 +793,16 @@ export interface MarkAttendanceInput {
 
 /** Documents module (feedback D2/D3) — a template library and the letters generated from it. */
 export type DocumentKind =
-  | "OFFER_LETTER"
-  | "JOINING_LETTER"
-  | "RELIEVING_LETTER"
-  | "EXPERIENCE_LETTER"
-  | "PROMOTION_LETTER"
+  | "OFFER_LETTER" | "APPOINTMENT_LETTER" | "INTERNSHIP_OFFER" | "JOINING_LETTER"
+  | "CONFIRMATION_LETTER" | "PROBATION_EXTENSION"
+  | "INCREMENT_LETTER" | "PROMOTION_LETTER" | "TRANSFER_LETTER" | "BONUS_LETTER" | "APPRECIATION_LETTER"
+  | "SALARY_CERTIFICATE" | "EMPLOYMENT_VERIFICATION" | "NOC"
+  | "WARNING_LETTER" | "SHOW_CAUSE_NOTICE" | "PIP_LETTER" | "TERMINATION_LETTER"
+  | "RESIGNATION_ACCEPTANCE" | "RELIEVING_LETTER" | "EXPERIENCE_LETTER" | "NO_DUES_CERTIFICATE"
+  | "FNF_STATEMENT" | "INTERNSHIP_CERTIFICATE"
   | "CUSTOM";
+
+export type LetterDateStyle = "LONG" | "SHORT" | "NUMERIC";
 
 export interface DocumentTemplate {
   id: string;
@@ -838,6 +842,20 @@ export interface Letterhead {
   useBackground: boolean;
   backgroundName: string | null;
   updatedAt: string;
+  /** The company's legal identity, printed in the footer of every page. */
+  cin?: string | null;
+  gstin?: string | null;
+  website?: string | null;
+  email?: string | null;
+  dateStyle?: LetterDateStyle;
+  /** Standard terms every letter quotes. */
+  probationDays?: number | null;
+  noticeProbation?: string | null;
+  noticePeriod?: string | null;
+  workingDays?: string | null;
+  workingHours?: string | null;
+  payDay?: string | null;
+  jurisdiction?: string | null;
 }
 export type LetterheadInput = Partial<
   Omit<Letterhead, "updatedAt" | "hasBackground" | "backgroundName">

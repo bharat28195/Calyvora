@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Loader2, Plus, Trash2, Save, FileSignature, FileUp, Lock, Braces, ChevronDown, Eye } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { DocumentKind, DocumentTemplate, Letterhead, MergeField } from "@/lib/types";
-import { KIND_LABELS, renderTemplate, placeholdersIn } from "@/lib/documents";
+import { KIND_LABELS, KIND_STAGES, renderTemplate, placeholdersIn } from "@/lib/documents";
 import { FormatToolbar } from "@/components/documents/format-toolbar";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export default function TemplatesPage() {
   const [fields, setFields] = useState<MergeField[]>([]);
   const [letterhead, setLetterhead] = useState<Letterhead | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (keep?: string) => {
@@ -102,24 +103,38 @@ export default function TemplatesPage() {
       ) : (
         // The list stays narrow — the editor and the letter beside it are what the screen is for.
         <div className="mt-8 grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
+          {/* Grouped by stage — two dozen letters in one list is a list nobody finds anything in. */}
           <div className="flex flex-col gap-1.5">
-            {templates.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setSelectedId(t.id)}
-                className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                  t.id === selectedId
-                    ? "border-violet/40 bg-violet/10 text-violet"
-                    : "border-fg/10 text-fg/70 hover:bg-fg/5"
-                }`}
-              >
-                <span className="flex items-center gap-1.5 font-medium">
-                  {t.name}
-                  {t.builtIn && <Lock className="h-3 w-3 text-fg/30" aria-label="Starter template" />}
-                </span>
-                <span className="block text-xs text-fg/40">{KIND_LABELS[t.kind]}</span>
-              </button>
-            ))}
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a letter…"
+              className="mb-1 rounded-lg border border-fg/15 bg-fg/5 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet" />
+            {KIND_STAGES.map(({ stage, kinds }) => {
+              const inStage = templates.filter((t) => kinds.includes(t.kind)
+                && (!search.trim() || t.name.toLowerCase().includes(search.trim().toLowerCase())));
+              if (inStage.length === 0) return null;
+              return (
+                <div key={stage} className="mb-2">
+                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-fg/40">{stage}</p>
+                  <div className="flex flex-col gap-1">
+                    {inStage.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedId(t.id)}
+                        className={`rounded-lg border px-3 py-1.5 text-left text-sm transition-colors ${
+                          t.id === selectedId
+                            ? "border-violet/40 bg-violet/10 text-violet"
+                            : "border-fg/10 text-fg/70 hover:bg-fg/5"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {t.name}
+                          {t.builtIn && <Lock className="h-3 w-3 text-fg/30" aria-label="Starter template" />}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {selected ? (
