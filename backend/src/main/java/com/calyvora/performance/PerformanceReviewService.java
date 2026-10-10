@@ -58,6 +58,7 @@ public class PerformanceReviewService {
     private final com.calyvora.people.OrgScope orgScope;
 
     private final com.calyvora.access.PermissionService permissions;
+    private final com.calyvora.document.DocumentService documentService;
 
     public PerformanceReviewService(ReviewCycleRepository cycleRepository,
                                     PerformanceReviewRepository reviewRepository,
@@ -66,8 +67,10 @@ public class PerformanceReviewService {
                                     CompensationRepository compensationRepository,
                                     NotificationService notificationService,
                                     com.calyvora.people.OrgScope orgScope,
-            com.calyvora.access.PermissionService permissions) {
+            com.calyvora.access.PermissionService permissions,
+            @org.springframework.context.annotation.Lazy com.calyvora.document.DocumentService documentService) {
         this.permissions = permissions;
+        this.documentService = documentService;
         this.orgScope = orgScope;
         this.cycleRepository = cycleRepository;
         this.reviewRepository = reviewRepository;
@@ -91,6 +94,7 @@ public class PerformanceReviewService {
         }
         ReviewCycle cycle = new ReviewCycle(UUID.randomUUID(), companyId, req.name().trim(), start, end,
                 principal.userId());
+        cycle.setQuestions(ReviewForms.write(ReviewForms.clean(req.questions())));
         cycleRepository.save(cycle);
 
         // Fan out one review per active employee, snapshotting their current manager.
@@ -121,6 +125,22 @@ public class PerformanceReviewService {
         requireCycle(cycleId, companyId);
         return reviewRepository.findByCycleIdOrderByCreatedAtAsc(cycleId).stream()
                 .map(this::toResponse).toList();
+    }
+
+    /**
+     * Remove a cycle that has not decided anything yet (PD-66) — one opened by mistake, or a test run.
+     * Refused once any review in it is approved: an approved review may already have changed pay.
+     */
+    @Transactional
+    public void deleteCycle(UUID cycleId) {
+        UUID companyId = TenantContext.getCompanyId();
+        ReviewCycle cycle = requireCycle(cycleId, companyId);
+        if (reviewRepository.countByCycleIdAndStatus(cycleId, ReviewStatus.APPROVED) > 0) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "Reviews in this cycle have been approved, so it is kept. Close it instead.");
+        }
+        reviewRepository.deleteAll(reviewRepository.findByCycleIdOrderByCreatedAtAsc(cycleId));
+        cycleRepository.delete(cycle);
     }
 
     @Transactional
@@ -270,6 +290,12 @@ public class PerformanceReviewService {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "This review is no longer open for self-assessment");
         }
         review.setSelfAssessment(blankToNull(req.selfAssessment()));
+        List<ReviewForms.Question> questions = questionsOf(review);
+        if (!questions.isEmpty() && req.answers() != null) {
+            review.setSelfAnswers(ReviewForms.write(ReviewForms.forSide(questions, req.answers(), false, req.submit())));
+        } else if (!questions.isEmpty() && req.submit()) {
+            ReviewForms.forSide(questions, ReviewForms.answers(review.getSelfAnswers()), false, true);
+        }
         if (req.submit()) {
             review.setSelfSubmittedAt(java.time.Instant.now());
             if (review.getStatus() == ReviewStatus.PENDING_SELF) {
@@ -297,6 +323,24 @@ public class PerformanceReviewService {
         if (req.strengths() != null) review.setStrengths(blankToNull(req.strengths()));
         if (req.improvements() != null) review.setImprovements(blankToNull(req.improvements()));
         if (req.hikeNote() != null) review.setHikeNote(blankToNull(req.hikeNote()));
+        if (req.newTitle() != null) {
+            String t = blankToNull(req.newTitle());
+            if (t != null && t.length() > 120) throw new ApiException(ErrorCode.VALIDATION_ERROR, "Keep the new title under 120 characters");
+            review.setNewTitle(t);
+        }
+        if (req.effectiveDate() != null) {
+            try {
+                review.setEffectiveDate(req.effectiveDate().isBlank() ? null : LocalDate.parse(req.effectiveDate().trim()));
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR, "The effective date must be a date like 2026-11-01");
+            }
+        }
+        List<ReviewForms.Question> questions = questionsOf(review);
+        if (!questions.isEmpty() && req.answers() != null) {
+            review.setManagerAnswers(ReviewForms.write(ReviewForms.forSide(questions, req.answers(), true, req.submit())));
+        } else if (!questions.isEmpty() && req.submit()) {
+            ReviewForms.forSide(questions, ReviewForms.answers(review.getManagerAnswers()), true, true);
+        }
 
         HikeType hikeType = parseHikeType(req.hikeType());
         if (hikeType != null) {
@@ -338,12 +382,35 @@ public class PerformanceReviewService {
     /** Admin approves a submitted review; a recommended hike is written into compensation. */
     @Transactional
     public PerformanceReviewResponse approve(UUID reviewId, AuthPrincipal principal) {
+        return approve(reviewId, com.calyvora.performance.dto.ApproveReviewRequest.DEFAULT, principal);
+    }
+
+    /**
+     * Approve a submitted review (PD-66): the hike goes into pay from the effective date, a new title
+     * onto the employee, and — when asked — the increment or promotion letter is issued in the same
+     * step. Both sides must have had their say: refused while the self-assessment is missing unless
+     * {@code force}, because a decision made without hearing the person is the one that gets disputed.
+     */
+    @Transactional
+    public PerformanceReviewResponse approve(UUID reviewId, com.calyvora.performance.dto.ApproveReviewRequest req,
+                                             AuthPrincipal principal) {
         PerformanceReview review = requireReview(reviewId);
         if (review.getStatus() != ReviewStatus.SUBMITTED) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Only a submitted review can be approved");
         }
+        boolean force = req != null && Boolean.TRUE.equals(req.force());
+        if (review.getSelfSubmittedAt() == null && !force) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "The employee has not submitted their self-assessment yet. Wait for it, or approve anyway.");
+        }
         UUID companyId = review.getCompanyId();
         Employee employee = requireEmployee(review.getEmployeeId());
+        LocalDate effective = review.getEffectiveDate() == null ? LocalDate.now() : review.getEffectiveDate();
+
+        if (review.getNewTitle() != null && !review.getNewTitle().equals(employee.getJobTitle())) {
+            employee.setJobTitle(review.getNewTitle());
+            employeeRepository.save(employee);
+        }
 
         BigDecimal newAnnual = resolveNewSalary(review);
         if (newAnnual != null && newAnnual.signum() > 0) {
@@ -352,7 +419,7 @@ public class PerformanceReviewService {
                     + (review.getManagerRating() == null ? "" : " (rating " + review.getManagerRating() + "/5)");
             String currency = comp.currency() == null ? "USD" : comp.currency();
             compensationService.add(review.getEmployeeId(),
-                    new AddCompensationRequest(newAnnual, LocalDate.now().toString(), currency, reason), principal);
+                    new AddCompensationRequest(newAnnual, effective.toString(), currency, reason), principal);
             // We record that a raise was applied; the exact comp row is the latest for this employee.
             review.setAppliedCompId(review.getId());
         }
@@ -360,6 +427,14 @@ public class PerformanceReviewService {
         review.setStatus(ReviewStatus.APPROVED);
         review.setDecidedBy(principal.userId());
         review.setDecidedAt(java.time.Instant.now());
+
+        if (req != null && Boolean.TRUE.equals(req.issueLetter()) && (newAnnual != null || review.getNewTitle() != null)) {
+            // Best effort, as with exit letters: a company that deleted the template has chosen not to
+            // issue it, and that must not undo an approval that has already changed pay.
+            com.calyvora.document.DocumentKind kind = newAnnual != null
+                    ? com.calyvora.document.DocumentKind.INCREMENT_LETTER : com.calyvora.document.DocumentKind.PROMOTION_LETTER;
+            documentService.issueByKind(kind, employee.getId(), null, principal);
+        }
 
         notificationService.send(companyId, employee.getUserId(), principal.userId(),
                 NotificationType.REVIEW_APPROVED, "Review approved",
@@ -454,7 +529,14 @@ public class PerformanceReviewService {
         }
 
         return PerformanceReviewResponse.of(review, cycleName, periodStart, periodEnd, cycleStatus,
-                employeeName, jobTitle, managerName, currency, currentSalary, achieved, goals.size(), goalDtos);
+                employeeName, jobTitle, managerName, currency, currentSalary, achieved, goals.size(), goalDtos)
+                .withQuestions(cycle == null ? List.of() : ReviewForms.questions(cycle.getQuestions()));
+    }
+
+    /** The questions the review's cycle asks; empty for a cycle from before questions existed. */
+    private List<ReviewForms.Question> questionsOf(PerformanceReview review) {
+        return cycleRepository.findById(review.getCycleId())
+                .map(c -> ReviewForms.questions(c.getQuestions())).orElse(List.of());
     }
 
     private void notifyManager(PerformanceReview review, UUID actorId, NotificationType type,

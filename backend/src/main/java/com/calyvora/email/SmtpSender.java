@@ -28,6 +28,12 @@ public class SmtpSender implements EmailSender {
 
     @Override
     public void send(EmailSettings settings, String to, String subject, String body, String html) throws Exception {
+        send(settings, to, subject, body, html, null, java.util.List.of());
+    }
+
+    @Override
+    public void send(EmailSettings settings, String to, String subject, String body, String html,
+                     String displayName, java.util.List<Attachment> attachments) throws Exception {
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
         sender.setHost(settings.host());
         sender.setPort(settings.port());
@@ -48,7 +54,7 @@ public class SmtpSender implements EmailSender {
         // HTML costs deliverability — filters read the text part, and its absence counts against you.
         MimeMessage message = sender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        helper.setFrom(new InternetAddress(settings.from(), EmailIdentity.DISPLAY_NAME, "UTF-8"));
+        helper.setFrom(new InternetAddress(settings.from(), EmailIdentity.displayName(displayName), "UTF-8"));
         helper.setTo(to);
         helper.setSubject(subject);
         if (html == null || html.isBlank()) {
@@ -58,6 +64,9 @@ public class SmtpSender implements EmailSender {
         }
         if (settings.replyTo() != null && !settings.replyTo().isBlank()) {
             helper.setReplyTo(settings.replyTo());
+        }
+        for (Attachment a : attachments == null ? java.util.List.<Attachment>of() : attachments) {
+            helper.addAttachment(a.fileName(), new org.springframework.core.io.ByteArrayResource(a.content()), a.contentType());
         }
         sender.send(message);
     }

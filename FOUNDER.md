@@ -1931,6 +1931,67 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Next (not built):** the employee accepting a letter in Orbit (name and date stamped on it), a
   signature image, and the F&F figures computed from payroll instead of typed.
 
+### PD-64 · 2026-10-10 · Letters leave Orbit: PDF, email, and letterpads in any format
+- **Trigger (founder sheet, items 17–20):** the letterpad did not show when generating a letter, only
+  images could be uploaded, and issued letters could not be emailed.
+- **Root cause of the missing letterpad:** the API reads the token only from the Authorization header,
+  which neither a CSS background nor an <img> sends — so the image 401'd on every screen and letters
+  showed as bare text. Fixed by fetching it with the token into an object URL, cached per version.
+- **Letterpads as PDF or Word (.docx):** page one rendered to an image at 150 dpi on the server
+  (PDFBox; Word via the POI/xdocreport converter, iText 2.1.7 LGPL/MPL, BouncyCastle excluded).
+  Old .doc is refused with "save as .docx or PDF". Images still 2 MB, documents up to 10 MB.
+- **Letters as PDF:** OpenHTMLtoPDF renders the same body format the screen does (tables, page breaks,
+  headings), with Noto Sans/Serif embedded (the PDF base fonts have no ₹); the letterpad image is
+  drawn under every page, or the composed heading and footer repeat on every page.
+- **Send by email:** from "{company} via Orbit", replies to the letterpad's email, the letter
+  attached as PDF; every send recorded on the letter (V74 document_emails) with delivered / error.
+  Attachments added to the Resend and SMTP transports.
+- **Dockerfile:** fontconfig + FreeType in the runtime image for headless Java2D.
+
+### PD-65 · 2026-10-10 · An exit needs an admin's yes
+- **Decision (founder, item 26):** exits are approved by an admin before anyone is marked as leaving.
+- **Shape:** a new permission, Approve exits (EXITS_APPROVE), admin-only by default. Starting an exit
+  without it records a request (V75 columns on employees); the person stays exactly as they were —
+  pay, access, status — until an admin approves, which puts them on notice on the requested terms and
+  seeds the checklist. An admin starting one is the approval. Admins are notified; the requester hears
+  the decision. Requests can be withdrawn. Shown on Exits and in the inbox.
+
+### PD-66 · 2026-10-10 · Reviews with questions on both sides, and an outcome before a hike
+- **Decision (founder, items 6–7; default question set accepted):** each cycle carries its own
+  questions — ratings and written, for the employee, the manager or both. Standard set: achievements,
+  goals met, ownership, teamwork, strengths, areas to improve, support wanted (self), promotion
+  readiness (manager); editable per cycle. Cycles from before keep the free-text form.
+- **Flow:** employee answers theirs; the manager answers theirs beside the employee's, gives the overall
+  rating and proposes the outcome — hike by % (quick 5/8/10/12/15) or new salary, new title, effective
+  date; HR reads both side by side and approves, which applies pay from the effective date, the title,
+  and optionally issues the increment / promotion letter in the same step. Approval waits for the
+  self-assessment unless HR approves anyway, deliberately.
+- **Lists:** one line per person, filtered by stage (waiting on self / manager / to approve /
+  approved), opening one at a time; My team groups by cycle. Cycles with nothing approved can be
+  deleted (cleans up the "QA Cycle …" test rows on the demo). V76.
+
+### PD-67 · 2026-10-10 · One inbox, and a nudge for a forgotten check-out
+- **Inbox (items 4–5):** tabs All · Leave · Attendance · Comp-off · Expenses · Tax proofs · Exits ·
+  Tickets · Updates, each with a count; leave, corrections, comp-off, expenses and exits decided in
+  place, several at once. Built from each module's own queue, so it shows exactly what that person may
+  decide under the same rules — no second copy of the approval logic.
+- **Check-out reminder (item 3, next morning chosen):** hourly job; at 8 a.m. company time, anyone with
+  a session from yesterday never closed gets an email and an inbox note linking to the correction form
+  pre-filled for that day. Marked once sent (V77), so restarts never resend. First scheduled job in
+  the app (@EnableScheduling); it binds each company's tenant itself.
+
+### PD-68 · 2026-10-10 · Navigation, labels and the permission audit
+- **Navigation:** the most specific nav entry owns the page (Exits no longer lights up People; Roles
+  stays under Members). Time & attendance is its own section; People is about people. "Company
+  settings" vs "My account" (your language, timezone and password; the profile menu no longer
+  duplicates those tabs). Dialog headers stay pinned on long forms; hiring boards use the full width.
+- **Clarity:** department tiles say Present / On leave / Absent / Not in yet with a bar; the tax rent
+  step is laid out in two rows with hints under fields.
+- **Permission audit (item 21):** a test walks every permission-guarded GET in the app and checks an
+  employee is refused exactly what their role lacks and an admin nothing — new screens are covered
+  automatically. Found and fixed: anyone could read anyone's goals by id; now self, the chain above, or
+  HR / performance managers only.
+
 ## 4. Architecture Decision Log
 
 

@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, ClipboardCheck, ChevronRight, Lock } from "lucide-react";
+import { Loader2, Plus, ClipboardCheck, ChevronRight, Lock, Trash2, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
-import type { ReviewCycle, PerformanceReview } from "@/lib/types";
+import type { ReviewCycle, PerformanceReview, ReviewQuestion } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
-import { ReviewCard } from "@/components/performance/review-card";
+import { ReviewList } from "@/components/performance/review-list";
 import { cn } from "@/lib/utils";
 import { can, canCompanyWide } from "@/lib/permissions";
 
@@ -81,7 +81,8 @@ export default function PerformancePage() {
           {cycles.map((c) => (
             <CycleRow key={c.id} cycle={c} open={openId === c.id}
               onToggle={() => setOpenId((id) => (id === c.id ? null : c.id))}
-              onClosed={upsertCycle} />
+              onClosed={upsertCycle}
+              onDeleted={() => setCycles((cur) => cur?.filter((x) => x.id !== c.id) ?? cur)} />
           ))}
         </div>
       )}
@@ -94,13 +95,15 @@ function NewCycleForm({ onCreated, onCancel }: { onCreated: (c: ReviewCycle) => 
   const [name, setName] = useState(`Annual Review ${thisYear}`);
   const [start, setStart] = useState(`${thisYear}-01-01`);
   const [end, setEnd] = useState(`${thisYear}-12-31`);
+  const [questions, setQuestions] = useState<ReviewQuestion[]>(DEFAULT_QUESTIONS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const setQ = (i: number, patch: Partial<ReviewQuestion>) => setQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setError(null);
-    try { onCreated(await api.createReviewCycle({ name: name.trim(), periodStart: start, periodEnd: end })); }
+    try { onCreated(await api.createReviewCycle({ name: name.trim(), periodStart: start, periodEnd: end, questions })); }
     catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't create cycle"); setBusy(false); }
   }
 
@@ -122,8 +125,34 @@ function NewCycleForm({ onCreated, onCancel }: { onCreated: (c: ReviewCycle) => 
           <label className="block text-xs text-fg/50">Period end</label>
           <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1" />
         </div>
+        <div className="sm:col-span-2">
+          <p className="text-xs font-medium text-fg/60">Questions</p>
+          <p className="text-xs text-fg/45">Each is a 1–5 rating or a written answer, asked of the employee, the manager or both. Both see each other&apos;s answers side by side.</p>
+          <div className="mt-2 space-y-2">
+            {questions.map((q, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-fg/10 p-2">
+                <Input value={q.text} onChange={(e) => setQ(i, { text: e.target.value })} className="min-w-[14rem] flex-1" />
+                <select value={q.kind} onChange={(e) => setQ(i, { kind: e.target.value as ReviewQuestion["kind"] })}
+                  className="rounded-md border border-fg/15 bg-fg/5 px-2 py-2 text-xs text-fg">
+                  <option value="RATING">Rating 1–5</option>
+                  <option value="TEXT">Written</option>
+                </select>
+                <select value={q.audience} onChange={(e) => setQ(i, { audience: e.target.value as ReviewQuestion["audience"] })}
+                  className="rounded-md border border-fg/15 bg-fg/5 px-2 py-2 text-xs text-fg">
+                  <option value="BOTH">Both</option>
+                  <option value="SELF">Employee only</option>
+                  <option value="MANAGER">Manager only</option>
+                </select>
+                <button type="button" aria-label="Remove question" onClick={() => setQuestions((qs) => qs.filter((_, j) => j !== i))}
+                  className="text-fg/30 hover:text-red-500"><X className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button type="button" onClick={() => setQuestions((qs) => [...qs, { id: `q${Date.now()}`, text: "", kind: "TEXT", audience: "BOTH" }])}
+              className="inline-flex items-center gap-1 text-sm text-violet hover:underline"><Plus className="h-4 w-4" /> Add a question</button>
+          </div>
+        </div>
         <div className="flex gap-2 sm:col-span-2">
-          <Button type="submit" disabled={busy || !name.trim()}>
+          <Button type="submit" disabled={busy || !name.trim() || questions.every((q) => !q.text.trim())}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} Open cycle
           </Button>
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
@@ -133,8 +162,8 @@ function NewCycleForm({ onCreated, onCancel }: { onCreated: (c: ReviewCycle) => 
   );
 }
 
-function CycleRow({ cycle, open, onToggle, onClosed }: {
-  cycle: ReviewCycle; open: boolean; onToggle: () => void; onClosed: (c: ReviewCycle) => void;
+function CycleRow({ cycle, open, onToggle, onClosed, onDeleted }: {
+  cycle: ReviewCycle; open: boolean; onToggle: () => void; onClosed: (c: ReviewCycle) => void; onDeleted: () => void;
 }) {
   const [reviews, setReviews] = useState<PerformanceReview[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +175,12 @@ function CycleRow({ cycle, open, onToggle, onClosed }: {
         .catch((e) => { setReviews([]); setError(e instanceof ApiError ? e.message : "Failed to load"); });
     }
   }, [open, reviews, cycle.id]);
+
+  async function remove() {
+    if (!confirm(`Delete "${cycle.name}" and its ${cycle.reviewCount} reviews? Nothing in it has been approved.`)) return;
+    try { await api.deleteReviewCycle(cycle.id); onDeleted(); }
+    catch (e) { setError(e instanceof ApiError ? e.message : "Couldn't delete"); }
+  }
 
   async function close() {
     setClosing(true);
@@ -175,25 +210,36 @@ function CycleRow({ cycle, open, onToggle, onClosed }: {
       {open && (
         <div className="mt-4 border-t border-fg/10 pt-4">
           {error && <Alert tone="error" className="mb-3">{error}</Alert>}
-          {cycle.status === "OPEN" && (
-            <div className="mb-4 flex justify-end">
+          <div className="mb-4 flex justify-end gap-2">
+            {cycle.approvedCount === 0 && (
+              <Button size="sm" variant="ghost" onClick={remove}><Trash2 className="h-4 w-4 text-red-400" /> Delete</Button>
+            )}
+            {cycle.status === "OPEN" && (
               <Button size="sm" variant="secondary" onClick={close} disabled={closing}>
                 {closing && <Loader2 className="h-4 w-4 animate-spin" />} Close cycle
               </Button>
-            </div>
-          )}
+            )}
+          </div>
           {reviews === null ? (
             <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-violet" /></div>
           ) : (
-            <div className="space-y-5">
-              {reviews.map((r) => (
-                <ReviewCard key={r.id} review={r} perspective="manager" canApprove
-                  onChange={(u) => setReviews((cur) => cur?.map((x) => (x.id === u.id ? u : x)) ?? cur)} />
-              ))}
-            </div>
+            <ReviewList reviews={reviews} perspective="manager" canApprove
+              onChange={(u) => setReviews((cur) => cur?.map((x) => (x.id === u.id ? u : x)) ?? cur)} />
           )}
         </div>
       )}
     </Card>
   );
 }
+
+/** The standard question set — the same as the server's ReviewForms.DEFAULTS, editable per cycle. */
+const DEFAULT_QUESTIONS: ReviewQuestion[] = [
+  { id: "achievements", text: "Key achievements this period", kind: "TEXT", audience: "BOTH" },
+  { id: "goals", text: "How well were the period's goals met?", kind: "RATING", audience: "BOTH" },
+  { id: "quality", text: "Ownership and quality of work", kind: "RATING", audience: "BOTH" },
+  { id: "teamwork", text: "Collaboration and teamwork", kind: "RATING", audience: "BOTH" },
+  { id: "strengths", text: "Strengths", kind: "TEXT", audience: "BOTH" },
+  { id: "improve", text: "Areas to improve", kind: "TEXT", audience: "BOTH" },
+  { id: "support", text: "Support or training wanted for the next period", kind: "TEXT", audience: "SELF" },
+  { id: "readiness", text: "Readiness for more responsibility or a promotion", kind: "TEXT", audience: "MANAGER" },
+];

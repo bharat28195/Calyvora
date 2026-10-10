@@ -20,6 +20,8 @@ import java.util.concurrent.ThreadPoolExecutor;
  */
 @Configuration
 @EnableAsync
+// Scheduled jobs: the hourly check-out reminder (PD-67). Each binds its own tenant, like the pool above.
+@org.springframework.scheduling.annotation.EnableScheduling
 public class BackgroundWorkConfig {
 
     public static final String PAYROLL_EXECUTOR = "payrollExecutor";

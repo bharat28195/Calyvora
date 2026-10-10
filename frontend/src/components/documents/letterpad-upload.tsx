@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { Letterhead } from "@/lib/types";
+import { useLetterpadImage } from "@/components/documents/use-letterpad";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
@@ -20,8 +21,9 @@ import { Alert } from "@/components/ui/alert";
  * separate so an internal memo can be printed plain without deleting the file.
  */
 
-const ACCEPT = "image/png,image/jpeg,image/webp";
-const MAX_MB = 2;
+// PDF and Word too since PD-64: the server turns page one into the image letters print on.
+const ACCEPT = ".pdf,.docx,image/png,image/jpeg,image/webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const MAX_MB = 10;
 
 export function LetterpadUpload({
     letterhead,
@@ -32,6 +34,7 @@ export function LetterpadUpload({
 }) {
     const input = useRef<HTMLInputElement>(null);
     const [busy, setBusy] = useState(false);
+    const image = useLetterpadImage(letterhead.updatedAt, letterhead.hasBackground);
     const [error, setError] = useState<string | null>(null);
 
     async function upload(file: File | undefined) {
@@ -40,7 +43,7 @@ export function LetterpadUpload({
         // Checked here as well as on the server: a 2 MB limit that only announces itself after the
         // file has been sent is a slow way to say no, especially on an Indian office connection.
         if (file.size > MAX_MB * 1024 * 1024) {
-            setError(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Keep it under ${MAX_MB} MB — export at 150 dpi rather than 300.`);
+            setError(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Keep it under ${MAX_MB} MB.`);
             return;
         }
         setBusy(true);
@@ -94,7 +97,7 @@ export function LetterpadUpload({
                         {/* The real thing, at A4 proportions, so what is checked here is what prints. */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src={api.letterpadImageUrl(letterhead.updatedAt)}
+                            src={image ?? undefined}
                             alt="The uploaded company letterpad"
                             className="block w-full"
                         />
@@ -141,12 +144,12 @@ export function LetterpadUpload({
                             : <Upload className="h-6 w-6 text-fg/30" />}
                         <span className="text-sm font-medium">{busy ? "Uploading…" : "Choose a file"}</span>
                         <span className="text-xs text-fg/40">
-                            PNG, JPEG or WebP · up to {MAX_MB} MB · A4 portrait prints best
+                            PDF, Word (.docx) or an image · up to {MAX_MB} MB · A4 portrait prints best
                         </span>
                     </button>
                     <p className="mt-2 text-xs text-fg/40">
-                        Have it as a PDF? Export page one as an image first — a PDF cannot be used as the
-                        background of a printed page here.
+                        Upload the file your printer or designer gave you — page one is used as the
+                        background of every letter.
                     </p>
                 </div>
             )}

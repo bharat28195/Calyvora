@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck } from "lucide-react";
+import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck, DoorOpen } from "lucide-react";
 import { createElement, type ReactNode } from "react";
 import type { NotificationType } from "@/lib/types";
 import { formatDate } from "@/lib/format";
@@ -15,6 +15,9 @@ export const NOTIFICATION_ICON: Record<NotificationType, ReactNode> = {
   REVIEW_SUBMITTED: createElement(ClipboardCheck, { className: "h-4 w-4 text-amber-400" }),
   REVIEW_APPROVED: createElement(Star, { className: "h-4 w-4 text-emerald-400" }),
   ANNOUNCEMENT: createElement(Megaphone, { className: "h-4 w-4 text-fg/50" }),
+  EXIT_REQUESTED: createElement(DoorOpen, { className: "h-4 w-4 text-amber-400" }),
+  EXIT_DECIDED: createElement(DoorOpen, { className: "h-4 w-4 text-violet" }),
+  CHECKOUT_MISSED: createElement(CalendarClock, { className: "h-4 w-4 text-red-400" }),
 };
 
 /** "3m ago" / "2h ago" / "5d ago" — relative time reads better than a timestamp in an inbox. */

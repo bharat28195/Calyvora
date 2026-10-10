@@ -35,8 +35,8 @@ public class GoalController {
     }
 
     @GetMapping
-    public List<GoalResponse> list(@PathVariable UUID employeeId) {
-        return goalService.list(employeeId);
+    public List<GoalResponse> list(@PathVariable UUID employeeId, @CurrentUser AuthPrincipal principal) {
+        return goalService.list(employeeId, principal);
     }
 
     @PostMapping

@@ -25,6 +25,31 @@ public class RecordingEmailService implements EmailService {
     private final List<Sent> trialAcknowledgements = new ArrayList<>();
     private final List<Sent> trialApprovals = new ArrayList<>();
     private final List<Sent> resetCodes = new ArrayList<>();
+    private final List<Sent> documents = new ArrayList<>();
+    private final List<Sent> checkoutReminders = new ArrayList<>();
+
+    @Override
+    public EmailResult sendCheckoutReminder(String to, String firstName, String companyName, String day,
+                                            String checkIn, String link) {
+        checkoutReminders.add(new Sent(to, link));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> checkoutReminders() {
+        return checkoutReminders;
+    }
+
+    /** A document sent by email: who to, and the attachment's file name. */
+    @Override
+    public EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
+                                    String message, com.calyvora.email.EmailSender.Attachment attachment) {
+        documents.add(new Sent(to, attachment.fileName()));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> documents() {
+        return documents;
+    }
 
     @Override
     public EmailResult sendVerificationEmail(String to, String verificationUrl) {

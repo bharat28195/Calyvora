@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLetterpadImage } from "@/components/documents/use-letterpad";
 import { api } from "@/lib/api";
 import { EMPTY, LETTERHEAD_FONTS } from "@/lib/documents";
 import type { Letterhead } from "@/lib/types";
@@ -32,9 +33,10 @@ export function LetterSheet({
   // suppressed: the uploaded image already carries the logo, the address and the strip along the
   // bottom, and drawing ours on top of theirs is how you get two addresses on one letter.
   const printed = letterhead?.useBackground && letterhead.hasBackground;
+  const image = useLetterpadImage(letterhead?.updatedAt, !!printed);
   const paper = printed
     ? {
-        backgroundImage: `url(${api.letterpadImageUrl(letterhead.updatedAt)})`,
+        backgroundImage: image ? `url(${image})` : undefined,
         backgroundSize: "100% 100%",
         backgroundRepeat: "no-repeat",
         // A4 proportions, so the body sits where it will sit on paper rather than wherever the

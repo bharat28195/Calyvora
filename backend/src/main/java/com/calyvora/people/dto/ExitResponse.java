@@ -18,7 +18,12 @@ public record ExitResponse(
         int tasksTotal,
         boolean checklistComplete,
         List<OnboardingTaskResponse> checklist,
-        List<IssuedLetter> letters
+        List<IssuedLetter> letters,
+        /** An exit asked for and waiting for an admin (PD-65); all null when there is none. */
+        String requestedLastDay,
+        String requestedReason,
+        String requestedByName,
+        String requestedAt
 ) {
     /** A letter raised for this exit, so the screen can link to it rather than re-render it. */
     public record IssuedLetter(String id, String kind, String title, String createdAt) {}

@@ -87,14 +87,25 @@ class LetterpadUploadTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("a PDF is refused, and the message says what to do instead")
-    void only_images() throws Exception {
+    @DisplayName("a broken PDF, an old .doc and a text file are refused, each saying what to do")
+    void unreadable_files() throws Exception {
         Session owner = onboardOwner("Padco4", "admin@padco4.test", PW);
+        // PDFs and Word files are accepted since PD-64 — but one that cannot be read must say so.
         mockMvc.perform(multipart("/api/v1/documents/letterhead/background")
                         .file(file("letterpad.pdf", "application/pdf", "%PDF-1.4".getBytes()))
                         .header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("PNG")));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("could not be read")));
+        mockMvc.perform(multipart("/api/v1/documents/letterhead/background")
+                        .file(file("letterpad.doc", "application/msword", new byte[]{1, 2, 3}))
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(".docx")));
+        mockMvc.perform(multipart("/api/v1/documents/letterhead/background")
+                        .file(file("notes.txt", "text/plain", "hello".getBytes()))
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("PDF")));
     }
 
     @Test

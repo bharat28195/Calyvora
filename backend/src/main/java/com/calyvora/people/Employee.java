@@ -99,6 +99,18 @@ public class Employee {
     @Column(name = "exit_started_at")
     private Instant exitStartedAt;
 
+    // ---- an exit asked for, waiting for an admin (V75, PD-65) ----
+    @Column(name = "exit_request_last_day")
+    private LocalDate exitRequestLastDay;
+    @Column(name = "exit_request_reason", length = 500)
+    private String exitRequestReason;
+    @Column(name = "exit_requested_by")
+    private UUID exitRequestedBy;
+    @Column(name = "exit_requested_at")
+    private Instant exitRequestedAt;
+    @Column(name = "exit_request_checklist")
+    private Boolean exitRequestChecklist;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -228,6 +240,31 @@ public class Employee {
 
     public void setExitReason(String exitReason) {
         this.exitReason = exitReason;
+    }
+
+    public LocalDate getExitRequestLastDay() { return exitRequestLastDay; }
+    public String getExitRequestReason() { return exitRequestReason; }
+    public UUID getExitRequestedBy() { return exitRequestedBy; }
+    public Instant getExitRequestedAt() { return exitRequestedAt; }
+    public boolean exitRequestSeedsChecklist() { return exitRequestChecklist == null || exitRequestChecklist; }
+
+    /** An exit is waiting for an admin's decision. */
+    public boolean hasExitRequest() { return exitRequestedAt != null; }
+
+    public void requestExit(LocalDate lastDay, String reason, UUID by, boolean seedChecklist) {
+        this.exitRequestLastDay = lastDay;
+        this.exitRequestReason = reason;
+        this.exitRequestedBy = by;
+        this.exitRequestedAt = Instant.now();
+        this.exitRequestChecklist = seedChecklist;
+    }
+
+    public void clearExitRequest() {
+        this.exitRequestLastDay = null;
+        this.exitRequestReason = null;
+        this.exitRequestedBy = null;
+        this.exitRequestedAt = null;
+        this.exitRequestChecklist = null;
     }
 
     public Instant getExitStartedAt() {

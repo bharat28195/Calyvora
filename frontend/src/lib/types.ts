@@ -665,7 +665,10 @@ export type NotificationType =
   | "REVIEW_SELF_SUBMITTED"
   | "REVIEW_SUBMITTED"
   | "REVIEW_APPROVED"
-  | "ANNOUNCEMENT";
+  | "ANNOUNCEMENT"
+  | "EXIT_REQUESTED"
+  | "EXIT_DECIDED"
+  | "CHECKOUT_MISSED";
 
 export interface AppNotification {
   id: string;
@@ -864,6 +867,13 @@ export interface MergeField {
   key: string;
   label: string;
 }
+/** An issued letter's email form defaults and every time it has been sent (PD-64). */
+export interface DocumentEmailState {
+  to: string | null;
+  subject: string;
+  message: string;
+  sent: { id: string; to: string; subject: string; sentAt: string; delivered: boolean; error: string | null }[];
+}
 export interface GeneratedDoc {
   id: string;
   title: string;
@@ -922,6 +932,7 @@ export interface ReviewCycle {
   submittedCount: number;
   approvedCount: number;
   createdAt: string;
+  questions?: ReviewQuestion[];
 }
 
 export interface PerformanceReview {
@@ -954,16 +965,36 @@ export interface PerformanceReview {
   goalsAchieved: number;
   goalsTotal: number;
   goals: Goal[];
+  /** PD-66: the cycle's questions (empty for an older free-text cycle) and both sides' answers. */
+  questions?: ReviewQuestion[];
+  selfAnswers?: Record<string, ReviewAnswer>;
+  managerAnswers?: Record<string, ReviewAnswer>;
+  newTitle?: string | null;
+  effectiveDate?: string | null;
+}
+
+/** One question a review cycle asks: a 1–5 rating or a written answer, of the employee, the manager or both. */
+export interface ReviewQuestion {
+  id: string;
+  text: string;
+  kind: "RATING" | "TEXT";
+  audience: "SELF" | "MANAGER" | "BOTH";
+}
+export interface ReviewAnswer {
+  rating?: number | null;
+  text?: string | null;
 }
 
 export interface CreateCycleInput {
   name: string;
   periodStart: string;
   periodEnd: string;
+  questions?: ReviewQuestion[];
 }
 export interface SelfAssessmentInput {
   selfAssessment: string;
   submit: boolean;
+  answers?: Record<string, ReviewAnswer>;
 }
 export interface ManagerReviewInput {
   rating?: number;
@@ -975,6 +1006,9 @@ export interface ManagerReviewInput {
   proposedSalary?: number;
   hikeNote?: string;
   submit: boolean;
+  answers?: Record<string, ReviewAnswer>;
+  newTitle?: string;
+  effectiveDate?: string;
 }
 
 /** Recruitment / ATS. */
@@ -1442,6 +1476,11 @@ export interface ExitView {
   checklistComplete: boolean;
   checklist: OnboardingTask[];
   letters: { id: string; kind: DocumentKind; title: string; createdAt: string }[];
+  /** An exit asked for and waiting for an admin (PD-65). Null when there is none. */
+  requestedLastDay?: string | null;
+  requestedReason?: string | null;
+  requestedByName?: string | null;
+  requestedAt?: string | null;
 }
 export interface StartExitInput {
   lastWorkingDay: string;

@@ -19,4 +19,7 @@ public interface AttendancePunchRepository extends JpaRepository<AttendancePunch
             UUID companyId, Collection<UUID> employeeIds, LocalDate from, LocalDate to);
 
     void deleteByEmployeeIdAndDate(UUID employeeId, LocalDate date);
+
+    /** Sessions on a day that were never closed, and nobody has been reminded about yet (V77). */
+    List<AttendancePunch> findByCompanyIdAndDateAndCheckOutIsNullAndRemindedAtIsNull(UUID companyId, LocalDate date);
 }

@@ -101,7 +101,17 @@ public class PerformanceController {
 
     @PostMapping("/reviews/{id}/approve")
     @PreAuthorize("@perm.has('PERFORMANCE_MANAGE')")
-    public PerformanceReviewResponse approve(@PathVariable UUID id, @CurrentUser AuthPrincipal principal) {
-        return service.approve(id, principal);
+    public PerformanceReviewResponse approve(@PathVariable UUID id,
+                                             @RequestBody(required = false) com.calyvora.performance.dto.ApproveReviewRequest body,
+                                             @CurrentUser AuthPrincipal principal) {
+        return service.approve(id, body == null ? com.calyvora.performance.dto.ApproveReviewRequest.DEFAULT : body, principal);
+    }
+
+    /** A cycle opened by mistake, with nothing approved in it (PD-66). */
+    @org.springframework.web.bind.annotation.DeleteMapping("/cycles/{id}")
+    @PreAuthorize("@perm.has('PERFORMANCE_MANAGE')")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void deleteCycle(@PathVariable UUID id) {
+        service.deleteCycle(id);
     }
 }

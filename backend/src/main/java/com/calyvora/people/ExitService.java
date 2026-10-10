@@ -51,6 +51,8 @@ public class ExitService {
     private final GeneratedDocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final OrgScope orgScope;
+    private final com.calyvora.access.PermissionService permissions;
+    private final com.calyvora.notification.NotificationService notifications;
 
     public ExitService(EmployeeRepository employeeRepository,
                        OnboardingTaskRepository taskRepository,
@@ -58,8 +60,12 @@ public class ExitService {
                        DocumentService documentService,
                        GeneratedDocumentRepository documentRepository,
                        UserRepository userRepository,
-                       OrgScope orgScope) {
+                       OrgScope orgScope,
+                       com.calyvora.access.PermissionService permissions,
+                       com.calyvora.notification.NotificationService notifications) {
         this.orgScope = orgScope;
+        this.permissions = permissions;
+        this.notifications = notifications;
         this.employeeRepository = employeeRepository;
         this.taskRepository = taskRepository;
         this.onboardingService = onboardingService;
@@ -68,6 +74,14 @@ public class ExitService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Start an exit — or, for anyone who may not approve one, ask for it (PD-65).
+     *
+     * <p>Putting someone on notice changes their pay, their access and what the company tells them, so
+     * it takes an admin's yes. HR and managers raise the request; it waits in the admins' inbox, and
+     * the employee stays exactly as they were until it is approved. An admin starting one is the
+     * approval, so theirs takes effect at once.
+     */
     @Transactional
     public ExitResponse start(UUID employeeId, StartExitRequest request, AuthPrincipal principal) {
         Employee employee = requireEmployee(employeeId);
@@ -79,22 +93,106 @@ public class ExitService {
             throw new ApiException(ErrorCode.VALIDATION_ERROR,
                     "The last working day cannot be before the start date");
         }
-        employee.setEndDate(request.lastWorkingDay());
-        employee.setExitReason(request.reason());
+        if (!permissions.has(principal, com.calyvora.access.Permission.EXITS_APPROVE)) {
+            if (employee.hasExitRequest()) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR, "An exit for this person is already waiting for approval");
+            }
+            employee.requestExit(request.lastWorkingDay(), request.reason(), principal.userId(), request.shouldSeedChecklist());
+            employeeRepository.save(employee);
+            String name = nameOf(employee.getUserId(), TenantContext.getCompanyId());
+            notifications.sendAll(TenantContext.getCompanyId(), approverIds(), principal.userId(),
+                    com.calyvora.notification.NotificationType.EXIT_REQUESTED,
+                    "Exit to approve: " + name,
+                    "Last working day " + request.lastWorkingDay() + (request.reason() == null ? "" : " · " + request.reason()),
+                    "/inbox", "EMPLOYEE", employee.getId());
+            return view(employee, principal);
+        }
+        employee.clearExitRequest();
+        return begin(employee, request.lastWorkingDay(), request.reason(), request.shouldSeedChecklist(), principal);
+    }
+
+    /** Exits waiting for an admin. Admins (EXITS_APPROVE) only. */
+    @Transactional(readOnly = true)
+    public List<ExitResponse> requests(AuthPrincipal principal) {
+        requireApprover(principal);
+        return employeeRepository.findByCompanyIdAndExitRequestedAtIsNotNull(TenantContext.getCompanyId()).stream()
+                .map(e -> view(e, principal)).toList();
+    }
+
+    /** Approve a requested exit: the person goes on notice, on the terms that were asked for. */
+    @Transactional
+    public ExitResponse approve(UUID employeeId, AuthPrincipal principal) {
+        requireApprover(principal);
+        Employee employee = requireEmployee(employeeId);
+        if (!employee.hasExitRequest()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "There is no exit waiting for approval for this person");
+        }
+        UUID requestedBy = employee.getExitRequestedBy();
+        LocalDate lastDay = employee.getExitRequestLastDay();
+        String reason = employee.getExitRequestReason();
+        boolean seed = employee.exitRequestSeedsChecklist();
+        employee.clearExitRequest();
+        ExitResponse out = begin(employee, lastDay, reason, seed, principal);
+        notifications.send(TenantContext.getCompanyId(), requestedBy, principal.userId(),
+                com.calyvora.notification.NotificationType.EXIT_DECIDED,
+                "Exit approved: " + out.employeeName(), "Last working day " + lastDay, "/people/exits", "EMPLOYEE", employeeId);
+        return out;
+    }
+
+    /** Turn a requested exit down. Nothing about the person changes. */
+    @Transactional
+    public ExitResponse reject(UUID employeeId, AuthPrincipal principal) {
+        requireApprover(principal);
+        Employee employee = requireEmployee(employeeId);
+        if (!employee.hasExitRequest()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "There is no exit waiting for approval for this person");
+        }
+        UUID requestedBy = employee.getExitRequestedBy();
+        employee.clearExitRequest();
+        employeeRepository.save(employee);
+        ExitResponse out = view(employee, principal);
+        notifications.send(TenantContext.getCompanyId(), requestedBy, principal.userId(),
+                com.calyvora.notification.NotificationType.EXIT_DECIDED,
+                "Exit not approved: " + out.employeeName(), null, "/people/exits", "EMPLOYEE", employeeId);
+        return out;
+    }
+
+    private ExitResponse begin(Employee employee, LocalDate lastDay, String reason, boolean seedChecklist,
+                               AuthPrincipal principal) {
+        employee.setEndDate(lastDay);
+        employee.setExitReason(reason);
         employee.setExitStartedAt(Instant.now());
         employee.setEmploymentStatus(EmploymentStatus.NOTICE);
         employeeRepository.save(employee);
-
-        if (request.shouldSeedChecklist()) {
-            onboardingService.seedDefaultsIfEmpty(employeeId, ChecklistKind.EXIT);
+        if (seedChecklist) {
+            onboardingService.seedDefaultsIfEmpty(employee.getId(), ChecklistKind.EXIT);
         }
         return view(employee, principal);
+    }
+
+    private void requireApprover(AuthPrincipal principal) {
+        if (!permissions.has(principal, com.calyvora.access.Permission.EXITS_APPROVE)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "Only an admin can approve an exit");
+        }
+    }
+
+    /** Who decides: the company's admins (who hold every permission, EXITS_APPROVE included). */
+    private List<UUID> approverIds() {
+        return userRepository.findByCompanyIdOrderByCreatedAtAsc(TenantContext.getCompanyId()).stream()
+                .filter(u -> u.getRole() == com.calyvora.identity.Role.ADMIN)
+                .map(com.calyvora.identity.User::getId).toList();
     }
 
     /** Resignation withdrawn. Clears the exit and the clearance list — none of it happened. */
     @Transactional
     public ExitResponse cancel(UUID employeeId, AuthPrincipal principal) {
         Employee employee = requireEmployee(employeeId);
+        if (employee.hasExitRequest() && employee.getEmploymentStatus() != EmploymentStatus.NOTICE) {
+            // Withdrawn before an admin decided: just drop the request.
+            employee.clearExitRequest();
+            employeeRepository.save(employee);
+            return view(employee, principal);
+        }
         if (employee.getEmploymentStatus() != EmploymentStatus.NOTICE) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "This employee is not serving notice");
         }
@@ -158,8 +256,12 @@ public class ExitService {
      */
     @Transactional(readOnly = true)
     public List<ExitResponse> leaving(AuthPrincipal principal) {
-        List<Employee> onNotice = employeeRepository.findByCompanyIdAndEmploymentStatus(
-                TenantContext.getCompanyId(), EmploymentStatus.NOTICE);
+        List<Employee> onNotice = new java.util.ArrayList<>(employeeRepository.findByCompanyIdAndEmploymentStatus(
+                TenantContext.getCompanyId(), EmploymentStatus.NOTICE));
+        // Exits still waiting for an admin are listed too, so whoever asked can see where it stands.
+        for (Employee e : employeeRepository.findByCompanyIdAndExitRequestedAtIsNotNull(TenantContext.getCompanyId())) {
+            if (e.getEmploymentStatus() != EmploymentStatus.NOTICE) onNotice.add(e);
+        }
         if (!orgScope.seesWholeCompany(principal)) {
             Set<UUID> mine = orgScope.downline(principal, false);
             onNotice = onNotice.stream().filter(e -> mine.contains(e.getId())).toList();
@@ -196,7 +298,11 @@ public class ExitService {
                 checklist.size(),
                 !checklist.isEmpty() && done == checklist.size(),
                 checklist,
-                letters);
+                letters,
+                employee.getExitRequestLastDay() == null ? null : employee.getExitRequestLastDay().toString(),
+                employee.getExitRequestReason(),
+                employee.getExitRequestedBy() == null ? null : nameOf(employee.getExitRequestedBy(), companyId),
+                employee.getExitRequestedAt() == null ? null : employee.getExitRequestedAt().toString());
     }
 
     private static ExitResponse.IssuedLetter letter(GeneratedDocument d) {

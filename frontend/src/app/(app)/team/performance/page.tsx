@@ -7,7 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import type { PerformanceReview } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { ReviewList } from "@/components/performance/review-list";
 import { NoTeam, TeamHeader, useTeamStanding } from "@/components/team/team-bits";
 
 /**
@@ -67,20 +67,12 @@ export default function TeamPerformancePage() {
             No reviews yet. They appear once HR opens a review cycle.
           </Card>
         ) : (
-          reviews.map((r) => (
-            <Card key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-              <div>
-                <div className="font-medium">{r.employeeName}</div>
-                <div className="text-xs text-fg/50">
-                  {[r.jobTitle, r.cycleName].filter(Boolean).join(" · ")}
-                  {r.managerName ? ` · reviewed by ${r.managerName}` : ""}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {r.rating != null && <span className="text-sm tabular-nums text-fg/70">{r.rating}/5</span>}
-                {r.hikePercent != null && <span className="text-sm tabular-nums text-fg/70">+{r.hikePercent}%</span>}
-                <Badge value={r.status} />
-              </div>
+          // One section per cycle, one line per person — not a card per review (feedback item 6).
+          [...new Set(reviews.map((r) => r.cycleName))].map((cycle) => (
+            <Card key={cycle}>
+              <p className="mb-3 font-medium">{cycle}</p>
+              <ReviewList reviews={reviews.filter((r) => r.cycleName === cycle)} perspective="manager" canApprove={false} readOnly
+                onChange={(u) => setReviews((cur) => cur?.map((x) => (x.id === u.id ? u : x)) ?? cur)} />
             </Card>
           ))
         )}

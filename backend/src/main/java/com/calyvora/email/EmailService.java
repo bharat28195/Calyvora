@@ -30,4 +30,21 @@ public interface EmailService {
     /** A new company's first admin: sign-in email and temporary password (changed at first sign-in). */
     EmailResult sendWelcomeEmail(String to, String firstName, String companyName, String temporaryPassword,
                                  String loginUrl);
+
+    /**
+     * A document sent on a company's behalf — a letter as a PDF attachment, from "{company} via Orbit",
+     * with replies going to {@code replyTo} (the company's own address) rather than to no-reply.
+     */
+    /**
+     * "You did not check out yesterday" (PD-67), with a link to ask for the correction.
+     */
+    default EmailResult sendCheckoutReminder(String to, String firstName, String companyName, String day,
+                                             String checkIn, String link) {
+        return EmailResult.failed("NONE", "Not supported");
+    }
+
+    default EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
+                                     String message, EmailSender.Attachment attachment) {
+        return EmailResult.failed("NONE", "This deployment cannot send documents by email.");
+    }
 }

@@ -623,29 +623,60 @@ public class DemoSeedService {
         performanceReviewService.saveSelf(priyaReview,
                 new com.calyvora.performance.dto.SelfAssessmentRequest(
                         "Led the RS256 rollout and wrote the key-rotation runbook; mentored a junior engineer. "
-                                + "Shipped the security work ahead of schedule.", true),
+                                + "Shipped the security work ahead of schedule.", true,
+                        demoAnswers(false, 4, "Led the RS256 rollout and wrote the key-rotation runbook; shipped the security work ahead of schedule.",
+                                "Security depth and ownership", "Saying no to side requests", "A course on distributed systems")),
                 principalFor(owner, emp, priya.getEmail()));
         performanceReviewService.saveManager(priyaReview,
                 new com.calyvora.performance.dto.ManagerReviewRequest(5,
                         "Outstanding year — owned security end to end and lifted the whole team with her.",
                         "Security depth, ownership, mentoring", "Delegate more of the on-call load",
                         "PERCENT", new java.math.BigDecimal("12"), null,
-                        "Top performer this cycle; strong retention case.", true),
+                        "Top performer this cycle; strong retention case.", true,
+                        demoAnswers(true, 5, "Owned security end to end; the key rotation shipped with zero downtime.",
+                                "Security depth, ownership, mentoring", "Delegate more of the on-call load",
+                                "Ready to lead the platform security track."),
+                        "Senior Security Engineer", null),
                 principalFor(owner, emp, marcus.getEmail()));
 
         // Sara (→ Tom): self + manager submitted, and the owner approved — an 8% raise lands in comp.
         UUID saraReview = UUID.fromString(reviewByEmployee.get(emp.get(sara.getEmail()).id()));
         performanceReviewService.saveSelf(saraReview,
                 new com.calyvora.performance.dto.SelfAssessmentRequest(
-                        "Cut average ticket response time and kept CSAT high through the launch spike.", true),
+                        "Cut average ticket response time and kept CSAT high through the launch spike.", true,
+                        demoAnswers(false, 4, "Cut average ticket response time and kept CSAT high through the launch spike.",
+                                "Staying calm with upset customers", "Writing things down for the team", "Time to build the knowledge base")),
                 principalFor(owner, emp, sara.getEmail()));
         performanceReviewService.saveManager(saraReview,
                 new com.calyvora.performance.dto.ManagerReviewRequest(4,
                         "Reliable and calm under load; customers genuinely like working with Sara.",
                         "Responsiveness, empathy", "Start owning the support knowledge base",
-                        "PERCENT", new java.math.BigDecimal("8"), null, "Steady, dependable contributor.", true),
+                        "PERCENT", new java.math.BigDecimal("8"), null, "Steady, dependable contributor.", true,
+                        demoAnswers(true, 4, "Kept CSAT high through the launch spike.", "Responsiveness, empathy",
+                                "Start owning the support knowledge base", "Not yet — another cycle owning the knowledge base first."),
+                        null, null),
                 principalFor(owner, emp, tom.getEmail()));
         performanceReviewService.approve(saraReview, owner);
+    }
+
+    /** Answers to the standard review questions, for one side of a seeded review (PD-66). */
+    private static java.util.Map<String, com.calyvora.performance.ReviewForms.Answer> demoAnswers(
+            boolean manager, int rating, String achievements, String strengths, String improve, String lastWord) {
+        java.util.Map<String, com.calyvora.performance.ReviewForms.Answer> a = new java.util.LinkedHashMap<>();
+        for (var q : com.calyvora.performance.ReviewForms.DEFAULTS) {
+            boolean asked = "BOTH".equals(q.audience()) || (manager ? "MANAGER" : "SELF").equals(q.audience());
+            if (!asked) continue;
+            String text = switch (q.id()) {
+                case "achievements" -> achievements;
+                case "strengths" -> strengths;
+                case "improve" -> improve;
+                default -> lastWord;
+            };
+            a.put(q.id(), "RATING".equals(q.kind())
+                    ? new com.calyvora.performance.ReviewForms.Answer(rating, null)
+                    : new com.calyvora.performance.ReviewForms.Answer(null, text));
+        }
+        return a;
     }
 
     /** A short, believable wall: an announcement, a birthday, a question, and one team-only post. */

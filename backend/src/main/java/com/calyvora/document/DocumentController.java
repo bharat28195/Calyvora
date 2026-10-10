@@ -37,10 +37,13 @@ public class DocumentController {
 
     private final DocumentService documentService;
     private final LetterheadService letterheadService;
+    private final DocumentDeliveryService deliveryService;
 
-    public DocumentController(DocumentService documentService, LetterheadService letterheadService) {
+    public DocumentController(DocumentService documentService, LetterheadService letterheadService,
+                              DocumentDeliveryService deliveryService) {
         this.documentService = documentService;
         this.letterheadService = letterheadService;
+        this.deliveryService = deliveryService;
     }
 
     // ---- letterhead ----
@@ -165,5 +168,30 @@ public class DocumentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID documentId) {
         documentService.deleteDocument(documentId);
+    }
+
+    /** The letter as a PDF, on the letterpad — the same file the email attaches. */
+    @GetMapping("/{documentId}/pdf")
+    public org.springframework.http.ResponseEntity<byte[]> pdf(@PathVariable UUID documentId) {
+        DocumentDeliveryService.Pdf pdf = deliveryService.pdf(documentId);
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment()
+                                .filename(pdf.fileName(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .body(pdf.bytes());
+    }
+
+    /** What the send form starts from, and every time the letter has been sent. */
+    @GetMapping("/{documentId}/email")
+    public DocumentDeliveryService.SendDefaults emailDefaults(@PathVariable UUID documentId) {
+        return deliveryService.defaults(documentId);
+    }
+
+    @PostMapping("/{documentId}/email")
+    public DocumentDeliveryService.SendDefaults email(@PathVariable UUID documentId,
+                                                      @RequestBody DocumentDeliveryService.SendRequest body,
+                                                      @com.calyvora.common.security.CurrentUser com.calyvora.common.security.AuthPrincipal principal) {
+        return deliveryService.send(documentId, body, principal);
     }
 }

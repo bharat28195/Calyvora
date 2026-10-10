@@ -61,6 +61,24 @@ public class ExitController {
         return exitService.start(employeeId, request, principal);
     }
 
+    /** Exits waiting for an admin's approval (PD-65). The service checks EXITS_APPROVE. */
+    @GetMapping("/exits/requests")
+    public List<ExitResponse> requests(@CurrentUser AuthPrincipal principal) {
+        return exitService.requests(principal);
+    }
+
+    @PostMapping("/employees/{employeeId}/exit/approve")
+    @PreAuthorize("@perm.has('EXITS_APPROVE')")
+    public ExitResponse approve(@PathVariable UUID employeeId, @CurrentUser AuthPrincipal principal) {
+        return exitService.approve(employeeId, principal);
+    }
+
+    @PostMapping("/employees/{employeeId}/exit/reject")
+    @PreAuthorize("@perm.has('EXITS_APPROVE')")
+    public ExitResponse reject(@PathVariable UUID employeeId, @CurrentUser AuthPrincipal principal) {
+        return exitService.reject(employeeId, principal);
+    }
+
     /** Resignation withdrawn. */
     @DeleteMapping("/employees/{employeeId}/exit")
     @PreAuthorize("@perm.has('EXITS_MANAGE')")

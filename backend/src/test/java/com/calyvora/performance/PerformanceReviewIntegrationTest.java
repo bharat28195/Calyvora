@@ -35,14 +35,15 @@ class PerformanceReviewIntegrationTest extends IntegrationTestBase {
         // Priya writes and submits her self-assessment → hands off to her manager.
         Session priyaS = login("priya.nair@northwind.demo", DEMO_PW);
         patchJson("/api/v1/performance/reviews/" + reviewId + "/self", priyaS,
-                Map.of("selfAssessment", "Shipped the security work.", "submit", true));
+                Map.of("selfAssessment", "Shipped the security work.", "submit", true,
+                        "answers", answersFor(priya, false)));
         assertThat(reviewById(owner, reviewId).get("status").asText()).isEqualTo("PENDING_MANAGER");
 
         // Marcus (her manager) rates her and recommends a 10% hike, then submits.
         Session marcus = login("marcus.reed@northwind.demo", DEMO_PW);
         patchJson("/api/v1/performance/reviews/" + reviewId + "/manager", marcus,
                 Map.of("rating", 5, "summary", "Excellent", "hikeType", "PERCENT",
-                        "hikePercent", 10, "submit", true));
+                        "hikePercent", 10, "submit", true, "answers", answersFor(priya, true)));
         assertThat(reviewById(owner, reviewId).get("status").asText()).isEqualTo("SUBMITTED");
 
         // Owner approves → the raise lands in compensation and Priya is told.
@@ -123,6 +124,18 @@ class PerformanceReviewIntegrationTest extends IntegrationTestBase {
 
     private String bearer(Session s) {
         return "Bearer " + s.accessToken();
+    }
+
+    /** An answer to every question the cycle asks this side (PD-66: a submit must answer them all). */
+    private static Map<String, Map<String, Object>> answersFor(JsonNode review, boolean manager) {
+        Map<String, Map<String, Object>> out = new java.util.LinkedHashMap<>();
+        for (JsonNode q : review.get("questions")) {
+            String audience = q.get("audience").asText();
+            if (!"BOTH".equals(audience) && !(manager ? "MANAGER" : "SELF").equals(audience)) continue;
+            out.put(q.get("id").asText(), "RATING".equals(q.get("kind").asText())
+                    ? Map.of("rating", 4) : Map.of("text", "Answered."));
+        }
+        return out;
     }
 
     private String createCycle(Session owner, String name) throws Exception {

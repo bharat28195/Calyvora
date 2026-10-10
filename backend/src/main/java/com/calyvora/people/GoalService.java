@@ -29,20 +29,30 @@ public class GoalService {
     private final NotificationService notificationService;
 
     private final com.calyvora.access.PermissionService permissions;
+    private final OrgScope orgScope;
 
     public GoalService(GoalRepository goalRepository, EmployeeRepository employeeRepository,
                        NotificationService notificationService,
-            com.calyvora.access.PermissionService permissions) {
+            com.calyvora.access.PermissionService permissions,
+            OrgScope orgScope) {
         this.permissions = permissions;
+        this.orgScope = orgScope;
         this.goalRepository = goalRepository;
         this.employeeRepository = employeeRepository;
         this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
-    public List<GoalResponse> list(UUID employeeId) {
+    public List<GoalResponse> list(UUID employeeId, AuthPrincipal principal) {
         UUID companyId = TenantContext.getCompanyId();
-        requireEmployee(employeeId, companyId);
+        Employee employee = requireEmployee(employeeId, companyId);
+        // Someone's goals are their own, their chain's above them, and HR's — not every colleague's.
+        // This read had no check at all, so anyone could list anyone's by id (role review, PD-68).
+        boolean self = employee.getUserId() != null && employee.getUserId().equals(principal.userId());
+        if (!self && !permissions.has(principal, com.calyvora.access.Permission.PERFORMANCE_MANAGE)
+                && !orgScope.seesWholeCompany(principal) && !orgScope.canSee(principal, employeeId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "You can only see goals for yourself or the people you lead");
+        }
         return goalRepository.findByEmployeeIdOrderByCreatedAtDesc(employeeId).stream()
                 .map(GoalResponse::of).toList();
     }

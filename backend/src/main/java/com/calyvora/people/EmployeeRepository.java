@@ -41,6 +41,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     /** Everyone in one employment state — the exits screen asks for NOTICE (PD-20). */
     List<Employee> findByCompanyIdAndEmploymentStatus(UUID companyId, EmploymentStatus employmentStatus);
 
+    /** Exits waiting for an admin (V75). */
+    List<Employee> findByCompanyIdAndExitRequestedAtIsNotNull(UUID companyId);
+
     long countByDepartmentId(UUID departmentId);
 
     List<Employee> findByDepartmentId(UUID departmentId);

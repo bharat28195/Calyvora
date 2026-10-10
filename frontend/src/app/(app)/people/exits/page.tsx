@@ -34,6 +34,9 @@ export default function ExitsPage() {
 
   // A manager works the checklist; deciding that someone is leaving, and declaring them left, is HR's.
   const canStart = can(me, "EXITS_MANAGE");
+  // Putting someone on notice takes an admin's yes (PD-65); everyone else's start is a request.
+  const canApprove = can(me, "EXITS_APPROVE");
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -59,8 +62,17 @@ export default function ExitsPage() {
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
+      {notice && <Alert tone="success" className="mt-6">{notice}</Alert>}
 
-      {canStart && <StartExitCard onStarted={(e) => { void load(); setOpenId(e.employeeId); }} />}
+      {canStart && <StartExitCard onStarted={(e) => {
+        void load();
+        if (e.requestedAt && e.employmentStatus !== "NOTICE") {
+          setNotice(`Sent to an admin for approval. ${e.employeeName ?? "They"} stay${e.employeeName ? "s" : ""} as they are until it is approved.`);
+        } else {
+          setNotice(null);
+          setOpenId(e.employeeId);
+        }
+      }} />}
 
       {exits === null ? (
         <div className="mt-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
@@ -80,6 +92,7 @@ export default function ExitsPage() {
               onToggleOpen={() => setOpenId(openId === e.employeeId ? null : e.employeeId)}
               onChanged={load}
               canComplete={!!canStart}
+              canApprove={!!canApprove}
             />
           ))}
         </div>
@@ -162,13 +175,14 @@ function StartExitCard({ onStarted }: { onStarted: (e: ExitView) => void }) {
 }
 
 function ExitCard({
-  exit, open, onToggleOpen, onChanged, canComplete,
+  exit, open, onToggleOpen, onChanged, canComplete, canApprove,
 }: {
   exit: ExitView;
   open: boolean;
   onToggleOpen: () => void;
   onChanged: () => Promise<void>;
   canComplete: boolean;
+  canApprove: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +200,37 @@ function ExitCard({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Asked for, not yet approved: nothing has happened to the person; show where it stands.
+  if (exit.requestedAt && exit.employmentStatus !== "NOTICE") {
+    return (
+      <Card className="border-amber-500/30 bg-amber-500/[0.04]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 font-medium">
+              {exit.employeeName ?? "Unnamed"}
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">Waiting for admin approval</span>
+            </div>
+            <div className="text-xs text-fg/50">
+              Last day {exit.requestedLastDay ?? "—"}
+              {exit.requestedReason && <> · {exit.requestedReason}</>}
+              {exit.requestedByName && <> · asked by {exit.requestedByName}</>}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {canApprove && <>
+              <Button size="sm" disabled={busy} onClick={() => run(() => api.approveExit(exit.employeeId))}>Approve</Button>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => run(() => api.rejectExit(exit.employeeId))}>Turn down</Button>
+            </>}
+            {canComplete && !canApprove && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => run(() => api.cancelExit(exit.employeeId))}>Withdraw</Button>
+            )}
+          </div>
+        </div>
+        {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+      </Card>
+    );
   }
 
   return (

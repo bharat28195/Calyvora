@@ -25,6 +25,8 @@ public enum Permission {
     PEOPLE_PRIVATE_VIEW("People", "See private details", "PAN, bank account, UAN and other personal details of other employees.", false),
     LEAVE_POLICY_MANAGE("People", "Manage leave policy and holidays", "Set leave entitlements, accrual, carry-forward and the holiday calendar.", false),
     EXITS_MANAGE("People", "Manage exits", "Start, cancel and complete someone's exit, and work the exit checklist.", false),
+    /** PD-65: putting someone on notice takes an admin's yes. Without this, starting an exit only asks. */
+    EXITS_APPROVE("People", "Approve exits", "Approve or turn down an exit before the person is put on notice.", false),
 
     // --- Time ---
     LEAVE_APPROVE("Time", "Approve leave", "Approve or reject leave and comp-off requests.", true),

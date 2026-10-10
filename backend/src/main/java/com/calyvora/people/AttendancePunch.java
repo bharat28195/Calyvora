@@ -42,6 +42,10 @@ public class AttendancePunch {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** When the person was told they never checked out of this session (V77). */
+    @Column(name = "reminded_at")
+    private Instant remindedAt;
+
     protected AttendancePunch() {
     }
 
@@ -66,4 +70,6 @@ public class AttendancePunch {
     public LocalTime getCheckIn() { return checkIn; }
     public LocalTime getCheckOut() { return checkOut; }
     public void setCheckOut(LocalTime checkOut) { this.checkOut = checkOut; }
+    public Instant getRemindedAt() { return remindedAt; }
+    public void setRemindedAt(Instant v) { this.remindedAt = v; }
 }

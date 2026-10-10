@@ -40,13 +40,19 @@ public class ResendSender implements EmailSender {
 
     @Override
     public void send(EmailSettings settings, String to, String subject, String body, String html) throws Exception {
+        send(settings, to, subject, body, html, null, List.of());
+    }
+
+    @Override
+    public void send(EmailSettings settings, String to, String subject, String body, String html,
+                     String displayName, List<Attachment> attachments) throws Exception {
         if (settings.apiKey() == null || settings.apiKey().isBlank()) {
             throw new IllegalStateException("No Resend API key configured (set RESEND_API_KEY)");
         }
         // Both parts, always. The client picks; filters read the text one, and a message with no text
         // alternative is scored as more likely to be spam for exactly that reason.
         Map<String, Object> payloadMap = new LinkedHashMap<>(Map.of(
-                "from", EmailIdentity.from(settings),
+                "from", EmailIdentity.from(settings, displayName),
                 "to", List.of(to),
                 "subject", subject,
                 "text", body));
@@ -55,6 +61,11 @@ public class ResendSender implements EmailSender {
         }
         if (settings.replyTo() != null && !settings.replyTo().isBlank()) {
             payloadMap.put("reply_to", settings.replyTo());
+        }
+        if (attachments != null && !attachments.isEmpty()) {
+            payloadMap.put("attachments", attachments.stream().map(a -> Map.of(
+                    "filename", a.fileName(),
+                    "content", java.util.Base64.getEncoder().encodeToString(a.content()))).toList());
         }
         byte[] payload = json.writeValueAsBytes(payloadMap);
 

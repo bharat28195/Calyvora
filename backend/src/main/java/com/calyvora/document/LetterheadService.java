@@ -78,18 +78,18 @@ public class LetterheadService {
     }
 
     /**
-     * Accepted letterpad formats.
-     *
-     * <p>Images only. A PDF letterpad is the commoner thing for a printer to hand over, and it
-     * cannot be used as a CSS background without rasterising it — which needs a renderer this
-     * application does not have. Refusing it with a sentence that says what to do instead is
-     * better than accepting it and printing a broken page.
+     * Accepted letterpad formats: an image as it is, or a PDF or Word file whose first page is
+     * rendered to an image (PD-64, see {@link LetterpadConverter}). The old Word format (.doc) is not
+     * readable here; the message says to save it as .docx or PDF.
      */
-    private static final java.util.Set<String> ACCEPTED =
-            java.util.Set.of("image/png", "image/jpeg", "image/webp");
+    private static final java.util.Set<String> IMAGES = java.util.Set.of("image/png", "image/jpeg", "image/webp");
+    private static final String PDF = "application/pdf";
+    private static final String DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-    /** Two megabytes: comfortably a 300-dpi A4 scan, and small enough to sit in a row. */
+    /** Two megabytes for an image: comfortably a 300-dpi A4 scan, and small enough to sit in a row. */
     static final long MAX_BYTES = 2L * 1024 * 1024;
+    /** A PDF or Word file can carry fonts and vector art, so it may be larger; what is stored is the image. */
+    static final long MAX_DOCUMENT_BYTES = 10L * 1024 * 1024;
 
     @Transactional
     public LetterheadResponse uploadBackground(org.springframework.web.multipart.MultipartFile file) {
@@ -98,22 +98,35 @@ public class LetterheadService {
                     com.calyvora.common.error.ErrorCode.VALIDATION_ERROR, "Choose a file to upload.");
         }
         String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase(java.util.Locale.ROOT);
-        if (!ACCEPTED.contains(type)) {
-            throw new com.calyvora.common.error.ApiException(
-                    com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
-                    "Upload a PNG, JPEG or WebP image. A PDF letterpad needs exporting to an image first.");
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(java.util.Locale.ROOT);
+        // Browsers send Word files under several types (or none); the extension settles it.
+        if (name.endsWith(".pdf")) type = PDF;
+        else if (name.endsWith(".docx")) type = DOCX;
+        if (name.endsWith(".doc")) {
+            throw invalid("That is the old Word format. Save it as .docx or as a PDF, and upload that.");
         }
-        if (file.getSize() > MAX_BYTES) {
-            throw new com.calyvora.common.error.ApiException(
-                    com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
-                    "That file is larger than 2 MB. Export it at a lower resolution and try again.");
+        boolean document = PDF.equals(type) || DOCX.equals(type);
+        if (!IMAGES.contains(type) && !document) {
+            throw invalid("Upload your letterpad as a PDF, a Word file (.docx) or an image (PNG, JPEG or WebP).");
+        }
+        if (file.getSize() > (document ? MAX_DOCUMENT_BYTES : MAX_BYTES)) {
+            throw invalid(document ? "That file is larger than 10 MB." : "That image is larger than 2 MB. Export it at a lower resolution and try again.");
         }
         byte[] bytes;
         try {
             bytes = file.getBytes();
-        } catch (java.io.IOException e) {
-            throw new com.calyvora.common.error.ApiException(
-                    com.calyvora.common.error.ErrorCode.VALIDATION_ERROR, "That file could not be read.");
+            if (document) {
+                LetterpadConverter.Image image = PDF.equals(type)
+                        ? LetterpadConverter.fromPdf(bytes) : LetterpadConverter.fromDocx(bytes);
+                bytes = image.bytes();
+                type = image.contentType();
+            }
+        } catch (java.io.IOException | RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(LetterheadService.class)
+                    .warn("Letterpad {} could not be converted: {}", file.getOriginalFilename(), e.toString(), e);
+            throw invalid(document
+                    ? "That file could not be read as a letterpad. If it is password-protected, remove the password; otherwise try saving it as a PDF."
+                    : "That file could not be read.");
         }
         Letterhead l = getOrCreate();
         l.setBackground(bytes, type, blankToNull(file.getOriginalFilename()) == null
@@ -161,6 +174,10 @@ public class LetterheadService {
         return companyRepository.findById(TenantContext.getCompanyId())
                 .map(com.calyvora.company.Company::getName)
                 .orElse(null);
+    }
+
+    private static com.calyvora.common.error.ApiException invalid(String message) {
+        return new com.calyvora.common.error.ApiException(com.calyvora.common.error.ErrorCode.VALIDATION_ERROR, message);
     }
 
     private static String blankToNull(String s) {

@@ -17,9 +17,12 @@ export const REG_TONE: Record<RegularizationStatus, string> = {
 };
 
 /** Employee widget: raise a "forgot to punch" regularization and see your requests. */
-export function MyRegularizations() {
+/**
+ * @param fixDate a day to correct straight away — the "you didn't check out" email links here with it
+ */
+export function MyRegularizations({ fixDate }: { fixDate?: string | null } = {}) {
   const [items, setItems] = useState<Regularization[] | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(!!fixDate);
   const [error, setError] = useState<string | null>(null);
 
   function load() {
@@ -36,7 +39,7 @@ export function MyRegularizations() {
       <p className="mt-1 text-sm text-fg/50">Forgot to clock in? Request a fix — it goes to your manager for approval.</p>
 
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}
-      {adding && <RaiseForm onDone={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />}
+      {adding && <RaiseForm initialDate={fixDate ?? undefined} onDone={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />}
 
       {items === null ? (
         <div className="mt-4"><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></div>
@@ -59,11 +62,11 @@ export function MyRegularizations() {
   );
 }
 
-function RaiseForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const [date, setDate] = useState(() => new Date(Date.now() - 86400000).toISOString().slice(0, 10));
+function RaiseForm({ onDone, onCancel, initialDate }: { onDone: () => void; onCancel: () => void; initialDate?: string }) {
+  const [date, setDate] = useState(() => initialDate ?? new Date(Date.now() - 86400000).toISOString().slice(0, 10));
   const [checkIn, setCheckIn] = useState("09:30");
   const [checkOut, setCheckOut] = useState("18:00");
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(initialDate ? "Forgot to check out" : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

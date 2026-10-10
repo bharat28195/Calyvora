@@ -88,6 +88,7 @@ import {
   type TaxSettings,
   type TaxReviewInput,
   type Form130,
+  type DocumentEmailState,
   type TdsDeposits,
   type TdsChallanInput,
   type LeaveRequest,
@@ -434,6 +435,9 @@ function pageQuery(opts: object): string {
   const query = qs.toString();
   return query ? `?${query}` : "";
 }
+
+/** Letterpad images by version, as object URLs (see api.letterpadImage). */
+const letterpadCache = new Map<string, Promise<string>>();
 
 export const api = {
   // --- auth / registration ---
@@ -933,9 +937,12 @@ export const api = {
     return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/manager`, { method: "PATCH", body: JSON.stringify(input) })
       : mockBackend.saveManagerReview(accessToken, reviewId, input);
   },
-  approveReview(reviewId: string): Promise<PerformanceReview> {
-    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/approve`, { method: "POST" })
+  approveReview(reviewId: string, opts: { force?: boolean; issueLetter?: boolean } = {}): Promise<PerformanceReview> {
+    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/approve`, { method: "POST", body: JSON.stringify(opts) })
       : mockBackend.approveReview(accessToken, reviewId);
+  },
+  deleteReviewCycle(cycleId: string): Promise<void> {
+    return LIVE ? http<void>(`/performance/cycles/${cycleId}`, { method: "DELETE" }) : liveOnly("Review cycles");
   },
   listEmployees(): Promise<Employee[]> {
     return LIVE ? http<Employee[]>("/people/employees") : mockBackend.listEmployees(accessToken);
@@ -1708,6 +1715,26 @@ export const api = {
   document(id: string): Promise<GeneratedDoc> {
     return LIVE ? http<GeneratedDoc>(`/documents/${id}`) : mockBackend.document(accessToken, id);
   },
+  /** The issued letter as a PDF on the letterpad — the same file the email attaches. */
+  async documentPdf(id: string): Promise<Blob> {
+    const res = await fetch(`${BASE}/documents/${id}/pdf`, {
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    }
+    return res.blob();
+  },
+  documentEmail(id: string): Promise<DocumentEmailState> {
+    return LIVE ? http<DocumentEmailState>(`/documents/${id}/email`) : liveOnly("Emailing letters");
+  },
+  sendDocumentEmail(id: string, input: { to: string; subject: string; message: string }): Promise<DocumentEmailState> {
+    return LIVE
+      ? http<DocumentEmailState>(`/documents/${id}/email`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Emailing letters");
+  },
   deleteDocument(id: string): Promise<void> {
     return LIVE ? http<void>(`/documents/${id}`, { method: "DELETE" }) : mockBackend.deleteDocument(accessToken, id);
   },
@@ -1754,7 +1781,44 @@ export const api = {
   letterpadImageUrl(version: string): string {
     return `${BASE}/documents/letterhead/background?v=${encodeURIComponent(version)}`;
   },
+  /**
+   * The letterpad image as a local object URL, fetched with the session's token.
+   *
+   * <p>The API reads the token from the Authorization header only, which neither an <img> nor a CSS
+   * background sends — so pointing either at {@link letterpadImageUrl} got a 401 and letters showed as
+   * bare text. One fetch per version, shared by every letter on screen.
+   */
+  letterpadImage(version: string): Promise<string> {
+    const hit = letterpadCache.get(version);
+    if (hit) return hit;
+    const p = (async () => {
+      const res = await fetch(`${BASE}/documents/letterhead/background?v=${encodeURIComponent(version)}`, {
+        credentials: "include",
+        headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+      });
+      if (!res.ok) throw new Error("letterpad " + res.status);
+      return URL.createObjectURL(await res.blob());
+    })();
+    letterpadCache.set(version, p);
+    p.catch(() => letterpadCache.delete(version));
+    return p;
+  },
 
+  /** Exits waiting for an admin's approval (PD-65). Admins only; others get a 403. */
+  exitRequests(): Promise<(ExitView & { employeeName: string; lastWorkingDay: string | null; reason: string | null; requestedByName: string | null })[]> {
+    return LIVE
+      ? http<ExitView[]>("/people/exits/requests").then((rows) => rows.map((r) => ({
+          ...r, employeeName: r.employeeName ?? "Employee", lastWorkingDay: r.requestedLastDay ?? null,
+          reason: r.requestedReason ?? null, requestedByName: r.requestedByName ?? null,
+        })))
+      : Promise.resolve([]);
+  },
+  approveExit(employeeId: string): Promise<ExitView> {
+    return LIVE ? http<ExitView>(`/people/employees/${employeeId}/exit/approve`, { method: "POST" }) : liveOnly("Exits");
+  },
+  rejectExit(employeeId: string): Promise<ExitView> {
+    return LIVE ? http<ExitView>(`/people/employees/${employeeId}/exit/reject`, { method: "POST" }) : liveOnly("Exits");
+  },
   exits(): Promise<ExitView[]> {
     return LIVE ? http<ExitView[]>("/people/exits") : liveOnly("Exits");
   },

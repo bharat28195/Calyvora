@@ -12,6 +12,9 @@ RUN mvn -B clean package -DskipTests
 
 # ---- run stage ----
 FROM eclipse-temurin:21-jre
+# Letters are rendered to PDF and letterpads from PDF to images on the server (PD-64); Java2D needs
+# fontconfig and FreeType to do that headless.
+RUN apt-get update && apt-get install -y --no-install-recommends fontconfig libfreetype6 \n    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/target/calyvora-backend-*.jar app.jar
 # Respect the container's memory limit (free tiers are small).

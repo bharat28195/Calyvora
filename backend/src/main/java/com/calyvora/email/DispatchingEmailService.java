@@ -109,6 +109,50 @@ public class DispatchingEmailService implements EmailService {
         return send(to, subject, body, html, java.util.function.UnaryOperator.identity());
     }
 
+    @Override
+    public EmailResult sendCheckoutReminder(String to, String firstName, String companyName, String day,
+                                            String checkIn, String link) {
+        String subject = "You didn't check out on " + day;
+        String body = "Hi " + (firstName == null ? "there" : firstName) + ",\n\n"
+                + "You checked in at " + checkIn + " on " + day + " but never checked out, so that day's hours are incomplete.\n\n"
+                + "Add your check-out time here — your manager will approve it:\n" + link + "\n\n"
+                + "If you have already sorted it out, ignore this.\n\n" + (companyName == null ? "Orbit" : companyName);
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + "<p>Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(firstName == null ? "there" : firstName) + ",</p>"
+                + "<p>You checked in at <b>" + org.springframework.web.util.HtmlUtils.htmlEscape(checkIn) + "</b> on <b>"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(day) + "</b> but never checked out, so that day's hours are incomplete.</p>"
+                + "<p><a href=\"" + org.springframework.web.util.HtmlUtils.htmlEscape(link) + "\" style=\"display:inline-block;background:#7c5cff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none\">Add my check-out time</a></p>"
+                + "<p style=\"color:#666\">Your manager approves the correction. If you have already sorted it out, ignore this.</p></div>";
+        return send(to, subject, body, html);
+    }
+
+    @Override
+    public EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
+                                    String message, EmailSender.Attachment attachment) {
+        EmailSettings base = resolver.resolve(TenantContext.getCompanyIdOrNull());
+        // Replies go to the company, not to the platform's no-reply — a new joinee answering their
+        // offer letter must reach the people who sent it.
+        EmailSettings settings = replyTo == null || replyTo.isBlank() ? base
+                : new EmailSettings(base.provider(), base.from(), replyTo, base.otpFrom(), base.apiKey(), base.apiUrl(),
+                        base.host(), base.port(), base.username(), base.password(), base.auth(), base.starttls(), base.ssl());
+        String provider = settings.provider().name();
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(message).replace("\n", "<br>") + "</div>";
+        try {
+            EmailSender sender = senderFor(settings);
+            sender.send(settings, to, subject, message, html, companyName, java.util.List.of(attachment));
+            if (sender instanceof ConsoleSender) {
+                return EmailResult.failed(provider,
+                        "No mail provider is configured, so nothing was delivered — the message was only written to the server log.");
+            }
+            return EmailResult.ok(provider);
+        } catch (Exception ex) {
+            String error = describe(ex);
+            log.warn("Failed to send document '{}' to {} via {}: {}", subject, to, provider, error);
+            return EmailResult.failed(provider, error);
+        }
+    }
+
     /**
      * @param senderIdentity adjusts the resolved settings for this one message — used only to swap the
      *                       From for a one-time code. A function rather than a field so the choice is

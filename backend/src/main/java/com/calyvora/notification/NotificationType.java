@@ -27,4 +27,10 @@ public enum NotificationType {
     /** Your attendance regularization was approved or rejected. */
     REGULARIZATION_DECIDED,
     ANNOUNCEMENT,
+    /** An exit was asked for and needs an admin's approval (PD-65). */
+    EXIT_REQUESTED,
+    /** The exit you asked for was approved or turned down. */
+    EXIT_DECIDED,
+    /** You checked in yesterday and never checked out (PD-67). */
+    CHECKOUT_MISSED,
 }
