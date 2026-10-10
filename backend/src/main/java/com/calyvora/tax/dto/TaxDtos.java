@@ -46,7 +46,7 @@ public final class TaxDtos {
     }
 
     public record HouseView(String id, boolean letOut, String address, String lenderName, String lenderPan,
-                            BigDecimal interest, BigDecimal annualRent, BigDecimal municipalTax,
+                            String lenderAddress, String lenderType, BigDecimal interest, BigDecimal annualRent, BigDecimal municipalTax,
                             String proofStatus, BigDecimal acceptedInterest, String reviewNote,
                             List<ProofView> proofs) {
     }
@@ -60,6 +60,12 @@ public final class TaxDtos {
     public record DeclarationResponse(
             String employeeId,
             String employeeName,
+            /** Form 124 item 1, as the employee last certified it. */
+            String employeeAddress,
+            String employeePan,
+            /** For "son / daughter of" in the verification. */
+            String parentName,
+            String designation,
             String financialYear,
             TaxRegime regime,
             String status,
@@ -93,7 +99,8 @@ public final class TaxDtos {
     }
 
     public record HousePayload(String id, boolean letOut, String address, String lenderName, String lenderPan,
-                               BigDecimal interest, BigDecimal annualRent, BigDecimal municipalTax) {
+                               BigDecimal interest, BigDecimal annualRent, BigDecimal municipalTax,
+                               String lenderAddress, String lenderType) {
     }
 
     public record PreviousPayload(String employerName, String tan, BigDecimal income, BigDecimal tds,
@@ -106,9 +113,9 @@ public final class TaxDtos {
      */
     public record DeclarationPayload(TaxRegime regime, Boolean parentsSenior, Map<String, BigDecimal> declared,
                                      List<ItemPayload> items, List<RentPayload> rent, List<HousePayload> houses,
-                                     PreviousPayload previous) {
+                                     PreviousPayload previous, String employeeAddress) {
         public DeclarationPayload(TaxRegime regime, Map<String, BigDecimal> declared) {
-            this(regime, null, declared, null, null, null, null);
+            this(regime, null, declared, null, null, null, null, null);
         }
     }
 
@@ -119,7 +126,20 @@ public final class TaxDtos {
     }
 
     /** One line as claimed and as allowed. */
-    public record DeductionRow(String key, String section, String label, BigDecimal declared, BigDecimal allowed) {
+    /**
+     * One line of the working. {@code declared} is the amount the calculation used — what was claimed
+     * until the proof deadline, what HR accepted after it. {@code claimed} and {@code approved} are the
+     * two figures behind that, for the lines an employee types (null for lines Orbit works out).
+     * {@code limit} and {@code usedBefore} explain a capped line: the ceiling, and how much of it the
+     * lines above had already used.
+     */
+    public record DeductionRow(String key, String section, String label, BigDecimal declared, BigDecimal allowed,
+                               BigDecimal claimed, BigDecimal approved, String proofStatus,
+                               BigDecimal limit, BigDecimal usedBefore, BigDecimal movedToHouse) {
+    }
+
+    /** One earning in one month. */
+    public record HeadRow(String name, BigDecimal amount) {
     }
 
     /** A shared ceiling and how full it is. */
@@ -127,7 +147,8 @@ public final class TaxDtos {
     }
 
     /** One month of the year: where its figure comes from, the salary and the tax. */
-    public record MonthRow(String month, String source, BigDecimal gross, BigDecimal tds) {
+    public record MonthRow(String month, String source, BigDecimal gross, BigDecimal tds, BigDecimal pt,
+                           List<HeadRow> heads) {
     }
 
     public record HraMonthRow(String month, BigDecimal hraReceived, BigDecimal rentLessTenPercent,
@@ -169,7 +190,12 @@ public final class TaxDtos {
             boolean withheldByPayroll,
             boolean proofsDue,
             List<MonthRow> months,
-            List<HraMonthRow> hraMonths) {
+            List<HraMonthRow> hraMonths,
+            /** Salary and tax from before this payroll — a previous employer, or an opening balance. */
+            BigDecimal priorIncome,
+            BigDecimal priorTds,
+            /** Home-loan interest declared under 130 / 131 that counts under Section 22 instead. */
+            BigDecimal interestMovedToHouse) {
     }
 
     /** The same income under both sets of rules, and which one wins. */
@@ -192,25 +218,70 @@ public final class TaxDtos {
     public record ReviewPayload(String type, String id, String status, BigDecimal acceptedAmount, String note) {
     }
 
-    public record TaxSettings(boolean declarationsOpen, boolean proofsOpen, String proofDeadline) {
+    /**
+     * The windows, and who signs the forms. The signer fields are left as they are when null and
+     * cleared when blank.
+     */
+    public record TaxSettings(boolean declarationsOpen, boolean proofsOpen, String proofDeadline,
+                              String signerName, String signerParent, String signerDesignation,
+                              String signerPlace, String citTdsAddress) {
+        public TaxSettings(boolean declarationsOpen, boolean proofsOpen, String proofDeadline) {
+            this(declarationsOpen, proofsOpen, proofDeadline, null, null, null, null, null);
+        }
     }
 
-    // ---- Form 130 Part B --------------------------------------------------------------------
+    // ---- TDS deposits (challans and 24Q receipts) --------------------------------------------
 
-    public record QuarterRow(String quarter, BigDecimal tds) {
+    /** One salary month: the tax payroll deducted and the challan it was paid on, if recorded. */
+    public record DepositMonth(String month, boolean finalised, BigDecimal tdsDeducted, String bsrCode,
+                               String depositDate, String challanSerial, BigDecimal amount) {
+    }
+
+    public record DepositQuarter(String quarter, String label, String receiptNo, List<DepositMonth> months) {
+    }
+
+    public record DepositsResponse(String financialYear, List<DepositQuarter> quarters) {
+    }
+
+    /** A challan for a month. A null amount means "what payroll deducted that month". */
+    public record ChallanPayload(String bsrCode, String depositDate, String challanSerial, BigDecimal amount) {
+    }
+
+    public record ReceiptPayload(String receiptNo) {
+    }
+
+    // ---- Form 130 -----------------------------------------------------------------------------
+
+    /** Part A's summary: one quarter's salary, tax deducted and tax deposited, for one employee. */
+    public record QuarterRow(String quarter, String label, String receiptNo, BigDecimal amountPaid,
+                             BigDecimal tds, BigDecimal deposited) {
+    }
+
+    /** Part A, section II: one deposit of this employee's tax and the challan it went on. */
+    public record ChallanRow(String month, BigDecimal tds, String bsrCode, String depositDate, String challanSerial) {
+    }
+
+    /** Who signs the verification. */
+    public record Signer(String name, String parent, String designation, String place) {
     }
 
     public record Form130Response(
             String financialYear,
             String employerName,
             String employerAddress,
+            String employerPan,
             String employerTan,
+            String citTdsAddress,
             String employeeName,
+            String employeeAddress,
             String employeePan,
+            String employeeNo,
             String designation,
             String periodFrom,
             String periodTo,
+            Signer signer,
             List<QuarterRow> quarters,
+            List<ChallanRow> challans,
             ComputationResponse computation) {
     }
 }

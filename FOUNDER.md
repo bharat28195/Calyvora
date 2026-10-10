@@ -1839,7 +1839,8 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **The law as built (tax year 2026-27, verified against published sources, Budget 2026 changed no
   slab):** new regime 0/5/10/15/20/25/30% with the ₹60,000 rebate to ₹12 lakh and marginal relief;
   old regime 0/5/20/30% (₹3L / ₹5L free for 60+ / 80+); standard deduction ₹75,000 / ₹50,000;
-  surcharge with relief at every threshold; 4% cess; income and tax rounded to ₹10 (Section 516).
+  surcharge with relief at every threshold; 4% cess; income rounded to ₹10 (Section 516; tax to the
+  rupee since PD-61).
   Sections shown with the 2025 Act's numbers and the 1961 ones beside them (Sec 123 (80C), 126
   (80D), 129 (80E), 133 (80G), 153 (80TTA/TTB), 154 (80U)…). Forms are Form 124 (was 12BB) and
   Form 130 (was Form 16). HRA metros are eight from 2026-27 (Bengaluru, Hyderabad, Pune, Ahmedabad
@@ -1863,6 +1864,48 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Data (V71):** old declaration keys mapped onto the new lines (80C → "Other Section 123",
   home-loan interest → a house, a >₹25,000 parents' claim read as "parent is a senior"); salary
   template lines tagged HRA / LTA. Tenant-bound per company, with a data test.
+
+### PD-61 · 2026-10-10 · Forms 124 and 130 laid out as the official ones; tax payable to the rupee
+- **Trigger (founder):** a real Form 16 Part A and Part B issued through TRACES and a Keka Form 124,
+  shared as the layout to build to. Only their structure was used; no personal data is in the code.
+- **Tax to the rupee, not to ₹10.** The TRACES Part B shows ₹2,93,520 tax + ₹11,741 cess =
+  ₹3,05,261. Orbit rounded the tax to ₹10 (₹3,05,260). Rounding to ten belongs to the return the
+  employee files; TDS deducted and certified is exact, and a payroll that rounds disagrees with every
+  Form 16 by up to ₹5. Income is still rounded to ₹10. A test reproduces that certificate exactly.
+- **Form 124** now follows the Rules' own table: serial / nature of claim / amount / evidence; HRA
+  per landlord (rent, name, address, PAN), LTA, interest on borrowing (lender name, address, PAN and
+  type — financial institution, employer, other), Chapter VI-A split into (A) Sections 123 and 124
+  — with "EPF (deducted from salary)" first — and (B) other sections as "Section 131 (Formerly
+  80EEA)"; then the employee's verification with "son/daughter of", place, date, designation.
+- **Form 130** has both parts, numbered line for line as TRACES prints them (1(a)–(e), 2(a)–(i), …
+  10(a)–(n), 11–21). Part A is a *draft from payroll* for HR to check the TRACES download against:
+  quarter summary (amount paid, deducted, deposited, 24Q receipt) and every challan (BSR, date,
+  serial). The signer's verification includes the amounts in words (Indian system).
+- **New data (V72, schema only):** employee address on the year's declaration; lender address and
+  type; the person responsible for TDS (name, parent, designation, place) and the CIT (TDS); a
+  challan per salary month; a receipt number per 24Q quarter. Manage tax is now three tabs —
+  Employees, TDS deposits, Settings.
+
+### PD-62 · 2026-10-10 · A computation screen that explains every rupee — and pays less where the law allows
+- **Trigger (founder):** a capture of Keka's income-tax computation page; "do whatever is best and
+  make Orbit way better than Keka". Orbit's engine already matched Keka line for line (their old-regime
+  example comes to ₹3,49,608 under Orbit's rules too); the gap was explanation, not arithmetic.
+- **Home-loan interest goes where it is worth most (engine change).** Interest declared under Section
+  130 / 131 (80EE / 80EEA) first fills Section 22's (24(b)) ₹2,00,000 for a self-occupied home; only
+  the excess stays under 130 / 131. Old regime only, bounded by both the self-occupied ceiling and the
+  ₹2,00,000 house-loss set-off, so nothing moved is wasted. On Keka's own example — ₹1,65,084 of interest
+  claimed under 131, ₹1,50,000 allowed — Orbit allows all of it: ₹4,704 less tax. The line keeps the
+  declared figure and says what moved, so it never looks like a claim vanished.
+- **Every capped line explains itself:** the ceiling, what the lines above used, what was left, the
+  amount counted, and "allowed = the smaller of the two" — Keka hides this behind a drill-in per row;
+  Orbit computes it server-side for every capped line (Section 123 and every shared ceiling).
+- **The screen:** six headline numbers and a paid-so-far bar; a chip saying whether declared or
+  HR-approved amounts are being counted; tax deducted per month as a chart (paid / expected / before
+  Orbit) with the three-way split; deductions as two tables (the ₹1.5 lakh pool, everything else) with
+  claimed / approved / allowed; salary head by head for all twelve months, each month tagged paid or
+  expected (so a mid-year raise shows from its month — heads always add to the month's gross);
+  professional tax month by month; slab bars; HRA table highlighting which of the three won.
+- **Kept on purpose:** taxable income rounded to ₹10 (Section 516), which Keka skips; tax to the rupee.
 
 ## 4. Architecture Decision Log
 

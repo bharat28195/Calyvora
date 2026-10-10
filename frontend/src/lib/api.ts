@@ -88,6 +88,8 @@ import {
   type TaxSettings,
   type TaxReviewInput,
   type Form130,
+  type TdsDeposits,
+  type TdsChallanInput,
   type LeaveRequest,
   type LeaveTypeBalance,
   type LoginResult,
@@ -1520,6 +1522,18 @@ export const api = {
   },
   saveTaxSettings(input: TaxSettings): Promise<TaxSettings> {
     return LIVE ? http<TaxSettings>("/tax/settings", { method: "PUT", body: JSON.stringify(input) }) : liveOnly("Income tax");
+  },
+  tdsDeposits(year?: string): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  saveTdsChallan(month: string, input: TdsChallanInput): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits/challans/${month}`, { method: "PUT", body: JSON.stringify(input) }) : liveOnly("Income tax");
+  },
+  clearTdsChallan(month: string): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits/challans/${month}`, { method: "DELETE" }) : liveOnly("Income tax");
+  },
+  saveTdsReceipt(quarter: string, receiptNo: string): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits/receipts/${quarter}`, { method: "PUT", body: JSON.stringify({ receiptNo }) }) : liveOnly("Income tax");
   },
   employeeTaxDeclaration(employeeId: string, year?: string): Promise<TaxDeclaration> {
     return LIVE ? http<TaxDeclaration>(`/tax/declarations/${employeeId}${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");

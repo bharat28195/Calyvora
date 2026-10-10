@@ -42,7 +42,7 @@ export default function TaxComputationPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/finance/tax/form124"><Button variant="secondary"><FileText className="h-4 w-4" /> Form 124</Button></Link>
-          <Link href="/finance/tax/form130"><Button variant="secondary"><FileText className="h-4 w-4" /> Form 130 Part B</Button></Link>
+          <Link href="/finance/tax/form130"><Button variant="secondary"><FileText className="h-4 w-4" /> Form 130</Button></Link>
         </div>
       </div>
 
@@ -51,17 +51,6 @@ export default function TaxComputationPage() {
           Your employer doesn&apos;t deduct income tax through Orbit yet, so none has come off your payslips here. Use this to plan.
         </Alert>
       )}
-      {data.proofsDue && (
-        <Alert tone="info" className="mt-4">The proof deadline has passed, so only what HR accepted counts below.</Alert>
-      )}
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-4">
-        <Stat label="Tax for the year" value={money(data.totalTax)} />
-        <Stat label="Deducted so far" value={money(data.deductedSoFar)} />
-        <Stat label="Still to deduct" value={money(data.remainingTax)} />
-        <Stat label="Next payslip" value={money(data.projectedNextMonth)} />
-      </div>
-
       {data.comparison.saving > 0 && (
         <Card className="mt-4">
           <p className="text-sm">
@@ -76,14 +65,5 @@ export default function TaxComputationPage() {
 
       <div className="mt-4"><TaxWorking c={data} /></div>
     </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <p className="text-xs text-fg/50">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
-    </Card>
   );
 }

@@ -77,6 +77,10 @@ public class TaxDeclaration {
     @Column(name = "prev_review_note", length = 400)
     private String prevReviewNote;
 
+    /** Form 124 item 1 — the address the employee certified this year (V72). */
+    @Column(name = "employee_address", length = 400)
+    private String employeeAddress;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -163,6 +167,8 @@ public class TaxDeclaration {
     public void setPrevStatus(String v) { this.prevStatus = v; }
     public String getPrevReviewNote() { return prevReviewNote; }
     public void setPrevReviewNote(String v) { this.prevReviewNote = v; }
+    public String getEmployeeAddress() { return employeeAddress; }
+    public void setEmployeeAddress(String v) { this.employeeAddress = v; }
 
     /** Whether there is an earlier employer's income on this declaration that counts. */
     public boolean hasPreviousEmployer() {

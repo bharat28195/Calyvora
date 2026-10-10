@@ -11,8 +11,11 @@ import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { TdsDepositsPanel } from "@/components/tax/deposits";
 
 type Filter = "ALL" | "WAITING" | "NOT_STARTED" | "SUBMITTED";
+type Tab = "people" | "deposits" | "settings";
+type Signer = { signerName: string; signerParent: string; signerDesignation: string; signerPlace: string; citTdsAddress: string };
 
 /**
  * HR's year: the windows, and everybody's declaration with what is waiting on them.
@@ -27,6 +30,8 @@ export default function ManageTaxPage() {
   const [deadline, setDeadline] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
+  const [tab, setTab] = useState<Tab>("people");
+  const [signer, setSigner] = useState<Signer>({ signerName: "", signerParent: "", signerDesignation: "", signerPlace: "", citTdsAddress: "" });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +42,7 @@ export default function ManageTaxPage() {
       setRows(list);
       setSettings(s);
       setDeadline(s.proofDeadline ?? "");
+      setSigner(signerOf(s));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not load declarations");
     }
@@ -46,7 +52,9 @@ export default function ManageTaxPage() {
   async function saveSettings(next: TaxSettings) {
     setBusy(true); setError(null); setNotice(null);
     try {
-      setSettings(await api.saveTaxSettings(next));
+      const saved = await api.saveTaxSettings(next);
+      setSettings(saved);
+      setSigner(signerOf(saved));
       setNotice("Saved.");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not save");
@@ -85,7 +93,16 @@ export default function ManageTaxPage() {
         <Stat label="Tax for the year" value={money(counts.tax)} />
       </div>
 
-      {settings && (
+      <div className="mt-6 flex gap-1 border-b border-fg/10">
+        {([["people", "Employees"], ["deposits", "TDS deposits"], ["settings", "Settings"]] as [Tab, string][]).map(([t, l]) => (
+          <button key={t} onClick={() => setTab(t)}
+            className={cn("-mb-px border-b-2 px-4 py-2 text-sm", tab === t ? "border-violet font-medium text-fg" : "border-transparent text-fg/50 hover:text-fg")}>{l}</button>
+        ))}
+      </div>
+
+      {tab === "deposits" && <TdsDepositsPanel />}
+
+      {tab === "settings" && settings && (
         <Card className="mt-4">
           <CardTitle>Windows</CardTitle>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -108,7 +125,27 @@ export default function ManageTaxPage() {
         </Card>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      {tab === "settings" && settings && (
+        <Card className="mt-4">
+          <CardTitle>Who signs Forms 124 and 130</CardTitle>
+          <p className="mt-1 text-xs text-fg/50">The person responsible for deducting tax. Printed in the verification on every certificate.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <SignerField label="Full name" value={signer.signerName} onChange={(v) => setSigner({ ...signer, signerName: v })} />
+            <SignerField label="Son / daughter of" value={signer.signerParent} onChange={(v) => setSigner({ ...signer, signerParent: v })} />
+            <SignerField label="Designation" value={signer.signerDesignation} onChange={(v) => setSigner({ ...signer, signerDesignation: v })} placeholder="e.g. Director" />
+            <SignerField label="Place" value={signer.signerPlace} onChange={(v) => setSigner({ ...signer, signerPlace: v })} placeholder="e.g. Ahmedabad" />
+            <SignerField label="CIT (TDS) address" className="sm:col-span-2" value={signer.citTdsAddress} onChange={(v) => setSigner({ ...signer, citTdsAddress: v })}
+              placeholder="The Commissioner of Income Tax (TDS) for your TAN — on the TRACES profile" />
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button disabled={busy || JSON.stringify(signer) === JSON.stringify(signerOf(settings))}
+              onClick={() => void saveSettings({ ...settings, ...signer })}>Save</Button>
+          </div>
+        </Card>
+      )}
+
+      {tab === "people" && <>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1">
           {([["ALL", "Everyone"], ["WAITING", "Proofs waiting"], ["NOT_STARTED", "Not started"], ["SUBMITTED", "Submitted"]] as [Filter, string][]).map(([f, l]) => (
             <button key={f} onClick={() => setFilter(f)}
@@ -161,7 +198,22 @@ export default function ManageTaxPage() {
           </table>
         )}
       </Card>
+      </>}
     </div>
+  );
+}
+
+function signerOf(s: TaxSettings): Signer {
+  return { signerName: s.signerName ?? "", signerParent: s.signerParent ?? "", signerDesignation: s.signerDesignation ?? "",
+    signerPlace: s.signerPlace ?? "", citTdsAddress: s.citTdsAddress ?? "" };
+}
+
+function SignerField({ label, value, onChange, placeholder, className }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
+  return (
+    <label className={cn("flex flex-col gap-1", className)}>
+      <span className="text-xs font-medium text-fg/60">{label}</span>
+      <Input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+    </label>
   );
 }
 

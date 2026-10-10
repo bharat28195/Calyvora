@@ -19,7 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the calculator was run — the working is in the comment beside it. A number copied out of a debugger
  * proves only that the code does what it does.
  *
- * <p>Total income and tax are both rounded to the nearest ₹10 (Section 516 of the 2025 Act).
+ * <p>Total income is rounded to the nearest ₹10 (Section 516 of the 2025 Act). The tax is kept to the
+ * rupee, as TRACES prints it on Form 130 (Form 16) Part B — see {@code matches_a_traces_form_16}.
  */
 class IncomeTaxCalculatorTest {
 
@@ -196,12 +197,12 @@ class IncomeTaxCalculatorTest {
         }
 
         @Test
-        @DisplayName("the old rebate has no marginal relief, and the tax rounds to ten")
+        @DisplayName("the old rebate has no marginal relief")
         void the_old_rebate_stops_dead() {
-            // 5,01,000 taxable: 12,500 + 200 = 12,700; cess 508 -> 13,208 -> rounded 13,210.
+            // 5,01,000 taxable: 12,500 + 200 = 12,700; cess 508 -> 13,208.
             IncomeTaxCalculator.Result r = tax("551000", TaxRegime.OLD);
             assertThat(r.rebate()).isEqualByComparingTo(BigDecimal.ZERO);
-            assertThat(r.totalTax()).isEqualByComparingTo(rs("13210"));
+            assertThat(r.totalTax()).isEqualByComparingTo(rs("13208"));
         }
 
         @Test
@@ -214,7 +215,7 @@ class IncomeTaxCalculatorTest {
             //   123: PF 72,000 + LIC 30,000 + ELSS 80,000 = 1,82,000 -> capped 1,50,000.
             //   124(3) NPS 50,000. 126 self 20,000 + parents (not senior) 30,000 -> 25,000.
             //   Deductions 2,45,000. Total income 8,22,600.
-            //   Tax: 12,500 + 3,22,600 @20% 64,520 = 77,020; cess 3,080.80 -> 80,100.80 -> 80,100.
+            //   Tax: 12,500 + 3,22,600 @20% 64,520 = 77,020; cess 3,080.80 -> 80,100.80 -> 80,101.
             IncomeTaxCalculator.Result r = IncomeTaxCalculator.compute(input("1500000", TaxRegime.OLD,
                     AgeBand.BELOW_60, "600000", "72000", "2400", "180000", "300000", "0", "240000", false,
                     List.of(new IncomeTaxCalculator.HouseProperty(false, null, null, rs("240000"))),
@@ -231,7 +232,7 @@ class IncomeTaxCalculatorTest {
             assertThat(r.totalDeductions()).isEqualByComparingTo(rs("245000"));
             assertThat(r.taxableIncome()).isEqualByComparingTo(rs("822600"));
             assertThat(r.taxOnIncome()).isEqualByComparingTo(rs("77020"));
-            assertThat(r.totalTax()).isEqualByComparingTo(rs("80100"));
+            assertThat(r.totalTax()).isEqualByComparingTo(rs("80101"));
         }
 
         @Test
@@ -368,8 +369,13 @@ class IncomeTaxCalculatorTest {
         @Test
         @DisplayName("Section 130 and 131 cannot both be claimed")
         void home_loan_sections() {
-            IncomeTaxCalculator.Result r = tax("1500000", TaxRegime.OLD,
-                    declare(TaxDeduction.FIRST_HOME_LOAN, "70000", TaxDeduction.AFFORDABLE_HOME_LOAN, "100000"));
+            // A home already using all ₹2,00,000 of Section 22, so nothing moves there and the two
+            // sections are compared on their own.
+            IncomeTaxCalculator.Result r = IncomeTaxCalculator.compute(input("1500000", TaxRegime.OLD,
+                    AgeBand.BELOW_60, "600000", "0", "0", "0", "0", "0", "0", false,
+                    List.of(new IncomeTaxCalculator.HouseProperty(false, null, null, rs("200000"))),
+                    declare(TaxDeduction.FIRST_HOME_LOAN, "70000", TaxDeduction.AFFORDABLE_HOME_LOAN, "100000")));
+            assertThat(r.interestMovedToHouse()).isEqualByComparingTo(BigDecimal.ZERO);
             assertThat(allowed(r, "FIRST_HOME_LOAN")).isEqualByComparingTo(rs("50000"));
             assertThat(allowed(r, "AFFORDABLE_HOME_LOAN")).isEqualByComparingTo(BigDecimal.ZERO);
         }
@@ -484,8 +490,96 @@ class IncomeTaxCalculatorTest {
     }
 
     @Nested
+    @DisplayName("home-loan interest goes where it is worth most")
+    class HomeLoanInterest {
+
+        private IncomeTaxCalculator.AllowedDeduction row(IncomeTaxCalculator.Result r, String key) {
+            return r.deductions().stream().filter(d -> d.key().equals(key)).findFirst().orElseThrow();
+        }
+
+        @Test
+        @DisplayName("a 131 claim with no Section 22 claim is counted under Section 22 instead — ₹4,704 less tax")
+        void all_of_it_moves() {
+            // Figures from a competitor's computation screen (old regime, under 60), which put the whole
+            // ₹1,65,084 of interest under 131 and allowed ₹1,50,000 of it:
+            //   Salary 26,84,928 - HRA 5,36,986 - std 50,000 - PT 2,400 = 20,95,542.
+            //   123: EPF 30,000 + PPF 50,000 + principal 80,460 -> 1,50,000 (principal gets 70,000).
+            //   124(3) NPS 50,000. Their 131: 1,50,000. Taxable 17,45,542 -> tax 3,49,608.
+            // Under Section 22 the same interest is allowed in full (up to ₹2,00,000):
+            //   House -1,65,084. GTI 19,30,458. Deductions 1,50,000 + 50,000 = 2,00,000.
+            //   Total income 17,30,458 -> 17,30,460. Tax 12,500 + 1,00,000 + 7,30,460 @30% 2,19,138
+            //   = 3,31,638; cess 13,265.52 -> 3,44,903.52 -> 3,44,904. ₹4,704 less.
+            IncomeTaxCalculator.Result r = IncomeTaxCalculator.compute(input("2684928", TaxRegime.OLD,
+                    AgeBand.BELOW_60, "1342464", "30000", "2400", "536986", "671232", "0", "816000", false,
+                    List.of(), declare(TaxDeduction.PPF, "50000", TaxDeduction.HOME_LOAN_PRINCIPAL, "80460",
+                            TaxDeduction.NPS_ADDITIONAL, "50000", TaxDeduction.AFFORDABLE_HOME_LOAN, "165084")));
+            assertThat(r.salaryIncome()).isEqualByComparingTo(rs("2095542"));
+            assertThat(r.interestMovedToHouse()).isEqualByComparingTo(rs("165084"));
+            assertThat(r.houseProperty()).isEqualByComparingTo(rs("-165084"));
+            assertThat(r.totalDeductions()).isEqualByComparingTo(rs("200000"));
+            assertThat(r.taxableIncome()).isEqualByComparingTo(rs("1730460"));
+            assertThat(r.taxOnIncome()).isEqualByComparingTo(rs("331638"));
+            assertThat(r.totalTax()).isEqualByComparingTo(rs("344904"));
+
+            // The 131 line still shows as declared, with where it went.
+            IncomeTaxCalculator.AllowedDeduction eea = row(r, "AFFORDABLE_HOME_LOAN");
+            assertThat(eea.declared()).isEqualByComparingTo(rs("165084"));
+            assertThat(eea.allowed()).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(eea.movedToHouse()).isEqualByComparingTo(rs("165084"));
+
+            // And the 123 ceiling is used row by row: principal gets what PF and PPF left.
+            IncomeTaxCalculator.AllowedDeduction principal = row(r, "HOME_LOAN_PRINCIPAL");
+            assertThat(principal.limit()).isEqualByComparingTo(rs("150000"));
+            assertThat(principal.usedBefore()).isEqualByComparingTo(rs("80000"));
+            assertThat(principal.allowed()).isEqualByComparingTo(rs("70000"));
+        }
+
+        @Test
+        @DisplayName("only Section 22's headroom moves; the rest stays under 131")
+        void only_the_headroom_moves() {
+            // A self-occupied home with 1,20,000 of interest already under Section 22 leaves 80,000 of
+            // its ₹2,00,000. Of a 1,65,084 claim under 131, 80,000 moves and 85,084 stays (under 1,50,000).
+            IncomeTaxCalculator.Result r = IncomeTaxCalculator.compute(input("2000000", TaxRegime.OLD,
+                    AgeBand.BELOW_60, "800000", "0", "0", "0", "0", "0", "0", false,
+                    List.of(new IncomeTaxCalculator.HouseProperty(false, null, null, rs("120000"))),
+                    declare(TaxDeduction.AFFORDABLE_HOME_LOAN, "165084")));
+            assertThat(r.interestMovedToHouse()).isEqualByComparingTo(rs("80000"));
+            assertThat(r.houseProperty()).isEqualByComparingTo(rs("-200000"));
+            assertThat(allowed(r, "AFFORDABLE_HOME_LOAN")).isEqualByComparingTo(rs("85084"));
+        }
+
+        @Test
+        @DisplayName("nothing moves in the new regime, where neither is allowed")
+        void new_regime_untouched() {
+            IncomeTaxCalculator.Result r = IncomeTaxCalculator.compute(input("2000000", TaxRegime.NEW,
+                    AgeBand.BELOW_60, "800000", "0", "0", "0", "0", "0", "0", false, List.of(),
+                    declare(TaxDeduction.AFFORDABLE_HOME_LOAN, "165084")));
+            assertThat(r.interestMovedToHouse()).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(r.houseProperty()).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+    }
+
+    @Nested
     @DisplayName("rounding and age")
     class Rounding {
+
+        @Test
+        @DisplayName("agrees to the rupee with a Form 16 Part B that TRACES issued")
+        void matches_a_traces_form_16() {
+            // A real certificate (names and PAN left out), new regime, two employers in the year:
+            //   salary here 12,93,560 + reported from the other employer 11,55,520 = 24,49,080
+            //   less standard deduction 75,000 = 23,74,080 taxable (item 12).
+            //   Tax: 4L-8L 20,000 + 8L-12L 40,000 + 12L-16L 60,000 + 16L-20L 80,000
+            //        + 3,74,080 @25% 93,520 = 2,93,520 (item 13).
+            //   Cess 4% = 11,740.80 -> 11,741 (item 16). Tax payable 3,05,261 (item 17).
+            // The same slabs and standard deduction apply in 2026-27.
+            IncomeTaxCalculator.Result r = tax("2449080", TaxRegime.NEW);
+            assertThat(r.taxableIncome()).isEqualByComparingTo(rs("2374080"));
+            assertThat(r.taxOnIncome()).isEqualByComparingTo(rs("293520"));
+            assertThat(r.surcharge()).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(r.cess()).isEqualByComparingTo(rs("11741"));
+            assertThat(r.totalTax()).isEqualByComparingTo(rs("305261"));
+        }
 
         @Test
         @DisplayName("Section 516: paise ignored, then the nearest ten — five rounds up")

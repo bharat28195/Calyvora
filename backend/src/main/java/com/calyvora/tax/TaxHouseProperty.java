@@ -31,6 +31,11 @@ public class TaxHouseProperty {
     private String lenderName;
     @Column(name = "lender_pan", length = 10)
     private String lenderPan;
+    @Column(name = "lender_address", length = 300)
+    private String lenderAddress;
+    /** Form 124 item 3(iv): FINANCIAL_INSTITUTION, EMPLOYER or OTHER (V72). */
+    @Column(name = "lender_type", length = 24)
+    private String lenderType;
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal interest = BigDecimal.ZERO;
     @Column(name = "annual_rent", nullable = false, precision = 14, scale = 2)
@@ -67,6 +72,10 @@ public class TaxHouseProperty {
     public void setLenderName(String v) { this.lenderName = v; }
     public String getLenderPan() { return lenderPan; }
     public void setLenderPan(String v) { this.lenderPan = v; }
+    public String getLenderAddress() { return lenderAddress; }
+    public void setLenderAddress(String v) { this.lenderAddress = v; }
+    public String getLenderType() { return lenderType; }
+    public void setLenderType(String v) { this.lenderType = v; }
     public BigDecimal getInterest() { return interest; }
     public void setInterest(BigDecimal v) { this.interest = v == null ? BigDecimal.ZERO : v; }
     public BigDecimal getAnnualRent() { return annualRent; }

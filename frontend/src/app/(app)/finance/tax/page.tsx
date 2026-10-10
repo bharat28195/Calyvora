@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type {
-  TaxComputation, TaxDeclaration, TaxDeclarationInput, TaxRegime,
+  TaxComputation, TaxDeclaration, TaxDeclarationInput, TaxRegime, LenderType,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,9 +32,16 @@ type ItemState = Record<string, { amount: string; detail: string }>;
 type RentRow = { id: string | null; fromMonth: string; toMonth: string; monthlyRent: string; city: string;
   landlordName: string; landlordPan: string; landlordAddress: string; landlordRelationship: string };
 type HouseRow = { id: string | null; letOut: boolean; address: string; lenderName: string; lenderPan: string;
-  interest: string; annualRent: string; municipalTax: string };
+  lenderAddress: string; lenderType: LenderType | ""; interest: string; annualRent: string; municipalTax: string };
 type PrevRow = { employerName: string; tan: string; income: string; tds: string; pf: string; pt: string };
-type Form = { regime: TaxRegime; parentsSenior: boolean; items: ItemState; rent: RentRow[]; houses: HouseRow[]; previous: PrevRow };
+type Form = { regime: TaxRegime; parentsSenior: boolean; items: ItemState; rent: RentRow[]; houses: HouseRow[]; previous: PrevRow;
+  employeeAddress: string };
+
+const LENDER_TYPES: { value: LenderType; label: string }[] = [
+  { value: "FINANCIAL_INSTITUTION", label: "Bank or housing finance company" },
+  { value: "EMPLOYER", label: "My employer" },
+  { value: "OTHER", label: "Someone else" },
+];
 
 const STEPS = [
   { id: "regime", label: "Regime", icon: Scale },
@@ -73,13 +80,15 @@ function fromDeclaration(d: TaxDeclaration): Form {
       city: r.city, landlordName: r.landlordName ?? "", landlordPan: r.landlordPan ?? "",
       landlordAddress: r.landlordAddress ?? "", landlordRelationship: r.landlordRelationship ?? "" })),
     houses: d.houses.map((h) => ({ id: h.id, letOut: h.letOut, address: h.address ?? "", lenderName: h.lenderName ?? "",
-      lenderPan: h.lenderPan ?? "", interest: String(h.interest), annualRent: String(h.annualRent || ""),
+      lenderPan: h.lenderPan ?? "", lenderAddress: h.lenderAddress ?? "", lenderType: h.lenderType ?? "",
+      interest: String(h.interest), annualRent: String(h.annualRent || ""),
       municipalTax: String(h.municipalTax || "") })),
     previous: {
       employerName: d.previous?.employerName ?? "", tan: d.previous?.tan ?? "",
       income: d.previous?.income != null ? String(d.previous.income) : "", tds: d.previous?.tds != null ? String(d.previous.tds) : "",
       pf: d.previous?.pf != null ? String(d.previous.pf) : "", pt: d.previous?.pt != null ? String(d.previous.pt) : "",
     },
+    employeeAddress: d.employeeAddress ?? "",
   };
 }
 
@@ -95,7 +104,9 @@ function toPayload(f: Form): TaxDeclarationInput {
       landlordName: r.landlordName || null, landlordPan: r.landlordPan || null,
       landlordAddress: r.landlordAddress || null, landlordRelationship: r.landlordRelationship || null })),
     houses: f.houses.map((h) => ({ id: h.id, letOut: h.letOut, address: h.address || null, lenderName: h.lenderName || null,
-      lenderPan: h.lenderPan || null, interest: num(h.interest), annualRent: num(h.annualRent), municipalTax: num(h.municipalTax) })),
+      lenderPan: h.lenderPan || null, lenderAddress: h.lenderAddress || null, lenderType: h.lenderType || null,
+      interest: num(h.interest), annualRent: num(h.annualRent), municipalTax: num(h.municipalTax) })),
+    employeeAddress: f.employeeAddress,
     previous: hasPrev ? { employerName: f.previous.employerName || null, tan: f.previous.tan || null,
       income: num(f.previous.income), tds: num(f.previous.tds), pf: num(f.previous.pf), pt: num(f.previous.pt) } : {},
   };
@@ -428,6 +439,14 @@ export default function TaxDeclarationPage() {
                         {h.letOut && <Labelled label="Rent received this year"><MoneyInput disabled={locked} value={h.annualRent} onChange={(v) => set({ annualRent: v })} /></Labelled>}
                         {h.letOut && <Labelled label="Municipal tax paid"><MoneyInput disabled={locked} value={h.municipalTax} onChange={(v) => set({ municipalTax: v })} /></Labelled>}
                         <Labelled label="Address" className={h.letOut ? "" : "sm:col-span-3"}><Input disabled={locked} value={h.address} onChange={(e) => set({ address: e.target.value })} /></Labelled>
+                        <Labelled label="The lender is">
+                          <select disabled={locked} value={h.lenderType} onChange={(e) => set({ lenderType: e.target.value as LenderType | "" })}
+                            className="w-full rounded-md border border-fg/15 bg-fg/5 px-3 py-2 text-sm text-fg">
+                            <option value="">Choose</option>
+                            {LENDER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                          </select>
+                        </Labelled>
+                        <Labelled label="Lender's address" className="sm:col-span-2"><Input disabled={locked} value={h.lenderAddress} onChange={(e) => set({ lenderAddress: e.target.value })} placeholder="Branch address on your loan statement" /></Labelled>
                       </div>
                       <p className="mt-2 text-xs text-fg/45">{h.letOut
                         ? "Rent less 30% and the interest is your income from it; a loss comes off other income up to ₹2,00,000 (old regime only)."
@@ -445,6 +464,11 @@ export default function TaxDeclarationPage() {
               </div>
               <h3 className="mt-6 text-sm font-semibold">Extra interest for first-time and affordable homes</h3>
               <div className="divide-y divide-fg/5">{HOME_EXTRA.map((k) => line(k))}</div>
+              {preview && preview.interestMovedToHouse > 0 && (
+                <p className="mt-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+                  We count {money(preview.interestMovedToHouse)} of this under Section 22 (formerly 24(b)) instead — it allows up to ₹2,00,000 on a home you live in, more than Section 130/131. Same interest, less tax; nothing to do.
+                </p>
+              )}
             </Card>
           )}
 
@@ -507,6 +531,10 @@ export default function TaxDeclarationPage() {
                 <Row label="Tax for the year" value={money(preview.totalTax)} strong />
                 <Row label="Each month from now" value={money(preview.projectedNextMonth)} />
               </dl>
+              <Labelled label="Your address" hint="Printed on Form 124 — where you live now" className="mt-5">
+                <Input disabled={locked} value={form.employeeAddress} onChange={(e) => update((f) => ({ ...f, employeeAddress: e.target.value }))}
+                  placeholder="House, street, city, PIN" />
+              </Labelled>
               {preview.deductions.some((d) => d.allowed < d.declared) && (
                 <p className="mt-4 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                   Some claims are above their legal limit or don&apos;t apply to the {preview.regime === "NEW" ? "new" : "old"} regime; only the allowed part counts.
@@ -631,7 +659,8 @@ function emptyRent(year: string, existing: RentRow[]): RentRow {
 }
 
 function emptyHouse(): HouseRow {
-  return { id: null, letOut: false, address: "", lenderName: "", lenderPan: "", interest: "", annualRent: "", municipalTax: "" };
+  return { id: null, letOut: false, address: "", lenderName: "", lenderPan: "", lenderAddress: "", lenderType: "",
+    interest: "", annualRent: "", municipalTax: "" };
 }
 
 function statusLabel(status: TaxDeclaration["status"]): string {

@@ -355,6 +355,8 @@ export interface TaxHouse {
   address: string | null;
   lenderName: string | null;
   lenderPan: string | null;
+  lenderAddress: string | null;
+  lenderType: LenderType | null;
   interest: number;
   annualRent: number;
   municipalTax: number;
@@ -376,9 +378,17 @@ export interface TaxPrevious {
   proofs: TaxProofFile[];
 }
 
+export type LenderType = "FINANCIAL_INSTITUTION" | "EMPLOYER" | "OTHER";
+
 export interface TaxDeclaration {
   employeeId: string;
   employeeName: string;
+  /** Form 124 item 1, as the employee last certified it. */
+  employeeAddress: string | null;
+  employeePan: string | null;
+  /** For "son / daughter of" in the verification. */
+  parentName: string | null;
+  designation: string | null;
   financialYear: string;
   regime: TaxRegime;
   status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
@@ -421,6 +431,8 @@ export interface TaxHouseInput {
   address?: string | null;
   lenderName?: string | null;
   lenderPan?: string | null;
+  lenderAddress?: string | null;
+  lenderType?: LenderType | null;
   interest: number;
   annualRent?: number;
   municipalTax?: number;
@@ -443,6 +455,7 @@ export interface TaxDeclarationInput {
   rent?: TaxRentInput[];
   houses?: TaxHouseInput[];
   previous?: TaxPreviousInput;
+  employeeAddress?: string | null;
 }
 
 export interface TaxBandRow {
@@ -457,8 +470,18 @@ export interface TaxDeductionRow {
   key: string;
   section: string;
   label: string;
+  /** What the calculation used: claimed until the proof deadline, approved after it. */
   declared: number;
   allowed: number;
+  /** What the employee typed, and what HR approved (null until reviewed). Null for lines Orbit works out. */
+  claimed?: number | null;
+  approved?: number | null;
+  proofStatus?: string | null;
+  /** For a line inside a shared ceiling: the ceiling, and how much the lines above it used. */
+  limit?: number | null;
+  usedBefore?: number | null;
+  /** Home-loan interest counted under Section 22 instead of here. */
+  movedToHouse?: number | null;
 }
 
 export interface TaxGroupRow {
@@ -473,6 +496,9 @@ export interface TaxMonthRow {
   source: "OPENING" | "LOCKED" | "PROJECTED" | "NONE";
   gross: number;
   tds: number | null;
+  pt: number;
+  /** The month's earnings line by line (Basic, HRA…); empty for months not paid here. */
+  heads: { name: string; amount: number }[];
 }
 
 export interface TaxHraMonthRow {
@@ -526,6 +552,11 @@ export interface TaxComputation {
   proofsDue: boolean;
   months: TaxMonthRow[];
   hraMonths: TaxHraMonthRow[];
+  /** Salary and tax from before this payroll: a previous employer or an opening balance. */
+  priorIncome: number;
+  priorTds: number;
+  /** Home-loan interest declared under 130 / 131 that counts under Section 22 instead. */
+  interestMovedToHouse: number;
 }
 
 export interface TaxDeclarationRow {
@@ -543,6 +574,35 @@ export interface TaxSettings {
   declarationsOpen: boolean;
   proofsOpen: boolean;
   proofDeadline: string | null;
+  /** The person responsible for deducting tax, who signs Forms 124 and 130. */
+  signerName?: string | null;
+  signerParent?: string | null;
+  signerDesignation?: string | null;
+  signerPlace?: string | null;
+  /** The CIT (TDS) the TAN falls under — Form 130 Part A. */
+  citTdsAddress?: string | null;
+}
+
+export interface TdsDepositMonth {
+  month: string;
+  finalised: boolean;
+  tdsDeducted: number;
+  bsrCode: string | null;
+  depositDate: string | null;
+  challanSerial: string | null;
+  amount: number | null;
+}
+
+export interface TdsDeposits {
+  financialYear: string;
+  quarters: { quarter: string; label: string; receiptNo: string | null; months: TdsDepositMonth[] }[];
+}
+
+export interface TdsChallanInput {
+  bsrCode: string;
+  depositDate: string;
+  challanSerial: string;
+  amount?: number | null;
 }
 
 export interface TaxReviewInput {
@@ -557,13 +617,21 @@ export interface Form130 {
   financialYear: string;
   employerName: string;
   employerAddress: string | null;
+  employerPan: string | null;
   employerTan: string | null;
+  citTdsAddress: string | null;
   employeeName: string;
+  employeeAddress: string | null;
   employeePan: string | null;
+  employeeNo: string | null;
   designation: string | null;
   periodFrom: string;
   periodTo: string;
-  quarters: { quarter: string; tds: number }[];
+  signer: { name: string | null; parent: string | null; designation: string | null; place: string | null };
+  /** Part A summary — finalised months only. */
+  quarters: { quarter: string; label: string; receiptNo: string | null; amountPaid: number; tds: number; deposited: number }[];
+  /** Part A, section II — one row per month with tax; challan fields null until HR records it. */
+  challans: { month: string; tds: number; bsrCode: string | null; depositDate: string | null; challanSerial: string | null }[];
   computation: TaxComputation;
 }
 

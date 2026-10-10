@@ -78,6 +78,7 @@ public class TaxService {
     private final PayslipTemplateService templateService;
     private final com.calyvora.payroll.StatutorySettingsService statutorySettingsService;
     private final com.calyvora.company.CompanyRepository companyRepository;
+    private final TdsDepositService depositService;
 
     public TaxService(TaxDeclarationRepository declarationRepository,
                       TaxDeclarationItemRepository itemRepository,
@@ -95,7 +96,8 @@ public class TaxService {
                       TaxYear taxYear,
                       PayslipTemplateService templateService,
                       com.calyvora.payroll.StatutorySettingsService statutorySettingsService,
-                      com.calyvora.company.CompanyRepository companyRepository) {
+                      com.calyvora.company.CompanyRepository companyRepository,
+                      TdsDepositService depositService) {
         this.declarationRepository = declarationRepository;
         this.itemRepository = itemRepository;
         this.rentRepository = rentRepository;
@@ -113,6 +115,7 @@ public class TaxService {
         this.templateService = templateService;
         this.statutorySettingsService = statutorySettingsService;
         this.companyRepository = companyRepository;
+        this.depositService = depositService;
     }
 
     // =============================================================================================
@@ -208,6 +211,9 @@ public class TaxService {
         }
         if (p.parentsSenior() != null) {
             d.setParentsSenior(p.parentsSenior());
+        }
+        if (p.employeeAddress() != null) {
+            d.setEmployeeAddress(trimTo(p.employeeAddress(), 400));
         }
         if (p.items() != null || p.declared() != null) {
             List<TaxDtos.ItemPayload> items = new ArrayList<>();
@@ -342,6 +348,8 @@ public class TaxService {
             row.setAddress(trimTo(w.address(), 300));
             row.setLenderName(trimTo(w.lenderName(), 160));
             row.setLenderPan(pan(w.lenderPan(), "lender's PAN"));
+            row.setLenderAddress(trimTo(w.lenderAddress(), 300));
+            row.setLenderType(lenderType(w.lenderType()));
             row.setInterest(interest);
             row.setAnnualRent(w.letOut() ? rent : BigDecimal.ZERO);
             row.setMunicipalTax(w.letOut() ? municipal : BigDecimal.ZERO);
@@ -596,7 +604,7 @@ public class TaxService {
             IncomeTaxCalculator.Result empty = IncomeTaxCalculator.compute(IncomeTaxCalculator.Input.of(BigDecimal.ZERO,
                     override == null ? TaxRegime.DEFAULT : override.regime()));
             return response(fy, empty, empty, currency, BigDecimal.ZERO, 0, BigDecimal.ZERO, BigDecimal.ZERO,
-                    withheld, false, List.of(), List.of(), BigDecimal.ZERO);
+                    withheld, false, List.of(), List.of(), BigDecimal.ZERO, Map.of(), BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
         IncomeTaxCalculator.Result result = IncomeTaxCalculator.compute(facts.input());
@@ -616,7 +624,9 @@ public class TaxService {
                 case PROJECTED -> perMonth;
                 default -> null;
             };
-            months.add(new TaxDtos.MonthRow(m.month().toString(), m.source().name(), m.gross(), tds));
+            List<TaxDtos.HeadRow> heads = new ArrayList<>();
+            for (TaxYear.Head h : m.heads()) heads.add(new TaxDtos.HeadRow(h.name(), h.amount()));
+            months.add(new TaxDtos.MonthRow(m.month().toString(), m.source().name(), m.gross(), tds, m.pt(), heads));
         }
         List<TaxDtos.HraMonthRow> hra = new ArrayList<>();
         for (HraCalculator.MonthResult m : facts.hra().months()) {
@@ -624,7 +634,39 @@ public class TaxService {
                     m.exempt()));
         }
         return response(fy, result, alternative, currency, facts.content().previousIncome(), elapsed, deductedSoFar,
-                perMonth, withheld, facts.proofsDue(), months, hra, perMonth);
+                perMonth, withheld, facts.proofsDue(), months, hra, perMonth,
+                claims(companyId, employee.getId(), fy, override), facts.priorIncome(), facts.priorTds());
+    }
+
+    /** What was typed and what HR approved, per line — the two figures behind each deduction. */
+    private record Claim(BigDecimal claimed, BigDecimal approved, String status) {
+    }
+
+    private Map<String, Claim> claims(UUID companyId, UUID employeeId, FinancialYear fy, TaxYear.Content override) {
+        Map<String, Claim> out = new HashMap<>();
+        declarationRepository.findByCompanyIdAndEmployeeIdAndFinancialYear(companyId, employeeId, fy.label())
+                .ifPresent(d -> {
+                    for (TaxDeclarationItem i : itemRepository.findByDeclarationId(d.getId())) {
+                        ProofStatus s = i.getProofStatus();
+                        BigDecimal approved = switch (s) {
+                            case ACCEPTED -> i.getAcceptedAmount() == null ? i.getAmount() : i.getAcceptedAmount();
+                            case PARTIAL -> i.getAcceptedAmount();
+                            case REJECTED -> BigDecimal.ZERO;
+                            default -> null;
+                        };
+                        out.put(i.getDeduction().name(), new Claim(i.getAmount(), approved, s.name()));
+                    }
+                });
+        if (override != null) {
+            // A preview: what is on the screen is what is claimed; HR's decisions stay as they were.
+            Map<String, Claim> typed = new HashMap<>();
+            override.declared().forEach((k, v) -> {
+                Claim saved = out.get(k.name());
+                typed.put(k.name(), new Claim(v, saved == null ? null : saved.approved(), saved == null ? "NONE" : saved.status()));
+            });
+            return typed;
+        }
+        return out;
     }
 
     private static TaxDtos.ComputationResponse response(FinancialYear fy, IncomeTaxCalculator.Result r,
@@ -632,24 +674,30 @@ public class TaxService {
                                                         BigDecimal previousIncome, int elapsed, BigDecimal deductedSoFar,
                                                         BigDecimal perMonth, boolean withheld, boolean proofsDue,
                                                         List<TaxDtos.MonthRow> months,
-                                                        List<TaxDtos.HraMonthRow> hra, BigDecimal nextMonth) {
+                                                        List<TaxDtos.HraMonthRow> hra, BigDecimal nextMonth,
+                                                        Map<String, Claim> claims, BigDecimal priorIncome,
+                                                        BigDecimal priorTds) {
         BigDecimal oldTax = r.regime() == TaxRegime.OLD ? r.totalTax() : alternative.totalTax();
         BigDecimal newTax = r.regime() == TaxRegime.NEW ? r.totalTax() : alternative.totalTax();
         TaxRegime cheaper = oldTax.compareTo(newTax) < 0 ? TaxRegime.OLD : TaxRegime.NEW;
         return new TaxDtos.ComputationResponse(fy.label(), r.regime(), r.age(), currency,
-                r.grossSalary(), previousIncome, rows(r.exemptions()), r.standardDeduction(), r.professionalTax(),
+                r.grossSalary(), previousIncome, rows(r.exemptions(), claims), r.standardDeduction(), r.professionalTax(),
                 r.salaryIncome(), r.houseProperty(), r.otherIncome(), r.grossTotalIncome(),
-                rows(r.deductions()), groupRows(r.groups()), r.totalDeductions(), r.taxableIncome(), bandRows(r),
+                rows(r.deductions(), claims), groupRows(r.groups()), r.totalDeductions(), r.taxableIncome(), bandRows(r),
                 r.taxOnIncome(), r.rebate(), r.surcharge(), r.cess(), r.totalTax(), perMonth, elapsed,
                 deductedSoFar, r.totalTax().subtract(deductedSoFar).max(BigDecimal.ZERO), nextMonth,
                 new TaxDtos.RegimeComparison(oldTax, newTax, cheaper, oldTax.subtract(newTax).abs()),
-                withheld, proofsDue, months, hra);
+                withheld, proofsDue, months, hra, priorIncome, priorTds, r.interestMovedToHouse());
     }
 
-    private static List<TaxDtos.DeductionRow> rows(List<IncomeTaxCalculator.AllowedDeduction> list) {
+    private static List<TaxDtos.DeductionRow> rows(List<IncomeTaxCalculator.AllowedDeduction> list,
+                                                   Map<String, Claim> claims) {
         List<TaxDtos.DeductionRow> out = new ArrayList<>();
         for (IncomeTaxCalculator.AllowedDeduction d : list) {
-            out.add(new TaxDtos.DeductionRow(d.key(), d.section(), d.label(), d.declared(), d.allowed()));
+            Claim c = claims.get(d.key());
+            out.add(new TaxDtos.DeductionRow(d.key(), d.section(), d.label(), d.declared(), d.allowed(),
+                    c == null ? null : c.claimed(), c == null ? null : c.approved(), c == null ? null : c.status(),
+                    d.limit(), d.usedBefore(), d.movedToHouse()));
         }
         return out;
     }
@@ -847,7 +895,9 @@ public class TaxService {
     public TaxDtos.TaxSettings taxSettings() {
         CompanySettings s = settings(TenantContext.getCompanyId());
         return new TaxDtos.TaxSettings(s.isTaxDeclarationsOpen(), s.isTaxProofsOpen(),
-                s.getTaxProofDeadline() == null ? null : s.getTaxProofDeadline().toString());
+                s.getTaxProofDeadline() == null ? null : s.getTaxProofDeadline().toString(),
+                s.getTdsSignerName(), s.getTdsSignerParent(), s.getTdsSignerDesignation(), s.getTdsSignerPlace(),
+                s.getCitTdsAddress());
     }
 
     /** Open or close declarations and proofs, and set the proof deadline. */
@@ -868,6 +918,11 @@ public class TaxService {
             }
         }
         s.setTaxProofDeadline(deadline);
+        if (req.signerName() != null) s.setTdsSignerName(trimTo(req.signerName(), 160));
+        if (req.signerParent() != null) s.setTdsSignerParent(trimTo(req.signerParent(), 160));
+        if (req.signerDesignation() != null) s.setTdsSignerDesignation(trimTo(req.signerDesignation(), 120));
+        if (req.signerPlace() != null) s.setTdsSignerPlace(trimTo(req.signerPlace(), 80));
+        if (req.citTdsAddress() != null) s.setCitTdsAddress(trimTo(req.citTdsAddress(), 400));
         settingsRepository.save(s);
         return taxSettings();
     }
@@ -901,21 +956,43 @@ public class TaxService {
         CompanySettings s = settings(companyId);
         String employer = s.getLegalName() != null && !s.getLegalName().isBlank() ? s.getLegalName()
                 : companyRepository.findById(companyId).map(com.calyvora.company.Company::getName).orElse("");
-        String tan = statutorySettingsService.effective(companyId).getTan();
+        var statutory = statutorySettingsService.effective(companyId);
         EmployeeFinance fin = financeRepository.findByEmployeeIdAndCompanyId(e.getId(), companyId).orElse(null);
         LocalDate from = e.getStartDate() != null && e.getStartDate().isAfter(fy.start()) ? e.getStartDate() : fy.start();
         LocalDate to = e.getEndDate() != null && e.getEndDate().isBefore(fy.end()) ? e.getEndDate() : fy.end();
-        BigDecimal[] quarters = new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+        String address = declarationRepository.findByCompanyIdAndEmployeeIdAndFinancialYear(companyId, e.getId(), fy.label())
+                .map(TaxDeclaration::getEmployeeAddress).orElse(null);
+
+        // Part A: only months this employer finalised and paid — not opening balances, not projections.
+        Map<String, TdsChallan> challans = depositService.challans(companyId, TdsDepositService.months(fy));
+        Map<String, String> receipts = depositService.receipts(companyId, fy);
+        BigDecimal[] paid = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+        BigDecimal[] deducted = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+        BigDecimal[] deposited = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+        List<TaxDtos.ChallanRow> challanRows = new ArrayList<>();
         for (TaxDtos.MonthRow m : c.months()) {
-            if (!"LOCKED".equals(m.source()) || m.tds() == null) continue;
+            if (!"LOCKED".equals(m.source())) continue;
             int index = (int) (YearMonth.from(fy.start()).until(YearMonth.parse(m.month()), java.time.temporal.ChronoUnit.MONTHS) / 3);
-            quarters[index] = quarters[index].add(m.tds());
+            BigDecimal tds = m.tds() == null ? BigDecimal.ZERO : m.tds();
+            paid[index] = paid[index].add(m.gross() == null ? BigDecimal.ZERO : m.gross());
+            deducted[index] = deducted[index].add(tds);
+            if (tds.signum() <= 0) continue;
+            TdsChallan ch = challans.get(m.month());
+            if (ch != null) deposited[index] = deposited[index].add(tds);
+            challanRows.add(new TaxDtos.ChallanRow(m.month(), tds, ch == null ? null : ch.getBsrCode(),
+                    ch == null ? null : ch.getDepositDate().toString(), ch == null ? null : ch.getChallanSerial()));
         }
-        List<TaxDtos.QuarterRow> q = List.of(
-                new TaxDtos.QuarterRow("Q1 (Apr–Jun)", quarters[0]), new TaxDtos.QuarterRow("Q2 (Jul–Sep)", quarters[1]),
-                new TaxDtos.QuarterRow("Q3 (Oct–Dec)", quarters[2]), new TaxDtos.QuarterRow("Q4 (Jan–Mar)", quarters[3]));
-        return new TaxDtos.Form130Response(fy.label(), employer, s.getAddress(), tan, nameOf(e),
-                fin == null ? null : fin.getPanNumber(), e.getJobTitle(), from.toString(), to.toString(), q, c);
+        List<TaxDtos.QuarterRow> q = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            String key = TdsDepositService.quarterKey(fy, i);
+            q.add(new TaxDtos.QuarterRow(key, TdsDepositService.quarterLabel(i), receipts.get(key), paid[i], deducted[i], deposited[i]));
+        }
+        TaxDtos.Signer signer = new TaxDtos.Signer(s.getTdsSignerName(), s.getTdsSignerParent(),
+                s.getTdsSignerDesignation(), s.getTdsSignerPlace());
+        return new TaxDtos.Form130Response(fy.label(), employer, s.getAddress(), statutory.getCompanyPan(),
+                statutory.getTan(), s.getCitTdsAddress(), nameOf(e), address,
+                fin == null ? null : fin.getPanNumber(), e.getEmployeeNo(), e.getJobTitle(),
+                from.toString(), to.toString(), signer, q, challanRows, c);
     }
 
     // =============================================================================================
@@ -939,7 +1016,9 @@ public class TaxService {
                 .findByCompanyIdAndEmployeeIdAndFinancialYear(companyId, e.getId(), fy.label()).orElse(null);
         if (d == null) {
             // Nothing on file is not an error — it is the normal state every April.
-            return new TaxDtos.DeclarationResponse(e.getId().toString(), nameOf(e), fy.label(), TaxRegime.DEFAULT,
+            return new TaxDtos.DeclarationResponse(e.getId().toString(), nameOf(e), null,
+                    fin == null ? null : fin.getPanNumber(), fin == null ? null : fin.getParentName(), e.getJobTitle(),
+                    fy.label(), TaxRegime.DEFAULT,
                     "NOT_STARTED", null, s.isTaxDeclarationsOpen(), s.isTaxProofsOpen(),
                     s.getTaxProofDeadline() == null ? null : s.getTaxProofDeadline().toString(), proofsDue, false, age,
                     fin != null && fin.getDateOfBirth() != null, hasHra, hasLta, Map.of(), List.of(), List.of(), List.of(),
@@ -972,7 +1051,7 @@ public class TaxService {
         List<TaxDtos.HouseView> houses = new ArrayList<>();
         for (TaxHouseProperty h : houseRepository.findByDeclarationId(d.getId())) {
             houses.add(new TaxDtos.HouseView(h.getId().toString(), h.isLetOut(), h.getAddress(), h.getLenderName(),
-                    h.getLenderPan(), h.getInterest(), h.getAnnualRent(), h.getMunicipalTax(), h.getProofStatus().name(),
+                    h.getLenderPan(), h.getLenderAddress(), h.getLenderType(), h.getInterest(), h.getAnnualRent(), h.getMunicipalTax(), h.getProofStatus().name(),
                     h.getAcceptedInterest(), h.getReviewNote(), proofs.getOrDefault("HOUSE:" + h.getId(), List.of())));
         }
         TaxDtos.PreviousView previous = d.getPrevIncome() == null && d.getPrevTds() == null && d.getPrevEmployerName() == null
@@ -980,7 +1059,9 @@ public class TaxService {
                 : new TaxDtos.PreviousView(d.getPrevEmployerName(), d.getPrevEmployerTan(), d.getPrevIncome(),
                         d.getPrevTds(), d.getPrevPf(), d.getPrevPt(), d.getPrevStatus(), d.getPrevReviewNote(),
                         proofs.getOrDefault("PREVIOUS:" + d.getId(), List.of()));
-        return new TaxDtos.DeclarationResponse(e.getId().toString(), nameOf(e), fy.label(), d.getRegime(),
+        return new TaxDtos.DeclarationResponse(e.getId().toString(), nameOf(e), d.getEmployeeAddress(),
+                fin == null ? null : fin.getPanNumber(), fin == null ? null : fin.getParentName(), e.getJobTitle(),
+                fy.label(), d.getRegime(),
                 d.getStatus().name(), d.getSubmittedAt() == null ? null : d.getSubmittedAt().toString(),
                 s.isTaxDeclarationsOpen(), s.isTaxProofsOpen(),
                 s.getTaxProofDeadline() == null ? null : s.getTaxProofDeadline().toString(), proofsDue,
@@ -1150,6 +1231,15 @@ public class TaxService {
 
     private static boolean blank(String s) {
         return s == null || s.isBlank();
+    }
+
+    private static final Set<String> LENDER_TYPES = Set.of("FINANCIAL_INSTITUTION", "EMPLOYER", "OTHER");
+
+    private static String lenderType(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String v = raw.trim().toUpperCase();
+        if (!LENDER_TYPES.contains(v)) throw invalid("The lender is a financial institution, your employer, or other.");
+        return v;
     }
 
     private static String trimTo(String s, int max) {

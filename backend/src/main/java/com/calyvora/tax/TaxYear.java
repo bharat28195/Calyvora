@@ -102,7 +102,11 @@ public class TaxYear {
 
     /** One month of salary and what came off it. */
     public record MonthFact(YearMonth month, Source source, BigDecimal gross, BigDecimal basic, BigDecimal hra,
-                            BigDecimal lta, BigDecimal pf, BigDecimal pt, BigDecimal tds) {
+                            BigDecimal lta, BigDecimal pf, BigDecimal pt, BigDecimal tds, List<Head> heads) {
+    }
+
+    /** One earning of a month's salary — Basic, HRA, Special allowance — as the template splits it. */
+    public record Head(String name, BigDecimal amount) {
     }
 
     /** A run of months at one rent. */
@@ -142,7 +146,9 @@ public class TaxYear {
      */
     public record Facts(Employee employee, YearMonth asOf, FinancialYear year, List<MonthFact> months,
                         Content content, boolean proofsDue, AgeBand age, IncomeTaxCalculator.Input input,
-                        HraCalculator.Result hra, BigDecimal withheld, int spreadMonths, int openPastMonths) {
+                        HraCalculator.Result hra, BigDecimal withheld, int spreadMonths, int openPastMonths,
+                        /** Salary and tax from before this employer's payroll: opening balance plus previous employer. */
+                        BigDecimal priorIncome, BigDecimal priorTds) {
 
         /** (year's tax − already withheld) ÷ the months it is spread over, in whole rupees. */
         public BigDecimal thisMonth(BigDecimal yearTax) {
@@ -250,7 +256,7 @@ public class TaxYear {
                 YearMonth m = fyStart.plusMonths(i);
                 if (coveredThrough != null && !m.isAfter(coveredThrough)) {
                     months.add(new MonthFact(m, Source.OPENING, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null));
+                            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, List.of()));
                     continue;
                 }
                 PayslipSnapshot snap = m.isBefore(asOf) ? mine.get(m.toString()) : null;
@@ -262,7 +268,7 @@ public class TaxYear {
                 BigDecimal g = SalaryCalendar.grossForMonth(h, m, emp.getStartDate(), emp.getEndDate());
                 if (g == null || g.signum() <= 0) {
                     months.add(new MonthFact(m, Source.NONE, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null));
+                            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, List.of()));
                     continue;
                 }
                 months.add(projectedMonth(m, g, template, fin, statutory, pfSettings));
@@ -302,7 +308,8 @@ public class TaxYear {
                     basic, pf, pt, hra.exempt(), hraReceived, ltaReceived, rentForYear, content.parentsSenior(),
                     content.houses(), content.declared());
             out.put(id, new Facts(emp, asOf, fy, List.copyOf(months), content, proofsDue, age, input, hra,
-                    withheld, spread, openPast));
+                    withheld, spread, openPast, openingIncome.add(content.previousIncome()),
+                    openingTds.add(content.previousTds())));
         }
         return out;
     }
@@ -312,15 +319,36 @@ public class TaxYear {
         BigDecimal contracted = nz(snap.getGross());
         BigDecimal earned = snap.getEarnedGross() == null ? contracted : snap.getEarnedGross();
         BigDecimal basic = BigDecimal.ZERO, hra = BigDecimal.ZERO, lta = BigDecimal.ZERO;
+        List<Head> heads = List.of();
         if (contracted.signum() > 0) {
             PayslipTemplateService.Computed c = templateService.compute(template, contracted);
             BigDecimal share = earned.divide(contracted, 10, RoundingMode.HALF_UP);
             basic = c.basic().multiply(share).setScale(2, RoundingMode.HALF_UP);
             hra = c.hra().multiply(share).setScale(2, RoundingMode.HALF_UP);
             lta = c.lta().multiply(share).setScale(2, RoundingMode.HALF_UP);
+            heads = heads(c, share, earned);
         }
         return new MonthFact(m, Source.LOCKED, earned, basic, hra, lta, nz(snap.getEmployeePf()),
-                nz(snap.getProfessionalTax()), nz(snap.getIncomeTax()));
+                nz(snap.getProfessionalTax()), nz(snap.getIncomeTax()), heads);
+    }
+
+    /**
+     * The month's earnings line by line, scaled to what was actually earned (a month with unpaid leave
+     * pays each line in proportion). Rounding is absorbed by the last line so the heads add up to the
+     * month's gross exactly — a grid whose columns do not total is a grid nobody trusts.
+     */
+    private static List<Head> heads(PayslipTemplateService.Computed c, BigDecimal share, BigDecimal total) {
+        List<Head> out = new ArrayList<>();
+        BigDecimal sum = BigDecimal.ZERO;
+        for (int i = 0; i < c.earnings().size(); i++) {
+            var line = c.earnings().get(i);
+            BigDecimal amount = i == c.earnings().size() - 1
+                    ? total.subtract(sum)
+                    : line.amount().multiply(share).setScale(2, RoundingMode.HALF_UP);
+            sum = sum.add(amount);
+            out.add(new Head(line.label(), amount));
+        }
+        return List.copyOf(out);
     }
 
     /** A month still to be paid: the salary in force, through the template and the statutory rules. */
@@ -340,7 +368,8 @@ public class TaxYear {
                         gross, gross, m).amount();
             }
         }
-        return new MonthFact(m, Source.PROJECTED, gross, c.basic(), c.hra(), c.lta(), pf, pt, null);
+        return new MonthFact(m, Source.PROJECTED, gross, c.basic(), c.hra(), c.lta(), pf, pt, null,
+                heads(c, BigDecimal.ONE, gross));
     }
 
     /** Everybody's declaration for the year, reduced to what counts. */

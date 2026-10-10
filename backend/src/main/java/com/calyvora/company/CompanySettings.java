@@ -80,6 +80,24 @@ public class CompanySettings {
     @Column(name = "tax_proof_deadline")
     private java.time.LocalDate taxProofDeadline;
 
+    /** The person responsible for deducting tax, who signs Forms 124 and 130 (V72). */
+    @Column(name = "tds_signer_name", length = 160)
+    private String tdsSignerName;
+
+    /** "son / daughter of" in the verification. */
+    @Column(name = "tds_signer_parent", length = 160)
+    private String tdsSignerParent;
+
+    @Column(name = "tds_signer_designation", length = 120)
+    private String tdsSignerDesignation;
+
+    @Column(name = "tds_signer_place", length = 80)
+    private String tdsSignerPlace;
+
+    /** The CIT (TDS) whose jurisdiction the TAN falls under, printed on Form 130 Part A. */
+    @Column(name = "cit_tds_address", length = 400)
+    private String citTdsAddress;
+
     /**
      * How long a working day is, for anyone not rostered onto a shift that says otherwise (V70).
      * Effective hours below this mark the day short.
@@ -145,6 +163,17 @@ public class CompanySettings {
     public void setTaxProofDeadline(java.time.LocalDate taxProofDeadline) {
         this.taxProofDeadline = taxProofDeadline;
     }
+
+    public String getTdsSignerName() { return tdsSignerName; }
+    public void setTdsSignerName(String v) { this.tdsSignerName = v; }
+    public String getTdsSignerParent() { return tdsSignerParent; }
+    public void setTdsSignerParent(String v) { this.tdsSignerParent = v; }
+    public String getTdsSignerDesignation() { return tdsSignerDesignation; }
+    public void setTdsSignerDesignation(String v) { this.tdsSignerDesignation = v; }
+    public String getTdsSignerPlace() { return tdsSignerPlace; }
+    public void setTdsSignerPlace(String v) { this.tdsSignerPlace = v; }
+    public String getCitTdsAddress() { return citTdsAddress; }
+    public void setCitTdsAddress(String v) { this.citTdsAddress = v; }
 
     public int getWorkDayMinutes() {
         return workDayMinutes;

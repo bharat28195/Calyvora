@@ -34,7 +34,10 @@ import java.util.Map;
  *       regime so that a rupee over ₹12 lakh never costs sixty thousand.</li>
  *   <li>Surcharge for high incomes, with marginal relief at every threshold.</li>
  *   <li>Health and education cess, 4% of tax plus surcharge.</li>
- *   <li>The tax is rounded to the nearest ₹10 (Section 516).</li>
+ *   <li>The tax is kept to the rupee, the way TRACES computes it on Form 130 (Form 16) Part B —
+ *       ₹2,93,520 of tax and ₹11,741 of cess make ₹3,05,261, not ₹3,05,260. Rounding the tax to the
+ *       nearest ₹10 is for the return the employee files; TDS deposited and certified is exact, and
+ *       a payroll that rounded would disagree with every Form 16 by up to ₹5.</li>
  * </ol>
  *
  * <p>Residents only: a non-resident gets neither the rebate nor the senior-citizen slabs, and
@@ -186,7 +189,21 @@ public final class IncomeTaxCalculator {
      * Orbit works out itself — PF from payroll, the HRA from the rent.
      */
     public record AllowedDeduction(String key, String section, String label, BigDecimal declared,
-                                   BigDecimal allowed, TaxDeduction deduction) {
+                                   BigDecimal allowed, TaxDeduction deduction,
+                                   /** The ceiling this line was measured against, where it shares one. */
+                                   BigDecimal limit,
+                                   /** How much of {@code limit} the lines before it had already used. */
+                                   BigDecimal usedBefore,
+                                   /** Interest counted under Section 22 instead, because it is worth more there. */
+                                   BigDecimal movedToHouse) {
+        public AllowedDeduction(String key, String section, String label, BigDecimal declared,
+                                BigDecimal allowed, TaxDeduction deduction) {
+            this(key, section, label, declared, allowed, deduction, null, null, null);
+        }
+
+        AllowedDeduction withLimit(BigDecimal limit, BigDecimal usedBefore) {
+            return new AllowedDeduction(key, section, label, declared, allowed, deduction, round(limit), round(usedBefore), movedToHouse);
+        }
     }
 
     /** A shared ceiling and how full it is, for the progress bars on the form. */
@@ -220,7 +237,13 @@ public final class IncomeTaxCalculator {
             BigDecimal surcharge,
             BigDecimal cess,
             BigDecimal totalTax,
-            BigDecimal monthlyTds) {
+            BigDecimal monthlyTds,
+            /**
+             * Home-loan interest declared under Section 130 or 131 that was counted as self-occupied
+             * interest under Section 22 instead — where it is deductible up to ₹2,00,000 rather than
+             * ₹50,000 / ₹1,50,000 — before the excess went back to 130 / 131. Zero when nothing moved.
+             */
+            BigDecimal interestMovedToHouse) {
     }
 
     // ---- the calculation ------------------------------------------------------------------------
@@ -273,6 +296,27 @@ public final class IncomeTaxCalculator {
                 selfOccupied = selfOccupied.add(nn(p.interest()));
             }
         }
+
+        // 2a. Interest declared under Section 130 / 131 (80EE / 80EEA) is the same home-loan interest
+        // Section 22 (24(b)) allows up to ₹2,00,000 on a home you live in — and 131 allows only
+        // ₹1,50,000 (130, ₹50,000). People routinely claim it all under 131 and lose the difference.
+        // So, old regime only, it fills Section 22's headroom first and only the excess stays under
+        // 130 / 131: never worse, often better. Bounded by both the ₹2,00,000 self-occupied ceiling and
+        // the ₹2,00,000 limit on setting off a house loss, so not a rupee is moved that would be wasted.
+        BigDecimal moved = BigDecimal.ZERO;
+        if (old) {
+            TaxDeduction from = nn(declared.get(TaxDeduction.FIRST_HOME_LOAN)).signum() > 0
+                    ? TaxDeduction.FIRST_HOME_LOAN : TaxDeduction.AFFORDABLE_HOME_LOAN;
+            BigDecimal claim = nn(declared.get(from));
+            BigDecimal selfRoom = CAP_SELF_OCCUPIED_INTEREST.subtract(selfOccupied).max(BigDecimal.ZERO);
+            BigDecimal setOffRoom = letOut.subtract(selfOccupied.min(CAP_SELF_OCCUPIED_INTEREST))
+                    .add(CAP_HOUSE_LOSS_SETOFF).max(BigDecimal.ZERO);
+            moved = claim.min(selfRoom).min(setOffRoom);
+            if (moved.signum() > 0) {
+                declared.put(from, claim.subtract(moved));
+                selfOccupied = selfOccupied.add(moved);
+            }
+        }
         BigDecimal house = old ? letOut.subtract(selfOccupied.min(CAP_SELF_OCCUPIED_INTEREST)) : letOut;
         if (house.signum() < 0) {
             house = old ? house.max(CAP_HOUSE_LOSS_SETOFF.negate()) : BigDecimal.ZERO;
@@ -288,6 +332,7 @@ public final class IncomeTaxCalculator {
 
         // 4. Chapter VIII deductions.
         Deductions d = deductions(in, declared, savingsInterest, depositInterest, gti);
+        if (moved.signum() > 0) d = d.showingMoved(in.declared(), moved);
         BigDecimal deductionTotal = d.total().min(gti);
 
         // 5. Total income, rounded to the nearest ten rupees.
@@ -302,20 +347,46 @@ public final class IncomeTaxCalculator {
         BigDecimal surcharge = surcharge(taxable, afterRebate, regime, bands);
         BigDecimal cess = afterRebate.add(surcharge).multiply(CESS_RATE);
 
-        // 10. The tax, rounded to the nearest ten rupees.
-        BigDecimal total = roundToTen(afterRebate.add(surcharge).add(cess));
+        // 10. The tax, to the rupee (see the class comment: TRACES does not round it to ten).
+        BigDecimal total = round(afterRebate.add(surcharge).add(cess));
         BigDecimal monthly = total.divide(BigDecimal.valueOf(12), 0, RoundingMode.HALF_UP);
 
         return new Result(gross, regime, in.age(), List.copyOf(exemptions), round(standard), round(pt),
                 round(salaryIncome), round(house), round(otherIncome), round(gti),
                 d.lines(), d.groups(), round(deductionTotal), taxable, working,
                 round(taxOnIncome), round(rebate), round(afterRebate),
-                round(surcharge), round(cess), total, monthly);
+                round(surcharge), round(cess), total, monthly, round(moved));
     }
 
     // ---- Chapter VIII ---------------------------------------------------------------------------
 
     private record Deductions(List<AllowedDeduction> lines, List<GroupTotal> groups, BigDecimal total) {
+
+        /**
+         * The 130 / 131 line as the employee declared it, with what moved to Section 22 noted on it — a
+         * line that silently shrank would look like a mistake. If all of it moved, the line is added
+         * back with nothing allowed so it still shows.
+         */
+        Deductions showingMoved(Map<TaxDeduction, BigDecimal> original, BigDecimal moved) {
+            TaxDeduction from = nn(original.get(TaxDeduction.FIRST_HOME_LOAN)).signum() > 0
+                    ? TaxDeduction.FIRST_HOME_LOAN : TaxDeduction.AFFORDABLE_HOME_LOAN;
+            List<AllowedDeduction> out = new ArrayList<>();
+            boolean found = false;
+            for (AllowedDeduction l : lines) {
+                if (l.deduction() == from) {
+                    found = true;
+                    out.add(new AllowedDeduction(l.key(), l.section(), l.label(), round(original.get(from)), l.allowed(),
+                            from, l.limit(), l.usedBefore(), round(moved)));
+                } else {
+                    out.add(l);
+                }
+            }
+            if (!found) {
+                out.add(new AllowedDeduction(from.name(), from.sectionLabel(), from.label(), round(original.get(from)),
+                        BigDecimal.ZERO, from, null, null, round(moved)));
+            }
+            return new Deductions(List.copyOf(out), groups, total);
+        }
     }
 
     /**
@@ -365,7 +436,8 @@ public final class IncomeTaxCalculator {
         BigDecimal claimed123 = BigDecimal.ZERO;
         if (in.employeePf().signum() > 0) {
             BigDecimal ok = in.employeePf().min(room);
-            lines.add(auto("EPF", "Sec 123 (80C)", "Provident fund — deducted by payroll", in.employeePf(), ok));
+            lines.add(auto("EPF", "Sec 123 (80C)", "Provident fund — deducted by payroll", in.employeePf(), ok)
+                    .withLimit(CAP_123, BigDecimal.ZERO));
             room = room.subtract(ok);
             claimed123 = claimed123.add(in.employeePf());
         }
@@ -377,9 +449,10 @@ public final class IncomeTaxCalculator {
                     ? amount.min(in.basic().multiply(new BigDecimal("0.10")).setScale(0, RoundingMode.DOWN))
                     : amount;
             BigDecimal ok = eligible.min(room);
+            BigDecimal before = CAP_123.subtract(room);
             room = room.subtract(ok);
             claimed123 = claimed123.add(amount);
-            lines.add(line(k, amount, ok));
+            lines.add(line(k, amount, ok).withLimit(CAP_123, before));
         }
         BigDecimal allowed123 = CAP_123.subtract(room);
         if (claimed123.signum() > 0) {
@@ -492,9 +565,10 @@ public final class IncomeTaxCalculator {
             BigDecimal amount = declared.getOrDefault(k, BigDecimal.ZERO);
             if (amount.signum() <= 0) continue;
             BigDecimal ok = amount.min(room);
+            BigDecimal before = cap.subtract(room);
             room = room.subtract(ok);
             claimed = claimed.add(amount);
-            lines.add(line(k, amount, ok));
+            lines.add(line(k, amount, ok).withLimit(cap, before));
         }
         BigDecimal allowed = cap.subtract(room);
         if (claimed.signum() > 0) {
