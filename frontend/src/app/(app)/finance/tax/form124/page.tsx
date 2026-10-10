@@ -24,18 +24,20 @@ const LENDER: Record<string, string> = { FINANCIAL_INSTITUTION: "(a) Financial i
 const SKIP = new Set(["LTA", "PROFESSIONAL_TAX_OTHER", "HRA_EXEMPTION"]);
 
 function Form124() {
-  const employee = useSearchParams().get("employee");
+  const params = useSearchParams();
+  const employee = params.get("employee");
+  const year = params.get("year") ?? undefined;
   const [d, setD] = useState<TaxDeclaration | null>(null);
   const [c, setC] = useState<TaxComputation | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (employee
-      ? Promise.all([api.employeeTaxDeclaration(employee), api.employeeTaxComputation(employee)])
-      : Promise.all([api.taxDeclaration(), api.taxComputation()]))
+      ? Promise.all([api.employeeTaxDeclaration(employee, year), api.employeeTaxComputation(employee, year)])
+      : Promise.all([api.taxDeclaration(year), api.taxComputation(year)]))
       .then(([decl, comp]) => { setD(decl); setC(comp); })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Could not load the declaration"));
-  }, [employee]);
+  }, [employee, year]);
 
   if (error) return <Alert tone="error" className="mt-6">{error}</Alert>;
   if (!d || !c) return <div className="mt-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>;

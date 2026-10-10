@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Loader2, Search } from "lucide-react";
+import { ChevronRight, FileCheck2, Loader2, Search } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { TaxDeclarationRow, TaxSettings } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -80,8 +80,15 @@ export default function ManageTaxPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Manage tax</h1>
-      <p className="mt-1 text-fg/50">Declarations, proofs and what everyone&apos;s tax comes to this year.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Manage tax</h1>
+          <p className="mt-1 text-fg/50">Declarations, proofs and what everyone&apos;s tax comes to this year.</p>
+        </div>
+        <Link href="/finance/tax/form130/everyone">
+          <Button variant="secondary"><FileCheck2 className="h-4 w-4" /> Form 130 for everyone</Button>
+        </Link>
+      </div>
 
       {error && <Alert tone="error" className="mt-4">{error}</Alert>}
       {notice && <Alert tone="success" className="mt-4">{notice}</Alert>}

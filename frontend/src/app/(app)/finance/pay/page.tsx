@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
 import { money as fmtMoney, monthYear } from "@/lib/format";
+import { TaxDocuments } from "@/components/tax/tax-documents";
 
 // Company-currency formatting (Settings → Localization); per-record currency is ignored for display.
 function money(n: number | null | undefined, _currency?: string) {
@@ -61,6 +62,9 @@ export default function MyPayslipPage() {
             <p className="mt-1 text-3xl font-semibold">{money(comp.currentAnnual, currency)}<span className="text-base font-normal text-fg/40">/yr</span></p>
             <p className="text-sm text-fg/50">{money(comp.currentMonthly, currency)}/mo{comp.effectiveDate ? ` · since ${comp.effectiveDate}` : ""}</p>
           </Card>
+
+          {/* Form 130 sits with the payslips too — "my Form 16" is a pay question before it is a tax one. */}
+          <TaxDocuments className="mt-4 print:hidden" />
 
           {comp.history.length > 1 && (
             <Card className="mt-4">

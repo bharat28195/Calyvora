@@ -16,6 +16,7 @@ import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { money, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { TaxDocuments } from "@/components/tax/tax-documents";
 import { Meter, MoneyInput, Proofs, num } from "@/components/tax/bits";
 
 /*
@@ -259,11 +260,10 @@ export default function TaxDeclarationPage() {
             {data.submittedAt && ` on ${formatDate(data.submittedAt)}`}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/finance/tax/computation"><Button variant="secondary">How it&apos;s calculated</Button></Link>
-          <Link href="/finance/tax/form124"><Button variant="ghost"><FileText className="h-4 w-4" /> Form 124</Button></Link>
-        </div>
       </div>
+
+      {/* Form 130 and the rest, for this year or last — what people come here for every June. */}
+      <TaxDocuments className="mt-4" />
 
       {locked && (
         <Alert tone="info" className="mt-4">
