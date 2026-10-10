@@ -245,15 +245,23 @@ function ByTeam({ entries }: { entries: AttendanceEntry[] }) {
   return (
     <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {teams.map(([name, r]) => (
+        // Labelled counts with a bar, not "0 in · 1 on leave · 1 total": the shorthand needed explaining.
         <Card key={name} className="p-3">
-          <p className="truncate text-sm font-medium">{name}</p>
-          <p className="mt-1 text-xs text-fg/50">
-            <span className="text-emerald-400">{r.in} in</span>
-            {r.leave > 0 && <> · <span className="text-violet">{r.leave} on leave</span></>}
-            {r.absent > 0 && <> · <span className="text-red-400">{r.absent} absent</span></>}
-            {r.unmarked > 0 && <> · {r.unmarked} not marked</>}
-            {" · "}{r.total} total
-          </p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="truncate text-sm font-medium">{name}</p>
+            <p className="shrink-0 text-xs text-fg/45">Team of {r.total}</p>
+          </div>
+          <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-fg/10">
+            <div className="bg-emerald-500" style={{ width: `${(r.in / Math.max(1, r.total)) * 100}%` }} />
+            <div className="bg-violet" style={{ width: `${(r.leave / Math.max(1, r.total)) * 100}%` }} />
+            <div className="bg-red-400" style={{ width: `${(r.absent / Math.max(1, r.total)) * 100}%` }} />
+          </div>
+          <div className="mt-2 grid grid-cols-4 gap-1 text-center">
+            <Count n={r.in} label="Present" tone="text-emerald-600 dark:text-emerald-400" />
+            <Count n={r.leave} label="On leave" tone="text-violet" />
+            <Count n={r.absent} label="Absent" tone="text-red-500" />
+            <Count n={r.unmarked} label="Not in yet" tone="text-fg/60" />
+          </div>
         </Card>
       ))}
     </div>
@@ -264,4 +272,14 @@ function shiftDay(iso: string, by: number): string {
   const d = new Date(`${iso}T00:00:00`);
   d.setDate(d.getDate() + by);
   return d.toISOString().slice(0, 10);
+}
+
+/** One labelled count on a team tile. */
+function Count({ n, label, tone }: { n: number; label: string; tone: string }) {
+  return (
+    <div>
+      <p className={`text-base font-semibold tabular-nums ${n === 0 ? "text-fg/30" : tone}`}>{n}</p>
+      <p className="text-[10px] uppercase tracking-wide text-fg/45">{label}</p>
+    </div>
+  );
 }

@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronsUpDown, Globe, KeyRound, Loader2, LogOut, UserCog } from "lucide-react";
+import { ChevronsUpDown, Loader2, LogOut, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/hooks/useT";
 import type { Me } from "@/lib/types";
 
 /**
- * The signed-in person, as one button: click it for Account settings, Language & region and Log out.
+ * The signed-in person, as one button: click it for My account and Log out. Language, timezone and
+ * password are tabs inside My account — listing them here as well was three doors into one room.
  *
  * <p>`placement="up"` is the sidebar version (the menu opens above, since it sits at the bottom of
  * the screen); `"down"` is the phone header, which shows only the initials.
@@ -87,13 +88,7 @@ export function ProfileMenu({ me, onLogout, loggingOut, placement }: {
           </div>
           <div className="py-1">
             <Link role="menuitem" href="/account" className={item}>
-              <UserCog className="h-4 w-4" /> {t("Account settings")}
-            </Link>
-            <Link role="menuitem" href="/account#preferences" className={item}>
-              <Globe className="h-4 w-4" /> {t("Language & region")}
-            </Link>
-            <Link role="menuitem" href="/account#password" className={item}>
-              <KeyRound className="h-4 w-4" /> {t("Change password")}
+              <UserCog className="h-4 w-4" /> {t("My account")}
             </Link>
           </div>
           <div className="border-t border-fg/10 pt-1">

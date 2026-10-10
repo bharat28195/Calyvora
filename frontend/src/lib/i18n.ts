@@ -82,6 +82,9 @@ const ROWS: [string, string, string, string, string][] = [
 
   // ---- profile menu
   ["Account settings", "खाता सेटिंग्स", "Configuración de la cuenta", "Paramètres du compte", "Kontoeinstellungen"],
+  ["My account", "मेरा खाता", "Mi cuenta", "Mon compte", "Mein Konto"],
+  ["Company settings", "कंपनी सेटिंग्स", "Configuración de la empresa", "Paramètres de l'entreprise", "Unternehmenseinstellungen"],
+  ["Time & attendance", "समय और उपस्थिति", "Tiempo y asistencia", "Temps et présence", "Zeit und Anwesenheit"],
   ["Language & region", "भाषा और क्षेत्र", "Idioma y región", "Langue et région", "Sprache & Region"],
   ["Change password", "पासवर्ड बदलें", "Cambiar contraseña", "Changer le mot de passe", "Passwort ändern"],
   ["Log out", "लॉग आउट", "Cerrar sesión", "Se déconnecter", "Abmelden"],

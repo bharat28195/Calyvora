@@ -52,7 +52,7 @@ export default function AccountPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="text-2xl font-semibold tracking-tight">{t("Account settings")}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{t("My account")}</h1>
       <p className="mt-1 text-fg/50">{t("Your sign-in details, and how Orbit looks for you.")}</p>
 
       {forced && (

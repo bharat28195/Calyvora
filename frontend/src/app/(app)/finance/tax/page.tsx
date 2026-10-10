@@ -387,22 +387,31 @@ export default function TaxDeclarationPage() {
                   const set = (patch: Partial<RentRow>) => update((f) => ({ ...f, rent: f.rent.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
                   return (
                     <div key={i} className="rounded-xl border border-fg/10 p-4">
-                      <div className="grid gap-3 sm:grid-cols-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">{form.rent.length > 1 ? `Home ${i + 1}` : "Your home"}</p>
+                        {!locked && <button onClick={() => update((f) => ({ ...f, rent: f.rent.filter((_, j) => j !== i) }))}
+                          className="inline-flex items-center gap-1 text-xs text-fg/40 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /> Remove</button>}
+                      </div>
+                      <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-fg/40">Period and rent</p>
+                      <div className="mt-1.5 grid gap-3 sm:grid-cols-4">
                         <Labelled label="From"><Input type="month" disabled={locked} value={r.fromMonth} onChange={(e) => set({ fromMonth: e.target.value })} /></Labelled>
                         <Labelled label="To"><Input type="month" disabled={locked} value={r.toMonth} onChange={(e) => set({ toMonth: e.target.value })} /></Labelled>
                         <Labelled label="Rent a month"><MoneyInput disabled={locked} value={r.monthlyRent} onChange={(v) => set({ monthlyRent: v })} /></Labelled>
                         <Labelled label="City"><Input disabled={locked} value={r.city} onChange={(e) => set({ city: e.target.value })} placeholder="e.g. Pune" /></Labelled>
-                        <Labelled label="Landlord's name"><Input disabled={locked} value={r.landlordName} onChange={(e) => set({ landlordName: e.target.value })} /></Labelled>
-                        <Labelled label="Landlord's PAN" hint="Needed above ₹1 lakh a year"><Input disabled={locked} value={r.landlordPan} onChange={(e) => set({ landlordPan: e.target.value.toUpperCase() })} placeholder="ABCDE1234F" /></Labelled>
-                        <Labelled label="Landlord's address" className="sm:col-span-2"><Input disabled={locked} value={r.landlordAddress} onChange={(e) => set({ landlordAddress: e.target.value })} /></Labelled>
+                      </div>
+                      <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-fg/40">Landlord</p>
+                      <div className="mt-1.5 grid gap-3 sm:grid-cols-3">
+                        <Labelled label="Name"><Input disabled={locked} value={r.landlordName} onChange={(e) => set({ landlordName: e.target.value })} /></Labelled>
+                        <Labelled label="PAN" hint="Needed above ₹1 lakh a year"><Input disabled={locked} value={r.landlordPan} onChange={(e) => set({ landlordPan: e.target.value.toUpperCase() })} placeholder="ABCDE1234F" /></Labelled>
                         <Labelled label="Related to you?" hint="Form 124 asks"><Input disabled={locked} value={r.landlordRelationship} onChange={(e) => set({ landlordRelationship: e.target.value })} placeholder="No, or e.g. Father" /></Labelled>
+                        <Labelled label="Address" className="sm:col-span-3"><Input disabled={locked} value={r.landlordAddress} onChange={(e) => set({ landlordAddress: e.target.value })} placeholder="House, street, city, PIN" /></Labelled>
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                        {saved ? <Proofs status={saved.proofStatus} accepted={saved.acceptedRent} note={saved.reviewNote} proofs={saved.proofs}
-                          canUpload={proofsOpen} onUpload={(file) => uploadProof("RENT", saved.id, file)} onDelete={deleteProof} /> : <span />}
-                        {!locked && <button onClick={() => update((f) => ({ ...f, rent: f.rent.filter((_, j) => j !== i) }))}
-                          className="inline-flex items-center gap-1 text-xs text-fg/40 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /> Remove</button>}
-                      </div>
+                      {saved && (
+                        <div className="mt-3">
+                          <Proofs status={saved.proofStatus} accepted={saved.acceptedRent} note={saved.reviewNote} proofs={saved.proofs}
+                            canUpload={proofsOpen} onUpload={(file) => uploadProof("RENT", saved.id, file)} onDelete={deleteProof} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -630,9 +639,12 @@ function StepHead({ title, subtitle, oldOnly }: { title: string; subtitle: strin
 
 function Labelled({ label, hint, className, children }: { label: string; hint?: string; className?: string; children: React.ReactNode }) {
   return (
+    // The hint goes under the field, not beside the label: a long hint wrapped the label onto two
+    // lines and pushed that one input lower than its neighbours.
     <label className={cn("flex flex-col gap-1", className)}>
-      <span className="text-xs font-medium text-fg/60">{label}{hint && <span className="font-normal text-fg/40"> · {hint}</span>}</span>
+      <span className="truncate text-xs font-medium text-fg/60">{label}</span>
       {children}
+      {hint && <span className="text-[11px] leading-tight text-fg/40">{hint}</span>}
     </label>
   );
 }

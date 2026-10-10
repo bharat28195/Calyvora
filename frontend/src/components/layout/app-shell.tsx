@@ -46,6 +46,8 @@ interface NavItem {
   permWide?: boolean;
   /** Hide from people who hold `perm` company-wide (they reach the same page elsewhere). */
   hideIfWide?: boolean;
+  /** A section made only of panes with their own permissions: hidden when none of them is yours. */
+  hideIfEmpty?: boolean;
   /**
    * The module this section belongs to. Hidden when the company has not bought it.
    *
@@ -158,7 +160,6 @@ const NAV: NavItem[] = [
   },
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: COMPANY },
   { href: "/helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: COMPANY, feature: "HELPDESK" },
-  { href: "/regularizations", label: "Regularizations", icon: CalendarClock, roles: COMPANY, perm: "ATTENDANCE_MANAGE" },
   // Approvals, which is not the same thing as the team's leave calendar under My team — one is a
   // queue you have to act on, the other is a view. Shown to anyone who leads people rather than to
   // the MANAGER role, because the server now lets the whole chain above someone decide their
@@ -176,10 +177,19 @@ const NAV: NavItem[] = [
       { href: "/people", label: "Directory" },
       { href: "/people/departments", label: "Departments" },
       { href: "/people/designations", label: "Designations", perm: "PEOPLE_MANAGE" },
+      { href: "/people/holidays", label: "Holidays" },
+    ],
+  },
+  // The whole company's attendance and leave, for whoever runs them — its own section rather than
+  // inside People, which is about who works here. Your own days are under Me, your team's under My
+  // team; this is the company-wide desk. Shown when any pane in it is yours (see hideIfEmpty).
+  {
+    href: "/people/attendance", label: "Time & attendance", icon: CalendarClock, roles: COMPANY, hideIfEmpty: true,
+    children: [
       { href: "/people/attendance", label: "Attendance", perm: "ATTENDANCE_MANAGE", permWide: true },
       { href: "/people/time-off", label: "Time off", perm: "LEAVE_APPROVE", permWide: true },
+      { href: "/regularizations", label: "Regularizations", perm: "ATTENDANCE_MANAGE" },
       { href: "/people/leave-policy", label: "Leave policy", perm: "LEAVE_POLICY_MANAGE" },
-      { href: "/people/holidays", label: "Holidays" },
     ],
   },
   { href: "/recruitment", label: "Recruitment", icon: UserPlus, roles: COMPANY, perm: "RECRUITMENT_MANAGE", feature: "RECRUITMENT" },
@@ -220,7 +230,9 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/subscription", label: "Subscription", icon: CreditCard, roles: COMPANY, perm: "BILLING_MANAGE" },
-  { href: "/settings", label: "Settings", icon: Settings, roles: COMPANY, perm: "COMPANY_SETTINGS" },
+  // "Company settings", not "Settings": everything here applies to the whole company. Your own
+  // language, timezone and password are in My account (the profile menu).
+  { href: "/settings", label: "Company settings", icon: Settings, roles: COMPANY, perm: "COMPANY_SETTINGS" },
 ];
 
 /**
@@ -230,6 +242,9 @@ const NAV: NavItem[] = [
 const UNLISTED: { href: string; roles?: Role[]; feature?: string; perm?: PermissionKey; permWide?: boolean }[] = [
   { href: "/billing", roles: COMPANY, perm: "BILLING_MANAGE" },
 ];
+
+/** Pages laid out as wide boards rather than reading columns. */
+const WIDE_PAGES = ["/recruitment/"];
 
 /** Where each kind of account lands, and is sent back to from a page that is not theirs. */
 function homeFor(role: Role): string {
@@ -254,7 +269,8 @@ type RouteEntry = { href: string; roles?: Role[]; feature?: string; perm?: Permi
 function routeRule(pathname: string): { roles: Role[] | null; feature?: string; allows: (me: Me) => boolean } | null {
   const entries: RouteEntry[] = [...UNLISTED];
   for (const n of NAV) {
-    entries.push({ href: n.href, roles: n.roles, feature: n.feature, perm: n.perm, permWide: n.permWide });
+    // A section of panes only has no rule of its own — it would let anyone in; its panes decide.
+    if (!n.hideIfEmpty) entries.push({ href: n.href, roles: n.roles, feature: n.feature, perm: n.perm, permWide: n.permWide });
     for (const c of n.children ?? []) {
       // A pane with its own permission needs that; otherwise it needs whatever its section needs.
       entries.push(c.perm
@@ -349,8 +365,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // to them still runs exits for the business.
     .filter((n) => !n.leadsTeam || leadsTeam || seesWholeCompany)
     // Each pane can need its own permission (Manage tax, Review cycles, Designations…).
-    .map((n) => (n.children ? { ...n, children: n.children.filter((c) => allowed(c.perm, c.permWide)) } : n));
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+    .map((n) => (n.children ? { ...n, children: n.children.filter((c) => allowed(c.perm, c.permWide)) } : n))
+    // A section that is only its panes disappears when none of them is yours — and opens on the first that is.
+    .filter((n) => !n.hideIfEmpty || (n.children?.length ?? 0) > 0)
+    .map((n) => (n.hideIfEmpty && n.children?.length ? { ...n, href: n.children[0].href } : n));
+
+  // Which section and pane the page belongs to: the most specific match wins. Matching by prefix alone
+  // lit up People on /people/exits and Company settings on /settings/roles (which lives under Members).
+  const matches = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  let ownerSection: string | null = null;
+  let ownerPane: string | null = null;
+  let best = -1;
+  for (const n of nav) {
+    for (const h of [n.href, ...(n.children ?? []).map((c) => c.href)]) {
+      if (matches(h) && h.length > best) {
+        best = h.length;
+        ownerSection = n.href;
+        ownerPane = h;
+      }
+    }
+  }
+  const isActive = (href: string) => href === ownerSection;
+  const paneActive = (href: string) => href === ownerPane;
 
   async function logout() {
     setLoggingOut(true);
@@ -392,7 +428,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {hasChildren && section && (
                   <div className="mt-1 space-y-0.5 border-l border-fg/10 pb-1 pl-3 ml-4">
                     {item.children!.map((c) => {
-                      const active = pathname === c.href;
+                      const active = paneActive(c.href);
                       return (
                         <Link
                           key={c.href}
@@ -450,7 +486,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   item.children.filter((c) => c.href !== item.href).map((c) => (
                     <Link key={c.href} href={c.href}
                       className={cn("inline-flex shrink-0 items-center rounded-lg px-3 py-1.5 text-sm",
-                        pathname === c.href ? "bg-violet/10 text-violet" : "text-fg/50")}>
+                        paneActive(c.href) ? "bg-violet/10 text-violet" : "text-fg/50")}>
                       {t(c.label)}
                     </Link>
                   ))}
@@ -459,7 +495,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
+        {/* Boards that grow sideways (a hiring pipeline) get the whole width; reading pages keep a measure. */}
+        <main className={cn("mx-auto px-6 py-10", WIDE_PAGES.some((p) => pathname.startsWith(p)) ? "max-w-[96rem]" : "max-w-6xl")}>{children}</main>
       </div>
 
       <AssistantPanel />
