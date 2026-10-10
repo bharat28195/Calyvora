@@ -88,7 +88,31 @@ public class DocumentController {
      */
     @GetMapping("/letterhead/background")
     public org.springframework.http.ResponseEntity<byte[]> letterpadImage() {
-        return letterheadService.background()
+        return image(letterheadService.background());
+    }
+
+    /** The sheet for page two onwards (PD-69); the letterpad itself when it repeats. */
+    @GetMapping("/letterhead/continuation")
+    public org.springframework.http.ResponseEntity<byte[]> continuationImage() {
+        return image(letterheadService.continuation());
+    }
+
+    @PostMapping("/letterhead/continuation")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse uploadContinuation(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return letterheadService.uploadContinuation(file);
+    }
+
+    @DeleteMapping("/letterhead/continuation")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse removeContinuation() {
+        return letterheadService.removeContinuation();
+    }
+
+    private static org.springframework.http.ResponseEntity<byte[]> image(
+            java.util.Optional<LetterheadService.StoredImage> stored) {
+        return stored
                 .map(image -> org.springframework.http.ResponseEntity.ok()
                         .contentType(org.springframework.http.MediaType.parseMediaType(image.contentType()))
                         // Private: it is one company's stationery, and a shared cache must not hand

@@ -38,11 +38,13 @@ public class DocumentDeliveryService {
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final LetterheadService letterheadService;
 
     public DocumentDeliveryService(GeneratedDocumentRepository documentRepository, DocumentEmailRepository emailRepository,
                                    LetterheadRepository letterheadRepository, CompanyRepository companyRepository,
                                    EmployeeRepository employeeRepository, UserRepository userRepository,
-                                   EmailService emailService) {
+                                   EmailService emailService, LetterheadService letterheadService) {
+        this.letterheadService = letterheadService;
         this.documentRepository = documentRepository;
         this.emailRepository = emailRepository;
         this.letterheadRepository = letterheadRepository;
@@ -141,9 +143,13 @@ public class DocumentDeliveryService {
                 if (web != null) footer.add(web);
                 if (l.getFooterText() != null) footer.add(l.getFooterText());
                 boolean printed = l.isUseBackground() && l.getBackgroundImage() != null;
+                if (printed) letterheadService.measured(l);
+                byte[] later = "SAME".equals(l.getLaterPages()) ? null : l.getContinuationImage();
                 paper = new LetterPdf.Stationery(l.getHeading() == null ? company : l.getHeading(), l.getAddressLines(),
                         String.join("\n", footer), l.getBrandColor(), !"SANS".equals(l.getFontFamily()), l.getLogoUrl(),
-                        printed ? l.getBackgroundImage() : null);
+                        printed ? l.getBackgroundImage() : null, printed ? later : null,
+                        new LetterPdf.Area(or(l.getFirstTopMm(), 40), or(l.getFirstBottomMm(), 32),
+                                or(l.getLaterTopMm(), 22), or(l.getLaterBottomMm(), 32), or(l.getSideMm(), 22)));
             }
         }
         try {
@@ -151,6 +157,10 @@ public class DocumentDeliveryService {
         } catch (IOException | RuntimeException e) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "The letter could not be turned into a PDF.");
         }
+    }
+
+    private static int or(Integer v, int fallback) {
+        return v == null ? fallback : v;
     }
 
     private GeneratedDocument document(UUID id) {

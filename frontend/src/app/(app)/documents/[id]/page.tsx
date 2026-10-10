@@ -68,6 +68,38 @@ export default function DocumentPage() {
     }
   }
 
+  /**
+   * Prints the PDF rather than the screen (PD-69), so a printed letter is the same as the one
+   * downloaded or emailed: the same pages, on the letterpad and its continuation sheet.
+   */
+  async function print() {
+    if (!doc) return;
+    setBusy(true); setError(null);
+    try {
+      const url = URL.createObjectURL(await api.documentPdf(doc.id));
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.src = url;
+      frame.onload = () => {
+        try {
+          frame.contentWindow?.focus();
+          frame.contentWindow?.print();
+        } catch {
+          window.open(url, "_blank");
+        }
+        setTimeout(() => { frame.remove(); URL.revokeObjectURL(url); }, 60_000);
+      };
+      document.body.appendChild(frame);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not make the PDF");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function openSend() {
     if (!mail) return;
     setForm({ to: mail.to ?? "", subject: mail.subject, message: mail.message });
@@ -121,7 +153,7 @@ export default function DocumentPage() {
           <Button variant="secondary" onClick={() => void download()} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF
           </Button>
-          <Button variant="secondary" onClick={() => window.print()}>
+          <Button variant="secondary" onClick={() => void print()} disabled={busy}>
             <Printer className="h-4 w-4" /> Print
           </Button>
           <Button variant="ghost" onClick={copy} aria-label="Copy the text">

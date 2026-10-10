@@ -436,7 +436,10 @@ function pageQuery(opts: object): string {
   return query ? `?${query}` : "";
 }
 
-/** Letterpad images by version, as object URLs (see api.letterpadImage). */
+/** Which sheet of the letterpad: page one, or the one for page two onwards (PD-69). */
+export type LetterpadSheet = "background" | "continuation";
+
+/** Letterpad images by sheet and version, as object URLs (see api.letterpadImage). */
 const letterpadCache = new Map<string, Promise<string>>();
 
 export const api = {
@@ -1757,12 +1760,13 @@ export const api = {
    * browser to set its own with the boundary it generated. Everything else it does — the bearer
    * token, the waking-backend retry — does not apply to a one-off upload.
    */
-  async uploadLetterpad(file: File): Promise<Letterhead> {
+  /** The letterpad, or (PD-69) the continuation sheet for page two onwards. */
+  async uploadLetterpad(file: File, sheet: LetterpadSheet = "background"): Promise<Letterhead> {
     if (!LIVE) return liveOnly("The letterpad");
     const form = new FormData();
     form.append("file", file);
     forgetReads();
-    const res = await fetch(`${BASE}/documents/letterhead/background`, {
+    const res = await fetch(`${BASE}/documents/letterhead/${sheet}`, {
       method: "POST",
       credentials: "include",
       headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
@@ -1772,9 +1776,9 @@ export const api = {
     if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
     return body as Letterhead;
   },
-  removeLetterpad(): Promise<Letterhead> {
+  removeLetterpad(sheet: LetterpadSheet = "background"): Promise<Letterhead> {
     return LIVE
-      ? http<Letterhead>("/documents/letterhead/background", { method: "DELETE" })
+      ? http<Letterhead>(`/documents/letterhead/${sheet}`, { method: "DELETE" })
       : liveOnly("The letterpad");
   },
   /** Where the uploaded letterpad is served. Versioned so a replacement is not read from cache. */
@@ -1788,18 +1792,19 @@ export const api = {
    * background sends — so pointing either at {@link letterpadImageUrl} got a 401 and letters showed as
    * bare text. One fetch per version, shared by every letter on screen.
    */
-  letterpadImage(version: string): Promise<string> {
-    const hit = letterpadCache.get(version);
+  letterpadImage(version: string, sheet: LetterpadSheet = "background"): Promise<string> {
+    const key = `${sheet}:${version}`;
+    const hit = letterpadCache.get(key);
     if (hit) return hit;
     const p = (async () => {
-      const res = await fetch(`${BASE}/documents/letterhead/background?v=${encodeURIComponent(version)}`, {
+      const res = await fetch(`${BASE}/documents/letterhead/${sheet}?v=${encodeURIComponent(version)}`, {
         credentials: "include",
         headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
       });
       if (!res.ok) throw new Error("letterpad " + res.status);
       return URL.createObjectURL(await res.blob());
     })();
-    letterpadCache.set(version, p);
+    letterpadCache.set(key, p);
     p.catch(() => letterpadCache.delete(version));
     return p;
   },

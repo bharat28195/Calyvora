@@ -79,6 +79,14 @@ export default function LetterheadPage() {
         workingHours: draft.workingHours ?? "",
         payDay: draft.payDay ?? "",
         jurisdiction: draft.jurisdiction ?? "",
+        // The writing area on the uploaded letterpad (PD-69), adjusted in the upload card.
+        ...(draft.hasBackground ? {
+          firstTopMm: draft.firstTopMm,
+          firstBottomMm: draft.firstBottomMm,
+          laterTopMm: draft.laterTopMm,
+          laterBottomMm: draft.laterBottomMm,
+          sideMm: draft.sideMm,
+        } : {}),
       });
       setSaved(l);
       setDraft(l);
@@ -128,6 +136,7 @@ export default function LetterheadPage() {
           <LetterpadUpload
             letterhead={draft}
             onChange={(next) => { setSaved(next); setDraft(next); setError(null); }}
+            onDraft={(patch) => { setDraft((d) => (d ? { ...d, ...patch } : d)); setNote(null); }}
           />
 
           <Card>
@@ -289,7 +298,11 @@ export default function LetterheadPage() {
           <p className="mb-2 text-sm font-medium uppercase tracking-wide text-fg/40">
             How a letter will look
           </p>
-          <LetterSheet body={SAMPLE_BODY} letterhead={draft} />
+          {/* On an uploaded letterpad the sample runs to a second page, to show the continuation sheet. */}
+          <LetterSheet
+            body={draft.useBackground && draft.hasBackground ? SAMPLE_BODY + SAMPLE_PAGE_TWO : SAMPLE_BODY}
+            letterhead={draft}
+          />
           <p className="mt-3 text-xs text-fg/40">
             Sample text — the letterpad is what you are editing here, not the words.
           </p>
@@ -337,4 +350,19 @@ Yours faithfully,
 
 Ava Chen
 Head of People
+`;
+
+const SAMPLE_PAGE_TWO = `
+--- page ---
+# Annexure: terms of employment
+
+1. **Probation.** Six months from your date of joining, during which either side may end the employment with 15 days' notice.
+2. **Notice period.** After confirmation, 60 days' notice or salary in lieu.
+3. **Working hours.** Monday to Friday, 9:30 a.m. to 6:30 p.m.
+4. **Leave.** As per the company's leave policy, read from Orbit.
+5. **Confidentiality.** Company information stays confidential during and after your employment.
+
+I accept the terms of this appointment.
+
+Signature: ____________________     Date: ____________
 `;

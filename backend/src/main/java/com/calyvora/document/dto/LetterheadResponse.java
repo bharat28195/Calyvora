@@ -33,7 +33,16 @@ public record LetterheadResponse(
         String workingDays,
         String workingHours,
         String payDay,
-        String jurisdiction
+        String jurisdiction,
+        // ---- PD-69: page two onwards, and the writing area (millimetres on A4, defaults applied) ----
+        /** PAGE2, UPLOADED or DERIVED; null without a letterpad. */
+        String continuationSource,
+        String laterPages,
+        int firstTopMm,
+        int firstBottomMm,
+        int laterTopMm,
+        int laterBottomMm,
+        int sideMm
 ) {
     public static LetterheadResponse of(Letterhead l, String companyName) {
         String heading = l.getHeading() == null || l.getHeading().isBlank() ? companyName : l.getHeading();
@@ -44,6 +53,13 @@ public record LetterheadResponse(
                 l.getUpdatedAt().toString(),
                 l.getCin(), l.getGstin(), l.getWebsite(), l.getEmail(), l.getDateStyle(), l.getProbationDays(),
                 l.getNoticeProbation(), l.getNoticePeriod(), l.getWorkingDays(), l.getWorkingHours(),
-                l.getPayDay(), l.getJurisdiction());
+                l.getPayDay(), l.getJurisdiction(),
+                l.getContinuationSource(), l.getLaterPages(),
+                or(l.getFirstTopMm(), 40), or(l.getFirstBottomMm(), 32),
+                or(l.getLaterTopMm(), 22), or(l.getLaterBottomMm(), 32), or(l.getSideMm(), 22));
+    }
+
+    private static int or(Integer v, int fallback) {
+        return v == null ? fallback : v;
     }
 }

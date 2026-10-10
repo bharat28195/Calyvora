@@ -26,17 +26,32 @@ import java.util.regex.Pattern;
  * {@code --- page ---} breaks and pipe tables. Kept deliberately in step with it; the two are tested
  * against the same letters.
  *
- * <p>Stationery: an uploaded letterpad image is drawn underneath every page, with the text inside
- * generous margins; otherwise the composed heading and footer repeat on every page, as on screen.
+ * <p>Stationery: an uploaded letterpad is drawn underneath page one and its continuation sheet under
+ * every page after it (PD-69), with the text kept inside each sheet's measured writing area, so a
+ * letter of any length flows from page to page without touching the artwork. Otherwise the composed
+ * heading and footer repeat on every page, as on screen.
  */
 public final class LetterPdf {
 
     private LetterPdf() {
     }
 
-    /** The stationery to print on. {@code background} is the uploaded letterpad image, or null. */
+    /**
+     * The stationery to print on. {@code background} is the uploaded letterpad image, or null;
+     * {@code continuation} the sheet for page two onwards (null repeats the letterpad); {@code area}
+     * where to write on each, or null for the defaults.
+     */
     public record Stationery(String heading, String addressLines, String footerLines, String brandColor,
-                             boolean serif, String logoUrl, byte[] background) {
+                             boolean serif, String logoUrl, byte[] background, byte[] continuation, Area area) {
+        public Stationery(String heading, String addressLines, String footerLines, String brandColor,
+                          boolean serif, String logoUrl, byte[] background) {
+            this(heading, addressLines, footerLines, brandColor, serif, logoUrl, background, null, null);
+        }
+    }
+
+    /** The writing area in millimetres on A4: page one, the pages after it, and both sides. */
+    public record Area(int firstTop, int firstBottom, int laterTop, int laterBottom, int side) {
+        static final Area DEFAULT = new Area(40, 32, 22, 32, 22);
     }
 
     public static byte[] render(String body, Stationery paper) throws IOException {
@@ -52,7 +67,8 @@ public final class LetterPdf {
         b.toStream(out);
         b.run();
         byte[] pdf = out.toByteArray();
-        return paper != null && paper.background() != null ? underlay(pdf, paper.background()) : pdf;
+        return paper != null && paper.background() != null
+                ? underlay(pdf, paper.background(), paper.continuation()) : pdf;
     }
 
     private static void font(PdfRendererBuilder b, String resource, String family, int weight) {
@@ -63,11 +79,15 @@ public final class LetterPdf {
         }, family, weight, com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle.NORMAL, true);
     }
 
-    /** Draws the letterpad image under every page, full bleed. */
-    private static byte[] underlay(byte[] pdf, byte[] image) throws IOException {
+    /** Draws the letterpad under page one and the continuation sheet under the rest, full bleed. */
+    private static byte[] underlay(byte[] pdf, byte[] image, byte[] continuation) throws IOException {
         try (PDDocument doc = Loader.loadPDF(pdf)) {
-            PDImageXObject img = PDImageXObject.createFromByteArray(doc, image, "letterpad");
+            PDImageXObject first = PDImageXObject.createFromByteArray(doc, image, "letterpad");
+            PDImageXObject later = continuation == null ? first
+                    : PDImageXObject.createFromByteArray(doc, continuation, "continuation");
+            int index = 0;
             for (PDPage page : doc.getPages()) {
+                PDImageXObject img = index++ == 0 ? first : later;
                 PDRectangle box = page.getMediaBox();
                 try (PDPageContentStream cs = new PDPageContentStream(doc, page,
                         PDPageContentStream.AppendMode.PREPEND, true, true)) {
@@ -116,9 +136,15 @@ public final class LetterPdf {
                 foot.append("</div>");
             }
         }
-        String margins = printed ? "38mm 22mm 32mm 22mm" : (head.length() > 0 ? "42mm" : "22mm") + " 20mm "
-                + (foot.length() > 0 ? "30mm" : "20mm") + " 20mm";
+        String margins = (head.length() > 0 ? "42mm" : "22mm") + " 20mm " + (foot.length() > 0 ? "30mm" : "20mm") + " 20mm";
+        String firstPage = "";
+        if (printed) {
+            Area a = p.area() == null ? Area.DEFAULT : p.area();
+            margins = a.laterTop() + "mm " + a.side() + "mm " + a.laterBottom() + "mm " + a.side() + "mm";
+            firstPage = "@page :first{margin:" + a.firstTop() + "mm " + a.side() + "mm " + a.firstBottom() + "mm " + a.side() + "mm}";
+        }
         return "<!DOCTYPE html><html><head><meta charset='UTF-8'/><style>"
+                + firstPage
                 + "@page{size:A4;margin:" + margins + ";"
                 + (head.length() > 0 ? "@top-center{content:element(head);vertical-align:bottom;padding-bottom:6mm}" : "")
                 + (foot.length() > 0 ? "@bottom-center{content:element(foot);vertical-align:top;padding-top:4mm}" : "")

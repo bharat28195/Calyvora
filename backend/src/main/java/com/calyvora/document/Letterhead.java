@@ -75,6 +75,30 @@ public class Letterhead {
     @Column(name = "use_background", nullable = false)
     private boolean useBackground;
 
+    // ---- V78: page two onwards, and where the letter is written (PD-69) ----
+
+    @jakarta.persistence.Basic(fetch = jakarta.persistence.FetchType.LAZY)
+    @Column(name = "continuation_image")
+    private byte[] continuationImage;
+    @Column(name = "continuation_type", length = 64)
+    private String continuationType;
+    /** PAGE2 (from the uploaded file), UPLOADED (on its own) or DERIVED (page one, header cleared). */
+    @Column(name = "continuation_source", length = 12)
+    private String continuationSource;
+    /** CONTINUATION or SAME (the full letterpad on every page). */
+    @Column(name = "later_pages", nullable = false, length = 12)
+    private String laterPages = "CONTINUATION";
+    @Column(name = "first_top_mm")
+    private Integer firstTopMm;
+    @Column(name = "first_bottom_mm")
+    private Integer firstBottomMm;
+    @Column(name = "later_top_mm")
+    private Integer laterTopMm;
+    @Column(name = "later_bottom_mm")
+    private Integer laterBottomMm;
+    @Column(name = "side_mm")
+    private Integer sideMm;
+
     // ---- V73: the company's identity and standard terms, quoted by its letters ----
 
     @Column(length = 32)
@@ -126,6 +150,26 @@ public class Letterhead {
     public boolean isUseBackground() { return useBackground; }
     public void setUseBackground(boolean useBackground) { this.useBackground = useBackground; }
 
+    public byte[] getContinuationImage() { return continuationImage; }
+    public String getContinuationType() { return continuationType; }
+    public String getContinuationSource() { return continuationSource; }
+    public void setContinuation(byte[] image, String contentType, String source) {
+        this.continuationImage = image;
+        this.continuationType = contentType;
+        this.continuationSource = image == null ? null : source;
+        this.updatedAt = Instant.now();
+    }
+    public String getLaterPages() { return laterPages; }
+    public void setLaterPages(String laterPages) { this.laterPages = laterPages; this.updatedAt = Instant.now(); }
+    public Integer getFirstTopMm() { return firstTopMm; }
+    public Integer getFirstBottomMm() { return firstBottomMm; }
+    public Integer getLaterTopMm() { return laterTopMm; }
+    public Integer getLaterBottomMm() { return laterBottomMm; }
+    public Integer getSideMm() { return sideMm; }
+    public void setFirstArea(Integer top, Integer bottom) { this.firstTopMm = top; this.firstBottomMm = bottom; this.updatedAt = Instant.now(); }
+    public void setLaterArea(Integer top, Integer bottom) { this.laterTopMm = top; this.laterBottomMm = bottom; this.updatedAt = Instant.now(); }
+    public void setSideMm(Integer sideMm) { this.sideMm = sideMm; this.updatedAt = Instant.now(); }
+
     /** Attach an uploaded letterpad, or clear it with nulls. Clearing also switches it off. */
     public void setBackground(byte[] image, String contentType, String name) {
         this.backgroundImage = image;
@@ -133,6 +177,10 @@ public class Letterhead {
         this.backgroundName = name;
         if (image == null) {
             this.useBackground = false;
+            this.continuationImage = null;
+            this.continuationType = null;
+            this.continuationSource = null;
+            this.firstTopMm = this.firstBottomMm = this.laterTopMm = this.laterBottomMm = this.sideMm = null;
         }
         this.updatedAt = Instant.now();
     }

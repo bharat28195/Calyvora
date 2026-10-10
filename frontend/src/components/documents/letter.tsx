@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useLetterpadImage } from "@/components/documents/use-letterpad";
+import { PagedLetter } from "@/components/documents/paged-letter";
 import { api } from "@/lib/api";
 import { EMPTY, LETTERHEAD_FONTS } from "@/lib/documents";
 import type { Letterhead } from "@/lib/types";
@@ -33,35 +33,25 @@ export function LetterSheet({
   // suppressed: the uploaded image already carries the logo, the address and the strip along the
   // bottom, and drawing ours on top of theirs is how you get two addresses on one letter.
   const printed = letterhead?.useBackground && letterhead.hasBackground;
-  const image = useLetterpadImage(letterhead?.updatedAt, !!printed);
-  const paper = printed
-    ? {
-        backgroundImage: image ? `url(${image})` : undefined,
-        backgroundSize: "100% 100%",
-        backgroundRepeat: "no-repeat",
-        // A4 proportions, so the body sits where it will sit on paper rather than wherever the
-        // screen happens to end.
-        aspectRatio: "1 / 1.414",
-      }
-    : undefined;
+  // On the letterpad: real A4 pages, page one on the letterpad and the rest on the continuation
+  // sheet, the text inside each sheet's writing area (PD-69) — the same layout as the PDF.
+  if (printed && letterhead) {
+    return <PagedLetter html={html} letterhead={letterhead} fontFamily={font} className={className} />;
+  }
 
   return (
     <div
-      className={`letter-sheet rounded-xl border border-fg/10 bg-white text-[15px] leading-relaxed text-neutral-800 shadow-sm ${
-        printed
-          ? "px-14 py-20 sm:px-20 sm:py-28"
-          : "px-8 py-10 sm:px-12 sm:py-14"
-      } ${className}`}
-      style={{ ...(letterhead ? { fontFamily: font } : {}), ...paper }}
+      className={`letter-sheet rounded-xl border border-fg/10 bg-white px-8 py-10 text-[15px] leading-relaxed text-neutral-800 shadow-sm sm:px-12 sm:py-14 ${className}`}
+      style={letterhead ? { fontFamily: font } : undefined}
     >
       {/* A table so the browser repeats the header and footer on every printed page — a three-page
           appointment letter carries the company's name and CIN on each page, as paper ones do. */}
       <table className="w-full border-collapse">
-        {letterhead && !printed && (
+        {letterhead && (
           <thead><tr><td className="p-0"><Letterpad letterhead={letterhead} accent={accent} /></td></tr></thead>
         )}
         <tbody><tr><td className="p-0 align-top"><div dangerouslySetInnerHTML={{ __html: html }} /></td></tr></tbody>
-        {letterhead && !printed && (
+        {letterhead && (
           <tfoot><tr><td className="p-0"><Footer letterhead={letterhead} accent={accent} /></td></tr></tfoot>
         )}
       </table>

@@ -1992,6 +1992,25 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   automatically. Found and fixed: anyone could read anyone's goals by id; now self, the chain above, or
   HR / performance managers only.
 
+### PD-69 · 2026-10-10 · Letters of any length on the letterpad, written inside its blank area
+- **Trigger (founder, with a two-page Northwind letterpad as the example):** letters run to several
+  pages; page one must sit on the letterpad and the text must keep clear of its header, footer and
+  artwork, whatever format the letterpad arrives in. "The output should be very clean."
+- **Continuation sheet:** page 2 of an uploaded PDF/Word file becomes the sheet for page two onwards;
+  one can be uploaded separately; otherwise it is made from page one with the header cleared (painted
+  in the paper's own colour). HR can choose the full letterpad on every page instead. V78.
+- **Measured, not guessed:** on upload the page is scanned for the tallest band of empty rows (strict
+  near-white first, then ink-only for watermarked paper); the writing area is that band with 8 mm /
+  6 mm of air, and the side margin follows where the letterpad's own printing starts. Shown as a
+  dashed box on both sheets; every value adjustable in millimetres; "Measure again" resets.
+  Letterpads uploaded before this are measured on first read.
+- **Same layout everywhere:** the PDF uses @page :first margins plus the continuation underlay; the
+  screen shows real A4 pages laid out at 96 dpi and split by block (lists by item, tables by row with
+  the header and column widths kept); Print now prints the PDF. A test renders a three-page letter
+  and checks every line sits inside each page's writing area.
+- Images are now stored exactly as uploaded (only PDF/Word are rendered); an image Java cannot read
+  (WebP) prints on the default margins.
+
 ## 4. Architecture Decision Log
 
 

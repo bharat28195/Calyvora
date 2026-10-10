@@ -859,10 +859,23 @@ export interface Letterhead {
   workingHours?: string | null;
   payDay?: string | null;
   jurisdiction?: string | null;
+  /**
+   * PD-69 — page two onwards and the writing area. The continuation sheet came from page 2 of the
+   * uploaded file, was uploaded on its own, or was made from page one with the header cleared.
+   */
+  continuationSource?: "PAGE2" | "UPLOADED" | "DERIVED" | null;
+  /** CONTINUATION: the continuation sheet; SAME: the full letterpad on every page. */
+  laterPages?: "CONTINUATION" | "SAME";
+  /** Where the letter is written, in millimetres on A4. */
+  firstTopMm?: number;
+  firstBottomMm?: number;
+  laterTopMm?: number;
+  laterBottomMm?: number;
+  sideMm?: number;
 }
 export type LetterheadInput = Partial<
-  Omit<Letterhead, "updatedAt" | "hasBackground" | "backgroundName">
->;
+  Omit<Letterhead, "updatedAt" | "hasBackground" | "backgroundName" | "continuationSource">
+> & { remeasure?: boolean };
 export interface MergeField {
   key: string;
   label: string;

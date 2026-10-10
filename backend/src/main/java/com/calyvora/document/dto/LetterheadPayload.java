@@ -56,7 +56,18 @@ public record LetterheadPayload(
         @Size(max = 80) String workingDays,
         @Size(max = 80) String workingHours,
         @Size(max = 80) String payDay,
-        @Size(max = 80) String jurisdiction
+        @Size(max = 80) String jurisdiction,
+
+        // ---- PD-69: page two onwards, and the writing area (millimetres on A4) ----
+        @Pattern(regexp = "^(CONTINUATION|SAME)$", message = "Choose the continuation sheet or the full letterpad")
+        String laterPages,
+        @jakarta.validation.constraints.Min(5) @jakarta.validation.constraints.Max(180) Integer firstTopMm,
+        @jakarta.validation.constraints.Min(5) @jakarta.validation.constraints.Max(180) Integer firstBottomMm,
+        @jakarta.validation.constraints.Min(5) @jakarta.validation.constraints.Max(180) Integer laterTopMm,
+        @jakarta.validation.constraints.Min(5) @jakarta.validation.constraints.Max(180) Integer laterBottomMm,
+        @jakarta.validation.constraints.Min(8) @jakarta.validation.constraints.Max(50) Integer sideMm,
+        /** Measure the letterpad again, discarding hand-set margins. */
+        Boolean remeasure
 ) {
     public LetterheadPayload {
         logoUrl = trim(logoUrl);
