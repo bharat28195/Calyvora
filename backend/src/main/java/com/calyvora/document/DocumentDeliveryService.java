@@ -39,11 +39,16 @@ public class DocumentDeliveryService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final LetterheadService letterheadService;
+    private final SignatoryService signatoryService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private SignatureRequestRepository signatureRequests;
 
     public DocumentDeliveryService(GeneratedDocumentRepository documentRepository, DocumentEmailRepository emailRepository,
                                    LetterheadRepository letterheadRepository, CompanyRepository companyRepository,
                                    EmployeeRepository employeeRepository, UserRepository userRepository,
-                                   EmailService emailService, LetterheadService letterheadService) {
+                                   EmailService emailService, LetterheadService letterheadService,
+                                   SignatoryService signatoryService) {
+        this.signatoryService = signatoryService;
         this.letterheadService = letterheadService;
         this.documentRepository = documentRepository;
         this.emailRepository = emailRepository;
@@ -75,6 +80,28 @@ public class DocumentDeliveryService {
     public Pdf pdf(UUID documentId) {
         GeneratedDocument doc = document(documentId);
         return new Pdf(fileName(doc), render(doc));
+    }
+
+    /**
+     * The letter's PDF pages as PNG data URIs (PD-72) — what a signer reads. The same pages the PDF
+     * has, so what someone signs is exactly what prints, on any phone, with no PDF viewer needed.
+     */
+    @Transactional(readOnly = true)
+    public List<String> pageImages(UUID documentId) {
+        byte[] pdf = render(document(documentId));
+        List<String> out = new ArrayList<>();
+        try (org.apache.pdfbox.pdmodel.PDDocument d = org.apache.pdfbox.Loader.loadPDF(pdf)) {
+            org.apache.pdfbox.rendering.PDFRenderer r = new org.apache.pdfbox.rendering.PDFRenderer(d);
+            for (int i = 0; i < d.getNumberOfPages(); i++) {
+                java.awt.image.BufferedImage img = r.renderImageWithDPI(i, 110, org.apache.pdfbox.rendering.ImageType.RGB);
+                java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+                javax.imageio.ImageIO.write(img, "png", png);
+                out.add("data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png.toByteArray()));
+            }
+        } catch (IOException e) {
+            throw new ApiException(ErrorCode.INTERNAL_ERROR, "The letter could not be shown.");
+        }
+        return out;
     }
 
     @Transactional(readOnly = true)
@@ -153,7 +180,7 @@ public class DocumentDeliveryService {
             }
         }
         try {
-            return LetterPdf.render(doc.getBody(), paper);
+            return LetterPdf.render(doc.getBody(), paper, signatoryService.marksFor(doc.getSignatoryId()), signedTail(doc));
         } catch (IOException | RuntimeException e) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "The letter could not be turned into a PDF.");
         }
@@ -161,6 +188,53 @@ public class DocumentDeliveryService {
 
     private static int or(Integer v, int fallback) {
         return v == null ? fallback : v;
+    }
+
+    /**
+     * For a signed letter: the signer's acceptance under the letter, and an audit page after it with the
+     * evidence (PD-72). Null for a letter nobody has signed.
+     */
+    private String signedTail(GeneratedDocument doc) {
+        SignatureRequest r = signatureRequests.findByDocumentIdOrderBySentAtDesc(doc.getId()).stream()
+                .filter(x -> x.getStatus() == SignatureRequest.Status.SIGNED).findFirst().orElse(null);
+        if (r == null) return null;
+        java.time.format.DateTimeFormatter when = java.time.format.DateTimeFormatter
+                .ofPattern("d MMMM yyyy, h:mm a 'IST'", Locale.ENGLISH).withZone(java.time.ZoneId.of("Asia/Kolkata"));
+        String sig = r.getSignatureImage() == null ? "" : "<img src='" + LetterPdf.dataUri(r.getSignatureImage())
+                + "' style='height:16mm;max-width:60mm'/>";
+        StringBuilder t = new StringBuilder();
+        t.append("<div style='margin-top:16pt;page-break-inside:avoid'><p><b>Accepted</b></p>")
+                .append(sig)
+                .append("<p>").append(esc(r.getTypedName())).append("</p>")
+                .append("<p style='color:#555;font-size:9pt'>Signed electronically on ")
+                .append(esc(when.format(r.getDecidedAt()))).append("</p></div>");
+        String sender = r.getSentBy() == null ? "—" : userRepository.findById(r.getSentBy())
+                .map(u -> u.getFirstName() + " " + u.getLastName()).orElse("—");
+        t.append("<div class='page'></div><h2>Signature record</h2>")
+                .append("<p style='color:#555'>This page records how the letter above was accepted. It is part of the signed document.</p>")
+                .append("<table class='t'><tbody>");
+        row(t, "Letter", doc.getTitle());
+        row(t, "Document ID", doc.getId().toString());
+        row(t, "Fingerprint (SHA-256 of the letter text)", r.getDocumentHash());
+        row(t, "Sent by", sender);
+        row(t, "Sent to", r.getSignerName() + (r.getSignerEmail() == null ? "" : " <" + r.getSignerEmail() + ">"));
+        row(t, "Sent", when.format(r.getSentAt()));
+        row(t, "Opened", r.getViewedAt() == null ? "—" : when.format(r.getViewedAt()));
+        row(t, "Signed", when.format(r.getDecidedAt()));
+        row(t, "Name typed by signer", r.getTypedName());
+        row(t, "IP address", r.getSignerIp() == null ? "—" : r.getSignerIp());
+        row(t, "Browser", r.getSignerAgent() == null ? "—" : r.getSignerAgent());
+        t.append("</tbody></table>")
+                .append("<p style='color:#555;font-size:9pt'>Signed through Orbit by Calyvora. The fingerprint changes if a single character of the letter changes.</p>");
+        return t.toString();
+    }
+
+    private static void row(StringBuilder t, String k, String v) {
+        t.append("<tr><th style='width:38%'>").append(esc(k)).append("</th><td>").append(esc(v)).append("</td></tr>");
+    }
+
+    private static String esc(String s) {
+        return org.springframework.web.util.HtmlUtils.htmlEscape(s == null ? "" : s, "UTF-8").replace("&#39;", "&apos;");
     }
 
     private GeneratedDocument document(UUID id) {

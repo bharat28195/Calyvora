@@ -46,6 +46,9 @@ public class SecurityConfig {
             "/api/v1/trial-requests",
             "/api/v1/invitations/accept",
             "/api/v1/invitations/preview",
+            // A candidate signs their offer through a single-letter link before they have an account
+            // (PD-72). The token is the authority; only its hash is stored.
+            "/api/v1/public/sign/**",
             "/api/v1/dev/**",
     };
 

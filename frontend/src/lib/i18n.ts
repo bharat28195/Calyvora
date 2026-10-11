@@ -39,6 +39,7 @@ const ROWS: [string, string, string, string, string][] = [
   ["Overview", "सारांश", "Resumen", "Vue d'ensemble", "Übersicht"],
   ["Attendance", "उपस्थिति", "Asistencia", "Présence", "Anwesenheit"],
   ["Time off", "छुट्टी", "Ausencias", "Congés", "Abwesenheit"],
+  ["My letters", "मेरे पत्र", "Mis cartas", "Mes lettres", "Meine Schreiben"],
   ["My team", "मेरी टीम", "Mi equipo", "Mon équipe", "Mein Team"],
   ["Expenses", "खर्च", "Gastos", "Notes de frais", "Spesen"],
   ["Performance", "प्रदर्शन", "Desempeño", "Performance", "Leistung"],

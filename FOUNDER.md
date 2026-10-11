@@ -2024,6 +2024,43 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Gap closed:** `production` was not watched by CI at all before this.
 - Also fixed: the sign-out browser test had been red since PD-57 moved Log out into the profile menu.
 
+### PD-71 · 2026-10-11 · Authorised signatories, their signatures and the company seal on letters
+- **Decision (founder):** letters carry a real signature, printed automatically.
+- **Shape:** Letterpad → Signatures & seal: any number of signatories (name, title, signature drawn,
+  typed or uploaded), one default; a template may name its own. The seal is optional. Uploaded images
+  are cleaned on the server (paper made transparent, cropped to the ink, scaled). Issuing a letter
+  puts a `[[signature]]` line above the signatory's name; screen and PDF draw the signature with the
+  seal beside it there, at the same size, so page breaks match. A letter remembers its signatory; a
+  signatory is switched off, never deleted, so old letters keep their signature. V79.
+
+### PD-72 · 2026-10-11 · Letters accepted with a signature
+- **Decision (founder):** employees accept and e-sign letters inside Orbit; candidates too.
+- **Shape:** HR sends an issued letter for signature. An employee signs under Me → My letters
+  (email and notification). A candidate, who has no login, gets a link for that one letter (random
+  token, only its hash stored in a table outside RLS, like invitations; expires, 1–60 days). The signer
+  reads the letter as images of the very PDF pages, types their name, draws or types a signature,
+  ticks consent, and accepts or declines with a reason. HR sees sent, opened, signed or declined, and
+  can remind (extends by a week) or withdraw (the link dies).
+- **Evidence:** the letter text's SHA-256 at send, re-checked at signing; signature, typed name,
+  time, IP and browser kept. The signed PDF adds an acceptance block and a "Signature record" audit
+  page. A signed letter cannot be deleted. Click-and-draw e-signature, not Aadhaar eSign (an add-on later). V80.
+
+### PD-73 · 2026-10-11 · Full and final settlement from payroll
+- **Decision (founder; defaults accepted):** F&F is worked out, not typed.
+- **Final salary** is the final month's payslip from the payroll engine, which already prorates to the
+  last day and applies LOP, PF, ESI, PT and TDS, so payslip and F&F cannot disagree. If that month is
+  finalised it was paid there and is left out. **Leave encashment:** the balance on the last day of
+  chosen types (Vacation by default) × basic ÷ 26 (or basic ÷ 30 or gross ÷ 30); days can be set.
+  **Gratuity:** 15/26 × basic × years, a final part-year of 6+ months counts, due at 5 years or 4 years
+  240 days, capped at ₹20 lakh. **Notice shortfall:** required (parsed from the letterpad's notice
+  period, or set) minus served (exit start to last day) × gross ÷ 30, waivable. Approved, unreimbursed
+  **expense claims** are paid. HR adds free lines (bonus, laptop, advance).
+- **Flow:** a draft recalculates live; approve freezes the statement and issues the FNF_STATEMENT
+  letter; reopen before payment; mark paid with date and reference. Payroll permission (salary data).
+  Pay-by date: 2 working days after the last day (Code on Wages). V81.
+- **Not yet:** TDS on encashment and other extras beyond the final payslip; adding the payout to the
+  bank file. Today they are an HR line and a separate transfer.
+
 ## 4. Architecture Decision Log
 
 

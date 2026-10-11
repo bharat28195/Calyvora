@@ -61,6 +61,9 @@ public class DocumentService {
     private final com.calyvora.people.EmployeeFinanceRepository financeRepository;
     private final com.calyvora.people.CompensationService compensationService;
     private final SalaryTables salaryTables;
+    private final SignatoryService signatoryService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private SignatureRequestRepository signatureRequests;
 
     public DocumentService(DocumentTemplateRepository templateRepository,
                            GeneratedDocumentRepository documentRepository,
@@ -74,7 +77,9 @@ public class DocumentService {
                            com.calyvora.people.LeavePolicyRepository leavePolicyRepository,
                            com.calyvora.people.EmployeeFinanceRepository financeRepository,
                            @org.springframework.context.annotation.Lazy com.calyvora.people.CompensationService compensationService,
-                           SalaryTables salaryTables) {
+                           SalaryTables salaryTables,
+                           SignatoryService signatoryService) {
+        this.signatoryService = signatoryService;
         this.templateRepository = templateRepository;
         this.documentRepository = documentRepository;
         this.employeeRepository = employeeRepository;
@@ -119,6 +124,7 @@ public class DocumentService {
         DocumentTemplate t = new DocumentTemplate(UUID.randomUUID(), companyId, p.name().trim(), kind,
                 p.body(), principal.userId());
         t.setDescription(blankToNull(p.description()));
+        if (p.signatoryId() != null) t.setSignatoryId(signatoryIdFrom(p.signatoryId()));
         templateRepository.save(t);
         return TemplateResponse.of(t);
     }
@@ -131,7 +137,17 @@ public class DocumentService {
         if (p.description() != null) t.setDescription(blankToNull(p.description()));
         if (p.kind() != null) t.setKind(DocumentKind.valueOf(p.kind()));
         if (p.useLetterhead() != null) t.setUseLetterhead(p.useLetterhead());
+        if (p.signatoryId() != null) t.setSignatoryId(signatoryIdFrom(p.signatoryId()));
         return TemplateResponse.of(t);
+    }
+
+    /** "" means the company default; anything else must be one of this company's active signatories. */
+    private UUID signatoryIdFrom(String raw) {
+        if (raw.isBlank()) return null;
+        UUID id = UUID.fromString(raw);
+        boolean ok = signatoryService.list().stream().anyMatch(s -> s.id().equals(raw) && s.active());
+        if (!ok) throw new ApiException(ErrorCode.VALIDATION_ERROR, "Choose one of your active signatories.");
+        return id;
     }
 
     @Transactional
@@ -156,8 +172,10 @@ public class DocumentService {
             String v = values.get(key);
             if (v == null || v.isBlank()) missing.add(key);
         }
-        return new PreviewResponse(titleFor(t, req, values), MergeFields.render(t.getBody(), values),
-                t.isUseLetterhead(), values, missing);
+        java.util.Optional<LetterSignatory> signatory = signatoryService.forTemplate(t);
+        return new PreviewResponse(titleFor(t, req, values),
+                SignatoryService.withSignatureLine(MergeFields.render(t.getBody(), values), signatory.orElse(null), signatoryService.hasSeal()),
+                t.isUseLetterhead(), values, missing, signatory.map(s -> s.getId().toString()).orElse(null));
     }
 
     @Transactional
@@ -169,12 +187,14 @@ public class DocumentService {
                 ? null : UUID.fromString(req.employeeId());
 
         // Edited by hand after the fields filled in: the issuer's text is the letter.
+        LetterSignatory signatory = signatoryService.forTemplate(t).orElse(null);
         String body = req.body() != null && !req.body().isBlank()
                 ? req.body().strip()
-                : MergeFields.render(t.getBody(), values);
+                : SignatoryService.withSignatureLine(MergeFields.render(t.getBody(), values), signatory, signatoryService.hasSeal());
         GeneratedDocument doc = new GeneratedDocument(UUID.randomUUID(), companyId, t.getId(), employeeId,
                 titleFor(t, req, values), t.getKind(), body, t.isUseLetterhead(), principal.userId());
         doc.setRecipientName(recipientName(employeeId, values));
+        if (signatory != null) doc.setSignatoryId(signatory.getId());
         documentRepository.save(doc);
         return DocumentResponse.of(doc, values.get("employee.fullName"), values.get("signatory.name"));
     }
@@ -199,10 +219,13 @@ public class DocumentService {
                     GenerateRequest req = new GenerateRequest(t.getId().toString(),
                             employeeId == null ? null : employeeId.toString(), null, overrides);
                     Map<String, String> values = resolve(t, req, principal);
+                    LetterSignatory signatory = signatoryService.forTemplate(t).orElse(null);
                     GeneratedDocument doc = new GeneratedDocument(UUID.randomUUID(), companyId, t.getId(),
                             employeeId, titleFor(t, req, values), t.getKind(),
-                            MergeFields.render(t.getBody(), values), t.isUseLetterhead(), principal.userId());
+                            SignatoryService.withSignatureLine(MergeFields.render(t.getBody(), values), signatory, signatoryService.hasSeal()),
+                            t.isUseLetterhead(), principal.userId());
                     doc.setRecipientName(recipientName(employeeId, values));
+                    if (signatory != null) doc.setSignatoryId(signatory.getId());
                     documentRepository.save(doc);
                     return DocumentResponse.of(doc, values.get("employee.fullName"), values.get("signatory.name"));
                 });
@@ -275,6 +298,11 @@ public class DocumentService {
     @Transactional
     public void deleteDocument(UUID documentId) {
         UUID companyId = TenantContext.getCompanyId();
+        // A signed letter is evidence of what was agreed; it stays (PD-72).
+        if (signatureRequests.findByDocumentIdOrderBySentAtDesc(documentId).stream()
+                .anyMatch(r -> r.getStatus() == SignatureRequest.Status.SIGNED)) {
+            throw new ApiException(ErrorCode.CONFLICT, "This letter has been signed, so it is kept as a record and cannot be deleted.");
+        }
         documentRepository.delete(documentRepository.findByIdAndCompanyId(documentId, companyId)
                 .orElseThrow(() -> new NotFoundException("Document not found")));
     }
@@ -321,8 +349,13 @@ public class DocumentService {
             v.put("leave.summary", leaveSummary(companyId));
         }
 
-        // Who signs: the signatory named on the letterpad, or else whoever is issuing the letter.
-        if (lh != null && lh.getSignatureName() != null) {
+        // Who signs: the template's or the company's signatory (PD-71); before any were set up, the name
+        // typed on the letterpad; else whoever is issuing the letter.
+        java.util.Optional<LetterSignatory> chosen = signatoryService.forTemplate(t);
+        if (chosen.isPresent()) {
+            v.put("signatory.name", chosen.get().getName());
+            v.put("signatory.title", chosen.get().getTitle());
+        } else if (lh != null && lh.getSignatureName() != null) {
             v.put("signatory.name", lh.getSignatureName());
             v.put("signatory.title", lh.getSignatureTitle());
         } else {

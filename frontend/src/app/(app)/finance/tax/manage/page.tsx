@@ -140,7 +140,7 @@ export default function ManageTaxPage() {
             <SignerField label="Full name" value={signer.signerName} onChange={(v) => setSigner({ ...signer, signerName: v })} />
             <SignerField label="Son / daughter of" value={signer.signerParent} onChange={(v) => setSigner({ ...signer, signerParent: v })} />
             <SignerField label="Designation" value={signer.signerDesignation} onChange={(v) => setSigner({ ...signer, signerDesignation: v })} placeholder="e.g. Director" />
-            <SignerField label="Place" value={signer.signerPlace} onChange={(v) => setSigner({ ...signer, signerPlace: v })} placeholder="e.g. Ahmedabad" />
+            <SignerField label="Place" value={signer.signerPlace} onChange={(v) => setSigner({ ...signer, signerPlace: v })} placeholder="e.g. Pune" />
             <SignerField label="CIT (TDS) address" className="sm:col-span-2" value={signer.citTdsAddress} onChange={(v) => setSigner({ ...signer, citTdsAddress: v })}
               placeholder="The Commissioner of Income Tax (TDS) for your TAN — on the TRACES profile" />
           </div>

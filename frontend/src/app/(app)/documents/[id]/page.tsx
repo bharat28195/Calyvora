@@ -13,6 +13,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { LetterSheet } from "@/components/documents/letter";
+import { SignaturePanel } from "@/components/documents/signature-panel";
 import { formatDate } from "@/lib/format";
 
 /**
@@ -168,7 +169,10 @@ export default function DocumentPage() {
       {error && <Alert tone="error" className="mt-4 print:hidden">{error}</Alert>}
       {notice && <Alert tone="success" className="mt-4 print:hidden">{notice}</Alert>}
 
-      <LetterSheet body={doc.body} letterhead={doc.useLetterhead ? letterhead : null} className="mt-6" />
+      <LetterSheet body={doc.body} letterhead={doc.useLetterhead ? letterhead : null} signatoryId={doc.signatoryId}
+        className="mt-6" />
+
+      <SignaturePanel doc={doc} />
 
       {mail && mail.sent.length > 0 && (
         <Card className="mt-6 print:hidden">

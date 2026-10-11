@@ -43,6 +43,12 @@ public interface EmailService {
         return EmailResult.failed("NONE", "Not supported");
     }
 
+    /** "Please read and sign" (PD-72): a link to the letter, from the company, replies to the company. */
+    default EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
+                                             String letterTitle, String link, String message, String validUntil) {
+        return EmailResult.failed("NONE", "Not supported");
+    }
+
     default EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
                                      String message, EmailSender.Attachment attachment) {
         return EmailResult.failed("NONE", "This deployment cannot send documents by email.");

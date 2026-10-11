@@ -21,6 +21,8 @@ const PUBLIC = [
   "/dev/mailbox",
   // Preparing a demo happens before anyone is signed in — that is the point of it.
   "/demo/seed",
+  // A candidate signs their offer through a single-letter link, before they have an account (PD-72).
+  "/sign",
 ];
 const SESSION_COOKIE = "calyvora_session"; // live: presence of refresh cookie; mock: a marker cookie
 

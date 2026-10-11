@@ -127,6 +127,46 @@ public class DispatchingEmailService implements EmailService {
     }
 
     @Override
+    public EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
+                                            String letterTitle, String link, String message, String validUntil) {
+        String company = companyName == null ? "Your employer" : companyName;
+        String subject = "Please sign: " + letterTitle;
+        String note = message == null || message.isBlank() ? "" : message.trim() + "\n\n";
+        String body = "Hi " + signerName + ",\n\n" + note
+                + company + " has sent you \"" + letterTitle + "\" to read and accept.\n\n"
+                + "Open it here, read it, and sign if you agree:\n" + link + "\n\n"
+                + "The link works until " + validUntil + ". If something in the letter is not right, you can decline it and say why.\n\n"
+                + company;
+        String esc = org.springframework.web.util.HtmlUtils.htmlEscape(company);
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + "<p>Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(signerName) + ",</p>"
+                + (note.isEmpty() ? "" : "<p>" + org.springframework.web.util.HtmlUtils.htmlEscape(message.trim()).replace("\n", "<br>") + "</p>")
+                + "<p>" + esc + " has sent you <b>" + org.springframework.web.util.HtmlUtils.htmlEscape(letterTitle)
+                + "</b> to read and accept.</p>"
+                + "<p><a href=\"" + org.springframework.web.util.HtmlUtils.htmlEscape(link) + "\" style=\"display:inline-block;background:#7c5cff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none\">Read and sign</a></p>"
+                + "<p style=\"color:#666\">The link works until " + org.springframework.web.util.HtmlUtils.htmlEscape(validUntil)
+                + ". If something in the letter is not right, you can decline it and say why.</p><p>" + esc + "</p></div>";
+        EmailSettings base = resolver.resolve(TenantContext.getCompanyIdOrNull());
+        EmailSettings settings = replyTo == null || replyTo.isBlank() ? base
+                : new EmailSettings(base.provider(), base.from(), replyTo, base.otpFrom(), base.apiKey(), base.apiUrl(),
+                        base.host(), base.port(), base.username(), base.password(), base.auth(), base.starttls(), base.ssl());
+        String provider = settings.provider().name();
+        record(to, subject, link);
+        try {
+            EmailSender sender = senderFor(settings);
+            sender.send(settings, to, subject, body, html, companyName, java.util.List.of());
+            if (sender instanceof ConsoleSender) {
+                return EmailResult.failed(provider, "No mail provider is configured, so nothing was delivered.");
+            }
+            return EmailResult.ok(provider);
+        } catch (Exception ex) {
+            String error = describe(ex);
+            log.warn("Failed to send signing request '{}' to {} via {}: {}", subject, to, provider, error);
+            return EmailResult.failed(provider, error);
+        }
+    }
+
+    @Override
     public EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
                                     String message, EmailSender.Attachment attachment) {
         EmailSettings base = resolver.resolve(TenantContext.getCompanyIdOrNull());

@@ -12,5 +12,7 @@ public record PreviewResponse(
         String body,
         boolean useLetterhead,
         Map<String, String> values,
-        List<String> missing
+        List<String> missing,
+        /** PD-71: whose signature the letter will carry, or null. */
+        String signatoryId
 ) {}

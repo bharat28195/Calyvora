@@ -27,6 +27,19 @@ public class RecordingEmailService implements EmailService {
     private final List<Sent> resetCodes = new ArrayList<>();
     private final List<Sent> documents = new ArrayList<>();
     private final List<Sent> checkoutReminders = new ArrayList<>();
+    private final List<Sent> signatureRequests = new ArrayList<>();
+
+    /** A letter sent to sign (PD-72): who to, and the link to sign at. */
+    @Override
+    public EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
+                                            String letterTitle, String link, String message, String validUntil) {
+        signatureRequests.add(new Sent(to, link));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> signatureRequests() {
+        return signatureRequests;
+    }
 
     @Override
     public EmailResult sendCheckoutReminder(String to, String firstName, String companyName, String day,

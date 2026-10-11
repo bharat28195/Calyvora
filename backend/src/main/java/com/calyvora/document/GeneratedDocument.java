@@ -45,6 +45,10 @@ public class GeneratedDocument {
     @Column(name = "use_letterhead", nullable = false)
     private boolean useLetterhead = true;
 
+    /** The signatory this letter was issued under; their signature prints on it (PD-71). */
+    @Column(name = "signatory_id")
+    private UUID signatoryId;
+
     /** Whom the letter is addressed to when there is no employee record — a candidate, say (V69). */
     @Column(name = "recipient_name", length = 200)
     private String recipientName;
@@ -87,5 +91,7 @@ public class GeneratedDocument {
     public DocumentKind getKind() { return kind; }
     public String getBody() { return body; }
     public boolean isUseLetterhead() { return useLetterhead; }
+    public UUID getSignatoryId() { return signatoryId; }
+    public void setSignatoryId(UUID signatoryId) { this.signatoryId = signatoryId; }
     public Instant getCreatedAt() { return createdAt; }
 }

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { PagedLetter } from "@/components/documents/paged-letter";
+import { useSignatureMarks, type SignatureMarks } from "@/components/documents/use-signature-marks";
 import { api } from "@/lib/api";
 import { EMPTY, LETTERHEAD_FONTS } from "@/lib/documents";
 import type { Letterhead } from "@/lib/types";
@@ -18,14 +19,18 @@ import type { Letterhead } from "@/lib/types";
 export function LetterSheet({
   body,
   letterhead,
+  signatoryId,
   className = "",
 }: {
   body: string;
   /** Omit, or pass null, to print on plain paper. */
   letterhead?: Letterhead | null;
+  /** PD-71: whose signature is drawn at the letter's [[signature]] line. */
+  signatoryId?: string | null;
   className?: string;
 }) {
-  const html = useMemo(() => renderLetter(body), [body]);
+  const marks = useSignatureMarks(signatoryId, letterhead);
+  const html = useMemo(() => renderLetter(body, marks), [body, marks]);
   const font = LETTERHEAD_FONTS[letterhead?.fontFamily ?? "SERIF"].stack;
   const accent = letterhead?.brandColor ?? "#7c5cff";
 
@@ -135,7 +140,7 @@ function inline(s: string): string {
  * this, so what is saved is always something a person can read and repair by hand, and there is no
  * untrusted HTML to sanitise before it reaches `dangerouslySetInnerHTML`.
  */
-function renderLetter(body: string): string {
+function renderLetter(body: string, marks?: SignatureMarks): string {
   const lines = (body ?? "").replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
   let bullets: string[] | null = null;
@@ -167,6 +172,18 @@ function renderLetter(body: string): string {
   };
 
   for (const line of lines) {
+    // PD-71: where the letter is signed — the signature, with the seal beside it. Sized like the PDF
+    // (16 mm and 22 mm tall) so the page breaks fall in the same places.
+    if (line.trim() === "[[signature]]") {
+      flushTable();
+      flush();
+      if (marks?.signature || marks?.seal) {
+        out.push(`<div class="flex items-end gap-8 py-1" style="min-height:60px">${
+          marks.signature ? `<img src="${marks.signature}" alt="Signature" style="height:60px;max-width:227px;object-fit:contain" />` : ""}${
+          marks.seal ? `<img src="${marks.seal}" alt="Company seal" style="height:83px;max-width:113px;object-fit:contain" />` : ""}</div>`);
+      }
+      continue;
+    }
     // A pipe table — the salary annexure, a settlement statement.
     if (/^\s*\|.*\|\s*$/.test(line)) {
       flush();

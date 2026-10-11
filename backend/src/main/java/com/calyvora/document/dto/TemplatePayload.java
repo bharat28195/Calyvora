@@ -11,5 +11,7 @@ public record TemplatePayload(
         @Size(max = 400) String description,
         String body,
         /** Null leaves the current setting alone; most letters want the company letterpad. */
-        Boolean useLetterhead
+        Boolean useLetterhead,
+        /** PD-71: a signatory's id, "" for the company default; null leaves it alone. */
+        String signatoryId
 ) {}

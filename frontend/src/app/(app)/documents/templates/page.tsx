@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2, Save, FileSignature, FileUp, Lock, Braces, ChevronDown, Eye } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { DocumentKind, DocumentTemplate, Letterhead, MergeField } from "@/lib/types";
+import type { DocumentKind, DocumentTemplate, Letterhead, MergeField, Signatory } from "@/lib/types";
 import { KIND_LABELS, KIND_STAGES, renderTemplate, placeholdersIn } from "@/lib/documents";
 import { FormatToolbar } from "@/components/documents/format-toolbar";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -169,6 +169,12 @@ function TemplateEditor({
   const [description, setDescription] = useState(template.description ?? "");
   const [body, setBody] = useState(template.body);
   const [useLetterhead, setUseLetterhead] = useState(template.useLetterhead);
+  // PD-71: "" signs with the company's default signatory.
+  const [signatoryId, setSignatoryId] = useState(template.signatoryId ?? "");
+  const [signatories, setSignatories] = useState<Signatory[]>([]);
+  useEffect(() => { api.signatories().then(setSignatories).catch(() => setSignatories([])); }, []);
+  const signer = signatories.find((s) => s.id === signatoryId && s.active)
+    ?? signatories.find((s) => s.active && s.isDefault) ?? null;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -176,14 +182,29 @@ function TemplateEditor({
   const dirty =
     name !== template.name || kind !== template.kind || body !== template.body ||
     useLetterhead !== template.useLetterhead ||
+    signatoryId !== (template.signatoryId ?? "") ||
     description !== (template.description ?? "");
 
   /** Sample values so the preview reads like a letter instead of a form. */
   const sample = useMemo(() => {
     const values: Record<string, string> = {};
     for (const key of placeholdersIn(body)) values[key] = SAMPLE[key] ?? `«${key}»`;
-    return renderTemplate(body, values);
-  }, [body]);
+    if (signer) {
+      values["signatory.name"] = signer.name;
+      values["signatory.title"] = signer.title ?? "";
+    }
+    const text = renderTemplate(body, values);
+    if (!signer) return text;
+    // Where the signature will print: just above the signatory's name, as on an issued letter.
+    const lines = text.split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].replace(/\*/g, "").trim().toLowerCase() === signer.name.trim().toLowerCase()) {
+        lines.splice(i, 0, "[[signature]]");
+        break;
+      }
+    }
+    return lines.join("\n");
+  }, [body, signer]);
 
   function insert(key: string) {
     const el = bodyRef.current;
@@ -206,7 +227,7 @@ function TemplateEditor({
     setSaving(true);
     setError(null);
     try {
-      onSaved(await api.updateDocTemplate(template.id, { name, kind, description, body, useLetterhead }));
+      onSaved(await api.updateDocTemplate(template.id, { name, kind, description, body, useLetterhead, signatoryId }));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to save");
     } finally {
@@ -279,6 +300,16 @@ function TemplateEditor({
             </span>
           </div>
 
+          <Field label="Signed by" htmlFor="t-signer"
+            hint={signatories.length === 0 ? "Add signatories on the Letterpad page to print a signature." : undefined}>
+            <select id="t-signer" className={selectCls} value={signatoryId} onChange={(e) => setSignatoryId(e.target.value)}>
+              <option value="" className="bg-surface">The company&apos;s default signatory</option>
+              {signatories.filter((s) => s.active).map((s) => (
+                <option key={s.id} value={s.id} className="bg-surface">{s.name}{s.title ? ` — ${s.title}` : ""}</option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="When to use this" htmlFor="t-desc">
             <Input id="t-desc" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Sent once a candidate accepts verbally" />
@@ -290,7 +321,7 @@ function TemplateEditor({
           <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg/40">
             <Eye className="h-3.5 w-3.5" /> How it will look
           </p>
-          <LetterSheet body={sample} letterhead={useLetterhead ? letterhead : null} />
+          <LetterSheet body={sample} letterhead={useLetterhead ? letterhead : null} signatoryId={signer?.id ?? null} />
           <p className="mt-2 text-xs text-fg/35">
             Filled in with sample values. The real names and figures come from the employee you pick
             when you issue it.

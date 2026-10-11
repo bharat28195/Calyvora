@@ -147,13 +147,15 @@ export default function PipelinePage() {
       {candidates === null ? (
         <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
       ) : (
-        <div className="mt-6 overflow-x-auto pb-2">
-          <div className="flex gap-3" style={{ minWidth: "min-content" }}>
+        <div className="mt-6 overflow-x-auto pb-2 2xl:overflow-visible">
+          {/* All six stages side by side on a wide screen, sharing the width — no sideways scrolling.
+              Narrower screens keep fixed-width columns that scroll, since six would not fit. */}
+          <div className="flex min-w-max gap-3 2xl:grid 2xl:min-w-0 2xl:grid-cols-6">
             {STAGES.map((stage) => {
               const list = visible.filter((c) => c.stage === stage);
               const isTarget = overStage === stage && dragId !== null;
               return (
-                <div key={stage} className="w-64 shrink-0">
+                <div key={stage} className="w-60 shrink-0 xl:w-52 2xl:w-auto 2xl:min-w-0">
                   {/* Heading: the stage's own colour as a rule under it, and a count that stays put.
                       Six grey columns all look alike; the rule is what makes them findable. */}
                   <div className="mb-2 px-1">

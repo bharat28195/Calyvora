@@ -51,7 +51,7 @@ class LetterpadPagesTest extends IntegrationTestBase {
                 try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
                     if (p == 0) {
                         text(cs, "Northwind Robotics", 20, 30, 22);
-                        text(cs, "123 Innovation Way, Austin", 140, 20, 9);
+                        text(cs, "14 Lake View Road, Pune", 140, 20, 9);
                         cs.setNonStrokingColor(new Color(0x1f, 0x6f, 0xd8));
                         cs.addRect(20 * MM, H - 48 * MM, 170 * MM, 0.8f * MM);
                         cs.fill();
@@ -62,7 +62,7 @@ class LetterpadPagesTest extends IntegrationTestBase {
                     cs.lineTo(210 * MM, H - 280 * MM);
                     cs.closePath();
                     cs.fill();
-                    text(cs, "Robotics for a Smarter, Safer World", 20, 268, 10);
+                    text(cs, "Making everyday things work better", 20, 268, 10);
                     cs.setNonStrokingColor(new Color(0x15, 0x30, 0x5a));
                     cs.addRect(0, 0, 210 * MM, 7 * MM);
                     cs.fill();

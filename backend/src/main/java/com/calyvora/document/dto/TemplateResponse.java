@@ -15,11 +15,13 @@ public record TemplateResponse(
         boolean builtIn,
         boolean useLetterhead,
         List<String> placeholders,
-        String updatedAt
+        String updatedAt,
+        String signatoryId
 ) {
     public static TemplateResponse of(DocumentTemplate t) {
         return new TemplateResponse(t.getId().toString(), t.getName(), t.getKind().name(), t.getDescription(),
                 t.getBody(), t.isBuiltIn(), t.isUseLetterhead(),
-                MergeFields.placeholdersIn(t.getBody()), t.getUpdatedAt().toString());
+                MergeFields.placeholdersIn(t.getBody()), t.getUpdatedAt().toString(),
+                t.getSignatoryId() == null ? null : t.getSignatoryId().toString());
     }
 }

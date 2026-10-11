@@ -187,6 +187,9 @@ function ExitCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newTask, setNewTask] = useState("");
+  // The settlement is salary data, so it is payroll's to open (PD-73).
+  const { me } = useSession();
+  const canSettle = can(me, "PAYROLL_MANAGE") && !!exit.lastWorkingDay;
   const pct = exit.tasksTotal === 0 ? 0 : Math.round((exit.tasksDone / exit.tasksTotal) * 100);
 
   async function run(action: () => Promise<unknown>) {
@@ -318,6 +321,16 @@ function ExitCard({
                   </Link>
                 ))}
               </div>
+            </div>
+          )}
+
+          {canSettle && (
+            <div className="mt-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-fg/40">Full &amp; final</p>
+              <Link href={`/people/exits/${exit.employeeId}/settlement`}
+                className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-violet hover:underline">
+                <FileText className="h-3.5 w-3.5" /> Open the settlement — salary, leave encashment, gratuity, recoveries
+              </Link>
             </div>
           )}
 

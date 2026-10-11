@@ -106,6 +106,11 @@ import {
   type SearchResponse,
   type AssistantResponse,
   type Letterhead,
+  type Signatory,
+  type SignatureRequestView,
+  type SignerView,
+  type SettlementView,
+  type SettlementInput,
   type LetterheadInput,
   type ExitView,
   type StartExitInput,
@@ -438,6 +443,23 @@ function pageQuery(opts: object): string {
 
 /** Which sheet of the letterpad: page one, or the one for page two onwards (PD-69). */
 export type LetterpadSheet = "background" | "continuation";
+
+/** A multipart upload of one file as "file" — the browser sets the boundary, so no JSON helper. */
+async function upload<T>(path: string, file: Blob, name: string): Promise<T> {
+  if (!LIVE) return liveOnly("Uploads");
+  const form = new FormData();
+  form.append("file", file, name);
+  forgetReads();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
+    body: form,
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+  return body as T;
+}
 
 /** Letterpad images by sheet and version, as object URLs (see api.letterpadImage). */
 const letterpadCache = new Map<string, Promise<string>>();
@@ -1780,6 +1802,110 @@ export const api = {
     return LIVE
       ? http<Letterhead>(`/documents/letterhead/${sheet}`, { method: "DELETE" })
       : liveOnly("The letterpad");
+  },
+
+  // --- signatories and the seal (PD-71) ---
+  signatories(): Promise<Signatory[]> {
+    return LIVE ? http<Signatory[]>("/documents/signatories") : Promise.resolve([]);
+  },
+  createSignatory(input: { name: string; title?: string; isDefault?: boolean }): Promise<Signatory> {
+    return LIVE ? http<Signatory>("/documents/signatories", { method: "POST", body: JSON.stringify(input) }) : liveOnly("Signatories");
+  },
+  updateSignatory(id: string, input: { name?: string; title?: string; isDefault?: boolean; active?: boolean }): Promise<Signatory> {
+    return LIVE ? http<Signatory>(`/documents/signatories/${id}`, { method: "PATCH", body: JSON.stringify(input) }) : liveOnly("Signatories");
+  },
+  async uploadSignature(id: string, file: Blob, name = "signature.png"): Promise<Signatory> {
+    return upload<Signatory>(`/documents/signatories/${id}/image`, file, name);
+  },
+  removeSignature(id: string): Promise<Signatory> {
+    return LIVE ? http<Signatory>(`/documents/signatories/${id}/image`, { method: "DELETE" }) : liveOnly("Signatories");
+  },
+  async uploadSeal(file: Blob, name = "seal.png"): Promise<Letterhead> {
+    return upload<Letterhead>("/documents/letterhead/seal", file, name);
+  },
+  removeSeal(): Promise<Letterhead> {
+    return LIVE ? http<Letterhead>("/documents/letterhead/seal", { method: "DELETE" }) : liveOnly("The seal");
+  },
+  /** A signature or the seal as an object URL, fetched with the token; one fetch per version. */
+  markImage(kind: "signature" | "seal", id: string, version: string): Promise<string> {
+    const path = kind === "seal" ? "/documents/letterhead/seal" : `/documents/signatories/${id}/image`;
+    const key = `mark:${path}:${version}`;
+    const hit = letterpadCache.get(key);
+    if (hit) return hit;
+    const p = (async () => {
+      const res = await fetch(`${BASE}${path}?v=${encodeURIComponent(version)}`, {
+        credentials: "include",
+        headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+      });
+      if (!res.ok) throw new Error("image " + res.status);
+      return URL.createObjectURL(await res.blob());
+    })();
+    letterpadCache.set(key, p);
+    p.catch(() => letterpadCache.delete(key));
+    return p;
+  },
+
+  // --- letters accepted with a signature (PD-72) ---
+  sendForSignature(documentId: string, input: { email?: string; message?: string; validDays?: number }): Promise<SignatureRequestView> {
+    return LIVE ? http<SignatureRequestView>(`/documents/${documentId}/signature`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Signing");
+  },
+  signatureRequests(documentId: string): Promise<SignatureRequestView[]> {
+    return LIVE ? http<SignatureRequestView[]>(`/documents/${documentId}/signature`) : Promise.resolve([]);
+  },
+  withdrawSignature(requestId: string): Promise<SignatureRequestView> {
+    return LIVE ? http<SignatureRequestView>(`/documents/signature-requests/${requestId}/withdraw`, { method: "POST" }) : liveOnly("Signing");
+  },
+  remindSignature(requestId: string): Promise<SignatureRequestView> {
+    return LIVE ? http<SignatureRequestView>(`/documents/signature-requests/${requestId}/remind`, { method: "POST" }) : liveOnly("Signing");
+  },
+  myLetters(): Promise<SignatureRequestView[]> {
+    return LIVE ? http<SignatureRequestView[]>("/me/letters") : Promise.resolve([]);
+  },
+  myLetter(requestId: string): Promise<SignerView> {
+    return LIVE ? httpRaw<SignerView>(`/me/letters/${requestId}`) : liveOnly("Signing");
+  },
+  acceptMyLetter(requestId: string, input: { typedName: string; signature: string; agree: boolean }): Promise<SignerView> {
+    return LIVE ? http<SignerView>(`/me/letters/${requestId}/accept`, { method: "POST", body: JSON.stringify(input) }) : liveOnly("Signing");
+  },
+  declineMyLetter(requestId: string, reason: string): Promise<SignerView> {
+    return LIVE ? http<SignerView>(`/me/letters/${requestId}/decline`, { method: "POST", body: JSON.stringify({ reason }) }) : liveOnly("Signing");
+  },
+  async myLetterPdf(requestId: string): Promise<Blob> {
+    const res = await fetch(`${BASE}/me/letters/${requestId}/pdf`, {
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+    });
+    if (!res.ok) throw new ApiError(((await res.json().catch(() => null)) as ApiErrorBody) ?? infrastructureError(res.status));
+    return res.blob();
+  },
+  /** The public signing link — no session; the token is the authority. */
+  async publicSign<T>(token: string, action: "" | "accept" | "decline", body?: unknown): Promise<T> {
+    const res = await fetch(`${BASE}/public/sign/${encodeURIComponent(token)}${action ? "/" + action : ""}`, {
+      method: action ? "POST" : "GET",
+      headers: action ? { "Content-Type": "application/json" } : {},
+      body: action ? JSON.stringify(body ?? {}) : undefined,
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError((json as ApiErrorBody) ?? infrastructureError(res.status));
+    return json as T;
+  },
+  publicSignPdfUrl(token: string): string {
+    return `${BASE}/public/sign/${encodeURIComponent(token)}/pdf`;
+  },
+
+  // --- full and final settlement (PD-73) ---
+  settlement(employeeId: string): Promise<SettlementView> {
+    return LIVE ? httpRaw<SettlementView>(`/people/employees/${employeeId}/settlement`) : liveOnly("Settlements");
+  },
+  updateSettlement(employeeId: string, input: SettlementInput): Promise<SettlementView> {
+    return LIVE ? http<SettlementView>(`/people/employees/${employeeId}/settlement`, { method: "PATCH", body: JSON.stringify(input) })
+      : liveOnly("Settlements");
+  },
+  settlementAction(employeeId: string, action: "approve" | "reopen" | "paid", body?: { paidOn?: string; reference?: string }): Promise<SettlementView> {
+    return LIVE ? http<SettlementView>(`/people/employees/${employeeId}/settlement/${action}`, {
+      method: "POST", body: body ? JSON.stringify(body) : undefined,
+    }) : liveOnly("Settlements");
   },
   /** Where the uploaded letterpad is served. Versioned so a replacement is not read from cache. */
   letterpadImageUrl(version: string): string {

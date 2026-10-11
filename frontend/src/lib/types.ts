@@ -668,7 +668,10 @@ export type NotificationType =
   | "ANNOUNCEMENT"
   | "EXIT_REQUESTED"
   | "EXIT_DECIDED"
-  | "CHECKOUT_MISSED";
+  | "CHECKOUT_MISSED"
+  | "LETTER_TO_SIGN"
+  | "LETTER_SIGNED"
+  | "LETTER_DECLINED";
 
 export interface AppNotification {
   id: string;
@@ -819,6 +822,110 @@ export interface DocumentTemplate {
   /** The merge fields this body actually references. */
   placeholders: string[];
   updatedAt: string;
+  /** PD-71: who signs letters from this template; null = the company's default signatory. */
+  signatoryId?: string | null;
+}
+
+/** Someone authorised to sign the company's letters (PD-71). */
+export interface Signatory {
+  id: string;
+  name: string;
+  title: string | null;
+  hasImage: boolean;
+  isDefault: boolean;
+  active: boolean;
+  updatedAt: string;
+}
+
+/** A letter sent to be accepted with a signature (PD-72), as HR and the signer see it. */
+export type SignatureStatus = "SENT" | "VIEWED" | "SIGNED" | "DECLINED" | "WITHDRAWN" | "EXPIRED";
+export interface SignatureRequestView {
+  id: string;
+  documentId: string;
+  documentTitle: string;
+  signerName: string;
+  signerEmail: string | null;
+  employee: boolean;
+  status: SignatureStatus;
+  sentAt: string;
+  viewedAt: string | null;
+  decidedAt: string | null;
+  expiresAt: string;
+  declineReason: string | null;
+  typedName: string | null;
+  reminders: number;
+  open: boolean;
+}
+/** What the signer reads: the letter as its printed pages (PNG data URIs). */
+export interface SignerView {
+  requestId: string;
+  companyName: string;
+  documentTitle: string;
+  signerName: string;
+  message: string | null;
+  status: SignatureStatus;
+  expiresAt: string;
+  decidedAt: string | null;
+  pages: string[];
+}
+
+/** Full and final settlement (PD-73). */
+export interface SettlementLine { label: string; amount: number; note: string | null }
+export interface SettlementExtraLine { label: string; amount: number; deduction: boolean }
+export interface SettlementStatement {
+  employeeName: string;
+  employeeNo: string | null;
+  designation: string | null;
+  department: string | null;
+  startDate: string | null;
+  lastWorkingDay: string;
+  currency: string;
+  service: string;
+  gratuityDue: boolean;
+  monthlyGross: number;
+  monthlyBasic: number;
+  dayRate: number;
+  noticeRequired: number | null;
+  noticeServed: number | null;
+  noticeShortfall: number;
+  leave: { type: string; available: number; encashed: boolean }[];
+  earnings: SettlementLine[];
+  deductions: SettlementLine[];
+  totalEarnings: number;
+  totalDeductions: number;
+  netPayable: number;
+  payBy: string;
+  notes: string[];
+}
+export interface SettlementView {
+  id: string;
+  employeeId: string;
+  status: "DRAFT" | "APPROVED" | "PAID";
+  encashTypes: string;
+  encashDays: number | null;
+  encashBasis: "BASIC_26" | "BASIC_30" | "GROSS_30";
+  noticeDays: number | null;
+  noticeWaived: boolean;
+  includeGratuity: boolean;
+  extraLines: SettlementExtraLine[];
+  note: string | null;
+  statement: SettlementStatement;
+  approvedAt: string | null;
+  documentId: string | null;
+  paidOn: string | null;
+  paidReference: string | null;
+}
+export interface SettlementInput {
+  encashTypes?: string;
+  encashDays?: number | null;
+  clearEncashDays?: boolean;
+  encashBasis?: string;
+  noticeDays?: number | null;
+  clearNoticeDays?: boolean;
+  noticeWaived?: boolean;
+  includeGratuity?: boolean;
+  extraLines?: SettlementExtraLine[];
+  note?: string;
 }
 
 /** Which typeface the letterpad prints in. Mapped to real font stacks in `lib/documents`. */
@@ -872,6 +979,8 @@ export interface Letterhead {
   laterTopMm?: number;
   laterBottomMm?: number;
   sideMm?: number;
+  /** PD-71: a company seal has been uploaded. */
+  hasSeal?: boolean;
 }
 export type LetterheadInput = Partial<
   Omit<Letterhead, "updatedAt" | "hasBackground" | "backgroundName" | "continuationSource">
@@ -898,6 +1007,8 @@ export interface GeneratedDoc {
   useLetterhead: boolean;
   generatedBy: string | null;
   createdAt: string;
+  /** PD-71: whose signature prints on it. */
+  signatoryId?: string | null;
 }
 export interface DocumentPreview {
   title: string;
@@ -906,6 +1017,7 @@ export interface DocumentPreview {
   values: Record<string, string>;
   /** Fields the profile couldn't fill — fix or override before issuing. */
   missing: string[];
+  signatoryId?: string | null;
 }
 export interface GenerateDocInput {
   templateId: string;

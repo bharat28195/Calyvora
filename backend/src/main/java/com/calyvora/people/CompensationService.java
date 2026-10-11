@@ -84,6 +84,20 @@ public class CompensationService {
         this.pfSettingsService = pfSettingsService;
     }
 
+    /** Someone's monthly salary on a given day: gross, the basic in it, and the company currency (PD-73). */
+    public record SalaryOn(BigDecimal monthlyGross, BigDecimal monthlyBasic, String currency) {}
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<SalaryOn> salaryOn(UUID employeeId, LocalDate day) {
+        UUID companyId = TenantContext.getCompanyId();
+        requireEmployee(employeeId, companyId);
+        BigDecimal gross = monthlyGrossAt(
+                compensationRepository.findByEmployeeIdOrderByEffectiveDateDescCreatedAtDesc(employeeId), day);
+        if (gross == null || gross.signum() <= 0) return java.util.Optional.empty();
+        BigDecimal basic = payslipTemplateService.compute(companyId, gross).basic();
+        return java.util.Optional.of(new SalaryOn(gross, basic, companyCurrency(companyId)));
+    }
+
     @Transactional(readOnly = true)
     public CompensationResponse forEmployee(UUID employeeId) {
         UUID companyId = TenantContext.getCompanyId();

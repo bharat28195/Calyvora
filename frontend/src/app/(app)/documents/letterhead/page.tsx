@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Save, RotateCcw } from "lucide-react";
+import { CheckCircle2, Loader2, Save, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { Letterhead, LetterheadFont } from "@/lib/types";
 import { DEFAULT_LETTERHEAD, LETTERHEAD_FONTS } from "@/lib/documents";
@@ -12,6 +12,8 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { LetterSheet } from "@/components/documents/letter";
 import { LetterpadUpload } from "@/components/documents/letterpad-upload";
+import { SignatoriesCard } from "@/components/documents/signatories-card";
+import type { Signatory } from "@/lib/types";
 
 const FONTS = Object.keys(LETTERHEAD_FONTS) as LetterheadFont[];
 const textareaCls =
@@ -27,6 +29,8 @@ const textareaCls =
 export default function LetterheadPage() {
   const [saved, setSaved] = useState<Letterhead | null>(null);
   const [draft, setDraft] = useState<Letterhead | null>(null);
+  const [signatories, setSignatories] = useState<Signatory[]>([]);
+  const signer = signatories.find((s) => s.active && s.isDefault) ?? null;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -116,14 +120,23 @@ export default function LetterheadPage() {
             Your company stationery. Set it once and every letter — offer, joining, relieving — prints on it.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => setDraft(saved)} disabled={!dirty}>
-            <RotateCcw className="h-4 w-4" /> Discard
-          </Button>
-          <Button onClick={save} disabled={!dirty || saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
-          </Button>
-        </div>
+        {/* Greyed-out buttons read as broken. With nothing to save, say so; once something changes,
+            the buttons appear. */}
+        {dirty ? (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-400/30 px-3 py-1.5">
+            <span className="text-sm text-amber-500">Unsaved changes</span>
+            <Button variant="ghost" onClick={() => setDraft(saved)}>
+              <RotateCcw className="h-4 w-4" /> Discard
+            </Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
+            </Button>
+          </div>
+        ) : (
+          <span className="flex items-center gap-1.5 text-sm text-fg/45">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" /> All changes saved — edit any field below to change it
+          </span>
+        )}
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
@@ -137,6 +150,12 @@ export default function LetterheadPage() {
             letterhead={draft}
             onChange={(next) => { setSaved(next); setDraft(next); setError(null); }}
             onDraft={(patch) => { setDraft((d) => (d ? { ...d, ...patch } : d)); setNote(null); }}
+          />
+
+          <SignatoriesCard
+            letterhead={draft}
+            onLetterhead={(next) => { setSaved(next); setDraft(next); }}
+            onSignatories={setSignatories}
           />
 
           <Card>
@@ -217,10 +236,10 @@ export default function LetterheadPage() {
             <p className="mt-1 text-xs text-fg/45">Printed at the foot of every page.</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Field label="CIN" htmlFor="lh-cin">
-                <Input id="lh-cin" value={draft.cin ?? ""} placeholder="U62091GJ2025PTC000000" onChange={(e) => set("cin", e.target.value.toUpperCase())} />
+                <Input id="lh-cin" value={draft.cin ?? ""} placeholder="U00000MH2025PTC000000" onChange={(e) => set("cin", e.target.value.toUpperCase())} />
               </Field>
               <Field label="GSTIN" htmlFor="lh-gstin">
-                <Input id="lh-gstin" value={draft.gstin ?? ""} placeholder="24ABCDE1234F1Z5" onChange={(e) => set("gstin", e.target.value.toUpperCase())} />
+                <Input id="lh-gstin" value={draft.gstin ?? ""} placeholder="27ABCDE1234F1Z5" onChange={(e) => set("gstin", e.target.value.toUpperCase())} />
               </Field>
               <Field label="Website" htmlFor="lh-web">
                 <Input id="lh-web" value={draft.website ?? ""} placeholder="www.example.com" onChange={(e) => set("website", e.target.value)} />
@@ -234,7 +253,7 @@ export default function LetterheadPage() {
                 hint="Registered office or other lines your letters must carry.">
                 <textarea id="lh-footer" rows={2} className={textareaCls}
                   value={draft.footerText ?? ""}
-                  placeholder={"Northwind Robotics Pvt Ltd · CIN U72900KA2019PTC000000\nconnect@northwind.example · northwind.example"}
+                  placeholder={"Acme Industries Pvt Ltd · CIN U00000MH2025PTC000000\nhello@acme.example · acme.example"}
                   onChange={(e) => set("footerText", e.target.value)} />
               </Field>
             </div>
@@ -245,7 +264,7 @@ export default function LetterheadPage() {
             <p className="mt-1 text-xs text-fg/45">Printed under &quot;For {draft.heading ?? "the company"}&quot;. Leave blank to sign as whoever issues the letter.</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Field label="Name" htmlFor="lh-sig-name">
-                <Input id="lh-sig-name" value={draft.signatureName ?? ""} placeholder="e.g. Raunak Agarwal" onChange={(e) => set("signatureName", e.target.value)} />
+                <Input id="lh-sig-name" value={draft.signatureName ?? ""} placeholder="e.g. Asha Mehra" onChange={(e) => set("signatureName", e.target.value)} />
               </Field>
               <Field label="Title" htmlFor="lh-sig-title">
                 <Input id="lh-sig-title" value={draft.signatureTitle ?? ""} placeholder="e.g. Director" onChange={(e) => set("signatureTitle", e.target.value)} />
@@ -287,7 +306,7 @@ export default function LetterheadPage() {
                 </Field>
               </div>
               <Field label="Courts of (jurisdiction)" htmlFor="lh-jur">
-                <Input id="lh-jur" value={draft.jurisdiction ?? ""} placeholder="Ahmedabad, Gujarat" onChange={(e) => set("jurisdiction", e.target.value)} />
+                <Input id="lh-jur" value={draft.jurisdiction ?? ""} placeholder="e.g. Pune, Maharashtra" onChange={(e) => set("jurisdiction", e.target.value)} />
               </Field>
               <p className="text-xs text-fg/45">Leave entitlement is read from your leave policies, so it never disagrees with them.</p>
             </div>
@@ -300,8 +319,9 @@ export default function LetterheadPage() {
           </p>
           {/* On an uploaded letterpad the sample runs to a second page, to show the continuation sheet. */}
           <LetterSheet
-            body={draft.useBackground && draft.hasBackground ? SAMPLE_BODY + SAMPLE_PAGE_TWO : SAMPLE_BODY}
+            body={sampleBody(draft.useBackground && draft.hasBackground ? SAMPLE_BODY + SAMPLE_PAGE_TWO : SAMPLE_BODY, signer, draft.heading)}
             letterhead={draft}
+            signatoryId={signer?.id ?? null}
           />
           <p className="mt-3 text-xs text-fg/40">
             Sample text — the letterpad is what you are editing here, not the words.
@@ -325,9 +345,9 @@ const SAMPLE_BODY = `10 August 2026
 
 **Private & confidential**
 
-Dear Dana,
+Dear Riya,
 
-We are delighted to offer you the position of **Senior Engineer** at Northwind Robotics.
+We are delighted to offer you the position of **Senior Engineer** at {{COMPANY}}.
 
 - **Role:** Senior Engineer
 - **Department:** Engineering
@@ -346,11 +366,19 @@ by signing and returning a copy of this letter.
 
 Yours faithfully,
 
-**For Northwind Robotics**
+**For {{COMPANY}}**
 
-Ava Chen
-Head of People
+Meera Iyer
+HR Manager
 `;
+
+/** The sample signed by the default signatory, with their signature where it will print (PD-71). */
+function sampleBody(body: string, signer: Signatory | null, company: string | null): string {
+  // Made-up recipient and figures; your own company name and signatory where they appear.
+  const named = body.replaceAll("{{COMPANY}}", company?.trim() || "Your Company");
+  if (!signer) return named;
+  return named.replace("Meera Iyer\nHR Manager", `[[signature]]\n${signer.name}\n${signer.title ?? ""}`);
+}
 
 const SAMPLE_PAGE_TWO = `
 --- page ---

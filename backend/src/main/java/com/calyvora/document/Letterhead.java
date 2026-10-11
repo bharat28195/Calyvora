@@ -80,6 +80,13 @@ public class Letterhead {
     @jakarta.persistence.Basic(fetch = jakarta.persistence.FetchType.LAZY)
     @Column(name = "continuation_image")
     private byte[] continuationImage;
+
+    /** The company seal or stamp, printed beside the signature (PD-71, V79). */
+    @jakarta.persistence.Basic(fetch = jakarta.persistence.FetchType.LAZY)
+    @Column(name = "seal_image")
+    private byte[] sealImage;
+    @Column(name = "seal_type", length = 64)
+    private String sealType;
     @Column(name = "continuation_type", length = 64)
     private String continuationType;
     /** PAGE2 (from the uploaded file), UPLOADED (on its own) or DERIVED (page one, header cleared). */
@@ -151,6 +158,13 @@ public class Letterhead {
     public void setUseBackground(boolean useBackground) { this.useBackground = useBackground; }
 
     public byte[] getContinuationImage() { return continuationImage; }
+    public byte[] getSealImage() { return sealImage; }
+    public String getSealType() { return sealType; }
+    public void setSeal(byte[] image, String type) {
+        this.sealImage = image;
+        this.sealType = image == null ? null : type;
+        this.updatedAt = Instant.now();
+    }
     public String getContinuationType() { return continuationType; }
     public String getContinuationSource() { return continuationSource; }
     public void setContinuation(byte[] image, String contentType, String source) {

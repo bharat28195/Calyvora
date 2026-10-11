@@ -309,7 +309,7 @@ export default function GenerateDocumentPage() {
                 className="min-h-[36rem] w-full rounded-xl border border-fg/15 bg-surface p-5 font-mono text-sm leading-relaxed text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
               />
             ) : preview ? (
-              <LetterSheet body={customBody ?? preview.body} letterhead={preview.useLetterhead ? letterhead : null} />
+              <LetterSheet body={customBody ?? preview.body} letterhead={preview.useLetterhead ? letterhead : null} signatoryId={preview.signatoryId} />
             ) : (
               <Card className="text-sm text-fg/50">
                 {template ? "Rendering…" : "Pick a template to see the letter."}
@@ -342,7 +342,7 @@ const PLACEHOLDERS: Record<string, string> = {
   "letter.purpose": "e.g. a Schengen visa application",
   "letter.addressedTo": "e.g. The Branch Manager, HDFC Bank",
   "letter.residentialAddress": "House, street, city, PIN",
-  "transfer.fromLocation": "e.g. Ahmedabad",
+  "transfer.fromLocation": "e.g. Pune",
   "transfer.toLocation": "e.g. Pune",
   "transfer.reportingTo": "e.g. Arjun Rao",
   "probation.extendedUntil": "e.g. 31 January 2027",

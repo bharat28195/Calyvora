@@ -49,13 +49,38 @@ public final class LetterPdf {
         }
     }
 
+    /**
+     * What is drawn at the {@code [[signature]]} line (PD-71): the signatory's signature, the company
+     * seal beside it. Either may be null; with neither, the line is simply dropped.
+     */
+    public record Marks(byte[] signature, byte[] seal) {
+        public static final Marks NONE = new Marks(null, null);
+    }
+
+    public static byte[] render(String body, Stationery paper, Marks marks) throws IOException {
+        return render(body, paper, marks, null);
+    }
+
+    /**
+     * @param tail extra XHTML appended after the letter — the signer's acceptance block and the audit
+     *             page of a signed letter (PD-72); null for none
+     */
+    public static byte[] render(String body, Stationery paper, Marks marks, String tail) throws IOException {
+        String html = toHtml(body, marks == null ? Marks.NONE : marks) + (tail == null ? "" : tail);
+        return renderHtml(html, paper);
+    }
+
     /** The writing area in millimetres on A4: page one, the pages after it, and both sides. */
     public record Area(int firstTop, int firstBottom, int laterTop, int laterBottom, int side) {
         static final Area DEFAULT = new Area(40, 32, 22, 32, 22);
     }
 
     public static byte[] render(String body, Stationery paper) throws IOException {
-        String html = page(toHtml(body), paper);
+        return render(body, paper, Marks.NONE, null);
+    }
+
+    private static byte[] renderHtml(String bodyHtml, Stationery paper) throws IOException {
+        String html = page(bodyHtml, paper);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PdfRendererBuilder b = new PdfRendererBuilder();
         b.useFastMode();
@@ -154,6 +179,7 @@ public final class LetterPdf {
                 + "p{margin:0}h2{font-size:14pt;margin:12pt 0 6pt}h3{font-size:11pt;margin:10pt 0 3pt}"
                 + "ul,ol{margin:6pt 0 6pt 16pt;padding:0}li{margin:2pt 0}hr{border:0;border-top:1px solid #ccc;margin:12pt 0}"
                 + ".gap{height:8pt}.page{page-break-after:always;height:0}"
+                + "table.sig{border-collapse:collapse;margin:4pt 0 2pt 0}table.sig td{padding:0 10mm 0 0;vertical-align:bottom}"
                 + "table.t{width:100%;border-collapse:collapse;margin:8pt 0;font-size:9.5pt}"
                 + "table.t th,table.t td{border:1px solid #bbb;padding:4pt 6pt;text-align:left}"
                 + "table.t th{background:#f1f1f1}table.t td.n,table.t th.n{text-align:right}"
@@ -168,6 +194,15 @@ public final class LetterPdf {
 
     /** The letter body as XHTML — the same rules as {@code renderLetter} in letter.tsx. */
     static String toHtml(String body) {
+        return toHtml(body, Marks.NONE);
+    }
+
+    /** An image as a data URI for the PDF. */
+    static String dataUri(byte[] png) {
+        return "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png);
+    }
+
+    static String toHtml(String body, Marks marks) {
         String[] lines = (body == null ? "" : body).replace("\r\n", "\n").split("\n", -1);
         StringBuilder out = new StringBuilder();
         List<String> bullets = null, numbers = null;
@@ -198,7 +233,18 @@ public final class LetterPdf {
             }
             if (bullets != null) { out.append(list("ul", bullets)); bullets = null; }
             if (numbers != null) { out.append(list("ol", numbers)); numbers = null; }
-            if (line.matches("(?i)^\\s*---\\s*page\\s*---\\s*$")) {
+            if (line.trim().equals(SignatoryService.SIGNATURE_LINE)) {
+                if (marks.signature() != null || marks.seal() != null) {
+                    out.append("<table class='sig'><tr>");
+                    if (marks.signature() != null) {
+                        out.append("<td><img src='").append(dataUri(marks.signature())).append("' style='height:16mm;max-width:60mm'/></td>");
+                    }
+                    if (marks.seal() != null) {
+                        out.append("<td><img src='").append(dataUri(marks.seal())).append("' style='height:22mm;max-width:30mm'/></td>");
+                    }
+                    out.append("</tr></table>");
+                }
+            } else if (line.matches("(?i)^\\s*---\\s*page\\s*---\\s*$")) {
                 out.append("<div class='page'></div>");
             } else if (line.matches("^\\s*---+\\s*$")) {
                 out.append("<hr/>");

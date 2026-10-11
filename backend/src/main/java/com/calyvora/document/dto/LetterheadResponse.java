@@ -42,7 +42,9 @@ public record LetterheadResponse(
         int firstBottomMm,
         int laterTopMm,
         int laterBottomMm,
-        int sideMm
+        int sideMm,
+        /** PD-71: a company seal has been uploaded (served by /documents/letterhead/seal). */
+        boolean hasSeal
 ) {
     public static LetterheadResponse of(Letterhead l, String companyName) {
         String heading = l.getHeading() == null || l.getHeading().isBlank() ? companyName : l.getHeading();
@@ -56,7 +58,8 @@ public record LetterheadResponse(
                 l.getPayDay(), l.getJurisdiction(),
                 l.getContinuationSource(), l.getLaterPages(),
                 or(l.getFirstTopMm(), 40), or(l.getFirstBottomMm(), 32),
-                or(l.getLaterTopMm(), 22), or(l.getLaterBottomMm(), 32), or(l.getSideMm(), 22));
+                or(l.getLaterTopMm(), 22), or(l.getLaterBottomMm(), 32), or(l.getSideMm(), 22),
+                l.getSealType() != null);
     }
 
     private static int or(Integer v, int fallback) {

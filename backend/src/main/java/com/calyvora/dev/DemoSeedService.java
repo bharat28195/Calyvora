@@ -222,8 +222,8 @@ public class DemoSeedService {
                     changed = true;
                 }
                 if (isBlank(settings.getAddress())) {
-                    settings.setAddress("704-705, Sankalp Square 3A, Beside Taj Skyline Hotel, "
-                            + "PRL Colony, Thaltej, Ahmedabad, Gujarat, 380059.");
+                    settings.setAddress("3rd Floor, Riverside Tech Park, "
+                            + "Ashram Road, Ahmedabad, Gujarat 380009.");
                     changed = true;
                 }
                 if (changed) {
@@ -802,8 +802,8 @@ public class DemoSeedService {
         CompanySettings settings = new CompanySettings(company.getId());
         settings.setTimezone("Asia/Kolkata");
         settings.setLegalName("Northwind Robotics Private Limited");
-        settings.setAddress("704-705, Sankalp Square 3A, Beside Taj Skyline Hotel, "
-                + "PRL Colony, Thaltej, Ahmedabad, Gujarat, 380059.");
+        settings.setAddress("3rd Floor, Riverside Tech Park, "
+                + "Ashram Road, Ahmedabad, Gujarat 380009.");
         companySettingsRepository.save(settings);
         return company;
     }
@@ -886,7 +886,7 @@ public class DemoSeedService {
         }
         UUID employeeId = UUID.fromString(e.id());
         employeeFinanceService.update(employeeId, new com.calyvora.people.dto.UpdateEmployeeFinanceRequest(
-                "BANK_TRANSFER", bank, account, ifsc, e.firstName() + " " + e.lastName(), "Thaltej",
+                "BANK_TRANSFER", bank, account, ifsc, e.firstName() + " " + e.lastName(), "Ashram Road",
                 // No honorific — the seeder has no idea what any of these people use.
                 pfStatus, pfNumber, uan, pfJoinDate, (e.firstName() + " " + e.lastName()).toUpperCase(),
                 "NOT_ELIGIBLE", null,

@@ -38,9 +38,11 @@ public class DocumentController {
     private final DocumentService documentService;
     private final LetterheadService letterheadService;
     private final DocumentDeliveryService deliveryService;
+    private final SignatoryService signatoryService;
 
     public DocumentController(DocumentService documentService, LetterheadService letterheadService,
-                              DocumentDeliveryService deliveryService) {
+                              DocumentDeliveryService deliveryService, SignatoryService signatoryService) {
+        this.signatoryService = signatoryService;
         this.documentService = documentService;
         this.letterheadService = letterheadService;
         this.deliveryService = deliveryService;
@@ -108,6 +110,65 @@ public class DocumentController {
     @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
     public LetterheadResponse removeContinuation() {
         return letterheadService.removeContinuation();
+    }
+
+    // ---- signatories and the seal (PD-71) ----
+
+    /** Who may sign the company's letters. Readable by anyone who issues letters; changed by admins. */
+    @GetMapping("/signatories")
+    public java.util.List<SignatoryService.SignatoryView> signatories() {
+        return signatoryService.list();
+    }
+
+    @PostMapping("/signatories")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView createSignatory(@RequestBody SignatoryService.SignatoryPayload payload) {
+        return signatoryService.create(payload);
+    }
+
+    @PatchMapping("/signatories/{id}")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView updateSignatory(@PathVariable UUID id,
+                                                          @RequestBody SignatoryService.SignatoryPayload payload) {
+        return signatoryService.update(id, payload);
+    }
+
+    /** A photo or scan of the signature, or one drawn on screen (sent as a PNG). */
+    @PostMapping("/signatories/{id}/image")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView uploadSignature(@PathVariable UUID id,
+                                                          @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return signatoryService.uploadImage(id, file);
+    }
+
+    @DeleteMapping("/signatories/{id}/image")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView removeSignature(@PathVariable UUID id) {
+        return signatoryService.removeImage(id);
+    }
+
+    @GetMapping("/signatories/{id}/image")
+    public org.springframework.http.ResponseEntity<byte[]> signatureImage(@PathVariable UUID id) {
+        return image(signatoryService.image(id).map(i -> new LetterheadService.StoredImage(i.bytes(), i.contentType(), i.version())));
+    }
+
+    @PostMapping("/letterhead/seal")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse uploadSeal(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        signatoryService.uploadSeal(file);
+        return letterheadService.get();
+    }
+
+    @DeleteMapping("/letterhead/seal")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse removeSeal() {
+        signatoryService.removeSeal();
+        return letterheadService.get();
+    }
+
+    @GetMapping("/letterhead/seal")
+    public org.springframework.http.ResponseEntity<byte[]> sealImage() {
+        return image(signatoryService.seal().map(i -> new LetterheadService.StoredImage(i.bytes(), i.contentType(), i.version())));
     }
 
     private static org.springframework.http.ResponseEntity<byte[]> image(
