@@ -2011,6 +2011,19 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - Images are now stored exactly as uploaded (only PDF/Word are rendered); an image Java cannot read
   (WebP) prints on the default margins.
 
+### PD-70 · 2026-10-11 · CI at two speeds: the touched modules on every push, everything before prod
+- **Decision (founder):** don't run all ~660 backend tests on every push. Run only the tests of the
+  modules a change touches, and run the full suite before anything goes to production.
+- **How:** a first CI job reads the changed files and maps `com/calyvora/<module>/` to that module's
+  tests, plus the cross-cutting guards on every run (tenant isolation `rls`/`security` and the
+  permission audit `access`). Website- or docs-only pushes skip backend and frontend entirely.
+  The frontend build, lint and browser tests run only when `frontend/` changed.
+- **Always full:** pushes to `production` or `main`, pull requests into `production`, a hand-started
+  run ("Run workflow", full ticked), and any change to shared ground: common/auth/identity/company/
+  access/dev code, resources (migrations, config), pom.xml, Dockerfile, test support, or the workflow.
+- **Gap closed:** `production` was not watched by CI at all before this.
+- Also fixed: the sign-out browser test had been red since PD-57 moved Log out into the profile menu.
+
 ## 4. Architecture Decision Log
 
 
