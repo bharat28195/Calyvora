@@ -1255,6 +1255,9 @@ export interface CompanySummary {
   welcomeEmailSent?: boolean | null;
   /** Only on the answer to a create, and only when the email did not go out: pass it on by hand. */
   temporaryPassword?: string | null;
+  /** PD-74: archived — kept whole, nobody signs in, not billed. Null while live. */
+  archivedAt?: string | null;
+  archiveReason?: string | null;
 }
 
 /** An agency (a customer running several companies) as the platform owner sees it. */

@@ -461,7 +461,7 @@ public class PlatformService {
         // revenue figure the customer isn't being asked to pay.
         java.time.YearMonth thisMonth = java.time.YearMonth.now();
         BigDecimal price = sub == null ? null : pricingService.rateFor(sub, headcount, thisMonth);
-        BigDecimal revenue = (sub == null || sub.isLocked())
+        BigDecimal revenue = (sub == null || sub.isLocked() || company.isArchived())
                 ? BigDecimal.ZERO : pricingService.monthlyFor(sub, headcount, thisMonth);
         // Null for a company sold direct — the console groups by this to separate the two kinds.
         Company agency = company.getAgencyId() == null ? null
@@ -478,7 +478,8 @@ public class PlatformService {
                 price, sub != null && sub.isCustomPrice(), revenue, sub == null ? "INR" : sub.getCurrency(),
                 company.getCreatedAt() == null ? null : company.getCreatedAt().toString(),
                 agency == null ? null : agency.getId().toString(),
-                agency == null ? null : agency.getName(), null, null);
+                agency == null ? null : agency.getName(), null, null,
+                company.getArchivedAt() == null ? null : company.getArchivedAt().toString(), company.getArchiveReason());
     }
 
     private Company requireCompany(UUID companyId) {

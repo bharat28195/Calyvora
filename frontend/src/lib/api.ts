@@ -704,6 +704,19 @@ export const api = {
   endCompanySubscription(companyId: string): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/end`, { method: "POST" }) : Promise.reject(new Error("live only"));
   },
+  /** PD-74: archive (keep everything, stop sign-in and billing), restore, and delete for good. */
+  archiveCompany(companyId: string, reason?: string): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/archive`, { method: "POST", body: JSON.stringify({ reason }) })
+      : Promise.reject(new Error("live only"));
+  },
+  restoreCompany(companyId: string): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/restore`, { method: "POST" }) : Promise.reject(new Error("live only"));
+  },
+  deleteCompanyPermanently(companyId: string, confirmName: string, ownerPassword: string): Promise<{ rows: number; tables: number }> {
+    return LIVE ? http<{ rows: number; tables: number }>(`/platform/companies/${companyId}`, {
+      method: "DELETE", body: JSON.stringify({ confirmName, ownerPassword }),
+    }) : Promise.reject(new Error("live only"));
+  },
   renewCompanySubscription(companyId: string, months: number): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/renew`, { method: "POST", body: JSON.stringify({ months }) }) : Promise.reject(new Error("live only"));
   },

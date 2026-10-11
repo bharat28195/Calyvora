@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, XCircle, MoreHorizontal, Search } from "lucide-react";
+import { Archive, Loader2, Plus, RotateCcw, Trash2, XCircle, MoreHorizontal, Search } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import { api, ApiError } from "@/lib/api";
 import type { CompanySummary } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -70,7 +71,7 @@ export default function PlatformCompaniesPage() {
   }
 
   const totalEmployees = companies?.reduce((s, c) => s + c.headcount, 0) ?? 0;
-  const active = companies?.filter((c) => !c.locked).length ?? 0;
+  const active = companies?.filter((c) => !c.locked && !c.archivedAt).length ?? 0;
   // Per currency, never summed into one figure. Adding rupees to dollars produces a number that is
   // not revenue in any currency, and it would be the headline number on the page.
   const mrr = useMemo(() => {
@@ -131,6 +132,8 @@ const STATUS_FILTERS = [
   { id: "pending", label: "Awaiting activation" },
   { id: "ended", label: "Ended" },
   { id: "none", label: "No subscription" },
+  // PD-74: archived customers stay listed, greyed out, so their data is never out of sight.
+  { id: "archived", label: "Archived" },
 ] as const;
 
 type StatusFilter = (typeof STATUS_FILTERS)[number]["id"];
@@ -156,8 +159,11 @@ function CompaniesTable({ companies, busyId, act }: {
         || c.name.toLowerCase().includes(q)
         || c.adminEmail.toLowerCase().includes(q)
         || (c.agencyName ?? "").toLowerCase().includes(q);
+      const archived = !!c.archivedAt;
       const matchesStatus =
-        status === "all" ? true
+        status === "archived" ? archived
+        : status === "all" ? true
+        : archived ? false
           : status === "active" ? !c.locked && c.subscriptionStatus !== "NONE"
             : status === "pending" ? c.subscriptionStatus === "PENDING"
               : status === "ended" ? c.locked && c.subscriptionStatus !== "PENDING"
@@ -215,15 +221,26 @@ function CompaniesTable({ companies, busyId, act }: {
                 </td>
               </tr>
             ) : shown.map((c) => (
-              <tr key={c.companyId} className="border-b border-fg/5 last:border-0 hover:bg-fg/[0.02]">
+              <tr key={c.companyId} className={cn("border-b border-fg/5 last:border-0 hover:bg-fg/[0.02]", c.archivedAt && "opacity-55")}>
                 {/* Headcount and who sold it belong to the company, not to columns of their own —
                     two of the eight columns existed to hold one short phrase each. */}
                 <td className="px-5 py-3">
-                  <p className="font-medium">{c.name}</p>
+                  <p className="font-medium">
+                    {c.name}
+                    {c.archivedAt && (
+                      <span className="ml-2 rounded bg-fg/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fg/60">Archived</span>
+                    )}
+                  </p>
                   <p className="text-xs text-fg/40">
                     {c.headcount} employee{c.headcount === 1 ? "" : "s"}
                     {c.agencyName ? ` · via ${c.agencyName}` : ""}
                   </p>
+                  {c.archivedAt && (
+                    <p className="text-xs text-fg/40">
+                      Archived {new Date(c.archivedAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                      {c.archiveReason ? ` · ${c.archiveReason}` : ""}
+                    </p>
+                  )}
                 </td>
                 <td className="px-3 py-3">
                   <p className="text-fg/80">{c.adminName}</p>
@@ -288,6 +305,8 @@ function RowActions({ company: c, busy, act }: {
   const [editing, setEditing] = useState<null | "date" | "seats" | "price">(null);
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const [statutory, setStatutory] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [reason, setReason] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -341,6 +360,12 @@ function RowActions({ company: c, busy, act }: {
     };
   }, [open]);
 
+  if (c.archivedAt) {
+    // Archived: everything kept. The two ways out are to bring it back, or — separately, deliberately,
+    // with the owner's password — to delete it for good.
+    return <ArchivedActions company={c} busy={busy} act={act} />;
+  }
+
   if (editing) {
     const config = {
       date: { type: "date" as const, initial: c.endsAt ?? "", onSet: (v: string) => act(c.companyId, () => api.setCompanyEndDate(c.companyId, v)) },
@@ -368,6 +393,7 @@ function RowActions({ company: c, busy, act }: {
   if (!c.locked) {
     items.push({ label: "End subscription", run: () => act(c.companyId, () => api.endCompanySubscription(c.companyId)), danger: true });
   }
+  items.push({ label: "Archive company…", run: () => setArchiving(true), danger: true });
   // Statutory payroll, one customer at a time. It is the first thing in the product that can print a
   // wrong figure on somebody payslip, so it stays off until their numbers have been checked against a
   // real run — and turning it back off must be as easy as turning it on.
@@ -397,6 +423,25 @@ function RowActions({ company: c, busy, act }: {
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
       </button>
 
+      <Modal open={archiving} onClose={() => setArchiving(false)} title={`Archive ${c.name}?`}>
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="text-fg/70">
+            Nothing is deleted. Their people can no longer sign in, and the company stops being billed. You can
+            restore it at any time from the Archived filter.
+          </p>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-fg/60">Reason (optional, shown in this console)</span>
+            <Input value={reason} placeholder="e.g. Contract ended" onChange={(e) => setReason(e.target.value)} />
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setArchiving(false)}>Cancel</Button>
+            <Button disabled={busy} onClick={() => { setArchiving(false); act(c.companyId, () => api.archiveCompany(c.companyId, reason.trim() || undefined)); }}>
+              <Archive className="h-4 w-4" /> Archive
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Portalled to the body because the table scrolls inside `overflow-x-auto`, and an overflow
           container clips absolutely-positioned descendants — the menu would have been cut off at the
           edge of the card, or added a stray scrollbar. */}
@@ -422,6 +467,77 @@ function RowActions({ company: c, busy, act }: {
 }
 
 /** The inline field a row switches to when you choose a "Change …" action. */
+/**
+ * An archived company's row (PD-74): restore it, or delete it for good. The permanent delete asks for
+ * the company's name, the owner's own password and an explicit "cannot be undone" — the server checks
+ * the name and the password again, so this dialog is a convenience, not the guard.
+ */
+function ArchivedActions({ company: c, busy, act }: {
+  company: CompanySummary; busy: boolean; act: (id: string, fn: () => Promise<unknown>) => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [sure, setSure] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  async function deleteForGood() {
+    setWorking(true);
+    setError(null);
+    try {
+      await api.deleteCompanyPermanently(c.companyId, name, password);
+      setDeleting(false);
+      act(c.companyId, async () => undefined);   // reload the list
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "The company could not be deleted.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <Button size="sm" variant="secondary" disabled={busy} onClick={() => act(c.companyId, () => api.restoreCompany(c.companyId))}>
+        <RotateCcw className="h-3.5 w-3.5" /> Restore
+      </Button>
+      <Button size="sm" variant="ghost" disabled={busy}
+        onClick={() => { setName(""); setPassword(""); setSure(false); setError(null); setDeleting(true); }}>
+        <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete permanently
+      </Button>
+
+      <Modal open={deleting} onClose={() => setDeleting(false)} title={`Delete ${c.name} permanently?`}>
+        <div className="flex flex-col gap-3 text-sm">
+          <Alert tone="error">
+            This erases the company and everything in it — every employee, payslip, letter and record. It cannot be
+            undone. Restoring is no longer possible afterwards.
+          </Alert>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-fg/60">Type the company&apos;s name: <b>{c.name}</b></span>
+            <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-fg/60">Your owner password</span>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          </label>
+          <label className="flex items-start gap-2 text-fg/80">
+            <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} className="mt-0.5 h-4 w-4 accent-red-500" />
+            I understand this permanently deletes all of {c.name}&apos;s data.
+          </label>
+          {error && <Alert tone="error">{error}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setDeleting(false)}>Cancel</Button>
+            <Button disabled={working || !sure || !password || name.trim().toLowerCase() !== c.name.trim().toLowerCase()}
+              onClick={() => void deleteForGood()} className="bg-red-600 hover:bg-red-700">
+              {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Delete permanently
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 function InlineEditor({ label, type, initial, busy, onSet, onCancel }: {
   label: string; type: "date" | "number"; initial: string; busy: boolean;
   onSet: (v: string) => void; onCancel: () => void;

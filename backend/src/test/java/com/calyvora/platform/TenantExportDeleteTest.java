@@ -57,6 +57,15 @@ class TenantExportDeleteTest extends IntegrationTestBase {
         throw new AssertionError("the demo company was not provisioned");
     }
 
+    /** PD-74: only an archived company can be deleted for good. */
+    private void archive(Session platform, String companyId) throws Exception {
+        mockMvc.perform(post("/api/v1/platform/companies/" + companyId + "/archive")
+                        .header("Authorization", "Bearer " + platform.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("reason", "Test"))))
+                .andExpect(status().isOk());
+    }
+
     /** Rows this company owns, across every table that carries a company_id. */
     private long rowsOwnedBy(UUID companyId) {
         long total = 0;
@@ -118,6 +127,7 @@ class TenantExportDeleteTest extends IntegrationTestBase {
     void delete_is_complete() throws Exception {
         Session platform = platformOwner();
         String companyId = demoCompanyId(platform);
+        archive(platform, companyId);
         UUID id = UUID.fromString(companyId);
 
         long before = rowsOwnedBy(id);
@@ -126,7 +136,7 @@ class TenantExportDeleteTest extends IntegrationTestBase {
         mockMvc.perform(delete("/api/v1/platform/companies/" + companyId)
                         .header("Authorization", "Bearer " + platform.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("confirmName", "Northwind Robotics"))))
+                        .content(json(Map.of("confirmName", "Northwind Robotics", "ownerPassword", PLATFORM_OWNER_PASSWORD))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rows").value((int) before));
 
@@ -143,6 +153,7 @@ class TenantExportDeleteTest extends IntegrationTestBase {
     void delete_stops_at_the_tenant_boundary() throws Exception {
         Session platform = platformOwner();
         String companyId = demoCompanyId(platform);
+        archive(platform, companyId);
         Session bystander = onboardOwner("Bystander Two", "owner@bystander2.test", "Passw0rd!x");
         UUID bystanderId = UUID.fromString(
                 getJson("/api/v1/auth/me", bystander).get("company").get("id").asText());
@@ -151,7 +162,7 @@ class TenantExportDeleteTest extends IntegrationTestBase {
         mockMvc.perform(delete("/api/v1/platform/companies/" + companyId)
                         .header("Authorization", "Bearer " + platform.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("confirmName", "Northwind Robotics"))))
+                        .content(json(Map.of("confirmName", "Northwind Robotics", "ownerPassword", PLATFORM_OWNER_PASSWORD))))
                 .andExpect(status().isOk());
 
         assertThat(rowsOwnedBy(bystanderId))
@@ -164,6 +175,7 @@ class TenantExportDeleteTest extends IntegrationTestBase {
     void deletion_cannot_be_a_single_gesture() throws Exception {
         Session platform = platformOwner();
         String companyId = demoCompanyId(platform);
+        archive(platform, companyId);
 
         // A console listing every customer is one mis-click from ending one of them.
         mockMvc.perform(delete("/api/v1/platform/companies/" + companyId)
@@ -175,7 +187,7 @@ class TenantExportDeleteTest extends IntegrationTestBase {
         mockMvc.perform(delete("/api/v1/platform/companies/" + companyId)
                         .header("Authorization", "Bearer " + platform.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("confirmName", "Northwind"))))
+                        .content(json(Map.of("confirmName", "Northwind", "ownerPassword", PLATFORM_OWNER_PASSWORD))))
                 .andExpect(status().isBadRequest());
 
         // Still there.
@@ -197,7 +209,7 @@ class TenantExportDeleteTest extends IntegrationTestBase {
         mockMvc.perform(delete("/api/v1/platform/companies/" + companyId)
                         .header("Authorization", "Bearer " + ava.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("confirmName", "Northwind Robotics"))))
+                        .content(json(Map.of("confirmName", "Northwind Robotics", "ownerPassword", PLATFORM_OWNER_PASSWORD))))
                 .andExpect(status().isForbidden());
     }
 
@@ -212,10 +224,10 @@ class TenantExportDeleteTest extends IntegrationTestBase {
 
         // It holds the owner account: deleting it locks everybody out of the console, including
         // whoever would have to undo it.
-        mockMvc.perform(delete("/api/v1/platform/companies/" + platformCompanyId)
+        mockMvc.perform(post("/api/v1/platform/companies/" + platformCompanyId + "/archive")
                         .header("Authorization", "Bearer " + platform.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("confirmName", name))))
+                        .content(json(Map.of("reason", name))))
                 .andExpect(status().isBadRequest());
     }
 }

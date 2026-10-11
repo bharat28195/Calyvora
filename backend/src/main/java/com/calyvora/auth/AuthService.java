@@ -307,6 +307,12 @@ public class AuthService {
     private LoginResult issueSession(User user, RefreshTokenService.IssuedToken issued) {
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new NotFoundException("Company not found"));
+        // An archived workspace keeps its data but no one signs in to it (PD-74). Checked here, the
+        // one place both a login and a refresh pass through, so an open session dies at its next refresh.
+        if (company.isArchived()) {
+            throw new com.calyvora.common.error.ApiException(com.calyvora.common.error.ErrorCode.FORBIDDEN,
+                    "This workspace has been archived. Contact Calyvora to restore it.");
+        }
         // Login carries no token yet, so TenantFilter has bound nothing. Every read below is for
         // this user's own company and has to say so, or RLS returns nothing and the session starts
         // with the product's defaults instead of the customer's currency and timezone.

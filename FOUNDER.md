@@ -2061,6 +2061,26 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
 - **Not yet:** TDS on encashment and other extras beyond the final payslip; adding the payout to the
   bank file. Today they are an HR line and a separate transfer.
 
+### PD-74 · 2026-10-11 · Customers are archived, not deleted; a permanent delete is guarded
+- **Decision (founder):** production keeps real customers' data. Removing a company archives it:
+  every row kept, shown greyed out in the owner console with date and reason, its people cannot sign
+  in, and it is not billed. Restore undoes it in one click.
+- **Permanent delete:** only for a company already archived, from the owner console, after typing
+  the company's name and the **owner's own password** and ticking "cannot be undone". The server
+  re-checks name and password (BCrypt), refuses a live company (409), and logs every attempt.
+- **Enforced** where login and token refresh both pass (AuthService.issueSession): an open session
+  dies at its next refresh, within the access-token lifetime. V82 (archived_at/by/reason on companies).
+- Smaller deletes inside a company (letters, templates, candidates) are still hard deletes; to soft-delete later.
+
+### PD-75 · 2026-10-11 · An agency sees all its companies' subscriptions in one place
+- **Decision (founder):** agencies get a Subscriptions tab: status (active, renews within 30 days,
+  awaiting activation, ended, archived), paid-until with days left, seats used of bought with a bar,
+  per-person rate (agreed or standard), monthly and yearly cost, and a "Needs attention" list (ending
+  soon, ended, waiting, over seats → request seats). Money is per currency, never summed across.
+- Built only from the company summary the console already reads, so company-level facts only (no
+  employee data). **Process (founder):** every change to an agency-facing screen is reported
+  explicitly — what agencies will now see.
+
 ## 4. Architecture Decision Log
 
 

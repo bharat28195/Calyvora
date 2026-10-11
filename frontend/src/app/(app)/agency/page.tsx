@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import { WelcomeOutcome } from "@/components/platform/welcome-outcome";
+import { SubscriptionsView } from "@/components/agency/subscriptions-view";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
 
@@ -35,6 +36,8 @@ export default function AgencyPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [seatsFor, setSeatsFor] = useState<string | null>(null);
+  // PD-75: the companies, or their subscriptions side by side.
+  const [tab, setTab] = useState<"companies" | "subscriptions">("companies");
 
   function load() {
     api.agencyOverview().then(setOverview).catch(() => setOverview(null));
@@ -64,8 +67,20 @@ export default function AgencyPage() {
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
       {creating && <CreateCompanyForm onCreated={() => { setCreating(false); load(); }} onCancel={() => setCreating(false)} />}
 
+      <div className="mt-6 flex gap-1 border-b border-fg/10">
+        {(["companies", "subscriptions"] as const).map((t) => (
+          <button key={t} type="button" onClick={() => setTab(t)}
+            className={cn("-mb-px border-b-2 px-4 py-2 text-sm font-medium",
+              tab === t ? "border-violet text-violet" : "border-transparent text-fg/50 hover:text-fg")}>
+            {t === "companies" ? "Companies" : "Subscriptions"}
+          </button>
+        ))}
+      </div>
+
       {companies === null ? (
         <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
+      ) : tab === "subscriptions" ? (
+        <SubscriptionsView companies={companies} onRequestSeats={(id) => { setTab("companies"); setSeatsFor(id); }} />
       ) : (
         <>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

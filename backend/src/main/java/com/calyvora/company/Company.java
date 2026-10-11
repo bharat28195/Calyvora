@@ -64,6 +64,14 @@ public class Company {
     @Column(name = "plan_code", length = 32)
     private String planCode;
 
+    /** Archived (PD-74): kept whole, but nobody signs in and it is not billed. Null while live. */
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+    @Column(name = "archived_by")
+    private UUID archivedBy;
+    @Column(name = "archive_reason", length = 300)
+    private String archiveReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -122,6 +130,23 @@ public class Company {
 
     public void setPlatform(boolean platform) {
         this.platform = platform;
+    }
+
+    public boolean isArchived() { return archivedAt != null; }
+    public Instant getArchivedAt() { return archivedAt; }
+    public UUID getArchivedBy() { return archivedBy; }
+    public String getArchiveReason() { return archiveReason; }
+
+    public void archive(UUID by, String reason) {
+        this.archivedAt = Instant.now();
+        this.archivedBy = by;
+        this.archiveReason = reason;
+    }
+
+    public void restore() {
+        this.archivedAt = null;
+        this.archivedBy = null;
+        this.archiveReason = null;
     }
 
     public boolean isAgency() {
