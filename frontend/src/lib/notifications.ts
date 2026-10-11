@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck, DoorOpen, PenLine } from "lucide-react";
+import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck, DoorOpen, PenLine, Hourglass } from "lucide-react";
 import { createElement, type ReactNode } from "react";
 import type { NotificationType } from "@/lib/types";
 import { formatDate } from "@/lib/format";
@@ -21,6 +21,7 @@ export const NOTIFICATION_ICON: Record<NotificationType, ReactNode> = {
   LETTER_TO_SIGN: createElement(PenLine, { className: "h-4 w-4 text-violet" }),
   LETTER_SIGNED: createElement(PenLine, { className: "h-4 w-4 text-emerald-400" }),
   LETTER_DECLINED: createElement(PenLine, { className: "h-4 w-4 text-red-400" }),
+  SUBSCRIPTION_ENDING: createElement(Hourglass, { className: "h-4 w-4 text-amber-400" }),
 };
 
 /** "3m ago" / "2h ago" / "5d ago" — relative time reads better than a timestamp in an inbox. */

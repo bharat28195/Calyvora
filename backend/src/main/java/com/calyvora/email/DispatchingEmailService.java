@@ -127,6 +127,25 @@ public class DispatchingEmailService implements EmailService {
     }
 
     @Override
+    public EmailResult sendSubscriptionEnding(String to, String firstName, String companyName, String endsOn,
+                                              long daysLeft, String link) {
+        String company = companyName == null ? "your company" : companyName;
+        String when = daysLeft <= 0 ? "today" : daysLeft == 1 ? "tomorrow" : "in " + daysLeft + " days";
+        String subject = "Your Orbit subscription ends " + when;
+        String body = "Hi " + (firstName == null ? "there" : firstName) + ",\n\n"
+                + "The Orbit subscription for " + company + " ends on " + endsOn + ". After that, your team will not be able to use the workspace until it is renewed. Your data stays safe.\n\n"
+                + "To renew, reply to this email or write to connect@calyvora.in.\n\n"
+                + "See your subscription: " + link + "\n\nOrbit";
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + "<p>Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(firstName == null ? "there" : firstName) + ",</p>"
+                + "<p>The Orbit subscription for <b>" + org.springframework.web.util.HtmlUtils.htmlEscape(company) + "</b> ends on <b>"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(endsOn) + "</b>. After that, your team will not be able to use the workspace until it is renewed. Your data stays safe.</p>"
+                + "<p>To renew, reply to this email or write to <a href=\"mailto:connect@calyvora.in\">connect@calyvora.in</a>.</p>"
+                + "<p><a href=\"" + org.springframework.web.util.HtmlUtils.htmlEscape(link) + "\" style=\"display:inline-block;background:#7c5cff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none\">See my subscription</a></p></div>";
+        return send(to, subject, body, html);
+    }
+
+    @Override
     public EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
                                             String letterTitle, String link, String message, String validUntil) {
         String company = companyName == null ? "Your employer" : companyName;

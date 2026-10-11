@@ -28,6 +28,7 @@ public class RecordingEmailService implements EmailService {
     private final List<Sent> documents = new ArrayList<>();
     private final List<Sent> checkoutReminders = new ArrayList<>();
     private final List<Sent> signatureRequests = new ArrayList<>();
+    private final List<Sent> subscriptionEndings = new ArrayList<>();
 
     /** A letter sent to sign (PD-72): who to, and the link to sign at. */
     @Override
@@ -46,6 +47,17 @@ public class RecordingEmailService implements EmailService {
                                             String checkIn, String link) {
         checkoutReminders.add(new Sent(to, link));
         return EmailResult.ok("RECORDING");
+    }
+
+    @Override
+    public EmailResult sendSubscriptionEnding(String to, String firstName, String companyName, String endsOn,
+                                              long daysLeft, String link) {
+        subscriptionEndings.add(new Sent(to, link));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> subscriptionEndings() {
+        return subscriptionEndings;
     }
 
     public List<Sent> checkoutReminders() {
@@ -151,6 +163,7 @@ public class RecordingEmailService implements EmailService {
 
     public void clear() {
         verifications.clear();
+        subscriptionEndings.clear();
         invitations.clear();
         trialNotifications.clear();
         trialAcknowledgements.clear();

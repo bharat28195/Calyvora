@@ -39,4 +39,6 @@ public enum NotificationType {
     LETTER_SIGNED,
     /** The person you sent a letter to declined it. */
     LETTER_DECLINED,
+    /** The company's subscription ends within five days (PD-76). */
+    SUBSCRIPTION_ENDING,
 }

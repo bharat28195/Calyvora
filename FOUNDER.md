@@ -2081,6 +2081,15 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   employee data). **Process (founder):** every change to an agency-facing screen is reported
   explicitly — what agencies will now see.
 
+### PD-76 · 2026-10-11 · Admins hear five days before the subscription ends
+- **Found:** when the end date passes, login still works but the app is locked (lock screen, API 402),
+  and the only warning was an in-app banner, which nobody sees unless they open the app.
+- **Decision (founder):** five days ahead, every active admin of the company gets an email and an
+  inbox notification linking to the Subscription page. Sent once per end date (`expiry_reminded_for`),
+  so extending the subscription earns a fresh reminder. The check is "five days or fewer, not yet
+  reminded", run hourly, so a server asleep on the day (the demo sleeps) still sends it on waking.
+  Archived and platform companies are skipped.
+
 ## 4. Architecture Decision Log
 
 

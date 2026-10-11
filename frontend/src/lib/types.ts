@@ -671,7 +671,8 @@ export type NotificationType =
   | "CHECKOUT_MISSED"
   | "LETTER_TO_SIGN"
   | "LETTER_SIGNED"
-  | "LETTER_DECLINED";
+  | "LETTER_DECLINED"
+  | "SUBSCRIPTION_ENDING";
 
 export interface AppNotification {
   id: string;

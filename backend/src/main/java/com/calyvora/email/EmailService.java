@@ -43,6 +43,12 @@ public interface EmailService {
         return EmailResult.failed("NONE", "Not supported");
     }
 
+    /** "Your subscription ends on …" (PD-76), sent to the company's admins five days ahead. */
+    default EmailResult sendSubscriptionEnding(String to, String firstName, String companyName, String endsOn,
+                                               long daysLeft, String link) {
+        return EmailResult.failed("NONE", "Not supported");
+    }
+
     /** "Please read and sign" (PD-72): a link to the letter, from the company, replies to the company. */
     default EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
                                              String letterTitle, String link, String message, String validUntil) {
