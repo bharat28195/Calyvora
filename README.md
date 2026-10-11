@@ -22,7 +22,7 @@ Practical build/run state: [`CONTEXT.md`](CONTEXT.md).
 | `backend/` | Spring Boot 3 · Java 21 · **Maven**. Feature-organized packages under `com.calyvora`. |
 | `frontend/` | Next.js (App Router) · TypeScript · Tailwind. The product web app. |
 | `infra/` | `docker-compose.yml` — local Postgres + Mailpit. |
-| `web/` | Standalone static marketing site (deploy target for calyvora.in) — separate from the app. |
+| `website/` | Marketing sites, uploaded by hand to Hostinger: `orbit/` for calyvora.in, `calyvora-net/` for calyvora.net — separate from the app. |
 | `docs/` | Architecture constitution (00–15) + sprint plans. |
 
 ## Prerequisites

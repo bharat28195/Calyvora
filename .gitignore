@@ -36,3 +36,6 @@ secrets/
 calyvora-site.zip
 *.log
 frontend/.next-build/
+
+# Claude Code personal settings
+.claude/settings.local.json
