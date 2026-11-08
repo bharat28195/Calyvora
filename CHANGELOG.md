@@ -9,8 +9,9 @@ From the go-live readiness review of 2026-11-02 (defects D1 to D5).
 - **D1 — Opening a letter to sign took the server down.** Every page was drawn into one response.
   The signing screen now gets a page count and fetches each page as its own PNG
   (`/me/letters/{id}/pages/{n}`, `/public/sign/{token}/pages/{n}`), with a placeholder while each
-  loads. The backend's heap is capped at 60% of the container instead of 75%, leaving room for the
-  memory PDFBox and Java2D use outside it.
+  loads. The JVM now fits the container as a whole: heap 45% (was 75%), the serial collector, compiled
+  code capped at 96 MB and `MALLOC_ARENA_MAX=2`. Measured, about 220 MB lives outside the heap, so a
+  75% or even 60% heap took the process past 512 MB once letters had been rendered.
 - **D2 — Loss of pay over-deducted before the month ended.** Working days with nothing recorded yet
   now count in the month's total. One absence used to cost a month's pay on the 2nd and about 10% too
   much on the 28th; it now costs one working day, whenever payroll is run. PF, ESI, professional tax

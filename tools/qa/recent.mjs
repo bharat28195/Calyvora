@@ -98,7 +98,11 @@ for (const kind of ["ecr", "esi", "pt", "lwf"]) {
 }
 const fy = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
 const q = `${fy}-${String(fy + 1).slice(2)}-Q1`;
-log((await call(T.ADMIN, "GET", `/api/v1/payroll/filings/24q/${q}`)).status === 200, `Form 24Q file for ${q}`);
+{
+  // 24Q is built only from finalised months; until a quarter is finalised the right answer is a 409 that says so.
+  const r = await call(T.ADMIN, "GET", `/api/v1/payroll/filings/24q/${q}`);
+  log(r.status === 200 || (r.status === 409 && /Finalise/.test(r.json?.message ?? "")), `Form 24Q file for ${q}`, `${r.status} ${r.json?.message ?? ""}`);
+}
 log((await call(T.MEMBER, "POST", "/api/v1/tax/me/preview", {})).status === 200, "Member previews their tax");
 
 // ---- a letter: send, open page by page, sign ----

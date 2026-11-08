@@ -2356,8 +2356,11 @@ resulting market gaps.
   demo server down (502, then 503 for minutes). A Java heap shortage fails that request with a 500
   and the server lives on; a 502 means the host killed the process for using more memory than the
   container has. With the heap allowed 75% of 512 MB, everything outside the heap (class metadata,
-  compiled code, PDFBox and Java2D's native image and font memory) had about 128 MB. Fix: heap capped
-  at 60%, and letter pages rendered one per request instead of all at once.
+  compiled code, PDFBox and Java2D's native image and font memory) had about 128 MB. A first fix at
+  60% crashed the demo again; native memory tracking then showed ~220 MB outside the heap, so 60%
+  still totalled ~550 MB. Fix: heap 45%, serial GC, code cache capped, two malloc arenas, and letter
+  pages rendered one per request. Lesson: size a container by the whole process, measured, not by
+  the heap; and on 512 MB this app has little headroom left.
 
 - **2026-07-10 — Refresh-token rotation is hostile to concurrent/duplicate refreshes.** A duplicate
   refresh (React StrictMode's dev double-invoke, or two browser tabs) re-presents the just-rotated

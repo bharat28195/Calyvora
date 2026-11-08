@@ -18,14 +18,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends fontconfig libf
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/target/calyvora-backend-*.jar app.jar
-# Respect the container's memory limit (free tiers and Starter are both 512 MB).
+# Fit the whole JVM, not just its heap, inside the container (free tier and Starter are both 512 MB).
 #
-# The heap is capped at 60%, not 75% (D1). At 75% the heap alone could reach 384 MB, which left about
-# 128 MB for everything else the JVM needs — class metadata for Spring and Hibernate, compiled code,
-# thread stacks, and the native memory PDFBox and Java2D use to draw letters and fonts. Opening one
-# letter to sign crossed the container's limit: the host killed the process (a 502, then 503s), where
-# a heap shortage would only have failed that one request with a 500.
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60"
+# D1: opening a letter to sign got the process killed by the host (a 502, then minutes of 503s). A
+# heap shortage would only have failed that request with a 500; a kill means the process as a whole
+# went over the container's memory. Measured with native memory tracking (2026-11-08): about 220 MB
+# lives outside the heap — class metadata ~140 MB, compiled code ~50 MB, symbols ~40 MB — and rendering
+# letters grows the heap to its cap, where it stays. A 75% heap (384 MB) put the total near 650 MB and
+# a 60% heap still near 550 MB. Hence:
+#   - heap 45% of the container (~230 MB; letters, payroll and the read sweep all ran within it)
+#   - the serial collector, which a small container would pick anyway, made explicit: it has almost
+#     no memory of its own, where G1 used ~75 MB in the same measurement
+#   - compiled code capped at 96 MB (it used ~50; when full the JIT stops compiling, nothing fails)
+#   - two malloc arenas: glibc otherwise keeps one per thread, and that memory is invisible to Java
+#     yet counted against the container
+# If the plan grows past 512 MB these percentages grow with it.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=45 -XX:+UseSerialGC -XX:ReservedCodeCacheSize=96m"
+ENV MALLOC_ARENA_MAX=2
 # The profile is chosen by the deployment, never baked into the image. Each Render service sets
 # SPRING_PROFILES_ACTIVE explicitly (prod for production, staging for the demo). Baking in `staging`
 # meant a service that forgot to set it would silently run with the dev/seed/mailbox endpoints
