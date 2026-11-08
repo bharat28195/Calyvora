@@ -1892,6 +1892,21 @@ export const api = {
     if (!res.ok) throw new ApiError(((await res.json().catch(() => null)) as ApiErrorBody) ?? infrastructureError(res.status));
     return res.blob();
   },
+  /** One printed page of one of my letters, as a PNG. */
+  async myLetterPage(requestId: string, index: number): Promise<Blob> {
+    const res = await fetch(`${BASE}/me/letters/${requestId}/pages/${index}`, {
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+    });
+    if (!res.ok) throw new ApiError(((await res.json().catch(() => null)) as ApiErrorBody) ?? infrastructureError(res.status));
+    return res.blob();
+  },
+  /** One printed page of the letter behind a signing link, as a PNG. */
+  async publicSignPage(token: string, index: number): Promise<Blob> {
+    const res = await fetch(`${BASE}/public/sign/${encodeURIComponent(token)}/pages/${index}`);
+    if (!res.ok) throw new ApiError(((await res.json().catch(() => null)) as ApiErrorBody) ?? infrastructureError(res.status));
+    return res.blob();
+  },
   /** The public signing link — no session; the token is the authority. */
   async publicSign<T>(token: string, action: "" | "accept" | "decline", body?: unknown): Promise<T> {
     const res = await fetch(`${BASE}/public/sign/${encodeURIComponent(token)}${action ? "/" + action : ""}`, {

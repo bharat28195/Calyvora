@@ -182,8 +182,15 @@ class LetterSigningTest extends IntegrationTestBase {
 
         JsonNode view = getJson("/api/v1/me/letters/" + rid, priya);
         assertThat(view.get("status").asText()).isEqualTo("VIEWED");
-        assertThat(view.get("pages").size()).isGreaterThan(0);
-        assertThat(view.get("pages").get(0).asText()).startsWith("data:image/png;base64,");
+        assertThat(view.get("pageCount").asInt()).isGreaterThan(0);
+        // Pages come one at a time, as PNGs, only to the signer (D1).
+        byte[] page = mockMvc.perform(get("/api/v1/me/letters/" + rid + "/pages/0").header("Authorization", "Bearer " + priya.accessToken()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(ImageIO.read(new java.io.ByteArrayInputStream(page))).isNotNull();
+        mockMvc.perform(get("/api/v1/me/letters/" + rid + "/pages/0").header("Authorization", "Bearer " + marcus.accessToken()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/me/letters/" + rid + "/pages/" + view.get("pageCount").asInt()).header("Authorization", "Bearer " + priya.accessToken()))
+                .andExpect(status().isNotFound());
 
         // Unticked, or no name: refused.
         mockMvc.perform(post("/api/v1/me/letters/" + rid + "/accept").header("Authorization", "Bearer " + priya.accessToken())
@@ -235,7 +242,9 @@ class LetterSigningTest extends IntegrationTestBase {
         JsonNode view = objectMapper.readTree(mockMvc.perform(get("/api/v1/public/sign/" + token))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(view.get("companyName").asText()).isEqualTo("Northwind Robotics");
-        assertThat(view.get("pages").size()).isGreaterThan(0);
+        assertThat(view.get("pageCount").asInt()).isGreaterThan(0);
+        mockMvc.perform(get("/api/v1/public/sign/" + token + "/pages/0")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/public/sign/not-a-real-token-at-all-0000/pages/0")).andExpect(status().isNotFound());
 
         JsonNode signed = postJson("/api/v1/public/sign/" + token + "/accept", null,
                 Map.of("typedName", "Dana Scully", "signature", drawn(), "agree", true));

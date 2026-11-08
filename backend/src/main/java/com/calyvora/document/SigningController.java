@@ -88,6 +88,12 @@ public class SigningController {
         return pdf(signing.myPdf(requestId, principal));
     }
 
+    @GetMapping("/api/v1/me/letters/{requestId}/pages/{index}")
+    public ResponseEntity<byte[]> myPage(@PathVariable UUID requestId, @PathVariable int index,
+                                         @CurrentUser AuthPrincipal principal) {
+        return png(signing.myPage(requestId, index, principal));
+    }
+
     // ---- a candidate, through the link ----
 
     @GetMapping("/api/v1/public/sign/{token}")
@@ -110,6 +116,19 @@ public class SigningController {
     @GetMapping("/api/v1/public/sign/{token}/pdf")
     public ResponseEntity<byte[]> linkPdf(@PathVariable String token) {
         return pdf(signing.pdfByToken(token));
+    }
+
+    @GetMapping("/api/v1/public/sign/{token}/pages/{index}")
+    public ResponseEntity<byte[]> linkPage(@PathVariable String token, @PathVariable int index) {
+        return png(signing.pageByToken(token, index));
+    }
+
+    /** A page of a letter: personal data, so never stored by a shared cache. */
+    private static ResponseEntity<byte[]> png(byte[] page) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .body(page);
     }
 
     private static ResponseEntity<byte[]> pdf(DocumentDeliveryService.Pdf pdf) {

@@ -18,8 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends fontconfig libf
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/target/calyvora-backend-*.jar app.jar
-# Respect the container's memory limit (free tiers are small).
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
+# Respect the container's memory limit (free tiers and Starter are both 512 MB).
+#
+# The heap is capped at 60%, not 75% (D1). At 75% the heap alone could reach 384 MB, which left about
+# 128 MB for everything else the JVM needs — class metadata for Spring and Hibernate, compiled code,
+# thread stacks, and the native memory PDFBox and Java2D use to draw letters and fonts. Opening one
+# letter to sign crossed the container's limit: the host killed the process (a 502, then 503s), where
+# a heap shortage would only have failed that one request with a 500.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60"
 # The profile is chosen by the deployment, never baked into the image. Each Render service sets
 # SPRING_PROFILES_ACTIVE explicitly (prod for production, staging for the demo). Baking in `staging`
 # meant a service that forgot to set it would silently run with the dev/seed/mailbox endpoints

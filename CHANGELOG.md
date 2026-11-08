@@ -4,6 +4,23 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-11-08 — Go-live fixes: letter signing no longer crashes the server, loss of pay is a share of the whole month
+From the go-live readiness review of 2026-11-02 (defects D1 to D5).
+- **D1 — Opening a letter to sign took the server down.** Every page was drawn into one response.
+  The signing screen now gets a page count and fetches each page as its own PNG
+  (`/me/letters/{id}/pages/{n}`, `/public/sign/{token}/pages/{n}`), with a placeholder while each
+  loads. The backend's heap is capped at 60% of the container instead of 75%, leaving room for the
+  memory PDFBox and Java2D use outside it.
+- **D2 — Loss of pay over-deducted before the month ended.** Working days with nothing recorded yet
+  now count in the month's total. One absence used to cost a month's pay on the 2nd and about 10% too
+  much on the 28th; it now costs one working day, whenever payroll is run. PF, ESI, professional tax
+  and the bank file follow, since they are worked out on earned pay.
+- **D3 — Twelve backend tests failed on weekday afternoons.** They assumed nobody is absent; they now
+  switch the absence rules off for their company (`attendanceRulesOff`).
+- **D4 — "Â·" on the attendance sheet.** A leave note read "sick Â· family"; the character is fixed.
+- **D5 — QA scripts.** `sweep.mjs` and `features.mjs` no longer test the retired Work and Clients
+  modules; the new `tools/qa/recent.mjs` covers PD-55 to PD-76, including signing a letter end to end.
+
 ### 2026-10-03 — Demo-feedback fixes: adding people, scroll, org chart, password visibility, announcements
 A batch from live use of a newly created company.
 - **Adding people is discoverable.** The People directory now has an "Add people" button (admins)

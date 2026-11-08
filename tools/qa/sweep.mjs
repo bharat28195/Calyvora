@@ -46,24 +46,24 @@ const READS = [
   "/api/v1/people/employees/{emp}", "/api/v1/people/employees/{emp}/compensation",
   "/api/v1/people/employees/{emp}/finance", "/api/v1/people/employees/{emp}/payslip",
   "/api/v1/people/employees/{emp}/onboarding", "/api/v1/people/employees/{emp}/goals",
-  "/api/v1/people/employees/{emp}/work", "/api/v1/people/employees/{emp}/exit-checklist",
+  "/api/v1/people/employees/{emp}/exit-checklist", "/api/v1/people/exits/requests",
   "/api/v1/people/attendance/me", "/api/v1/people/attendance/me/today", "/api/v1/people/attendance/day",
   "/api/v1/people/attendance/employees/{emp}",
   "/api/v1/attendance/regularizations/mine", "/api/v1/attendance/regularizations/pending",
   "/api/v1/payroll/run", "/api/v1/payroll/payslip-template", "/api/v1/billing",
+  "/api/v1/payroll/months", "/api/v1/payroll/filings/readiness", "/api/v1/payroll/statutory-settings",
+  "/api/v1/payroll/tds-openings", "/api/v1/tax/declarations", "/api/v1/tax/deposits", "/api/v1/tax/settings",
+  "/api/v1/tax/me/declaration", "/api/v1/tax/me/computation", "/api/v1/tax/me/form130",
+  "/api/v1/people/attendance/month-summary", "/api/v1/shifts/work-day", "/api/v1/me/letters",
   "/api/v1/expenses", "/api/v1/expenses/me",
   "/api/v1/feed", "/api/v1/invitations", "/api/v1/shifts", "/api/v1/shifts/roster",
-  "/api/v1/clients", "/api/v1/documents", "/api/v1/documents/templates",
-  "/api/v1/documents/fields", "/api/v1/documents/letterhead",
+  "/api/v1/documents", "/api/v1/documents/templates",
+  "/api/v1/documents/fields", "/api/v1/documents/letterhead", "/api/v1/documents/signatories",
   "/api/v1/helpdesk/tickets", "/api/v1/helpdesk/tickets/mine",
   "/api/v1/knowledge/spaces", "/api/v1/knowledge/pages/mine", "/api/v1/knowledge/search?q=a",
   "/api/v1/performance/cycles", "/api/v1/performance/me/reviews", "/api/v1/performance/team/reviews",
   "/api/v1/recruit/jobs", "/api/v1/recruit/jobs/{job}", "/api/v1/recruit/jobs/{job}/candidates",
-  "/api/v1/work/projects", "/api/v1/work/tasks/mine",
-  "/api/v1/work/projects/{proj}", "/api/v1/work/projects/{proj}/board",
-  "/api/v1/work/projects/{proj}/backlog", "/api/v1/work/projects/{proj}/tasks",
-  "/api/v1/work/projects/{proj}/tickets", "/api/v1/work/projects/{proj}/sprints",
-  "/api/v1/work/projects/{proj}/velocity",
+  // The work tracker and Clients were retired from the HR product (bb1458f), so they are not swept.
   "/api/v1/analytics/overview",
 ];
 
@@ -71,8 +71,6 @@ async function resolveIds(token) {
   const ids = {};
   const e = await call(token, "GET", "/api/v1/people/employees");
   ids.emp = idOf(first(e.body));
-  const p = await call(token, "GET", "/api/v1/work/projects");
-  ids.proj = idOf(first(p.body));
   const j = await call(token, "GET", "/api/v1/recruit/jobs");
   ids.job = idOf(first(j.body));
   return ids;
@@ -109,7 +107,7 @@ await sweep("OWNER  ava.chen (Northwind)", ownerTok, READS, ids);
 const NARROW = [
   "/api/v1/auth/me", "/api/v1/dashboard/summary", "/api/v1/people/me", "/api/v1/people/employees",
   "/api/v1/people/me/payslip", "/api/v1/people/leave/mine", "/api/v1/people/leave",
-  "/api/v1/payroll/run", "/api/v1/expenses/me", "/api/v1/feed", "/api/v1/work/tasks/mine",
+  "/api/v1/payroll/run", "/api/v1/expenses/me", "/api/v1/feed", "/api/v1/me/letters",
   "/api/v1/helpdesk/tickets/mine", "/api/v1/notifications", "/api/v1/analytics/overview",
   "/api/v1/company/members", "/api/v1/people/employees/{emp}/compensation",
 ];

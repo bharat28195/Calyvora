@@ -94,6 +94,8 @@ class PayrollBillingIntegrationTest extends IntegrationTestBase {
 
     private void seedDemo() throws Exception {
         mockMvc.perform(post("/api/v1/dev/seed-demo")).andExpect(status().isOk());
+        // Full-month pay is asserted, so nobody may be marked absent this afternoon.
+        attendanceRulesOff(login("ava.chen@northwind.demo", DEMO_PW));
     }
 
     private String bearer(Session s) {

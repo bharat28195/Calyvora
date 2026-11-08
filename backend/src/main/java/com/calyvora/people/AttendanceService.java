@@ -27,17 +27,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Daily attendance (feedback C.4 â€” phase 2 of the "attendance option"). Phase 1 derived present vs
+ * Daily attendance (feedback C.4 — phase 2 of the "attendance option"). Phase 1 derived present vs
  * on-leave from approved leave; this stores a real row per employee per day.
  *
  * <p>Two rules keep it from becoming double data entry:
  * <ul>
- *   <li><b>Approved leave fills the day automatically.</b> Nobody marks time off twice â€” an
+ *   <li><b>Approved leave fills the day automatically.</b> Nobody marks time off twice — an
  *       unmarked day covered by approved leave resolves to {@code ON_LEAVE} (flagged {@code derived}).</li>
  *   <li><b>A marked row always wins</b> over anything derived, so a correction sticks.</li>
  * </ul>
  * Company holidays fill the day the same way; weekends resolve to {@code WEEK_OFF}. The work-week
- * itself is still hardcoded Monâ€“Fri â€” configurable work-week policy is the remaining debt here.
+ * itself is still hardcoded Mon–Fri — configurable work-week policy is the remaining debt here.
  */
 @Service
 public class AttendanceService {
@@ -569,7 +569,7 @@ public class AttendanceService {
 
     /**
      * A day's status: the marked row if there is one, else approved leave, else a weekend, else
-     * unmarked (null status) â€” which the UI shows as "not marked yet" rather than inventing a value.
+     * unmarked (null status) — which the UI shows as "not marked yet" rather than inventing a value.
      */
     private AttendanceEntryResponse resolve(Employee employee, User user, LocalDate date,
                                             Optional<AttendanceRecord> marked, List<LeaveRequest> leave) {
@@ -662,7 +662,7 @@ public class AttendanceService {
         for (LeaveRequest lr : leave) {
             if (!date.isBefore(lr.getStartDate()) && !date.isAfter(lr.getEndDate())) {
                 return entry(employee, user, date, AttendanceStatus.ON_LEAVE.name(), null, null,
-                        lr.getType().name().toLowerCase() + (lr.getReason() == null ? "" : " Â· " + lr.getReason()),
+                        lr.getType().name().toLowerCase() + (lr.getReason() == null ? "" : " · " + lr.getReason()),
                         true, prefetch);
             }
         }

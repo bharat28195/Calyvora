@@ -94,10 +94,14 @@ public class SigningService {
                               int reminders, boolean open) {
     }
 
-    /** What the signer sees: the letter as its printed pages, and what they are being asked. */
+    /**
+     * What the signer sees: what they are being asked, and how many printed pages the letter has. The
+     * pages themselves are fetched one at a time ({@link #myPage}, {@link #pageByToken}) — see D1 in
+     * {@link DocumentDeliveryService#pageImage}.
+     */
     public record SignerView(String requestId, String companyName, String documentTitle, String signerName,
                              String message, String status, String expiresAt, String decidedAt,
-                             List<String> pages) {
+                             int pageCount) {
     }
 
     public record SendRequest(String email, String message, Integer validDays) {
@@ -220,6 +224,13 @@ public class SigningService {
         return signerView(r);
     }
 
+    /** One printed page of one of my letters, as a PNG. */
+    @Transactional(readOnly = true)
+    public byte[] myPage(UUID requestId, int index, AuthPrincipal principal) {
+        SignatureRequest r = myRequest(requestId, principal);
+        return delivery.pageImage(r.getDocumentId(), index);
+    }
+
     /** The signed PDF of one of my letters, once I have signed it. */
     @Transactional(readOnly = true)
     public DocumentDeliveryService.Pdf myPdf(UUID requestId, AuthPrincipal principal) {
@@ -251,6 +262,12 @@ public class SigningService {
             decline(r, d, ip, agent);
             return signerView(r);
         });
+    }
+
+    /** One printed page of the letter behind a link, as a PNG. */
+    @Transactional(readOnly = true)
+    public byte[] pageByToken(String token, int index) {
+        return onLink(token, r -> delivery.pageImage(r.getDocumentId(), index));
     }
 
     @Transactional(readOnly = true)
@@ -344,7 +361,7 @@ public class SigningService {
                 ? r.getStatus().name() : "EXPIRED";
         return new SignerView(r.getId().toString(), company, doc.getTitle(), r.getSignerName(), r.getMessage(), status,
                 r.getExpiresAt().toString(), r.getDecidedAt() == null ? null : r.getDecidedAt().toString(),
-                delivery.pageImages(doc.getId()));
+                delivery.pageCount(doc.getId()));
     }
 
     private RequestView view(SignatureRequest r, GeneratedDocument doc) {

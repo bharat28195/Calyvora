@@ -26,6 +26,14 @@ class StatutoryPayrollIntegrationTest extends IntegrationTestBase {
 
     private static final String PW = "password1234";
 
+    /** Payslips here assert full-month pay, so a company made for a test has nobody absent today. */
+    @Override
+    protected Session onboardOwner(String companyName, String email, String password) throws Exception {
+        Session owner = super.onboardOwner(companyName, email, password);
+        attendanceRulesOff(owner);
+        return owner;
+    }
+
     private Session platformOwner() throws Exception {
         platformOwner.ensurePlatformOwner();
         return login(PLATFORM_OWNER_EMAIL, PLATFORM_OWNER_PASSWORD);

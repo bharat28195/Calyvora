@@ -35,6 +35,7 @@ export default function PublicSignPage() {
       {view && (
         <SignLetter
           view={view}
+          loadPage={(i) => api.publicSignPage(token, i)}
           onAccept={(input) => api.publicSign<SignerView>(token, "accept", input)}
           onDecline={(reason) => api.publicSign<SignerView>(token, "decline", { reason })}
           onDownload={() => { window.location.href = api.publicSignPdfUrl(token); }}

@@ -43,6 +43,7 @@ export default function MyLetterPage() {
       {view && (
         <SignLetter
           view={view}
+          loadPage={(i) => api.myLetterPage(id, i)}
           onAccept={(input) => api.acceptMyLetter(id, input)}
           onDecline={(reason) => api.declineMyLetter(id, reason)}
           onDownload={() => void download()}

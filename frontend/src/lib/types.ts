@@ -857,7 +857,7 @@ export interface SignatureRequestView {
   reminders: number;
   open: boolean;
 }
-/** What the signer reads: the letter as its printed pages (PNG data URIs). */
+/** What the signer reads: the request, and how many printed pages to fetch one at a time (D1). */
 export interface SignerView {
   requestId: string;
   companyName: string;
@@ -867,7 +867,7 @@ export interface SignerView {
   status: SignatureStatus;
   expiresAt: string;
   decidedAt: string | null;
-  pages: string[];
+  pageCount: number;
 }
 
 /** Full and final settlement (PD-73). */

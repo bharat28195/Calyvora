@@ -451,7 +451,18 @@ public class CompensationService {
         int workingDays = 0;
         double lopDays = 0;
         for (var d : att.days()) {
-            if (d.status() == null) continue;   // future/unmarked working day — not counted as LOP
+            if (d.status() == null) {
+                // A working day with nothing recorded yet — later this month, or before attendance
+                // rules were switched on — is a paid day, and it belongs in the month's total. Skipping
+                // it divided the month's pay over the days elapsed so far, so one absence on the 2nd
+                // cost a whole month's salary and a run on the 28th still over-deducted (D2). Days
+                // outside the employment are left out: SalaryCalendar has already prorated those.
+                LocalDate day = LocalDate.parse(d.date());
+                boolean employed = (employee.getStartDate() == null || !day.isBefore(employee.getStartDate()))
+                        && (employee.getEndDate() == null || !day.isAfter(employee.getEndDate()));
+                if (employed) workingDays++;
+                continue;
+            }
             AttendanceStatus s = AttendanceStatus.valueOf(d.status());
             if (s == AttendanceStatus.WEEK_OFF || s == AttendanceStatus.HOLIDAY) continue;
             workingDays++;

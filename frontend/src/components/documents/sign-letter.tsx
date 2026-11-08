@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Loader2, PenLine, XCircle } from "lucide-react";
 import { ApiError } from "@/lib/api";
 import type { SignerView } from "@/lib/types";
@@ -14,19 +14,51 @@ import { SignaturePad } from "@/components/documents/signature-pad";
  *
  * <p>The letter is shown as its printed pages — images of the very PDF that will be signed — so what
  * someone agrees to is exactly what prints, on any phone, with nothing to install.
+ *
+ * <p>Pages are fetched one after another, not all at once (D1): drawing every page into one response
+ * took the server down, and one request at a time keeps a long letter from doing the same.
  */
 export function SignLetter({
   view,
+  loadPage,
   onAccept,
   onDecline,
   onDownload,
 }: {
   view: SignerView;
+  loadPage: (index: number) => Promise<Blob>;
   onAccept: (input: { typedName: string; signature: string; agree: boolean }) => Promise<SignerView>;
   onDecline: (reason: string) => Promise<SignerView>;
   onDownload: () => void;
 }) {
   const [state, setState] = useState(view);
+  // One entry per page: an object URL once drawn, "failed" if it could not be, null while loading.
+  const [pages, setPages] = useState<(string | null)[]>([]);
+
+  // Reloaded when the status changes too: a signed letter gains its signature record on the last page.
+  useEffect(() => {
+    let cancelled = false;
+    const urls: string[] = [];
+    setPages(Array.from({ length: state.pageCount }, () => null));
+    (async () => {
+      for (let i = 0; i < state.pageCount && !cancelled; i++) {
+        let src = "failed";
+        try {
+          src = URL.createObjectURL(await loadPage(i));
+          urls.push(src);
+        } catch {
+          // Shown as a gap with a note; the PDF download still has every page.
+        }
+        if (!cancelled) setPages((prev) => prev.map((p, j) => (j === i ? src : p)));
+      }
+    })();
+    return () => {
+      cancelled = true;
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+    // loadPage is a new function on every render of the parent; the page set is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.requestId, state.pageCount, state.status]);
   const [typedName, setTypedName] = useState(view.signerName);
   const [signature, setSignature] = useState<string | null>(null);
   const [agree, setAgree] = useState(false);
@@ -79,11 +111,19 @@ export function SignLetter({
 
       {/* The letter, as it prints. */}
       <div className="flex flex-col gap-4">
-        {state.pages.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={i} src={src} alt={`Page ${i + 1} of ${state.pages.length}`}
-            className="w-full rounded-md bg-white shadow-md ring-1 ring-black/10" />
-        ))}
+        {pages.map((src, i) =>
+          src && src !== "failed" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={src} alt={`Page ${i + 1} of ${pages.length}`}
+              className="w-full rounded-md bg-white shadow-md ring-1 ring-black/10" />
+          ) : (
+            <div key={i} className="flex aspect-[210/297] w-full items-center justify-center rounded-md bg-white shadow-md ring-1 ring-black/10">
+              {src === "failed"
+                ? <span className="px-6 text-center text-sm text-black/50">Page {i + 1} could not be shown. Reload to try again.</span>
+                : <Loader2 className="h-6 w-6 animate-spin text-black/30" aria-label={`Loading page ${i + 1}`} />}
+            </div>
+          ),
+        )}
       </div>
 
       {open && (

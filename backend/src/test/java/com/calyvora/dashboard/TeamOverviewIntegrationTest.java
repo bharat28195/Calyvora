@@ -16,6 +16,8 @@ class TeamOverviewIntegrationTest extends IntegrationTestBase {
 
     private Session demo(String email) throws Exception {
         mockMvc.perform(post("/api/v1/dev/seed-demo")).andExpect(status().isOk());
+        // The present counts below assume nobody is absent yet, whatever the time of day.
+        attendanceRulesOff(login("ava.chen@northwind.demo", "demopass123"));
         return login(email, "demopass123");
     }
 

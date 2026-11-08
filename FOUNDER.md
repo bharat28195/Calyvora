@@ -2345,6 +2345,20 @@ resulting market gaps.
 
 > Knowledge base of mistakes, solutions, better approaches, and best practices. Newest first.
 
+- **2026-11-08 — Tests that read the clock pass in the morning and lie in the afternoon.** PD-59 made
+  people absent after shift start plus grace, and twelve tests that assumed "nobody is absent" began
+  failing after about 11:30 IST on weekdays. Looking into those failures, rather than rerunning them
+  in the morning, exposed a real payroll defect (D2): loss of pay was divided over the working days
+  elapsed so far, so one absence on the 2nd wiped out a month's salary. Lesson: explain a
+  time-dependent failure before pinning the test. Tests now state the assumption with
+  `attendanceRulesOff`.
+- **2026-11-08 — A 502 and a 500 are different memory problems.** Opening one letter to sign took the
+  demo server down (502, then 503 for minutes). A Java heap shortage fails that request with a 500
+  and the server lives on; a 502 means the host killed the process for using more memory than the
+  container has. With the heap allowed 75% of 512 MB, everything outside the heap (class metadata,
+  compiled code, PDFBox and Java2D's native image and font memory) had about 128 MB. Fix: heap capped
+  at 60%, and letter pages rendered one per request instead of all at once.
+
 - **2026-07-10 — Refresh-token rotation is hostile to concurrent/duplicate refreshes.** A duplicate
   refresh (React StrictMode's dev double-invoke, or two browser tabs) re-presents the just-rotated
   cookie, which reuse-detection correctly reads as theft and revokes the whole family — logging the

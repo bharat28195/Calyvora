@@ -153,6 +153,41 @@ public abstract class IntegrationTestBase {
         return email;
     }
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate testJdbc;
+
+    /**
+     * Switch the absent-after-grace rules off for this session's company.
+     *
+     * <p>A new company has them on from the day it is created (V70), so on a weekday after shift start
+     * plus grace everyone who has not checked in is ABSENT. A test about something else — a payslip, a
+     * bank file, a dashboard headcount — then passes in the morning and fails in the afternoon. Tests
+     * that assume nobody is absent call this to say so; attendance tests set the date themselves.
+     */
+    protected void attendanceRulesOff(Session session) throws Exception {
+        String payload = session.accessToken().split("[.]")[1];
+        JsonNode claims = objectMapper.readTree(java.util.Base64.getUrlDecoder().decode(payload));
+        String companyId = claims.get("companyId").asText();
+        // Reading the settings creates the row if the company has none yet, so the update has one to change.
+        getJson("/api/v1/company/settings", session);
+        // Tables are under FORCE row level security, so the tenant is bound on the same connection.
+        testJdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Integer>) c -> {
+            try (var set = c.prepareStatement("select set_config('calyvora.company_id', ?, false)")) {
+                set.setString(1, companyId);
+                set.execute();
+            }
+            try (var st = c.prepareStatement(
+                    "update company_settings set attendance_rules_from = null where company_id = ?")) {
+                st.setObject(1, java.util.UUID.fromString(companyId));
+                return st.executeUpdate();
+            } finally {
+                try (var reset = c.prepareStatement("select set_config('calyvora.company_id', '', false)")) {
+                    reset.execute();
+                }
+            }
+        });
+    }
+
     private static String refreshCookie(MockHttpServletResponse response) {
         String cookie = response.getHeader("Set-Cookie");
         if (cookie == null) {
