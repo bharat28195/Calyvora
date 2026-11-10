@@ -24,13 +24,15 @@ class TeamOverviewIntegrationTest extends IntegrationTestBase {
     @Test
     void owner_sees_headcount_and_present_counts() throws Exception {
         Session owner = demo("ava.chen@northwind.demo");
-        // The seed creates no leave, so nobody is out. On a weekday everyone is "present"; on a weekend
-        // the day sheet derives WEEK_OFF for all, so present is 0 — assert the value for today.
+        // The seed creates no leave and leaves today open for a live check-in, so nobody is present
+        // yet (PD-59 counts only real check-ins). On a weekday all seven are "not in yet"; on a weekend
+        // the day sheet derives WEEK_OFF for all, so nobody is unmarked either.
         boolean weekend = java.time.LocalDate.now().getDayOfWeek().getValue() >= 6;
         mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.headcount").value(7))
-                .andExpect(jsonPath("$.presentToday").value(weekend ? 0 : 7))
+                .andExpect(jsonPath("$.presentToday").value(0))
+                .andExpect(jsonPath("$.unmarkedToday").value(weekend ? 0 : 7))
                 .andExpect(jsonPath("$.onLeaveToday").value(0));
     }
 
@@ -50,7 +52,8 @@ class TeamOverviewIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(get("/api/v1/dashboard/team").header("Authorization", "Bearer " + tom.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.headcount").value(1))
-                .andExpect(jsonPath("$.presentToday").value(weekend ? 0 : 1))
+                .andExpect(jsonPath("$.presentToday").value(0))
+                .andExpect(jsonPath("$.unmarkedToday").value(weekend ? 0 : 1))
                 // Sara has a request pending; any leave shown belongs to the downline, never to Ava
                 // or Marcus, whose absences are none of Tom's business.
                 .andExpect(jsonPath("$.monthLeaves[?(@.employeeName != 'Sara Okoro')]").isEmpty());
