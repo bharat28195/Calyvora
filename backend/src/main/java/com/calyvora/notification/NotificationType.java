@@ -27,4 +27,18 @@ public enum NotificationType {
     /** Your attendance regularization was approved or rejected. */
     REGULARIZATION_DECIDED,
     ANNOUNCEMENT,
+    /** An exit was asked for and needs an admin's approval (PD-65). */
+    EXIT_REQUESTED,
+    /** The exit you asked for was approved or turned down. */
+    EXIT_DECIDED,
+    /** You checked in yesterday and never checked out (PD-67). */
+    CHECKOUT_MISSED,
+    /** HR sent you a letter to accept and sign (PD-72). */
+    LETTER_TO_SIGN,
+    /** The person you sent a letter to signed it. */
+    LETTER_SIGNED,
+    /** The person you sent a letter to declined it. */
+    LETTER_DECLINED,
+    /** The company's subscription ends within five days (PD-76). */
+    SUBSCRIPTION_ENDING,
 }

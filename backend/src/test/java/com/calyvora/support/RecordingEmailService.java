@@ -25,6 +25,56 @@ public class RecordingEmailService implements EmailService {
     private final List<Sent> trialAcknowledgements = new ArrayList<>();
     private final List<Sent> trialApprovals = new ArrayList<>();
     private final List<Sent> resetCodes = new ArrayList<>();
+    private final List<Sent> documents = new ArrayList<>();
+    private final List<Sent> checkoutReminders = new ArrayList<>();
+    private final List<Sent> signatureRequests = new ArrayList<>();
+    private final List<Sent> subscriptionEndings = new ArrayList<>();
+
+    /** A letter sent to sign (PD-72): who to, and the link to sign at. */
+    @Override
+    public EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
+                                            String letterTitle, String link, String message, String validUntil) {
+        signatureRequests.add(new Sent(to, link));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> signatureRequests() {
+        return signatureRequests;
+    }
+
+    @Override
+    public EmailResult sendCheckoutReminder(String to, String firstName, String companyName, String day,
+                                            String checkIn, String link) {
+        checkoutReminders.add(new Sent(to, link));
+        return EmailResult.ok("RECORDING");
+    }
+
+    @Override
+    public EmailResult sendSubscriptionEnding(String to, String firstName, String companyName, String endsOn,
+                                              long daysLeft, String link) {
+        subscriptionEndings.add(new Sent(to, link));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> subscriptionEndings() {
+        return subscriptionEndings;
+    }
+
+    public List<Sent> checkoutReminders() {
+        return checkoutReminders;
+    }
+
+    /** A document sent by email: who to, and the attachment's file name. */
+    @Override
+    public EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
+                                    String message, com.calyvora.email.EmailSender.Attachment attachment) {
+        documents.add(new Sent(to, attachment.fileName()));
+        return EmailResult.ok("RECORDING");
+    }
+
+    public List<Sent> documents() {
+        return documents;
+    }
 
     @Override
     public EmailResult sendVerificationEmail(String to, String verificationUrl) {
@@ -71,8 +121,10 @@ public class RecordingEmailService implements EmailService {
     }
 
     @Override
-    public EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl) {
-        trialApprovals.add(new Sent(to, loginUrl));
+    public EmailResult sendWelcomeEmail(String to, String firstName, String companyName,
+                                        String temporaryPassword, String loginUrl) {
+        // The password is what a test needs to sign in as the new admin, so it is what is recorded.
+        trialApprovals.add(new Sent(to, temporaryPassword));
         return EmailResult.ok("RECORDING");
     }
 
@@ -82,6 +134,11 @@ public class RecordingEmailService implements EmailService {
 
     public List<Sent> trialAcknowledgements() {
         return trialAcknowledgements;
+    }
+
+    /** Welcome emails to new company admins; {@code url} holds the temporary password. */
+    public List<Sent> welcomes() {
+        return trialApprovals;
     }
 
     public List<Sent> trialApprovals() {
@@ -106,6 +163,7 @@ public class RecordingEmailService implements EmailService {
 
     public void clear() {
         verifications.clear();
+        subscriptionEndings.clear();
         invitations.clear();
         trialNotifications.clear();
         trialAcknowledgements.clear();

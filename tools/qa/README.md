@@ -1,14 +1,21 @@
 # QA harness
 
-Two scripts that test the **deployed** application over HTTP. No dependencies — plain Node 18+.
+Three scripts that test the **deployed** application over HTTP. No dependencies — plain Node 18+.
 
 ```bash
 # read-only: every endpoint, as six different roles
 node tools/qa/sweep.mjs
 
-# functional: creates, changes and deletes real objects in all 24 modules
+# functional: creates, changes and deletes real objects in every module
 PLATFORM_OWNER_PASSWORD='…' node tools/qa/features.mjs
+
+# PD-55 to PD-76: payroll lock and statutory files, income tax, settlement, and a letter
+# generated and downloaded — then checks the server is still up. Letter signing is parked
+# on branch parked/letter-signing (2026-11-10), so the script checks it is switched off
+node tools/qa/recent.mjs
 ```
+
+The work tracker and Clients were retired from the HR product (bb1458f) and are no longer tested.
 
 | Variable | Default |
 |---|---|

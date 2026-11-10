@@ -27,5 +27,36 @@ public interface EmailService {
     EmailResult sendTrialRequestAcknowledgement(String to, String contactName);
 
     /** To the customer, once the vendor approves: the workspace exists and here is where to sign in. */
-    EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl);
+    /** A new company's first admin: sign-in email and temporary password (changed at first sign-in). */
+    EmailResult sendWelcomeEmail(String to, String firstName, String companyName, String temporaryPassword,
+                                 String loginUrl);
+
+    /**
+     * A document sent on a company's behalf — a letter as a PDF attachment, from "{company} via Orbit",
+     * with replies going to {@code replyTo} (the company's own address) rather than to no-reply.
+     */
+    /**
+     * "You did not check out yesterday" (PD-67), with a link to ask for the correction.
+     */
+    default EmailResult sendCheckoutReminder(String to, String firstName, String companyName, String day,
+                                             String checkIn, String link) {
+        return EmailResult.failed("NONE", "Not supported");
+    }
+
+    /** "Your subscription ends on …" (PD-76), sent to the company's admins five days ahead. */
+    default EmailResult sendSubscriptionEnding(String to, String firstName, String companyName, String endsOn,
+                                               long daysLeft, String link) {
+        return EmailResult.failed("NONE", "Not supported");
+    }
+
+    /** "Please read and sign" (PD-72): a link to the letter, from the company, replies to the company. */
+    default EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
+                                             String letterTitle, String link, String message, String validUntil) {
+        return EmailResult.failed("NONE", "Not supported");
+    }
+
+    default EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
+                                     String message, EmailSender.Attachment attachment) {
+        return EmailResult.failed("NONE", "This deployment cannot send documents by email.");
+    }
 }

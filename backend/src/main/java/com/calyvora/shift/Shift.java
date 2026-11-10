@@ -33,6 +33,10 @@ public class Shift {
     @Column(length = 16)
     private String color;
 
+    /** Hours of actual work this shift expects, in minutes (V70). Breaks sit outside it. */
+    @Column(name = "work_minutes", nullable = false)
+    private int workMinutes = 540;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -64,5 +68,7 @@ public class Shift {
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
+    public int getWorkMinutes() { return workMinutes; }
+    public void setWorkMinutes(int workMinutes) { this.workMinutes = workMinutes; }
     public Instant getCreatedAt() { return createdAt; }
 }

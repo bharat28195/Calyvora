@@ -163,27 +163,45 @@ final class EmailMessages {
         return new Message("We've got your Orbit trial request", text, html);
     }
 
-    static Message trialApproved(String companyName, String loginUrl) {
+    /**
+     * A new company's first admin: the workspace is ready, here is how to get in. Carries a temporary
+     * password because the admin has never been in Orbit and has nothing else to sign in with — which
+     * is exactly why the app makes them replace it on first sign-in (V67), and why the email says so.
+     */
+    static Message welcome(String firstName, String companyName, String loginEmail, String temporaryPassword,
+                           String loginUrl) {
         String text = """
-                Good news — the Orbit workspace for %s is set up and waiting.
+                Hi %s,
 
-                Sign in here:
-                %s
+                Your Orbit workspace for %s is ready.
 
-                Your sign-in details are coming separately from the person you've been speaking to.
+                Sign in here: %s
 
-                — The Orbit team""".formatted(companyName, loginUrl);
+                    Email:              %s
+                    Temporary password: %s
 
-        String html = EmailLayout.page("Your Orbit workspace is set up and waiting.",
-                EmailLayout.heading("Your Orbit trial is ready")
-                        + EmailLayout.paragraph("The workspace for <strong>" + escape(companyName)
-                                + "</strong> is set up and waiting.")
+                You'll be asked to choose your own password the first time you sign in. Please don't
+                forward this email — anyone with it can sign in until you do.
+
+                Need a hand getting set up? Just reply, or write to support@calyvora.in.
+
+                — The Orbit team""".formatted(firstName, companyName, loginUrl, loginEmail, temporaryPassword);
+
+        String html = EmailLayout.page("Your Orbit workspace for " + companyName + " is ready.",
+                EmailLayout.heading("Welcome to Orbit, " + firstName)
+                        + EmailLayout.paragraph("Your workspace for <strong>" + escape(companyName)
+                                + "</strong> is ready. Here are your sign-in details:")
+                        + EmailLayout.fields(EmailLayout.field("Email", loginEmail)
+                                + EmailLayout.field("Temporary password", temporaryPassword))
                         + EmailLayout.button("Sign in to Orbit", loginUrl)
                         + EmailLayout.fallbackLink(loginUrl)
-                        + EmailLayout.muted("Your sign-in details are coming separately from the person "
-                                + "you've been speaking to."));
+                        + EmailLayout.paragraph("You'll be asked to choose your own password the first time "
+                                + "you sign in.")
+                        + EmailLayout.muted("Please don't forward this email — anyone with it can sign in "
+                                + "until you change the password. Need a hand? Reply, or write to "
+                                + "support@calyvora.in."));
 
-        return new Message("Your Orbit trial is ready", text, html);
+        return new Message("Your Orbit workspace is ready — sign-in details inside", text, html);
     }
 
     private static void appendIfPresent(StringBuilder sb, String label, String value) {

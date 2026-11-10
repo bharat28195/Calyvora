@@ -17,7 +17,10 @@ public record CreateCompanyRequest(
         @NotBlank @Size(max = 80) String adminFirstName,
         @NotBlank @Size(max = 80) String adminLastName,
         @NotBlank @Email @Size(max = 255) String adminEmail,
-        @NotBlank @Size(min = 8, max = 100) String password,
+        // Optional: blank lets Orbit generate a temporary password, which the admin replaces at first
+        // sign-in either way (V67).
+        @jakarta.validation.constraints.Pattern(regexp = "^$|^.{8,100}$", message = "Use at least 8 characters, or leave it blank")
+        String password,
         @Positive int seats,
         @Positive int months,
         String agencyId,

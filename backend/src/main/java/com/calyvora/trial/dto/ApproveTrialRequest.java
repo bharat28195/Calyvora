@@ -13,7 +13,10 @@ import jakarta.validation.constraints.Size;
  * in a message we don't control.
  */
 public record ApproveTrialRequest(
-        @NotBlank @Size(min = 8, max = 100) String password,
+        // Optional: blank lets Orbit generate a temporary password, which the admin replaces at first
+        // sign-in either way (V67).
+        @jakarta.validation.constraints.Pattern(regexp = "^$|^.{8,100}$", message = "Use at least 8 characters, or leave it blank")
+        String password,
         @Positive int seats,
         @Positive int months,
         /**

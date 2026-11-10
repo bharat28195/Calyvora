@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Save, RotateCcw } from "lucide-react";
+import { CheckCircle2, Loader2, Save, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { Letterhead, LetterheadFont } from "@/lib/types";
 import { DEFAULT_LETTERHEAD, LETTERHEAD_FONTS } from "@/lib/documents";
@@ -12,6 +12,8 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { LetterSheet } from "@/components/documents/letter";
 import { LetterpadUpload } from "@/components/documents/letterpad-upload";
+import { SignatoriesCard } from "@/components/documents/signatories-card";
+import type { Signatory } from "@/lib/types";
 
 const FONTS = Object.keys(LETTERHEAD_FONTS) as LetterheadFont[];
 const textareaCls =
@@ -27,6 +29,8 @@ const textareaCls =
 export default function LetterheadPage() {
   const [saved, setSaved] = useState<Letterhead | null>(null);
   const [draft, setDraft] = useState<Letterhead | null>(null);
+  const [signatories, setSignatories] = useState<Signatory[]>([]);
+  const signer = signatories.find((s) => s.active && s.isDefault) ?? null;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -67,6 +71,26 @@ export default function LetterheadPage() {
         showDivider: draft.showDivider,
         signatureName: draft.signatureName ?? "",
         signatureTitle: draft.signatureTitle ?? "",
+        cin: draft.cin ?? "",
+        gstin: draft.gstin ?? "",
+        website: draft.website ?? "",
+        email: draft.email ?? "",
+        dateStyle: draft.dateStyle ?? "LONG",
+        probationDays: draft.probationDays ?? 0,
+        noticeProbation: draft.noticeProbation ?? "",
+        noticePeriod: draft.noticePeriod ?? "",
+        workingDays: draft.workingDays ?? "",
+        workingHours: draft.workingHours ?? "",
+        payDay: draft.payDay ?? "",
+        jurisdiction: draft.jurisdiction ?? "",
+        // The writing area on the uploaded letterpad (PD-69), adjusted in the upload card.
+        ...(draft.hasBackground ? {
+          firstTopMm: draft.firstTopMm,
+          firstBottomMm: draft.firstBottomMm,
+          laterTopMm: draft.laterTopMm,
+          laterBottomMm: draft.laterBottomMm,
+          sideMm: draft.sideMm,
+        } : {}),
       });
       setSaved(l);
       setDraft(l);
@@ -96,14 +120,23 @@ export default function LetterheadPage() {
             Your company stationery. Set it once and every letter — offer, joining, relieving — prints on it.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => setDraft(saved)} disabled={!dirty}>
-            <RotateCcw className="h-4 w-4" /> Discard
-          </Button>
-          <Button onClick={save} disabled={!dirty || saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
-          </Button>
-        </div>
+        {/* Greyed-out buttons read as broken. With nothing to save, say so; once something changes,
+            the buttons appear. */}
+        {dirty ? (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-400/30 px-3 py-1.5">
+            <span className="text-sm text-amber-500">Unsaved changes</span>
+            <Button variant="ghost" onClick={() => setDraft(saved)}>
+              <RotateCcw className="h-4 w-4" /> Discard
+            </Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
+            </Button>
+          </div>
+        ) : (
+          <span className="flex items-center gap-1.5 text-sm text-fg/45">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" /> All changes saved — edit any field below to change it
+          </span>
+        )}
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
@@ -116,6 +149,13 @@ export default function LetterheadPage() {
           <LetterpadUpload
             letterhead={draft}
             onChange={(next) => { setSaved(next); setDraft(next); setError(null); }}
+            onDraft={(patch) => { setDraft((d) => (d ? { ...d, ...patch } : d)); setNote(null); }}
+          />
+
+          <SignatoriesCard
+            letterhead={draft}
+            onLetterhead={(next) => { setSaved(next); setDraft(next); }}
+            onSignatories={setSignatories}
           />
 
           <Card>
@@ -193,14 +233,82 @@ export default function LetterheadPage() {
 
           <Card>
             <CardTitle>The footer</CardTitle>
-            <div className="mt-4">
-              <Field label="Footer" htmlFor="lh-footer"
-                hint="Registration number, GST, registered office — whatever your letters must carry.">
+            <p className="mt-1 text-xs text-fg/45">Printed at the foot of every page.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Field label="CIN" htmlFor="lh-cin">
+                <Input id="lh-cin" value={draft.cin ?? ""} placeholder="U00000MH2025PTC000000" onChange={(e) => set("cin", e.target.value.toUpperCase())} />
+              </Field>
+              <Field label="GSTIN" htmlFor="lh-gstin">
+                <Input id="lh-gstin" value={draft.gstin ?? ""} placeholder="27ABCDE1234F1Z5" onChange={(e) => set("gstin", e.target.value.toUpperCase())} />
+              </Field>
+              <Field label="Website" htmlFor="lh-web">
+                <Input id="lh-web" value={draft.website ?? ""} placeholder="www.example.com" onChange={(e) => set("website", e.target.value)} />
+              </Field>
+              <Field label="Email" htmlFor="lh-email">
+                <Input id="lh-email" value={draft.email ?? ""} placeholder="hr@example.com" onChange={(e) => set("email", e.target.value)} />
+              </Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Anything else" htmlFor="lh-footer"
+                hint="Registered office or other lines your letters must carry.">
                 <textarea id="lh-footer" rows={2} className={textareaCls}
                   value={draft.footerText ?? ""}
-                  placeholder={"Northwind Robotics Pvt Ltd · CIN U72900KA2019PTC000000\nconnect@northwind.example · northwind.example"}
+                  placeholder={"Acme Industries Pvt Ltd · CIN U00000MH2025PTC000000\nhello@acme.example · acme.example"}
                   onChange={(e) => set("footerText", e.target.value)} />
               </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Who signs</CardTitle>
+            <p className="mt-1 text-xs text-fg/45">Printed under &quot;For {draft.heading ?? "the company"}&quot;. Leave blank to sign as whoever issues the letter.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Field label="Name" htmlFor="lh-sig-name">
+                <Input id="lh-sig-name" value={draft.signatureName ?? ""} placeholder="e.g. Asha Mehra" onChange={(e) => set("signatureName", e.target.value)} />
+              </Field>
+              <Field label="Title" htmlFor="lh-sig-title">
+                <Input id="lh-sig-title" value={draft.signatureTitle ?? ""} placeholder="e.g. Director" onChange={(e) => set("signatureTitle", e.target.value)} />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Your standard terms</CardTitle>
+            <p className="mt-1 text-xs text-fg/45">Written once, quoted by every letter that needs them — appointment, confirmation, internship.</p>
+            <div className="mt-4 flex flex-col gap-3">
+              <Field label="Dates on letters" htmlFor="lh-date">
+                <div className="flex flex-wrap gap-1.5">
+                  {([["LONG", "1 August 2026"], ["SHORT", "01 Aug, 2026"], ["NUMERIC", "01/08/2026"]] as const).map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => set("dateStyle", k)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm ${(draft.dateStyle ?? "LONG") === k ? "border-violet/40 bg-violet/10 font-medium" : "border-fg/10 hover:bg-fg/5"}`}>{l}</button>
+                  ))}
+                </div>
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Probation (days)" htmlFor="lh-prob">
+                  <Input id="lh-prob" type="number" min={0} value={draft.probationDays ?? ""} placeholder="90"
+                    onChange={(e) => set("probationDays", e.target.value === "" ? null : Number(e.target.value))} />
+                </Field>
+                <Field label="Notice in probation" htmlFor="lh-np">
+                  <Input id="lh-np" value={draft.noticeProbation ?? ""} placeholder="ten (10) working days" onChange={(e) => set("noticeProbation", e.target.value)} />
+                </Field>
+                <Field label="Notice period" htmlFor="lh-n">
+                  <Input id="lh-n" value={draft.noticePeriod ?? ""} placeholder="three (3) months" onChange={(e) => set("noticePeriod", e.target.value)} />
+                </Field>
+                <Field label="Working days" htmlFor="lh-wd">
+                  <Input id="lh-wd" value={draft.workingDays ?? ""} placeholder="Monday to Friday" onChange={(e) => set("workingDays", e.target.value)} />
+                </Field>
+                <Field label="Working hours" htmlFor="lh-wh">
+                  <Input id="lh-wh" value={draft.workingHours ?? ""} placeholder="8 to 9 hours a day" onChange={(e) => set("workingHours", e.target.value)} />
+                </Field>
+                <Field label="Salary paid" htmlFor="lh-pay">
+                  <Input id="lh-pay" value={draft.payDay ?? ""} placeholder="on or before the 7th of the following month" onChange={(e) => set("payDay", e.target.value)} />
+                </Field>
+              </div>
+              <Field label="Courts of (jurisdiction)" htmlFor="lh-jur">
+                <Input id="lh-jur" value={draft.jurisdiction ?? ""} placeholder="e.g. Pune, Maharashtra" onChange={(e) => set("jurisdiction", e.target.value)} />
+              </Field>
+              <p className="text-xs text-fg/45">Leave entitlement is read from your leave policies, so it never disagrees with them.</p>
             </div>
           </Card>
         </div>
@@ -209,7 +317,12 @@ export default function LetterheadPage() {
           <p className="mb-2 text-sm font-medium uppercase tracking-wide text-fg/40">
             How a letter will look
           </p>
-          <LetterSheet body={SAMPLE_BODY} letterhead={draft} />
+          {/* On an uploaded letterpad the sample runs to a second page, to show the continuation sheet. */}
+          <LetterSheet
+            body={sampleBody(draft.useBackground && draft.hasBackground ? SAMPLE_BODY + SAMPLE_PAGE_TWO : SAMPLE_BODY, signer, draft.heading)}
+            letterhead={draft}
+            signatoryId={signer?.id ?? null}
+          />
           <p className="mt-3 text-xs text-fg/40">
             Sample text — the letterpad is what you are editing here, not the words.
           </p>
@@ -232,20 +345,52 @@ const SAMPLE_BODY = `10 August 2026
 
 **Private & confidential**
 
-Dear Dana,
+Dear Riya,
 
-We are delighted to offer you the position of **Senior Engineer** at Northwind Robotics.
+We are delighted to offer you the position of **Senior Engineer** at {{COMPANY}}.
 
 - **Role:** Senior Engineer
 - **Department:** Engineering
 - **Start date:** 1 September 2026
-- **Annual compensation:** INR 1,450,000
+- **Annual compensation:** INR 14,50,000.00 (Fourteen Lakh Fifty Thousand Rupees)
+
+| EARNINGS | MONTHLY (INR) | YEARLY (INR) |
+|---|---|---|
+| Basic Salary | 60,416.67 | 7,25,000.00 |
+| House Rent Allowance | 30,208.33 | 3,62,500.00 |
+| Special Allowance | 30,208.33 | 3,62,500.00 |
+| **TOTAL** | **1,20,833.33** | **14,50,000.00** |
 
 Your appointment is subject to our standard terms of employment. Please confirm your acceptance
 by signing and returning a copy of this letter.
 
-Warm regards,
+Yours faithfully,
 
-Ava Chen
-Head of People
+**For {{COMPANY}}**
+
+Meera Iyer
+HR Manager
+`;
+
+/** The sample signed by the default signatory, with their signature where it will print (PD-71). */
+function sampleBody(body: string, signer: Signatory | null, company: string | null): string {
+  // Made-up recipient and figures; your own company name and signatory where they appear.
+  const named = body.replaceAll("{{COMPANY}}", company?.trim() || "Your Company");
+  if (!signer) return named;
+  return named.replace("Meera Iyer\nHR Manager", `[[signature]]\n${signer.name}\n${signer.title ?? ""}`);
+}
+
+const SAMPLE_PAGE_TWO = `
+--- page ---
+# Annexure: terms of employment
+
+1. **Probation.** Six months from your date of joining, during which either side may end the employment with 15 days' notice.
+2. **Notice period.** After confirmation, 60 days' notice or salary in lieu.
+3. **Working hours.** Monday to Friday, 9:30 a.m. to 6:30 p.m.
+4. **Leave.** As per the company's leave policy, read from Orbit.
+5. **Confidentiality.** Company information stays confidential during and after your employment.
+
+I accept the terms of this appointment.
+
+Signature: ____________________     Date: ____________
 `;

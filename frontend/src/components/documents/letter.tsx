@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { PagedLetter } from "@/components/documents/paged-letter";
+import { useSignatureMarks, type SignatureMarks } from "@/components/documents/use-signature-marks";
 import { api } from "@/lib/api";
 import { EMPTY, LETTERHEAD_FONTS } from "@/lib/documents";
 import type { Letterhead } from "@/lib/types";
@@ -17,14 +19,18 @@ import type { Letterhead } from "@/lib/types";
 export function LetterSheet({
   body,
   letterhead,
+  signatoryId,
   className = "",
 }: {
   body: string;
   /** Omit, or pass null, to print on plain paper. */
   letterhead?: Letterhead | null;
+  /** PD-71: whose signature is drawn at the letter's [[signature]] line. */
+  signatoryId?: string | null;
   className?: string;
 }) {
-  const html = useMemo(() => renderLetter(body), [body]);
+  const marks = useSignatureMarks(signatoryId, letterhead);
+  const html = useMemo(() => renderLetter(body, marks), [body, marks]);
   const font = LETTERHEAD_FONTS[letterhead?.fontFamily ?? "SERIF"].stack;
   const accent = letterhead?.brandColor ?? "#7c5cff";
 
@@ -32,29 +38,28 @@ export function LetterSheet({
   // suppressed: the uploaded image already carries the logo, the address and the strip along the
   // bottom, and drawing ours on top of theirs is how you get two addresses on one letter.
   const printed = letterhead?.useBackground && letterhead.hasBackground;
-  const paper = printed
-    ? {
-        backgroundImage: `url(${api.letterpadImageUrl(letterhead.updatedAt)})`,
-        backgroundSize: "100% 100%",
-        backgroundRepeat: "no-repeat",
-        // A4 proportions, so the body sits where it will sit on paper rather than wherever the
-        // screen happens to end.
-        aspectRatio: "1 / 1.414",
-      }
-    : undefined;
+  // On the letterpad: real A4 pages, page one on the letterpad and the rest on the continuation
+  // sheet, the text inside each sheet's writing area (PD-69) — the same layout as the PDF.
+  if (printed && letterhead) {
+    return <PagedLetter html={html} letterhead={letterhead} fontFamily={font} className={className} />;
+  }
 
   return (
     <div
-      className={`letter-sheet rounded-xl border border-fg/10 bg-white text-[15px] leading-relaxed text-neutral-800 shadow-sm ${
-        printed
-          ? "px-14 py-20 sm:px-20 sm:py-28"
-          : "px-8 py-10 sm:px-12 sm:py-14"
-      } ${className}`}
-      style={{ ...(letterhead ? { fontFamily: font } : {}), ...paper }}
+      className={`letter-sheet rounded-xl border border-fg/10 bg-white px-8 py-10 text-[15px] leading-relaxed text-neutral-800 shadow-sm sm:px-12 sm:py-14 ${className}`}
+      style={letterhead ? { fontFamily: font } : undefined}
     >
-      {letterhead && !printed && <Letterpad letterhead={letterhead} accent={accent} />}
-      <div dangerouslySetInnerHTML={{ __html: html }} />
-      {letterhead && !printed && <Footer letterhead={letterhead} accent={accent} />}
+      {/* A table so the browser repeats the header and footer on every printed page — a three-page
+          appointment letter carries the company's name and CIN on each page, as paper ones do. */}
+      <table className="w-full border-collapse">
+        {letterhead && (
+          <thead><tr><td className="p-0"><Letterpad letterhead={letterhead} accent={accent} /></td></tr></thead>
+        )}
+        <tbody><tr><td className="p-0 align-top"><div dangerouslySetInnerHTML={{ __html: html }} /></td></tr></tbody>
+        {letterhead && (
+          <tfoot><tr><td className="p-0"><Footer letterhead={letterhead} accent={accent} /></td></tr></tfoot>
+        )}
+      </table>
     </div>
   );
 }
@@ -96,7 +101,12 @@ function Letterpad({ letterhead, accent }: { letterhead: Letterhead; accent: str
 }
 
 function Footer({ letterhead, accent }: { letterhead: Letterhead; accent: string }) {
-  const lines = splitLines(letterhead.footerText);
+  // The legal identity Indian letterheads carry, then whatever the company wrote itself.
+  const identity = [
+    [letterhead.cin && `CIN: ${letterhead.cin}`, letterhead.gstin && `GSTIN: ${letterhead.gstin}`].filter(Boolean).join("  ·  "),
+    [letterhead.website && `Website: ${letterhead.website}`, letterhead.email && `Email: ${letterhead.email}`].filter(Boolean).join("  ·  "),
+  ].filter(Boolean);
+  const lines = [...identity, ...splitLines(letterhead.footerText)];
   if (lines.length === 0) return null;
   return (
     <footer className="mt-10 border-t pt-4" style={{ borderColor: `${accent}33` }}>
@@ -130,7 +140,7 @@ function inline(s: string): string {
  * this, so what is saved is always something a person can read and repair by hand, and there is no
  * untrusted HTML to sanitise before it reaches `dangerouslySetInnerHTML`.
  */
-function renderLetter(body: string): string {
+function renderLetter(body: string, marks?: SignatureMarks): string {
   const lines = (body ?? "").replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
   let bullets: string[] | null = null;
@@ -147,7 +157,46 @@ function renderLetter(body: string): string {
     }
   };
 
+  let table: string[][] | null = null;
+  const flushTable = () => {
+    if (!table) return;
+    const rows = table.filter((cells) => !cells.every((c) => /^:?-{3,}:?$/.test(c)));
+    const [head, ...rest] = rows;
+    const cell = (c: string, tag: "th" | "td") => {
+      const numeric = /^[*\s]*[-+]?[\d,]+(\.\d+)?%?[*\s]*$/.test(c);
+      return `<${tag} class="border border-neutral-300 px-3 py-1.5 ${numeric ? "text-right tabular-nums" : "text-left"} ${tag === "th" ? "bg-neutral-100 font-semibold text-neutral-900" : ""}">${inline(c)}</${tag}>`;
+    };
+    out.push(`<table class="my-4 w-full border-collapse text-[13.5px]"><thead><tr>${head.map((c) => cell(c, "th")).join("")}</tr></thead><tbody>${
+      rest.map((r) => `<tr>${r.map((c) => cell(c, "td")).join("")}</tr>`).join("")}</tbody></table>`);
+    table = null;
+  };
+
   for (const line of lines) {
+    // PD-71: where the letter is signed — the signature, with the seal beside it. Sized like the PDF
+    // (16 mm and 22 mm tall) so the page breaks fall in the same places.
+    if (line.trim() === "[[signature]]") {
+      flushTable();
+      flush();
+      if (marks?.signature || marks?.seal) {
+        out.push(`<div class="flex items-end gap-8 py-1" style="min-height:60px">${
+          marks.signature ? `<img src="${marks.signature}" alt="Signature" style="height:60px;max-width:227px;object-fit:contain" />` : ""}${
+          marks.seal ? `<img src="${marks.seal}" alt="Company seal" style="height:83px;max-width:113px;object-fit:contain" />` : ""}</div>`);
+      }
+      continue;
+    }
+    // A pipe table — the salary annexure, a settlement statement.
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      flush();
+      (table ??= []).push(line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim()));
+      continue;
+    }
+    flushTable();
+    // "--- page ---" starts a new printed page (an annexure on its own sheet).
+    if (/^\s*---\s*page\s*---\s*$/i.test(line)) {
+      flush();
+      out.push('<div class="letter-page-break my-8 border-t border-dashed border-neutral-300 text-center text-[11px] uppercase tracking-widest text-neutral-400"><span class="relative -top-2 bg-white px-2">new page</span></div>');
+      continue;
+    }
     if (/^\s*[-*]\s+/.test(line)) {
       if (numbers) flush();
       (bullets ??= []).push(`<li>${inline(line.replace(/^\s*[-*]\s+/, ""))}</li>`);
@@ -172,5 +221,6 @@ function renderLetter(body: string): string {
     }
   }
   flush();
+  flushTable();
   return out.join("\n");
 }

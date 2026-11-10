@@ -18,4 +18,21 @@ public interface EmailSender {
      *                   so don't wrap it in something friendlier.
      */
     void send(EmailSettings settings, String to, String subject, String body, String html) throws Exception;
+
+    /** A file sent with a message — a letter as PDF. */
+    record Attachment(String fileName, String contentType, byte[] content) {
+    }
+
+    /**
+     * The same, sent in someone's name ("Northwind Robotics via Orbit") and with files attached. A
+     * transport that cannot attach refuses rather than silently dropping the file — a letter that
+     * arrives without the letter is worse than one that does not arrive.
+     */
+    default void send(EmailSettings settings, String to, String subject, String body, String html,
+                      String displayName, java.util.List<Attachment> attachments) throws Exception {
+        if (attachments != null && !attachments.isEmpty()) {
+            throw new UnsupportedOperationException(provider() + " cannot send attachments");
+        }
+        send(settings, to, subject, body, html);
+    }
 }

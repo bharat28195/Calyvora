@@ -44,6 +44,10 @@ public class DocumentTemplate {
     @Column(name = "use_letterhead", nullable = false)
     private boolean useLetterhead = true;
 
+    /** Who signs letters from this template; null means the company's default signatory (PD-71). */
+    @Column(name = "signatory_id")
+    private UUID signatoryId;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -93,6 +97,8 @@ public class DocumentTemplate {
     public void setBuiltIn(boolean builtIn) { this.builtIn = builtIn; }
     public boolean isUseLetterhead() { return useLetterhead; }
     public void setUseLetterhead(boolean useLetterhead) { this.useLetterhead = useLetterhead; }
+    public UUID getSignatoryId() { return signatoryId; }
+    public void setSignatoryId(UUID signatoryId) { this.signatoryId = signatoryId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

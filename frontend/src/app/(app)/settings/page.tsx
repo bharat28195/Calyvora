@@ -125,7 +125,7 @@ export default function SettingsPage() {
 
           <div className="rounded-lg border border-fg/10 bg-fg/[0.02] p-4">
             <p className="text-sm font-medium">Localization</p>
-            <p className="mt-0.5 text-xs text-fg/50">Currency is used everywhere money is shown. Language is saved for a future update.</p>
+            <p className="mt-0.5 text-xs text-fg/50">Currency is used everywhere money is shown. Language and timezone are the defaults for everyone in the company — each person can pick their own under Account settings.</p>
 
             <Field label="Currency" htmlFor="currency" className="mt-4">
               <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value as (typeof CURRENCIES)[number])}

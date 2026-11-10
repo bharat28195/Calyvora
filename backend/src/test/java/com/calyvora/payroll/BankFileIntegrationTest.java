@@ -25,6 +25,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class BankFileIntegrationTest extends IntegrationTestBase {
 
     private static final String PW = "password1234";
+
+    /** Payslips here assert full-month pay, so a company made for a test has nobody absent today. */
+    @Override
+    protected Session onboardOwner(String companyName, String email, String password) throws Exception {
+        Session owner = super.onboardOwner(companyName, email, password);
+        attendanceRulesOff(owner);
+        return owner;
+    }
     private static final String ACCOUNT = "50100424268412";
 
     private Session addMember(Session owner, String email) throws Exception {

@@ -51,7 +51,7 @@ export default function DashboardPage() {
           <Stat icon={<Users className="h-5 w-5 text-violet" />} label="People" value={summary?.memberCount ?? 0}
             sub={`${summary?.departmentCount ?? 0} departments`} href="/people" />
           <Stat icon={<Building2 className="h-5 w-5 text-aqua" />} label="Departments" value={summary?.departmentCount ?? 0}
-            sub="org structure" href="/people/org" />
+            sub="teams and headcount" href="/people/departments" />
           <Stat icon={<ClipboardCheck className="h-5 w-5 text-amber-400" />} label="Performance" value={undefined}
             sub="review cycles" href="/performance" />
           <Stat icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="Payroll" value={undefined}

@@ -85,6 +85,16 @@ public class PerformanceReview {
     @Column(name = "applied_comp_id")
     private UUID appliedCompId;
 
+    // ---- V76: answers to the cycle's questions, and the outcome beyond pay (PD-66) ----
+    @Column(name = "self_answers")
+    private String selfAnswers;
+    @Column(name = "manager_answers")
+    private String managerAnswers;
+    @Column(name = "new_title", length = 120)
+    private String newTitle;
+    @Column(name = "effective_date")
+    private java.time.LocalDate effectiveDate;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -152,6 +162,14 @@ public class PerformanceReview {
     public void setDecidedAt(Instant decidedAt) { this.decidedAt = decidedAt; }
     public UUID getAppliedCompId() { return appliedCompId; }
     public void setAppliedCompId(UUID appliedCompId) { this.appliedCompId = appliedCompId; }
+    public String getSelfAnswers() { return selfAnswers; }
+    public void setSelfAnswers(String v) { this.selfAnswers = v; }
+    public String getManagerAnswers() { return managerAnswers; }
+    public void setManagerAnswers(String v) { this.managerAnswers = v; }
+    public String getNewTitle() { return newTitle; }
+    public void setNewTitle(String v) { this.newTitle = v; }
+    public java.time.LocalDate getEffectiveDate() { return effectiveDate; }
+    public void setEffectiveDate(java.time.LocalDate v) { this.effectiveDate = v; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Clock, Loader2, Mail, Phone, Users } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { TrialRequest } from "@/lib/types";
+import type { CompanySummary, TrialRequest } from "@/lib/types";
+import { WelcomeOutcome } from "@/components/platform/welcome-outcome";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ export function TrialRequestsSection({ onChanged, onWaitingCount }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [terms, setTerms] = useState({ password: "", seats: "10", months: "1" });
+  const [outcome, setOutcome] = useState<CompanySummary | null>(null);
 
   function load() {
     api.platformTrialRequests().then(setRequests).catch(() => setRequests([]));
@@ -43,11 +45,11 @@ export function TrialRequestsSection({ onChanged, onWaitingCount }: {
     setBusyId(r.id);
     setError(null);
     try {
-      await api.approveTrialRequest(r.id, {
-        password: terms.password,
+      setOutcome(await api.approveTrialRequest(r.id, {
+        password: terms.password.trim() || undefined,
         seats: Number(terms.seats) || 10,
         months: Number(terms.months) || 1,
-      });
+      }));
       setOpenId(null);
       setTerms({ password: "", seats: "10", months: "1" });
       load();
@@ -99,6 +101,7 @@ export function TrialRequestsSection({ onChanged, onWaitingCount }: {
       </CardDescription>
 
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+      {outcome && <div className="mt-3"><WelcomeOutcome company={outcome} /></div>}
 
       {waiting.length === 0 && decided.length === 0 && (
         <p className="mt-4 text-sm text-fg/50">No requests yet.</p>
@@ -147,14 +150,14 @@ export function TrialRequestsSection({ onChanged, onWaitingCount }: {
               <div className="mt-4 border-t border-fg/10 pt-4">
                 <p className="text-sm text-fg/60">
                   This creates the workspace and makes <span className="text-fg">{r.email}</span> its
-                  admin. Pass the password on yourself — we email them that the trial is ready, never
-                  the credential.
+                  admin, and emails them a welcome with their sign-in email and a temporary password.
+                  They choose their own password the first time they sign in.
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <Field label="Starting password" htmlFor={`pw-${r.id}`}>
+                  <Field label="Temporary password (optional)" htmlFor={`pw-${r.id}`}>
                     <Input id={`pw-${r.id}`} type="text" value={terms.password} autoComplete="off"
                       onChange={(e) => setTerms((t) => ({ ...t, password: e.target.value }))}
-                      placeholder="At least 8 characters" />
+                      placeholder="Leave blank — Orbit creates one" />
                   </Field>
                   <Field label="Seats" htmlFor={`seats-${r.id}`}>
                     <Input id={`seats-${r.id}`} type="number" min={1} value={terms.seats}
@@ -165,7 +168,7 @@ export function TrialRequestsSection({ onChanged, onWaitingCount }: {
                       onChange={(e) => setTerms((t) => ({ ...t, months: e.target.value }))} />
                   </Field>
                 </div>
-                <Button className="mt-3" disabled={busyId === r.id || terms.password.length < 8}
+                <Button className="mt-3" disabled={busyId === r.id || (terms.password.length > 0 && terms.password.length < 8)}
                   onClick={() => approve(r)}>
                   {busyId === r.id && <Loader2 className="h-4 w-4 animate-spin" />}
                   Create workspace and approve

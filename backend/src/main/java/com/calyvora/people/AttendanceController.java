@@ -30,9 +30,12 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
     private final OrgScope orgScope;
+    private final com.calyvora.access.PermissionService permissions;
 
-    public AttendanceController(AttendanceService attendanceService, OrgScope orgScope) {
+    public AttendanceController(AttendanceService attendanceService, OrgScope orgScope,
+                                com.calyvora.access.PermissionService permissions) {
         this.orgScope = orgScope;
+        this.permissions = permissions;
         this.attendanceService = attendanceService;
     }
 
@@ -70,7 +73,40 @@ public class AttendanceController {
     @GetMapping("/day")
     @PreAuthorize("@perm.companyWide('ATTENDANCE_MANAGE')")
     public AttendanceDayResponse day(@RequestParam(required = false) String date) {
-        return attendanceService.day(date == null || date.isBlank() ? LocalDate.now() : LocalDate.parse(date));
+        return attendanceService.day(date == null || date.isBlank()
+                ? attendanceService.companyToday() : LocalDate.parse(date));
+    }
+
+    /**
+     * Correct many days at once, applied immediately (V70). HR and admins reach anyone; a lead
+     * reaches only their own downline (PD-32), and one person outside it refuses the whole request
+     * rather than applying part of it.
+     */
+    @PostMapping("/correct")
+    @PreAuthorize("@perm.has('ATTENDANCE_MANAGE')")
+    public java.util.List<AttendanceEntryResponse> correct(
+            @Valid @RequestBody com.calyvora.people.dto.CorrectAttendanceRequest request,
+            @CurrentUser AuthPrincipal principal) {
+        java.util.List<UUID> employeeIds;
+        java.util.List<LocalDate> dates;
+        try {
+            employeeIds = request.employeeIds().stream().map(UUID::fromString).toList();
+            dates = request.dates().stream().map(LocalDate::parse).toList();
+        } catch (RuntimeException bad) {
+            throw new com.calyvora.common.error.ApiException(
+                    com.calyvora.common.error.ErrorCode.VALIDATION_ERROR, "Invalid person or date");
+        }
+        if (!permissions.companyWide(principal, com.calyvora.access.Permission.ATTENDANCE_MANAGE)) {
+            java.util.Set<UUID> mine = orgScope.downline(principal, false);
+            if (!mine.containsAll(employeeIds)) {
+                throw new com.calyvora.common.error.ApiException(
+                        com.calyvora.common.error.ErrorCode.FORBIDDEN,
+                        "You can only correct attendance for people in your team");
+            }
+        }
+        return attendanceService.correctMany(employeeIds, dates,
+                com.calyvora.people.AttendanceStatus.valueOf(request.status()),
+                request.checkIn(), request.checkOut(), request.reason(), principal);
     }
 
     /**

@@ -37,10 +37,15 @@ public class DocumentController {
 
     private final DocumentService documentService;
     private final LetterheadService letterheadService;
+    private final DocumentDeliveryService deliveryService;
+    private final SignatoryService signatoryService;
 
-    public DocumentController(DocumentService documentService, LetterheadService letterheadService) {
+    public DocumentController(DocumentService documentService, LetterheadService letterheadService,
+                              DocumentDeliveryService deliveryService, SignatoryService signatoryService) {
+        this.signatoryService = signatoryService;
         this.documentService = documentService;
         this.letterheadService = letterheadService;
+        this.deliveryService = deliveryService;
     }
 
     // ---- letterhead ----
@@ -85,7 +90,90 @@ public class DocumentController {
      */
     @GetMapping("/letterhead/background")
     public org.springframework.http.ResponseEntity<byte[]> letterpadImage() {
-        return letterheadService.background()
+        return image(letterheadService.background());
+    }
+
+    /** The sheet for page two onwards (PD-69); the letterpad itself when it repeats. */
+    @GetMapping("/letterhead/continuation")
+    public org.springframework.http.ResponseEntity<byte[]> continuationImage() {
+        return image(letterheadService.continuation());
+    }
+
+    @PostMapping("/letterhead/continuation")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse uploadContinuation(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return letterheadService.uploadContinuation(file);
+    }
+
+    @DeleteMapping("/letterhead/continuation")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse removeContinuation() {
+        return letterheadService.removeContinuation();
+    }
+
+    // ---- signatories and the seal (PD-71) ----
+
+    /** Who may sign the company's letters. Readable by anyone who issues letters; changed by admins. */
+    @GetMapping("/signatories")
+    public java.util.List<SignatoryService.SignatoryView> signatories() {
+        return signatoryService.list();
+    }
+
+    @PostMapping("/signatories")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView createSignatory(@RequestBody SignatoryService.SignatoryPayload payload) {
+        return signatoryService.create(payload);
+    }
+
+    @PatchMapping("/signatories/{id}")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView updateSignatory(@PathVariable UUID id,
+                                                          @RequestBody SignatoryService.SignatoryPayload payload) {
+        return signatoryService.update(id, payload);
+    }
+
+    /** A photo or scan of the signature, or one drawn on screen (sent as a PNG). */
+    @PostMapping("/signatories/{id}/image")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView uploadSignature(@PathVariable UUID id,
+                                                          @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return signatoryService.uploadImage(id, file);
+    }
+
+    @DeleteMapping("/signatories/{id}/image")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public SignatoryService.SignatoryView removeSignature(@PathVariable UUID id) {
+        return signatoryService.removeImage(id);
+    }
+
+    @GetMapping("/signatories/{id}/image")
+    public org.springframework.http.ResponseEntity<byte[]> signatureImage(@PathVariable UUID id) {
+        return image(signatoryService.image(id).map(i -> new LetterheadService.StoredImage(i.bytes(), i.contentType(), i.version())));
+    }
+
+    @PostMapping("/letterhead/seal")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse uploadSeal(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        signatoryService.uploadSeal(file);
+        return letterheadService.get();
+    }
+
+    @DeleteMapping("/letterhead/seal")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
+    public LetterheadResponse removeSeal() {
+        signatoryService.removeSeal();
+        return letterheadService.get();
+    }
+
+    @GetMapping("/letterhead/seal")
+    public org.springframework.http.ResponseEntity<byte[]> sealImage() {
+        return image(signatoryService.seal().map(i -> new LetterheadService.StoredImage(i.bytes(), i.contentType(), i.version())));
+    }
+
+    private static org.springframework.http.ResponseEntity<byte[]> image(
+            java.util.Optional<LetterheadService.StoredImage> stored) {
+        return stored
                 .map(image -> org.springframework.http.ResponseEntity.ok()
                         .contentType(org.springframework.http.MediaType.parseMediaType(image.contentType()))
                         // Private: it is one company's stationery, and a shared cache must not hand
@@ -165,5 +253,30 @@ public class DocumentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID documentId) {
         documentService.deleteDocument(documentId);
+    }
+
+    /** The letter as a PDF, on the letterpad — the same file the email attaches. */
+    @GetMapping("/{documentId}/pdf")
+    public org.springframework.http.ResponseEntity<byte[]> pdf(@PathVariable UUID documentId) {
+        DocumentDeliveryService.Pdf pdf = deliveryService.pdf(documentId);
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment()
+                                .filename(pdf.fileName(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .body(pdf.bytes());
+    }
+
+    /** What the send form starts from, and every time the letter has been sent. */
+    @GetMapping("/{documentId}/email")
+    public DocumentDeliveryService.SendDefaults emailDefaults(@PathVariable UUID documentId) {
+        return deliveryService.defaults(documentId);
+    }
+
+    @PostMapping("/{documentId}/email")
+    public DocumentDeliveryService.SendDefaults email(@PathVariable UUID documentId,
+                                                      @RequestBody DocumentDeliveryService.SendRequest body,
+                                                      @com.calyvora.common.security.CurrentUser com.calyvora.common.security.AuthPrincipal principal) {
+        return deliveryService.send(documentId, body, principal);
     }
 }

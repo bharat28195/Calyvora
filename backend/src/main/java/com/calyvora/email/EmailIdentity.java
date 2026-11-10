@@ -20,4 +20,19 @@ final class EmailIdentity {
     static String from(EmailSettings settings) {
         return DISPLAY_NAME + " <" + settings.from() + ">";
     }
+
+    /**
+     * {@code Northwind Robotics via Orbit <no-reply@…>} for mail sent on a company's behalf — a letter
+     * from your employer should say who it is from, and "via Orbit" says honestly how it came.
+     */
+    static String from(EmailSettings settings, String onBehalfOf) {
+        return displayName(onBehalfOf) + " <" + settings.from() + ">";
+    }
+
+    static String displayName(String onBehalfOf) {
+        if (onBehalfOf == null || onBehalfOf.isBlank()) return DISPLAY_NAME;
+        // Quotes, angle brackets and line breaks would break the header; nothing legitimate needs them.
+        String clean = onBehalfOf.replaceAll("[\"<>\r\n]", "").trim();
+        return clean.isEmpty() ? DISPLAY_NAME : clean + " via " + DISPLAY_NAME;
+    }
 }

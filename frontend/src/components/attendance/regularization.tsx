@@ -17,9 +17,12 @@ export const REG_TONE: Record<RegularizationStatus, string> = {
 };
 
 /** Employee widget: raise a "forgot to punch" regularization and see your requests. */
-export function MyRegularizations() {
+/**
+ * @param fixDate a day to correct straight away — the "you didn't check out" email links here with it
+ */
+export function MyRegularizations({ fixDate }: { fixDate?: string | null } = {}) {
   const [items, setItems] = useState<Regularization[] | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(!!fixDate);
   const [error, setError] = useState<string | null>(null);
 
   function load() {
@@ -36,7 +39,7 @@ export function MyRegularizations() {
       <p className="mt-1 text-sm text-fg/50">Forgot to clock in? Request a fix — it goes to your manager for approval.</p>
 
       {error && <Alert tone="error" className="mt-3">{error}</Alert>}
-      {adding && <RaiseForm onDone={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />}
+      {adding && <RaiseForm initialDate={fixDate ?? undefined} onDone={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />}
 
       {items === null ? (
         <div className="mt-4"><Loader2 className="mx-auto h-5 w-5 animate-spin text-violet" /></div>
@@ -59,18 +62,20 @@ export function MyRegularizations() {
   );
 }
 
-function RaiseForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const [date, setDate] = useState(() => new Date(Date.now() - 86400000).toISOString().slice(0, 10));
+function RaiseForm({ onDone, onCancel, initialDate }: { onDone: () => void; onCancel: () => void; initialDate?: string }) {
+  const [date, setDate] = useState(() => initialDate ?? new Date(Date.now() - 86400000).toISOString().slice(0, 10));
   const [checkIn, setCheckIn] = useState("09:30");
   const [checkOut, setCheckOut] = useState("18:00");
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(initialDate ? "Forgot to check out" : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // Your manager decides on the reason, so a request without one is not sent.
+    if (!reason.trim()) { setError("Give a reason so your manager can decide."); return; }
     setBusy(true); setError(null);
-    try { await api.raiseRegularization({ date, checkIn, checkOut, reason: reason || undefined }); onDone(); }
+    try { await api.raiseRegularization({ date, checkIn, checkOut, reason: reason.trim() }); onDone(); }
     catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't submit"); setBusy(false); }
   }
 
@@ -80,9 +85,9 @@ function RaiseForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
       <Field label="Date" htmlFor="r-date"><Input id="r-date" type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} /></Field>
       <Field label="Check in" htmlFor="r-in"><Input id="r-in" type="time" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} /></Field>
       <Field label="Check out" htmlFor="r-out"><Input id="r-out" type="time" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></Field>
-      <div className="sm:col-span-3"><Field label="Reason" htmlFor="r-reason"><Input id="r-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. forgot to check in — was in office" /></Field></div>
+      <div className="sm:col-span-3"><Field label="Reason (required)" htmlFor="r-reason"><Input id="r-reason" required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. forgot to check in — was in office" /></Field></div>
       <div className="flex gap-2 sm:col-span-3">
-        <Button type="submit" disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Submit request</Button>
+        <Button type="submit" disabled={busy || !reason.trim()}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Submit request</Button>
         <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </form>

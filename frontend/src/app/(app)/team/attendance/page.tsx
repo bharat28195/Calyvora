@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { AttendanceMonthGrid } from "@/components/attendance/month-grid";
 import { NoTeam, ScopeToggle, TeamHeader, useTeamStanding } from "@/components/team/team-bits";
+import { CorrectAttendance } from "@/components/attendance/correct";
+import { Button } from "@/components/ui/button";
 
 /** The last twelve months, newest first — far enough back to settle an argument about a payslip. */
 function recentMonths(count = 12): string[] {
@@ -38,6 +40,7 @@ export default function TeamAttendancePage() {
   // picking a day is how anyone reads a calendar, and leaving it dead would be worse than not
   // drawing one.
   const [day, setDay] = useState<string | null>(null);
+  const [correcting, setCorrecting] = useState(false);
 
   const load = useCallback(async () => {
     setSummary(null);
@@ -66,8 +69,15 @@ export default function TeamAttendancePage() {
             {months.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           <ScopeToggle direct={direct} onChange={setDirect} standing={standing} />
+          <Button size="sm" onClick={() => setCorrecting(true)} disabled={!summary || summary.members.length === 0}>
+            Correct attendance
+          </Button>
         </div>
       </TeamHeader>
+      {correcting && summary && (
+        <CorrectAttendance open onClose={() => setCorrecting(false)} onDone={() => void load()}
+          people={summary.members.map((m) => ({ id: m.employeeId, name: m.name }))} />
+      )}
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
 

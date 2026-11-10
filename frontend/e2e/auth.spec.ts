@@ -61,7 +61,10 @@ test.describe("signing out", () => {
     const problems = watchForPageErrors(page);
     // The real control, not a shortcut: the access token lives in memory, so faking a sign-out by
     // clearing storage would test nothing that happens when somebody presses the button.
-    await page.getByRole("button", { name: /log out/i }).first().click();
+    // Log out lives in the profile menu (PD-57); the trigger is in the sidebar and in the phone
+    // header, so take the one this viewport shows.
+    await page.getByRole("button", { name: /open profile menu/i }).locator("visible=true").first().click();
+    await page.getByRole("menuitem", { name: /log out/i }).click();
     await page.waitForURL(/\/login/, { timeout: 20_000 });
 
     // And the session must actually be gone, not merely navigated away from.

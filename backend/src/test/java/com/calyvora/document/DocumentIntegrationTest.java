@@ -26,11 +26,12 @@ class DocumentIntegrationTest extends IntegrationTestBase {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
 
         JsonNode first = getJson("/api/v1/documents/templates", owner);
-        assertThat(first.size()).isEqualTo(5);
+        // The original five and the rest of the letter library (PD-63).
+        assertThat(first.size()).isEqualTo(StarterTemplates.all().size());
         assertThat(first.get(0).get("builtIn").asBoolean()).isTrue();
 
         // a second open must not duplicate the library
-        assertThat(getJson("/api/v1/documents/templates", owner).size()).isEqualTo(5);
+        assertThat(getJson("/api/v1/documents/templates", owner).size()).isEqualTo(StarterTemplates.all().size());
     }
 
     @Test
@@ -113,6 +114,48 @@ class DocumentIntegrationTest extends IntegrationTestBase {
         JsonNode fields = getJson("/api/v1/documents/fields", owner);
         assertThat(fields.size()).isGreaterThan(10);
         assertThat(fields.get(0).get("key").asText()).isEqualTo("employee.fullName");
+    }
+
+    @Test
+    void an_offer_letter_for_someone_not_yet_employed_is_typed_in_and_keeps_their_name() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        String templateId = templateOfKind(owner, "OFFER_LETTER");
+
+        Map<String, Object> req = new HashMap<>();
+        req.put("templateId", templateId);
+        req.put("overrides", Map.of("employee.fullName", "Priya Sharma", "employee.jobTitle", "Senior Designer"));
+        JsonNode doc = postJson("/api/v1/documents", owner, req);
+
+        assertThat(doc.get("employeeId").isNull()).isTrue();
+        assertThat(doc.get("body").asText()).contains("Senior Designer").doesNotContain("{{");
+        assertThat(doc.get("title").asText()).contains("Priya Sharma");
+        // The name stays with the letter in the issued list, though there is no employee behind it.
+        assertThat(doc.get("employeeName").asText()).isEqualTo("Priya Sharma");
+        JsonNode listed = getJson("/api/v1/documents", owner);
+        assertThat(listed.toString()).contains("Priya Sharma");
+    }
+
+    @Test
+    void a_full_name_fills_the_first_name_and_the_other_way_round() {
+        Map<String, String> typed = new HashMap<>(Map.of("employee.fullName", "Priya Kumari Sharma"));
+        DocumentService.completeName(typed);
+        assertThat(typed).containsEntry("employee.firstName", "Priya").containsEntry("employee.lastName", "Kumari Sharma");
+
+        Map<String, String> parts = new HashMap<>(Map.of("employee.firstName", "Arjun", "employee.lastName", "Rao"));
+        DocumentService.completeName(parts);
+        assertThat(parts).containsEntry("employee.fullName", "Arjun Rao");
+    }
+
+    @Test
+    void a_letter_edited_by_hand_is_issued_exactly_as_written() throws Exception {
+        Session owner = onboardOwner("Acme", "owner@acme.com", PW);
+        Map<String, Object> req = new HashMap<>();
+        req.put("templateId", templateOfKind(owner, "OFFER_LETTER"));
+        req.put("overrides", Map.of("employee.fullName", "Priya Sharma"));
+        req.put("body", "Dear Priya,\n\nA paragraph the template never had.\n");
+        JsonNode doc = postJson("/api/v1/documents", owner, req);
+        assertThat(doc.get("body").asText()).isEqualTo("Dear Priya,\n\nA paragraph the template never had.");
+        assertThat(doc.get("employeeName").asText()).isEqualTo("Priya Sharma");
     }
 
     // ---- helpers ----

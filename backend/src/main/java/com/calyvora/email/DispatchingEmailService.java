@@ -82,8 +82,10 @@ public class DispatchingEmailService implements EmailService {
     }
 
     @Override
-    public EmailResult sendTrialApprovedEmail(String to, String companyName, String loginUrl) {
-        EmailMessages.Message message = EmailMessages.trialApproved(companyName, loginUrl);
+    public EmailResult sendWelcomeEmail(String to, String firstName, String companyName,
+                                        String temporaryPassword, String loginUrl) {
+        EmailMessages.Message message = EmailMessages.welcome(firstName, companyName, to, temporaryPassword, loginUrl);
+        // The dev mailbox keeps the link, never the password: it is readable on a demo deployment.
         record(to, message.subject(), loginUrl);
         return send(to, message.subject(), message.body(), message.html());
     }
@@ -105,6 +107,109 @@ public class DispatchingEmailService implements EmailService {
 
     private EmailResult send(String to, String subject, String body, String html) {
         return send(to, subject, body, html, java.util.function.UnaryOperator.identity());
+    }
+
+    @Override
+    public EmailResult sendCheckoutReminder(String to, String firstName, String companyName, String day,
+                                            String checkIn, String link) {
+        String subject = "You didn't check out on " + day;
+        String body = "Hi " + (firstName == null ? "there" : firstName) + ",\n\n"
+                + "You checked in at " + checkIn + " on " + day + " but never checked out, so that day's hours are incomplete.\n\n"
+                + "Add your check-out time here — your manager will approve it:\n" + link + "\n\n"
+                + "If you have already sorted it out, ignore this.\n\n" + (companyName == null ? "Orbit" : companyName);
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + "<p>Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(firstName == null ? "there" : firstName) + ",</p>"
+                + "<p>You checked in at <b>" + org.springframework.web.util.HtmlUtils.htmlEscape(checkIn) + "</b> on <b>"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(day) + "</b> but never checked out, so that day's hours are incomplete.</p>"
+                + "<p><a href=\"" + org.springframework.web.util.HtmlUtils.htmlEscape(link) + "\" style=\"display:inline-block;background:#7c5cff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none\">Add my check-out time</a></p>"
+                + "<p style=\"color:#666\">Your manager approves the correction. If you have already sorted it out, ignore this.</p></div>";
+        return send(to, subject, body, html);
+    }
+
+    @Override
+    public EmailResult sendSubscriptionEnding(String to, String firstName, String companyName, String endsOn,
+                                              long daysLeft, String link) {
+        String company = companyName == null ? "your company" : companyName;
+        String when = daysLeft <= 0 ? "today" : daysLeft == 1 ? "tomorrow" : "in " + daysLeft + " days";
+        String subject = "Your Orbit subscription ends " + when;
+        String body = "Hi " + (firstName == null ? "there" : firstName) + ",\n\n"
+                + "The Orbit subscription for " + company + " ends on " + endsOn + ". After that, your team will not be able to use the workspace until it is renewed. Your data stays safe.\n\n"
+                + "To renew, reply to this email or write to connect@calyvora.in.\n\n"
+                + "See your subscription: " + link + "\n\nOrbit";
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + "<p>Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(firstName == null ? "there" : firstName) + ",</p>"
+                + "<p>The Orbit subscription for <b>" + org.springframework.web.util.HtmlUtils.htmlEscape(company) + "</b> ends on <b>"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(endsOn) + "</b>. After that, your team will not be able to use the workspace until it is renewed. Your data stays safe.</p>"
+                + "<p>To renew, reply to this email or write to <a href=\"mailto:connect@calyvora.in\">connect@calyvora.in</a>.</p>"
+                + "<p><a href=\"" + org.springframework.web.util.HtmlUtils.htmlEscape(link) + "\" style=\"display:inline-block;background:#7c5cff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none\">See my subscription</a></p></div>";
+        return send(to, subject, body, html);
+    }
+
+    @Override
+    public EmailResult sendSignatureRequest(String to, String companyName, String replyTo, String signerName,
+                                            String letterTitle, String link, String message, String validUntil) {
+        String company = companyName == null ? "Your employer" : companyName;
+        String subject = "Please sign: " + letterTitle;
+        String note = message == null || message.isBlank() ? "" : message.trim() + "\n\n";
+        String body = "Hi " + signerName + ",\n\n" + note
+                + company + " has sent you \"" + letterTitle + "\" to read and accept.\n\n"
+                + "Open it here, read it, and sign if you agree:\n" + link + "\n\n"
+                + "The link works until " + validUntil + ". If something in the letter is not right, you can decline it and say why.\n\n"
+                + company;
+        String esc = org.springframework.web.util.HtmlUtils.htmlEscape(company);
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + "<p>Hi " + org.springframework.web.util.HtmlUtils.htmlEscape(signerName) + ",</p>"
+                + (note.isEmpty() ? "" : "<p>" + org.springframework.web.util.HtmlUtils.htmlEscape(message.trim()).replace("\n", "<br>") + "</p>")
+                + "<p>" + esc + " has sent you <b>" + org.springframework.web.util.HtmlUtils.htmlEscape(letterTitle)
+                + "</b> to read and accept.</p>"
+                + "<p><a href=\"" + org.springframework.web.util.HtmlUtils.htmlEscape(link) + "\" style=\"display:inline-block;background:#7c5cff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none\">Read and sign</a></p>"
+                + "<p style=\"color:#666\">The link works until " + org.springframework.web.util.HtmlUtils.htmlEscape(validUntil)
+                + ". If something in the letter is not right, you can decline it and say why.</p><p>" + esc + "</p></div>";
+        EmailSettings base = resolver.resolve(TenantContext.getCompanyIdOrNull());
+        EmailSettings settings = replyTo == null || replyTo.isBlank() ? base
+                : new EmailSettings(base.provider(), base.from(), replyTo, base.otpFrom(), base.apiKey(), base.apiUrl(),
+                        base.host(), base.port(), base.username(), base.password(), base.auth(), base.starttls(), base.ssl());
+        String provider = settings.provider().name();
+        record(to, subject, link);
+        try {
+            EmailSender sender = senderFor(settings);
+            sender.send(settings, to, subject, body, html, companyName, java.util.List.of());
+            if (sender instanceof ConsoleSender) {
+                return EmailResult.failed(provider, "No mail provider is configured, so nothing was delivered.");
+            }
+            return EmailResult.ok(provider);
+        } catch (Exception ex) {
+            String error = describe(ex);
+            log.warn("Failed to send signing request '{}' to {} via {}: {}", subject, to, provider, error);
+            return EmailResult.failed(provider, error);
+        }
+    }
+
+    @Override
+    public EmailResult sendDocument(String to, String companyName, String replyTo, String subject,
+                                    String message, EmailSender.Attachment attachment) {
+        EmailSettings base = resolver.resolve(TenantContext.getCompanyIdOrNull());
+        // Replies go to the company, not to the platform's no-reply — a new joinee answering their
+        // offer letter must reach the people who sent it.
+        EmailSettings settings = replyTo == null || replyTo.isBlank() ? base
+                : new EmailSettings(base.provider(), base.from(), replyTo, base.otpFrom(), base.apiKey(), base.apiUrl(),
+                        base.host(), base.port(), base.username(), base.password(), base.auth(), base.starttls(), base.ssl());
+        String provider = settings.provider().name();
+        String html = "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222\">"
+                + org.springframework.web.util.HtmlUtils.htmlEscape(message).replace("\n", "<br>") + "</div>";
+        try {
+            EmailSender sender = senderFor(settings);
+            sender.send(settings, to, subject, message, html, companyName, java.util.List.of(attachment));
+            if (sender instanceof ConsoleSender) {
+                return EmailResult.failed(provider,
+                        "No mail provider is configured, so nothing was delivered — the message was only written to the server log.");
+            }
+            return EmailResult.ok(provider);
+        } catch (Exception ex) {
+            String error = describe(ex);
+            log.warn("Failed to send document '{}' to {} via {}: {}", subject, to, provider, error);
+            return EmailResult.failed(provider, error);
+        }
     }
 
     /**

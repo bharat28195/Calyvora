@@ -82,7 +82,7 @@ NOT a business module. Full plan: [docs/Sprint1.md](docs/Sprint1.md).
 | `backend/` | Spring Boot 3 · Java 21 · **Maven** | Foundation + domain layer done; services/controllers/tests in progress |
 | `frontend/` | Next.js 14 · TS · Tailwind | **ALL Sprint-1 screens built + verified live** (against mock) |
 | `infra/` | docker-compose (Postgres+Mailpit) | written; unused (no Docker on this machine) |
-| `web/` | static marketing site (calyvora.in) | separate, leave as-is |
+| `website/` | marketing sites (calyvora.in, calyvora.net), uploaded by hand | separate, leave as-is |
 | `docs/` | constitution 00–15 + Sprint1 plan | done |
 
 ## 3. Toolchain on THIS machine (important constraints)

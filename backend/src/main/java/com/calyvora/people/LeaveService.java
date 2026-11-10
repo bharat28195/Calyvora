@@ -300,13 +300,19 @@ public class LeaveService {
     /** Every leave type, with the accrual and carry-forward behind each number. */
     @Transactional(readOnly = true)
     public List<LeaveTypeBalanceResponse> balances(AuthPrincipal principal) {
+        return balancesOn(employeeForUser(TenantContext.getCompanyId(), principal.userId()).getId(), LocalDate.now());
+    }
+
+    /** Every leave type's balance for one employee as on a given day — the last working day, for F&F (PD-73). */
+    @Transactional(readOnly = true)
+    public List<LeaveTypeBalanceResponse> balancesOn(UUID employeeId, LocalDate day) {
         UUID companyId = TenantContext.getCompanyId();
-        Employee employee = employeeForUser(companyId, principal.userId());
-        LocalDate today = LocalDate.now();
+        Employee employee = employeeRepository.findByIdAndCompanyId(employeeId, companyId)
+                .orElseThrow(() -> new NotFoundException("Employee not found"));
         Map<LeaveType, LeavePolicy> policies = policyService.effectivePolicies();
         List<LeaveTypeBalanceResponse> out = new ArrayList<>();
         for (LeaveType type : LeaveType.values()) {
-            out.add(balanceFor(employee, policies.get(type), today));
+            out.add(balanceFor(employee, policies.get(type), day));
         }
         return out;
     }

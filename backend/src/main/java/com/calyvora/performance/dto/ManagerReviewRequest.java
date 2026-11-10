@@ -19,6 +19,17 @@ public record ManagerReviewRequest(
         BigDecimal hikePercent,
         BigDecimal proposedSalary,
         String hikeNote,
-        boolean submit
+        boolean submit,
+        /** Answers to the cycle's questions for the manager (PD-66). */
+        java.util.Map<String, com.calyvora.performance.ReviewForms.Answer> answers,
+        /** A promotion: the new job title, applied on approval. Blank for none. */
+        String newTitle,
+        /** When the hike and title take effect (yyyy-MM-dd); today when blank. */
+        String effectiveDate
 ) {
+    public ManagerReviewRequest(Integer rating, String summary, String strengths, String improvements, String hikeType,
+                                java.math.BigDecimal hikePercent, java.math.BigDecimal proposedSalary, String hikeNote,
+                                boolean submit) {
+        this(rating, summary, strengths, improvements, hikeType, hikePercent, proposedSalary, hikeNote, submit, null, null, null);
+    }
 }

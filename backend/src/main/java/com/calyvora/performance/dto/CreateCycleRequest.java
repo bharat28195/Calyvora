@@ -7,6 +7,11 @@ import jakarta.validation.constraints.Size;
 public record CreateCycleRequest(
         @NotBlank @Size(max = 120) String name,
         @NotBlank String periodStart,
-        @NotBlank String periodEnd
+        @NotBlank String periodEnd,
+        /** The questions to ask; null or empty uses the standard set (PD-66). */
+        java.util.List<com.calyvora.performance.ReviewForms.Question> questions
 ) {
+    public CreateCycleRequest(String name, String periodStart, String periodEnd) {
+        this(name, periodStart, periodEnd, null);
+    }
 }

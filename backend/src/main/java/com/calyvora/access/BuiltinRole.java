@@ -28,7 +28,7 @@ public enum BuiltinRole {
     /** What only the company's administrators do; everything else HR does too. */
     private static final Set<Permission> ADMIN_ONLY = EnumSet.of(
             Permission.MEMBERS_MANAGE, Permission.COMPANY_SETTINGS, Permission.BILLING_MANAGE,
-            Permission.FEED_MODERATE);
+            Permission.FEED_MODERATE, Permission.EXITS_APPROVE);
 
     /**
      * Approving for one's own reports. Granted to MANAGER and EMPLOYEE alike because the server never

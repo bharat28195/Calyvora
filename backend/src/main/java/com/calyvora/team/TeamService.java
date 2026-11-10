@@ -63,11 +63,14 @@ public class TeamService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final ExpenseClaimRepository expenseClaimRepository;
     private final PerformanceReviewRepository reviewRepository;
+    private final com.calyvora.people.AttendanceService attendanceService;
 
     public TeamService(OrgScope orgScope, EmployeeRepository employeeRepository, UserRepository userRepository,
                        DepartmentRepository departmentRepository, AttendanceRepository attendanceRepository,
                        LeaveRequestRepository leaveRequestRepository, ExpenseClaimRepository expenseClaimRepository,
-                       PerformanceReviewRepository reviewRepository) {
+                       PerformanceReviewRepository reviewRepository,
+                       com.calyvora.people.AttendanceService attendanceService) {
+        this.attendanceService = attendanceService;
         this.orgScope = orgScope;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
@@ -121,14 +124,23 @@ public class TeamService {
         // Every read below is filtered by the roster in the database rather than in memory. Read the
         // company's month instead and a lead of a hundred pulls the other nine hundred people's
         // attendance across the wire to throw it away — which is what this page used to do.
-        LocalDate today = LocalDate.now();
-        Map<UUID, List<AttendanceRecord>> attendance = attendanceRepository
-                .findByCompanyIdAndEmployeeIdInAndDateBetween(companyId, roster, month.atDay(1), month.atEndOfMonth())
-                .stream()
-                .collect(Collectors.groupingBy(AttendanceRecord::getEmployeeId));
-        Map<UUID, AttendanceStatus> todayStatus = attendanceRepository
-                .findByCompanyIdAndEmployeeIdInAndDate(companyId, roster, today).stream()
-                .collect(Collectors.toMap(AttendanceRecord::getEmployeeId, AttendanceRecord::getStatus, (a, b) -> a));
+        //
+        // Counted through the same resolution as the day sheet, dashboard and payroll (PD-59), so a
+        // day that payroll docks as absent or half is the day this page calls absent or half. Counting
+        // raw rows here missed approved leave, the absent-after-grace rule and short days entirely.
+        LocalDate today = attendanceService.companyToday();
+        Map<UUID, com.calyvora.people.dto.AttendanceMonthResponse> months =
+                attendanceService.monthForEveryone(month, roster);
+        Map<UUID, AttendanceStatus> todayStatus = new HashMap<>();
+        Map<UUID, com.calyvora.people.dto.AttendanceMonthResponse> current = YearMonth.from(today).equals(month)
+                ? months : attendanceService.monthForEveryone(YearMonth.from(today), roster);
+        for (var entry : current.entrySet()) {
+            for (var d : entry.getValue().days()) {
+                if (d.date().equals(today.toString()) && d.status() != null) {
+                    todayStatus.put(entry.getKey(), AttendanceStatus.valueOf(d.status()));
+                }
+            }
+        }
 
         Map<UUID, Long> pendingLeave = leaveRequestRepository
                 .findByCompanyIdAndEmployeeIdInAndStatus(companyId, roster, LeaveStatus.PENDING).stream()
@@ -153,7 +165,7 @@ public class TeamService {
 
         List<TeamMemberResponse> rows = new ArrayList<>();
         for (Employee e : members) {
-            List<AttendanceRecord> records = attendance.getOrDefault(e.getId(), List.of());
+            Map<String, Long> counts = months.containsKey(e.getId()) ? months.get(e.getId()).counts() : Map.of();
             AttendanceStatus todays = todayStatus.get(e.getId());
             rows.add(new TeamMemberResponse(
                     e.getId().toString(),
@@ -166,9 +178,9 @@ public class TeamService {
                     direct.contains(e.getId()) ? 1 : 2,
                     e.getEmploymentStatus() == null ? null : e.getEmploymentStatus().name(),
                     todays == null ? null : todays.name(),
-                    count(records, AttendanceStatus.PRESENT, AttendanceStatus.WORK_FROM_HOME, AttendanceStatus.HALF_DAY),
-                    count(records, AttendanceStatus.ABSENT),
-                    count(records, AttendanceStatus.ON_LEAVE),
+                    count(counts, AttendanceStatus.PRESENT, AttendanceStatus.WORK_FROM_HOME, AttendanceStatus.HALF_DAY),
+                    count(counts, AttendanceStatus.ABSENT),
+                    count(counts, AttendanceStatus.ON_LEAVE),
                     pendingLeave.getOrDefault(e.getId(), 0L),
                     openExpenseCount.getOrDefault(e.getId(), 0L),
                     openExpenseAmount.getOrDefault(e.getId(), BigDecimal.ZERO),
@@ -228,9 +240,11 @@ public class TeamService {
 
     // ---------- helpers ----------
 
-    private static long count(List<AttendanceRecord> records, AttendanceStatus... wanted) {
-        Set<AttendanceStatus> set = Set.of(wanted);
-        return records.stream().filter(r -> set.contains(r.getStatus())).count();
+    /** Days in a resolved month with any of these statuses. */
+    private static long count(Map<String, Long> counts, AttendanceStatus... wanted) {
+        long n = 0;
+        for (AttendanceStatus s : wanted) n += counts.getOrDefault(s.name(), 0L);
+        return n;
     }
 
     /** Employee id to display name, for a batch of employees, in one user query. */

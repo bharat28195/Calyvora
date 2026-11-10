@@ -1,22 +1,122 @@
 name: CI
 
-# Watch the branches work actually happens on, not just main. product/hr-platform is what Render
-# deploys from and what every commit lands on, so a workflow watching only main was watching nothing:
-# the full suite has not run in CI for any of this work. Those 23 minutes are free here and blocking
-# on a laptop, which is the entire argument for CI owning them.
+# Two speeds (founder, 2026-10-11):
+#   * Everyday pushes (product/hr-platform, feature/**) run only what the change can break: the
+#     backend tests of the modules touched, the frontend checks only when the frontend changed.
+#   * Anything headed for customers — a push to `production`, a pull request into it, or a run started
+#     by hand — runs every test there is. The full suite is the gate before prod.
+# A change to shared code (security, tenancy, migrations, the build) can break any module, so it
+# always gets the full backend suite too.
 on:
   push:
-    branches: [ main, "product/**", "feature/**" ]
+    branches: [ main, production, "product/**", "feature/**" ]
   pull_request:
-    branches: [ main, "product/**" ]
+    branches: [ main, production, "product/**" ]
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Run every test (as before a production release)"
+        type: boolean
+        default: true
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Decides what the rest runs. Reads the files changed by this push (or pull request) and maps
+  # backend/src/{main,test}/java/com/calyvora/<module>/ to that module's tests.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.plan.outputs.backend }}
+      frontend: ${{ steps.plan.outputs.frontend }}
+      tests: ${{ steps.plan.outputs.tests }}
+      summary: ${{ steps.plan.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Plan the run
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MANUAL_FULL: ${{ inputs.full }}
+        run: |
+          full=false
+          # Production, a PR into production, main, or a hand-started full run: everything.
+          if [ "$REF" = "production" ] || [ "$BASE_REF" = "production" ] || [ "$REF" = "main" ] || [ "$MANUAL_FULL" = "true" ]; then
+            full=true
+          fi
+
+          if [ "$EVENT" = "pull_request" ]; then
+            base="$PR_BASE"
+          else
+            base="$BEFORE"
+          fi
+          # A new branch has no "before"; without a base to compare with, run everything.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            full=true
+            changed=""
+          else
+            changed=$(git diff --name-only "$base" HEAD)
+          fi
+          echo "Changed files:"; echo "$changed" | sed 's/^/  /'
+
+          backend=false; frontend=false; modules=""
+          if [ "$full" = "true" ]; then
+            backend=true; frontend=true
+          else
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              case "$f" in
+                frontend/*) frontend=true ;;
+                .github/workflows/*) backend=true; frontend=true; full=true ;;
+              esac
+              case "$f" in
+                backend/*) backend=true ;;
+              esac
+              # Shared ground: any of these can break every module.
+              case "$f" in
+                backend/pom.xml|backend/Dockerfile|backend/src/main/resources/*|\
+                backend/src/main/java/com/calyvora/common/*|backend/src/main/java/com/calyvora/auth/*|\
+                backend/src/main/java/com/calyvora/identity/*|backend/src/main/java/com/calyvora/company/*|\
+                backend/src/main/java/com/calyvora/access/*|backend/src/main/java/com/calyvora/dev/*|\
+                backend/src/main/java/com/calyvora/CalyvoraApplication.java|\
+                backend/src/test/java/com/calyvora/support/*|backend/src/test/resources/*)
+                  full=true ;;
+              esac
+              m=$(echo "$f" | sed -n 's#^backend/src/\(main\|test\)/java/com/calyvora/\([a-z]*\)/.*#\2#p')
+              [ -n "$m" ] && modules="$modules $m"
+            done <<< "$changed"
+          fi
+
+          tests=""
+          if [ "$backend" = "true" ] && [ "$full" != "true" ]; then
+            # Always also run the cross-cutting guards: tenant isolation and the permission audit.
+            for m in $(echo "$modules rls access security" | tr ' ' '\n' | sort -u); do
+              [ -n "$m" ] && tests="${tests:+$tests,}com/calyvora/$m/**/*"
+            done
+          fi
+
+          if [ "$full" = "true" ]; then summary="full suite"; elif [ "$backend" = "true" ]; then summary="modules:$(echo "$modules" | tr ' ' '\n' | sort -u | tr '\n' ' ')"; else summary="no backend change"; fi
+          echo "backend=$backend frontend=$frontend full=$full tests=$tests"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "tests=$tests" >> "$GITHUB_OUTPUT"
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+          echo "### Test plan: $summary" >> "$GITHUB_STEP_SUMMARY"
+
   backend:
     name: Backend (Maven · JDK 21)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,11 +132,22 @@ jobs:
           cache: maven
 
       # Testcontainers uses the Docker daemon preinstalled on ubuntu-latest runners.
-      - name: Build & test
-        run: mvn -B --no-transfer-progress verify
+      # An empty TESTS means the full suite; otherwise only the listed modules' tests (everything
+      # still compiles, so a change that breaks another module's build is caught either way).
+      - name: Build & test (${{ needs.changes.outputs.summary }})
+        env:
+          TESTS: ${{ needs.changes.outputs.tests }}
+        run: |
+          if [ -z "$TESTS" ]; then
+            mvn -B --no-transfer-progress verify
+          else
+            mvn -B --no-transfer-progress verify -Dtest="$TESTS" -Dsurefire.failIfNoSpecifiedTests=false
+          fi
 
   frontend:
     name: Frontend (Node 22)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,6 +176,8 @@ jobs:
 
   e2e:
     name: End-to-end (Playwright)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

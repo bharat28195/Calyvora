@@ -72,6 +72,7 @@ export default function ShiftsPage() {
       </div>
 
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
+      <WorkDayCard />
       {addingShift && <NewShiftForm onCreated={() => { setAddingShift(false); refreshShifts(); }} onCancel={() => setAddingShift(false)} />}
 
       {/* Shift templates */}
@@ -85,7 +86,9 @@ export default function ShiftsPage() {
               <span key={s.id} className="inline-flex items-center gap-2 rounded-full border border-fg/10 bg-fg/5 py-1 pl-2.5 pr-1.5 text-sm">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color ?? "#8b5cf6" }} />
                 <span className="font-medium">{s.name}</span>
-                <span className="text-xs text-fg/50">{s.startTime}–{s.endTime}</span>
+                <span className="text-xs text-fg/50">
+                  {s.startTime}–{s.endTime}{s.workMinutes ? ` · ${hours(s.workMinutes)} work` : ""}
+                </span>
                 <button onClick={() => api.deleteShift(s.id).then(refreshShifts).catch(() => {})}
                   className="rounded-full p-0.5 text-fg/40 hover:bg-fg/10 hover:text-fg" aria-label={`Delete ${s.name}`}>
                   <X className="h-3.5 w-3.5" />
@@ -184,6 +187,7 @@ function NewShiftForm({ onCreated, onCancel }: { onCreated: () => void; onCancel
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
   const [color, setColor] = useState("#8b5cf6");
+  const [workHours, setWorkHours] = useState("9");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -192,7 +196,8 @@ function NewShiftForm({ onCreated, onCancel }: { onCreated: () => void; onCancel
     if (!name.trim()) return;
     setBusy(true); setError(null);
     try {
-      await api.createShift({ name: name.trim(), startTime, endTime, color });
+      await api.createShift({ name: name.trim(), startTime, endTime, color,
+        workMinutes: Math.round(Number(workHours) * 60) || 540 });
       onCreated();
     } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't create the shift"); setBusy(false); }
   }
@@ -205,13 +210,90 @@ function NewShiftForm({ onCreated, onCancel }: { onCreated: () => void; onCancel
         <div className="sm:col-span-2"><Field label="Name" htmlFor="s-name"><Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Morning" autoFocus /></Field></div>
         <Field label="Start" htmlFor="s-start"><Input id="s-start" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} /></Field>
         <Field label="End" htmlFor="s-end"><Input id="s-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} /></Field>
+        <Field label="Work hours" htmlFor="s-hours" hint="Actual work, breaks excluded">
+          <Input id="s-hours" type="number" min="0.5" max="24" step="0.5" value={workHours}
+            onChange={(e) => setWorkHours(e.target.value)} />
+        </Field>
         <Field label="Colour" htmlFor="s-color">
           <input id="s-color" type="color" value={color} onChange={(e) => setColor(e.target.value)}
             className="h-11 w-full cursor-pointer rounded-lg border border-fg/15 bg-fg/5 px-1" />
         </Field>
-        <div className="flex items-end gap-2 sm:col-span-3">
+        <div className="flex items-end gap-2 sm:col-span-2">
           <Button type="submit" disabled={busy || !name.trim()}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Create shift</Button>
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+/** "9h" or "8h 30m" from minutes. */
+function hours(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+/**
+ * The company's working day, for everyone not rostered onto a shift: when it starts, how many hours
+ * of work it asks for, and how long after the start a person with no check-in counts as absent.
+ * A day short of the hours becomes a half day, which payroll pays as half. Managers and HR can still
+ * correct any day by hand.
+ */
+function WorkDayCard() {
+  const [start, setStart] = useState("09:30");
+  const [workHours, setWorkHours] = useState("9");
+  const [graceHours, setGraceHours] = useState("2");
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.workDay().then((p) => {
+      setStart(p.workDayStart.slice(0, 5));
+      setWorkHours(String(p.workDayMinutes / 60));
+      setGraceHours(String(p.absentGraceMinutes / 60));
+    }).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      await api.setWorkDay({
+        workDayStart: start,
+        workDayMinutes: Math.round(Number(workHours) * 60),
+        absentGraceMinutes: Math.round(Number(graceHours) * 60),
+      });
+      setSaved(true);
+    } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't save the working day"); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardTitle>Working day</CardTitle>
+      <p className="mt-1 text-sm text-fg/60">
+        For everyone not on a shift. No check-in by the start plus the grace means absent; fewer hours
+        than required means a half day.
+      </p>
+      {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+      {saved && <Alert tone="success" className="mt-3">Saved.</Alert>}
+      <form onSubmit={save} className="mt-4 grid gap-3 sm:grid-cols-4">
+        <Field label="Day starts" htmlFor="wd-start">
+          <Input id="wd-start" type="time" value={start} onChange={(e) => { setStart(e.target.value); setSaved(false); }} />
+        </Field>
+        <Field label="Required hours" htmlFor="wd-hours">
+          <Input id="wd-hours" type="number" min="0.5" max="24" step="0.5" value={workHours}
+            onChange={(e) => { setWorkHours(e.target.value); setSaved(false); }} />
+        </Field>
+        <Field label="Absent after (hours)" htmlFor="wd-grace">
+          <Input id="wd-grace" type="number" min="0" max="12" step="0.25" value={graceHours}
+            onChange={(e) => { setGraceHours(e.target.value); setSaved(false); }} />
+        </Field>
+        <div className="flex items-end">
+          <Button type="submit" disabled={busy || !loaded}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
         </div>
       </form>
     </Card>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Users, UserCheck, CalendarOff, Palmtree } from "lucide-react";
+import { Users, UserCheck, UserX, CalendarOff, Palmtree } from "lucide-react";
 import { api } from "@/lib/api";
 import type { TeamOverview } from "@/lib/types";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -32,14 +32,16 @@ export function TeamOverviewSection({ wholeCompany = true }: { wholeCompany?: bo
       <h2 className="mb-4 text-lg font-semibold">{wholeCompany ? "Team overview" : "Your team today"}</h2>
 
       {/* Each tile opens the attendance day sheet, where the count can be drilled into by person. */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Tile icon={<Users className="h-5 w-5 text-violet" />} label={wholeCompany ? "Total employees" : "People reporting to you"} value={data?.headcount}
           loading={loading} href={peopleHref} />
+        {/* Present is people actually in: checked in, or marked in. Anyone still inside the grace
+            window is "not in yet" rather than counted as present on trust. */}
         <Tile icon={<UserCheck className="h-5 w-5 text-emerald-400" />} label="Present today" value={data?.presentToday}
           loading={loading} href={attendanceHref}
-          // presentToday counts anyone not on leave, marked or not (TeamOverviewResponse). "7 present ·
-          // 6 not marked yet" read as a contradiction; say that the unmarked are inside the 7.
-          hint={data && data.unmarkedToday > 0 ? `includes ${data.unmarkedToday} not checked in yet` : undefined} />
+          hint={data && data.unmarkedToday > 0 ? `${data.unmarkedToday} not in yet` : undefined} />
+        <Tile icon={<UserX className="h-5 w-5 text-red-400" />} label="Absent today" value={data?.absentToday ?? 0}
+          loading={loading} href={attendanceHref} hint="No check-in, no leave" />
         <Tile icon={<CalendarOff className="h-5 w-5 text-amber-400" />} label="On leave today" value={data?.onLeaveToday}
           loading={loading} href={attendanceHref} hint="See who" />
       </div>
@@ -50,8 +52,19 @@ export function TeamOverviewSection({ wholeCompany = true }: { wholeCompany?: bo
           <div className="mt-3 flex flex-col divide-y divide-fg/5">
             {loading ? (
               <div className="h-16 animate-pulse rounded bg-fg/5" />
-            ) : data && data.outToday.length > 0 ? (
-              data.outToday.map((l, i) => (
+            ) : data && (data.outToday.length > 0 || (data.absentees?.length ?? 0) > 0) ? (
+              <>
+              {(data.absentees ?? []).map((a, i) => (
+                <div key={`a${i}`} className="flex items-start gap-3 py-2.5">
+                  <UserX className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{a.employeeName}</p>
+                    <p className="truncate text-xs text-fg/50">Absent{a.reason ? ` — ${a.reason}` : ""}</p>
+                  </div>
+                  <span className="ml-auto shrink-0 text-xs text-fg/40">{a.jobTitle ?? ""}</span>
+                </div>
+              ))}
+              {data.outToday.map((l, i) => (
                 <div key={i} className="flex items-start gap-3 py-2.5">
                   <Palmtree className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
                   <div className="min-w-0">
@@ -62,9 +75,10 @@ export function TeamOverviewSection({ wholeCompany = true }: { wholeCompany?: bo
                   </div>
                   <span className="ml-auto shrink-0 text-xs text-fg/40">{l.startDate.slice(5)} → {l.endDate.slice(5)}</span>
                 </div>
-              ))
+              ))}
+              </>
             ) : (
-              <p className="py-6 text-sm text-fg/40">Everyone is present today. 🎉</p>
+              <p className="py-6 text-sm text-fg/40">Nobody is absent or on leave today.</p>
             )}
           </div>
         </Card>

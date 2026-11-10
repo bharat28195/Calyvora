@@ -31,6 +31,28 @@ public record CompanySummaryResponse(
         String currency,
         String createdAt,
         String agencyId,
-        String agencyName
+        String agencyName,
+        /** Only on the response that created the company: whether the admin's welcome email went out. */
+        Boolean welcomeEmailSent,
+        /**
+         * Only on the response that created the company, and only when the welcome email did NOT go
+         * out (or the workspace waits for activation): the admin's temporary password, to pass on by
+         * hand. Shown once; never stored anywhere readable and never in a list.
+         */
+        String temporaryPassword,
+        /** PD-74: archived — kept whole, nobody signs in, not billed. Null while live. */
+        String archivedAt,
+        String archiveReason
 ) {
+    public boolean archived() {
+        return archivedAt != null;
+    }
+
+    /** This summary as the answer to a create: with how the new admin gets their sign-in details. */
+    public CompanySummaryResponse withWelcome(com.calyvora.platform.PlatformService.Provisioned p) {
+        return new CompanySummaryResponse(companyId, name, slug, status, adminName, adminEmail, headcount,
+                seats, subscriptionStatus, endsAt, daysLeft, locked, pricePerEmployee, customPrice,
+                monthlyRevenue, currency, createdAt, agencyId, agencyName,
+                p.welcomeEmailSent(), p.welcomeEmailSent() ? null : p.temporaryPassword(), archivedAt, archiveReason);
+    }
 }

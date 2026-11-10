@@ -125,6 +125,7 @@ public class EmployeeFinanceService {
         if (r.panVerified() != null) f.setPanVerified(r.panVerified());
         if (r.dateOfBirth() != null) f.setDateOfBirth(parseDate(r.dateOfBirth(), "date of birth"));
         if (r.parentName() != null) f.setParentName(blankToNull(r.parentName()));
+        if (r.gender() != null) f.setGender(blankToNull(r.gender()));
         return f;
     }
 

@@ -145,9 +145,10 @@ class TdsOnPayslipTest extends IntegrationTestBase {
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("regime", "OLD",
-                                "declared", Map.of("SECTION_80C", 150000,
-                                        "SECTION_80CCD_1B", 50000,
-                                        "HOME_LOAN_INTEREST", 200000)))))
+                                "declared", Map.of("PPF", 150000, "NPS_ADDITIONAL", 50000),
+                                // The home loan is a house now, and its interest lives there.
+                                "houses", java.util.List.of(Map.of("letOut", false, "interest", 200000,
+                                        "lenderName", "HDFC Bank"))))))
                 .andExpect(status().isOk());
 
         long withheldAfter = lineNamed(myPayslip(owner), "Income tax (TDS)").get("amount").asLong();

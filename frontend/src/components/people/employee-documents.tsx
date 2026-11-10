@@ -6,6 +6,7 @@ import { Loader2, FileSignature, FileText } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { GeneratedDoc } from "@/lib/types";
 import { KIND_LABELS } from "@/lib/documents";
+import { formatDate } from "@/lib/format";
 
 /**
  * The letters issued for one person, shown on their profile (feedback D2). Closes the loop between
@@ -56,7 +57,7 @@ export function EmployeeDocuments({ employeeId }: { employeeId: string }) {
               >
                 <span className="min-w-0 truncate">{d.title}</span>
                 <span className="shrink-0 text-xs text-fg/40">
-                  {KIND_LABELS[d.kind]} · {new Date(d.createdAt).toLocaleDateString()}
+                  {KIND_LABELS[d.kind]} · {formatDate(d.createdAt)}
                 </span>
               </Link>
             </li>

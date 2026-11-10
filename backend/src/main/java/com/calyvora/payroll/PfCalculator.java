@@ -63,8 +63,24 @@ public final class PfCalculator {
      *                    available in this file, so the parameter is named for what it must be.
      */
     public static Result compute(BigDecimal basicPlusDa, PfSettings settings) {
+        return compute(basicPlusDa, settings, true);
+    }
+
+    /**
+     * @param pensionMember false for a member who has turned 58: the Pension Scheme stops taking
+     *                      contributions then, and the employer's whole share goes to EPF instead.
+     *                      Keeping 8.33% in EPS for them is a contribution the EPFO returns as an
+     *                      error on the ECR.
+     */
+    public static Result compute(BigDecimal basicPlusDa, PfSettings settings, boolean pensionMember) {
         if (basicPlusDa == null || basicPlusDa.signum() <= 0) {
             return Result.NONE;
+        }
+        if (!pensionMember) {
+            Result r = compute(basicPlusDa, settings, true);
+            BigDecimal epf = r.employerEps().add(r.employerEpf());
+            return new Result(r.pfWages(), r.employee(), BigDecimal.ZERO, epf, r.adminCharges(), r.edli(),
+                    r.employerTotal());
         }
         BigDecimal ceiling = settings.getWageCeiling();
 

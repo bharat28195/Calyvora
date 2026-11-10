@@ -45,7 +45,9 @@ public record UpdateEmployeeFinanceRequest(
         String panNumber,
         Boolean panVerified,
         String dateOfBirth,
-        @Size(max = 120) String parentName
+        @Size(max = 120) String parentName,
+        @Pattern(regexp = "^$|MALE|FEMALE|OTHER", message = "choose Male, Female or Other")
+        String gender
 ) {
     /**
      * Normalise the identifiers before validation runs, so the way people actually type these values
@@ -60,6 +62,7 @@ public record UpdateEmployeeFinanceRequest(
         paymentMode = paymentMode == null ? null : paymentMode.trim().toUpperCase();
         pfStatus = pfStatus == null ? null : pfStatus.trim().toUpperCase();
         esiStatus = esiStatus == null ? null : esiStatus.trim().toUpperCase();
+        gender = gender == null ? null : gender.trim().toUpperCase();
     }
 
     /** Trim, drop internal whitespace, upper-case. Null stays null; blank stays blank (clears). */

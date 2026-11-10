@@ -82,6 +82,36 @@ class AgencyIsolationTest extends IntegrationTestBase {
     }
 
     @Test
+    @org.junit.jupiter.api.DisplayName("an agency sees its subscriptions but changes none of them — every edit is the vendor's")
+    void an_agency_cannot_edit_any_subscription() throws Exception {
+        Session owner = login(OWNER, OWNER_PW);
+        Session alpha = agencyWith(owner, "Alpha Group", "alpha9@agency.test");
+        String companyId = addCompany(alpha, "Alpha Retail", "admin@alpharetail9.test");
+        String auth = "Bearer " + alpha.accessToken();
+        String base = "/api/v1/platform/companies/" + companyId;
+
+        // It can see it…
+        mockMvc.perform(get("/api/v1/agency/companies").header("Authorization", auth)).andExpect(status().isOk());
+        // …and nothing that changes a subscription or a company is open to it (PD-75).
+        Map<String, Object> bodies = Map.of(
+                "/seats", Map.of("seats", 500),
+                "/end-date", Map.of("endsAt", "2030-01-01"),
+                "/price", Map.of("price", 1),
+                "/renew", Map.of("months", 12),
+                "/archive", Map.of("reason", "x"),
+                "/restore", Map.of());
+        for (var e : bodies.entrySet()) {
+            mockMvc.perform(post(base + e.getKey()).header("Authorization", auth)
+                            .contentType(MediaType.APPLICATION_JSON).content(json(e.getValue())))
+                    .andExpect(status().isForbidden());
+        }
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(base)
+                        .header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("confirmName", "Alpha Retail", "ownerPassword", "x"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void an_agency_cannot_read_the_hr_data_of_a_company_it_runs() throws Exception {
         Session owner = login(OWNER, OWNER_PW);
         Session alpha = agencyWith(owner, "Alpha Group", "alpha4@agency.test");

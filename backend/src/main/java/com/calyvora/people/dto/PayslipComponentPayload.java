@@ -11,6 +11,11 @@ public record PayslipComponentPayload(
         @NotBlank String kind,   // EARNING | DEDUCTION
         @NotBlank String calc,   // PERCENT_OF_GROSS | PERCENT_OF_BASIC | FIXED | REMAINDER
         BigDecimal value,
-        boolean basis
+        boolean basis,
+        /** HRA or LTA when this earning is that allowance for tax; null otherwise. */
+        String taxTag
 ) {
+    public PayslipComponentPayload(String name, String kind, String calc, BigDecimal value, boolean basis) {
+        this(name, kind, calc, value, basis, null);
+    }
 }

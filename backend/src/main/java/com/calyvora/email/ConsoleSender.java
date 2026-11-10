@@ -20,6 +20,15 @@ public class ConsoleSender implements EmailSender {
     }
 
     @Override
+    public void send(EmailSettings settings, String to, String subject, String body, String html,
+                     String displayName, java.util.List<Attachment> attachments) {
+        send(settings, to, subject, body, html);
+        for (Attachment a : attachments == null ? java.util.List.<Attachment>of() : attachments) {
+            log.info("[DEV EMAIL] attached {} ({} bytes)", a.fileName(), a.content().length);
+        }
+    }
+
+    @Override
     public void send(EmailSettings settings, String to, String subject, String body, String html) {
         log.info("""
 

@@ -40,7 +40,13 @@ public record PerformanceReviewResponse(
         BigDecimal currentSalary,
         int goalsAchieved,
         int goalsTotal,
-        List<GoalResponse> goals
+        List<GoalResponse> goals,
+        // PD-66: the cycle's questions and both sides' answers, and the outcome beyond pay
+        List<com.calyvora.performance.ReviewForms.Question> questions,
+        java.util.Map<String, com.calyvora.performance.ReviewForms.Answer> selfAnswers,
+        java.util.Map<String, com.calyvora.performance.ReviewForms.Answer> managerAnswers,
+        String newTitle,
+        String effectiveDate
 ) {
     public static PerformanceReviewResponse of(
             PerformanceReview r, String cycleName, String periodStart, String periodEnd, String cycleStatus,
@@ -57,7 +63,21 @@ public record PerformanceReviewResponse(
                 r.getHikePercent(), r.getProposedSalary(), r.getHikeNote(),
                 r.getManagerSubmittedAt() == null ? null : r.getManagerSubmittedAt().toString(),
                 r.getDecidedAt() == null ? null : r.getDecidedAt().toString(),
-                currency, currentSalary, goalsAchieved, goalsTotal, goals);
+                currency, currentSalary, goalsAchieved, goalsTotal, goals,
+                List.of(), com.calyvora.performance.ReviewForms.answers(r.getSelfAnswers()),
+                com.calyvora.performance.ReviewForms.answers(r.getManagerAnswers()), r.getNewTitle(),
+                r.getEffectiveDate() == null ? null : r.getEffectiveDate().toString());
+    }
+
+    /** The same review with its cycle's questions attached. */
+    public PerformanceReviewResponse withQuestions(List<com.calyvora.performance.ReviewForms.Question> qs) {
+        return new PerformanceReviewResponse(
+                id, cycleId, cycleName, periodStart, periodEnd, cycleStatus,
+                employeeId, employeeName, jobTitle, managerId, managerName, status,
+                selfAssessment, selfSubmittedAt, rating, summary, strengths, improvements,
+                hikeType, hikePercent, proposedSalary, hikeNote, managerSubmittedAt, decidedAt,
+                currency, currentSalary, goalsAchieved, goalsTotal, goals,
+                qs, selfAnswers, managerAnswers, newTitle, effectiveDate);
     }
 
     /**
@@ -74,6 +94,7 @@ public record PerformanceReviewResponse(
                 employeeId, employeeName, jobTitle, managerId, managerName, status,
                 selfAssessment, selfSubmittedAt, rating, summary, strengths, improvements,
                 hikeType, hikePercent, null, hikeNote, managerSubmittedAt, decidedAt,
-                currency, null, goalsAchieved, goalsTotal, goals);
+                currency, null, goalsAchieved, goalsTotal, goals,
+                questions, selfAnswers, managerAnswers, newTitle, effectiveDate);
     }
 }

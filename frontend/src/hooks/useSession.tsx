@@ -70,11 +70,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // Keep the app-wide money/time formatters in sync with the company's currency and, for time, with
   // whichever zone this person is actually in — their own if set, else the company's. This is what
   // the attendance clock reads, and it has to match what the server stamps on a punch.
+  //
+  // Applied during render rather than in an effect: a page re-rendered because the person just
+  // changed their language or date style must format with the new choice on that same render, not
+  // one render later.
+  if (me?.company) {
+    setLocaleConfig({
+      currency: me.company.currency,
+      timezone: me.timezone ?? me.company.timezone,
+      language: me.language ?? "en",
+      dateFormat: me.user.preferences?.dateFormat ?? null,
+      timeFormat: me.user.preferences?.timeFormat ?? null,
+    });
+  }
   useEffect(() => {
-    if (me?.company) {
-      setLocaleConfig({ currency: me.company.currency, timezone: me.timezone ?? me.company.timezone });
-    }
-  }, [me]);
+    document.documentElement.lang = me?.language ?? "en";
+  }, [me?.language]);
 
   const value: SessionValue = {
     me,

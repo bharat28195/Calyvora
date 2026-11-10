@@ -216,15 +216,33 @@ public class PlatformController {
     }
 
     /**
-     * Delete a company and everything belonging to it. Not reversible, no grace period.
+     * Archive a company (PD-74): the everyday "remove". Everything is kept; its people cannot sign in
+     * and it is not billed. Reversible with restore.
+     */
+    @PostMapping("/companies/{id}/archive")
+    public CompanySummaryResponse archiveCompany(@PathVariable UUID id,
+                                                 @RequestBody(required = false) Map<String, String> body,
+                                                 @CurrentUser AuthPrincipal principal) {
+        return service.summarize(tenantData.archive(id, body == null ? null : body.get("reason"), principal.userId()));
+    }
+
+    @PostMapping("/companies/{id}/restore")
+    public CompanySummaryResponse restoreCompany(@PathVariable UUID id) {
+        return service.summarize(tenantData.restore(id));
+    }
+
+    /**
+     * Delete an archived company and everything belonging to it, for good. Not reversible.
      *
-     * <p>The body must carry the company's name. A console listing every customer is one mis-click
-     * from ending one of them, and typing the name is the only protection that survives a tired
-     * operator at the end of a long day.
+     * <p>The body must carry the company's name and the owner's own password: a console listing every
+     * customer is one mis-click from ending one of them, and only an archived company can be deleted,
+     * so a permanent delete is always a second, separate, deliberate decision.
      */
     @DeleteMapping("/companies/{id}")
     public Map<String, Object> deleteCompany(@PathVariable UUID id,
-                                             @RequestBody(required = false) Map<String, String> body) {
-        return tenantData.delete(id, body == null ? null : body.get("confirmName"));
+                                             @RequestBody(required = false) Map<String, String> body,
+                                             @CurrentUser AuthPrincipal principal) {
+        return tenantData.deletePermanently(id, body == null ? null : body.get("confirmName"),
+                body == null ? null : body.get("ownerPassword"), principal.userId());
     }
 }

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
+import { WelcomeOutcome } from "@/components/platform/welcome-outcome";
+import { SubscriptionsView } from "@/components/agency/subscriptions-view";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
 
@@ -34,6 +36,8 @@ export default function AgencyPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [seatsFor, setSeatsFor] = useState<string | null>(null);
+  // PD-75: the companies, or their subscriptions side by side.
+  const [tab, setTab] = useState<"companies" | "subscriptions">("companies");
 
   function load() {
     api.agencyOverview().then(setOverview).catch(() => setOverview(null));
@@ -63,8 +67,20 @@ export default function AgencyPage() {
       {error && <Alert tone="error" className="mt-6">{error}</Alert>}
       {creating && <CreateCompanyForm onCreated={() => { setCreating(false); load(); }} onCancel={() => setCreating(false)} />}
 
+      <div className="mt-6 flex gap-1 border-b border-fg/10">
+        {(["companies", "subscriptions"] as const).map((t) => (
+          <button key={t} type="button" onClick={() => setTab(t)}
+            className={cn("-mb-px border-b-2 px-4 py-2 text-sm font-medium",
+              tab === t ? "border-violet text-violet" : "border-transparent text-fg/50 hover:text-fg")}>
+            {t === "companies" ? "Companies" : "Subscriptions"}
+          </button>
+        ))}
+      </div>
+
       {companies === null ? (
         <div className="mt-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-violet" /></div>
+      ) : tab === "subscriptions" ? (
+        <SubscriptionsView companies={companies} onRequestSeats={(id) => { setTab("companies"); setSeatsFor(id); }} />
       ) : (
         <>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -195,6 +211,7 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [created, setCreated] = useState<CompanySummary | null>(null);
 
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setV((prev) => ({ ...prev, [k]: e.target.value }));
@@ -205,16 +222,15 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
     e.preventDefault();
     setSaving(true); setError(null); setFieldErrors({});
     try {
-      await api.agencyCreateCompany({
+      setCreated(await api.agencyCreateCompany({
         companyName: v.companyName,
         adminFirstName: v.adminFirstName,
         adminLastName: v.adminLastName,
         adminEmail: v.adminEmail,
-        password: v.password,
+        password: v.password.trim() || undefined,
         seats: Number(v.seats) || 1,
         months: 12,
-      });
-      onCreated();
+      }));
     } catch (err) {
       if (err instanceof ApiError) {
         setFieldErrors(err.fieldErrors);
@@ -235,6 +251,13 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
         the company is locked.
       </p>
       {error && <Alert tone="error" className="mt-4">{error}</Alert>}
+      {created && (
+        <div className="mt-4 flex flex-col gap-3">
+          <WelcomeOutcome company={created} handOver />
+          <div><Button type="button" onClick={onCreated}>Done</Button></div>
+        </div>
+      )}
+      {!created && (
       <form onSubmit={submit} className="mt-5 flex flex-col gap-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Company name" htmlFor="companyName" error={fieldErrors.companyName}>
@@ -252,8 +275,8 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
           <Field label="Admin email" htmlFor="adminEmail" error={fieldErrors.adminEmail}>
             <Input id="adminEmail" type="email" value={v.adminEmail} onChange={set("adminEmail")} />
           </Field>
-          <Field label="Temporary password" htmlFor="password" error={fieldErrors.password}>
-            <Input id="password" value={v.password} onChange={set("password")} />
+          <Field label="Temporary password (optional)" htmlFor="password" error={fieldErrors.password}>
+            <Input id="password" value={v.password} onChange={set("password")} placeholder="Leave blank — Orbit creates one" autoComplete="off" />
           </Field>
         </div>
         <div className="flex gap-2">
@@ -264,6 +287,7 @@ function CreateCompanyForm({ onCreated, onCancel }: { onCreated: () => void; onC
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
         </div>
       </form>
+      )}
     </Card>
   );
 }

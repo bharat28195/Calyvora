@@ -36,7 +36,8 @@ public record EmployeeFinanceResponse(
         String panMasked,
         boolean panVerified,
         String dateOfBirth,
-        String parentName
+        String parentName,
+        String gender
 ) {
 
     public static EmployeeFinanceResponse of(EmployeeFinance f, String employeeName) {
@@ -61,7 +62,8 @@ public record EmployeeFinanceResponse(
                 maskPan(f.getPanNumber()),
                 f.isPanVerified(),
                 f.getDateOfBirth() == null ? null : f.getDateOfBirth().toString(),
-                f.getParentName());
+                f.getParentName(),
+                f.getGender());
     }
 
     /** Last four digits only — enough to tell two accounts apart, useless to anyone else. */

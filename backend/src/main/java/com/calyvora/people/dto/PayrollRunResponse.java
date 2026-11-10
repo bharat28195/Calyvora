@@ -28,6 +28,10 @@ public record PayrollRunResponse(
      */
     public record Row(String employeeId, String name, String jobTitle,
                       BigDecimal gross, double lopDays, BigDecimal net,
-                      BigDecimal employeePf, BigDecimal employerContribution) {
+                      BigDecimal employeePf, BigDecimal employerContribution,
+                      /** Deducted from this person, already inside {@code net}. */
+                      BigDecimal employeeEsi,
+                      /** Deducted from this person, already inside {@code net}. */
+                      BigDecimal professionalTax) {
     }
 }

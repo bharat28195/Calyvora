@@ -8,10 +8,11 @@ public record ShiftResponse(
         String name,
         String startTime,
         String endTime,
-        String color
+        String color,
+        int workMinutes
 ) {
     public static ShiftResponse of(Shift s) {
         return new ShiftResponse(s.getId().toString(), s.getName(),
-                s.getStartTime().toString(), s.getEndTime().toString(), s.getColor());
+                s.getStartTime().toString(), s.getEndTime().toString(), s.getColor(), s.getWorkMinutes());
     }
 }

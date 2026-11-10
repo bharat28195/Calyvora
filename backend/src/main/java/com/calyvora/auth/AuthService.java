@@ -54,6 +54,7 @@ public class AuthService {
 
     private final com.calyvora.common.security.TenantBinder tenantBinder;
     private final com.calyvora.access.PermissionService permissionService;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     public AuthService(CompanyRepository companyRepository,
                        CompanySettingsRepository companySettingsRepository,
@@ -67,7 +68,9 @@ public class AuthService {
                        com.calyvora.people.EmployeeService employeeService,
                        com.calyvora.people.EmployeeRepository employeeRepository,
                        com.calyvora.common.security.TenantBinder tenantBinder,
-                       com.calyvora.access.PermissionService permissionService) {
+                       com.calyvora.access.PermissionService permissionService,
+                       RefreshTokenRepository refreshTokenRepository) {
+        this.refreshTokenRepository = refreshTokenRepository;
         this.tenantBinder = tenantBinder;
         this.permissionService = permissionService;
         this.employeeService = employeeService;
@@ -204,6 +207,32 @@ public class AuthService {
         return issueSession(user, refreshTokenService.issueNewFamily(user.getId(), userAgent));
     }
 
+    /**
+     * Change your own password while signed in.
+     *
+     * <p>Every other session is signed out — the likeliest reason to change a password is that
+     * somebody else may know it — and this one is re-issued, so the person changing it stays in.
+     * Clears the first-sign-in flag (V67). A wrong current password is a 400, not a 401: the person is
+     * signed in, and a 401 would make the app sign them out for a typo.
+     */
+    @Transactional
+    public LoginResult changePassword(UUID userId, String currentPassword, String newPassword, String userAgent) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Invalid session"));
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new com.calyvora.common.error.ApiException(com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
+                    "Your current password isn't right");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new com.calyvora.common.error.ApiException(com.calyvora.common.error.ErrorCode.VALIDATION_ERROR,
+                    "Choose a different password from your current one");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        refreshTokenRepository.revokeAllForUser(user.getId(), java.time.Instant.now());
+        return issueSession(user, refreshTokenService.issueNewFamily(user.getId(), userAgent));
+    }
+
     @Transactional
     public LoginResult refresh(String rawRefreshToken, String userAgent) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
@@ -223,6 +252,28 @@ public class AuthService {
         if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
             refreshTokenService.revoke(rawRefreshToken);
         }
+    }
+
+    /**
+     * Save a person's language, clock and date style, and answer with the /me they now get.
+     *
+     * <p>The timezone goes where the rest of the app already reads it: onto the employee record for
+     * anybody who has one — the same field My profile edits, and the one that stamps their
+     * attendance — and onto the account only for somebody without one. Two places holding one
+     * person's clock is how the attendance screen and the server come to disagree.
+     */
+    @Transactional
+    public MeResponse updatePreferences(UUID userId, com.calyvora.auth.dto.PreferencesRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Invalid session"));
+        String zone = com.calyvora.people.Timezones.validOrNull(request.timezone());
+        com.calyvora.people.Employee employee = employeeRepository.findByUserId(userId).orElse(null);
+        if (employee != null) {
+            employee.setTimezone(zone);
+        }
+        user.setPreferences(Preferences.validLanguage(request.language()), employee == null ? zone : null,
+                Preferences.validDateFormat(request.dateFormat()), Preferences.validTimeFormat(request.timeFormat()));
+        return me(userId);
     }
 
     @Transactional(readOnly = true)
@@ -256,6 +307,12 @@ public class AuthService {
     private LoginResult issueSession(User user, RefreshTokenService.IssuedToken issued) {
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new NotFoundException("Company not found"));
+        // An archived workspace keeps its data but no one signs in to it (PD-74). Checked here, the
+        // one place both a login and a refresh pass through, so an open session dies at its next refresh.
+        if (company.isArchived()) {
+            throw new com.calyvora.common.error.ApiException(com.calyvora.common.error.ErrorCode.FORBIDDEN,
+                    "This workspace has been archived. Contact Calyvora to restore it.");
+        }
         // Login carries no token yet, so TenantFilter has bound nothing. Every read below is for
         // this user's own company and has to say so, or RLS returns nothing and the session starts
         // with the product's defaults instead of the customer's currency and timezone.

@@ -87,6 +87,31 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- Letters as PDF (PD-64): HTML to PDF for emailing a letter, and PDFBox to turn an uploaded
+             PDF letterpad into the image letters print on. OpenHTMLtoPDF brings PDFBox 3. -->
+        <dependency>
+            <groupId>io.github.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+            <version>1.1.22</version>
+        </dependency>
+        <!-- A Word (.docx) letterpad is converted to PDF first. iText 2.1.7 underneath (LGPL/MPL);
+             the BouncyCastle jars are only for encrypted PDFs, which we never write. -->
+        <dependency>
+            <groupId>fr.opensagres.xdocreport</groupId>
+            <artifactId>fr.opensagres.poi.xwpf.converter.pdf</artifactId>
+            <version>2.1.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>bouncycastle</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- OpenAPI / Swagger UI -->
         <dependency>
             <groupId>org.springdoc</groupId>

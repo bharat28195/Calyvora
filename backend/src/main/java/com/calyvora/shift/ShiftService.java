@@ -4,11 +4,14 @@ import com.calyvora.common.error.ApiException;
 import com.calyvora.common.error.ErrorCode;
 import com.calyvora.common.error.NotFoundException;
 import com.calyvora.common.security.TenantContext;
+import com.calyvora.company.CompanySettings;
+import com.calyvora.company.CompanySettingsRepository;
 import com.calyvora.people.EmployeeService;
 import com.calyvora.people.dto.EmployeeResponse;
 import com.calyvora.shift.dto.RosterResponse;
 import com.calyvora.shift.dto.ShiftPayload;
 import com.calyvora.shift.dto.ShiftResponse;
+import com.calyvora.shift.dto.WorkDayPayload;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,12 +31,14 @@ public class ShiftService {
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository assignmentRepository;
     private final EmployeeService employeeService;
+    private final CompanySettingsRepository settingsRepository;
 
     public ShiftService(ShiftRepository shiftRepository, ShiftAssignmentRepository assignmentRepository,
-                        EmployeeService employeeService) {
+                        EmployeeService employeeService, CompanySettingsRepository settingsRepository) {
         this.shiftRepository = shiftRepository;
         this.assignmentRepository = assignmentRepository;
         this.employeeService = employeeService;
+        this.settingsRepository = settingsRepository;
     }
 
     // ---- shift templates ----
@@ -50,6 +55,7 @@ public class ShiftService {
         UUID companyId = TenantContext.getCompanyId();
         Shift shift = new Shift(UUID.randomUUID(), companyId, req.name().trim(),
                 parseTime(req.startTime()), parseTime(req.endTime()), blankToNull(req.color()));
+        if (req.workMinutes() != null) shift.setWorkMinutes(validMinutes(req.workMinutes()));
         shiftRepository.save(shift);
         return ShiftResponse.of(shift);
     }
@@ -62,7 +68,42 @@ public class ShiftService {
         if (req.startTime() != null && !req.startTime().isBlank()) shift.setStartTime(parseTime(req.startTime()));
         if (req.endTime() != null && !req.endTime().isBlank()) shift.setEndTime(parseTime(req.endTime()));
         if (req.color() != null) shift.setColor(blankToNull(req.color()));
+        if (req.workMinutes() != null) shift.setWorkMinutes(validMinutes(req.workMinutes()));
         return ShiftResponse.of(shift);
+    }
+
+    // ---- the standard working day ----
+
+    /**
+     * The standard day for anyone not rostered onto a shift — nine hours from 09:30 until an admin
+     * changes it — and how long after a shift starts somebody with no check-in counts as absent.
+     */
+    @Transactional(readOnly = true)
+    public WorkDayPayload workDay() {
+        UUID companyId = TenantContext.getCompanyId();
+        return of(settingsRepository.findById(companyId).orElseGet(() -> new CompanySettings(companyId)));
+    }
+
+    @Transactional
+    public WorkDayPayload setWorkDay(WorkDayPayload req) {
+        UUID companyId = TenantContext.getCompanyId();
+        CompanySettings settings = settingsRepository.findById(companyId)
+                .orElseGet(() -> settingsRepository.save(new CompanySettings(companyId)));
+        settings.setWorkDayMinutes(validMinutes(req.workDayMinutes()));
+        settings.setWorkDayStart(parseTime(req.workDayStart()));
+        settings.setAbsentGraceMinutes(req.absentGraceMinutes());
+        return of(settings);
+    }
+
+    private static WorkDayPayload of(CompanySettings s) {
+        return new WorkDayPayload(s.getWorkDayMinutes(), s.getWorkDayStart().toString(), s.getAbsentGraceMinutes());
+    }
+
+    private static int validMinutes(int minutes) {
+        if (minutes < 30 || minutes > 1440) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Work hours must be between 0.5 and 24");
+        }
+        return minutes;
     }
 
     @Transactional

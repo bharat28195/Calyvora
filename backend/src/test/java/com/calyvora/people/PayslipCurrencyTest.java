@@ -70,7 +70,7 @@ class PayslipCurrencyTest extends IntegrationTestBase {
         full.put("locale", "en");
         full.put("currency", "INR");
         full.put("legalName", "Northwind Robotics Private Limited");
-        full.put("address", "Thaltej, Ahmedabad");
+        full.put("address", "Ashram Road, Ahmedabad");
         mockMvc.perform(patch("/api/v1/company/settings")
                         .header("Authorization", "Bearer " + ava.accessToken())
                         .contentType(MediaType.APPLICATION_JSON).content(json(full)))
@@ -84,7 +84,7 @@ class PayslipCurrencyTest extends IntegrationTestBase {
                         .content(json(Map.of("timezone", "Asia/Kolkata", "locale", "en", "currency", "INR"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.legalName").value("Northwind Robotics Private Limited"))
-                .andExpect(jsonPath("$.address").value("Thaltej, Ahmedabad"));
+                .andExpect(jsonPath("$.address").value("Ashram Road, Ahmedabad"));
     }
 
     private void setCurrency(Session session, String currency) throws Exception {

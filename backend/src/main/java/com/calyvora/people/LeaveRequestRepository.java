@@ -53,6 +53,11 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, UUID
     List<LeaveRequest> findByCompanyIdAndEmployeeIdInAndStatus(
             UUID companyId, Collection<UUID> employeeIds, LeaveStatus status);
 
+    /** One roster's leave in a status that overlaps a window — a team's month, not its history. */
+    List<LeaveRequest> findByCompanyIdAndEmployeeIdInAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+            UUID companyId, Collection<UUID> employeeIds, LeaveStatus status, java.time.LocalDate to,
+            java.time.LocalDate from);
+
     Optional<LeaveRequest> findByIdAndCompanyId(UUID id, UUID companyId);
 
     List<LeaveRequest> findByEmployeeIdAndTypeAndStatus(UUID employeeId, LeaveType type, LeaveStatus status);

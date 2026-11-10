@@ -50,7 +50,7 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
         assertThat(d.get("regime").asText()).isEqualTo("NEW");
         assertThat(d.get("declared").size()).isZero();
         // The form needs the section list to render at all, so it ships with the empty declaration.
-        assertThat(d.get("options").size()).isGreaterThan(5);
+        assertThat(d.get("catalog").size()).isGreaterThan(5);
         assertThat(d.get("financialYear").asText()).matches("\\d{4}-\\d{2}");
     }
 
@@ -59,8 +59,8 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
     void saving_and_reading_back() throws Exception {
         Session owner = demoOwner();
         Map<String, Object> declared = new LinkedHashMap<>();
-        declared.put("SECTION_80C", 150000);
-        declared.put("SECTION_80D_SELF", 25000);
+        declared.put("PPF", 150000);
+        declared.put("HEALTH_SELF_PREMIUM", 25000);
 
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
@@ -68,7 +68,7 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
                         .content(json(declaration(TaxRegime.OLD, declared))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.regime").value("OLD"))
-                .andExpect(jsonPath("$.declared.SECTION_80C").value(150000));
+                .andExpect(jsonPath("$.declared.PPF").value(150000));
 
         // Switching to the new regime must not wipe the entries — the employee may switch back, and
         // retyping a year's investments because they compared the two is its own kind of defect.
@@ -78,7 +78,7 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
                         .content(json(Map.of("regime", "NEW"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.regime").value("NEW"))
-                .andExpect(jsonPath("$.declared.SECTION_80C").value(150000));
+                .andExpect(jsonPath("$.declared.PPF").value(150000));
     }
 
     @Test
@@ -88,17 +88,17 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(json(declaration(TaxRegime.OLD, Map.of("SECTION_80C", 150000)))))
+                        .content(json(declaration(TaxRegime.OLD, Map.of("PPF", 150000)))))
                 .andExpect(status().isOk());
 
         // A merge would make this impossible: nobody could ever take a claim back.
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(json(declaration(TaxRegime.OLD, Map.of("SECTION_80D_SELF", 20000)))))
+                        .content(json(declaration(TaxRegime.OLD, Map.of("HEALTH_SELF_PREMIUM", 20000)))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.declared.SECTION_80C").doesNotExist())
-                .andExpect(jsonPath("$.declared.SECTION_80D_SELF").value(20000));
+                .andExpect(jsonPath("$.declared.PPF").doesNotExist())
+                .andExpect(jsonPath("$.declared.HEALTH_SELF_PREMIUM").value(20000));
     }
 
     @Test
@@ -108,23 +108,32 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(json(declaration(TaxRegime.OLD, Map.of("SECTION_80C", 500000)))))
+                        .content(json(declaration(TaxRegime.OLD, Map.of("PPF", 500000)))))
                 .andExpect(status().isOk())
                 // Kept as entered, so the screen can say "you claimed this, that much is allowable".
-                .andExpect(jsonPath("$.declared.SECTION_80C").value(500000));
+                .andExpect(jsonPath("$.declared.PPF").value(500000));
 
         JsonNode c = getJson("/api/v1/tax/me/computation", owner);
         JsonNode row = null;
         for (JsonNode d : c.get("deductions")) {
-            if ("SECTION_80C".equals(d.get("key").asText())) {
+            if ("PPF".equals(d.get("key").asText())) {
                 row = d;
             }
         }
         assertThat(row).isNotNull();
         assertThat(row.get("declared").asLong()).isEqualTo(500000);
-        assertThat(row.get("allowed").asLong())
-                .as("80C is capped at 1,50,000 wherever the claim came from")
+        // PF from payroll, if any, fills the same ceiling first; the group is what is capped.
+        JsonNode group = null;
+        for (JsonNode g : c.get("groups")) {
+            if ("SEC_123".equals(g.get("group").asText())) {
+                group = g;
+            }
+        }
+        assertThat(group).isNotNull();
+        assertThat(group.get("allowed").asLong())
+                .as("Section 123 is capped at 1,50,000 wherever the claim came from")
                 .isEqualTo(150000);
+        assertThat(row.get("allowed").asLong()).isLessThanOrEqualTo(150000);
     }
 
     @Test
@@ -156,7 +165,7 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(json(declaration(TaxRegime.OLD, Map.of("SECTION_80C", 150000)))))
+                        .content(json(declaration(TaxRegime.OLD, Map.of("PPF", 150000)))))
                 .andExpect(status().isOk());
 
         JsonNode c = getJson("/api/v1/tax/me/computation", owner);
@@ -184,7 +193,7 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(json(declaration(TaxRegime.OLD, Map.of("SECTION_80C", 1000)))))
+                        .content(json(declaration(TaxRegime.OLD, Map.of("PPF", 1000)))))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/v1/tax/window")
@@ -195,7 +204,7 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(json(declaration(TaxRegime.OLD, Map.of("SECTION_80C", 1000)))))
+                        .content(json(declaration(TaxRegime.OLD, Map.of("PPF", 1000)))))
                 .andExpect(status().isOk());
     }
 
@@ -239,7 +248,7 @@ class TaxDeclarationIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(put("/api/v1/tax/me/declaration")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(json(declaration(TaxRegime.OLD, Map.of("SECTION_80C", 150000)))))
+                        .content(json(declaration(TaxRegime.OLD, Map.of("PPF", 150000)))))
                 .andExpect(status().isOk());
 
         Session other = onboardOwner("Taxco", "admin@taxco.test", "Passw0rd!x");

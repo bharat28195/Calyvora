@@ -86,6 +86,10 @@ public class EmployeeFinance {
     @Column(name = "parent_name", length = 120)
     private String parentName;
 
+    /** MALE / FEMALE / OTHER, or null. Read by professional tax: Maharashtra's slabs differ by it. */
+    @Column(name = "gender", length = 16)
+    private String gender;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -261,5 +265,13 @@ public class EmployeeFinance {
 
     public void setParentName(String parentName) {
         this.parentName = parentName;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 }

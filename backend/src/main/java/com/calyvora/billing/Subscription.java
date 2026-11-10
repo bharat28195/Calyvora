@@ -68,6 +68,10 @@ public class Subscription {
     @Column(name = "ends_at")
     private java.time.LocalDate endsAt;
 
+    /** The end date the "ends in 5 days" reminder was sent for (PD-76); a new end date reminds again. */
+    @Column(name = "expiry_reminded_for")
+    private java.time.LocalDate expiryRemindedFor;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -124,6 +128,8 @@ public class Subscription {
     public void setSeats(int seats) { this.seats = seats; }
     public java.time.LocalDate getEndsAt() { return endsAt; }
     public void setEndsAt(java.time.LocalDate endsAt) { this.endsAt = endsAt; }
+    public java.time.LocalDate getExpiryRemindedFor() { return expiryRemindedFor; }
+    public void setExpiryRemindedFor(java.time.LocalDate expiryRemindedFor) { this.expiryRemindedFor = expiryRemindedFor; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 

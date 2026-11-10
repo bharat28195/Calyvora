@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2, Save, FileSignature, FileUp, Lock, Braces, ChevronDown, Eye } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { DocumentKind, DocumentTemplate, Letterhead, MergeField } from "@/lib/types";
-import { KIND_LABELS, renderTemplate, placeholdersIn } from "@/lib/documents";
+import type { DocumentKind, DocumentTemplate, Letterhead, MergeField, Signatory } from "@/lib/types";
+import { KIND_LABELS, KIND_STAGES, renderTemplate, placeholdersIn } from "@/lib/documents";
 import { FormatToolbar } from "@/components/documents/format-toolbar";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export default function TemplatesPage() {
   const [fields, setFields] = useState<MergeField[]>([]);
   const [letterhead, setLetterhead] = useState<Letterhead | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (keep?: string) => {
@@ -102,24 +103,38 @@ export default function TemplatesPage() {
       ) : (
         // The list stays narrow — the editor and the letter beside it are what the screen is for.
         <div className="mt-8 grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
+          {/* Grouped by stage — two dozen letters in one list is a list nobody finds anything in. */}
           <div className="flex flex-col gap-1.5">
-            {templates.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setSelectedId(t.id)}
-                className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                  t.id === selectedId
-                    ? "border-violet/40 bg-violet/10 text-violet"
-                    : "border-fg/10 text-fg/70 hover:bg-fg/5"
-                }`}
-              >
-                <span className="flex items-center gap-1.5 font-medium">
-                  {t.name}
-                  {t.builtIn && <Lock className="h-3 w-3 text-fg/30" aria-label="Starter template" />}
-                </span>
-                <span className="block text-xs text-fg/40">{KIND_LABELS[t.kind]}</span>
-              </button>
-            ))}
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a letter…"
+              className="mb-1 rounded-lg border border-fg/15 bg-fg/5 px-3 py-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet" />
+            {KIND_STAGES.map(({ stage, kinds }) => {
+              const inStage = templates.filter((t) => kinds.includes(t.kind)
+                && (!search.trim() || t.name.toLowerCase().includes(search.trim().toLowerCase())));
+              if (inStage.length === 0) return null;
+              return (
+                <div key={stage} className="mb-2">
+                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-fg/40">{stage}</p>
+                  <div className="flex flex-col gap-1">
+                    {inStage.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedId(t.id)}
+                        className={`rounded-lg border px-3 py-1.5 text-left text-sm transition-colors ${
+                          t.id === selectedId
+                            ? "border-violet/40 bg-violet/10 text-violet"
+                            : "border-fg/10 text-fg/70 hover:bg-fg/5"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {t.name}
+                          {t.builtIn && <Lock className="h-3 w-3 text-fg/30" aria-label="Starter template" />}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {selected ? (
@@ -154,6 +169,12 @@ function TemplateEditor({
   const [description, setDescription] = useState(template.description ?? "");
   const [body, setBody] = useState(template.body);
   const [useLetterhead, setUseLetterhead] = useState(template.useLetterhead);
+  // PD-71: "" signs with the company's default signatory.
+  const [signatoryId, setSignatoryId] = useState(template.signatoryId ?? "");
+  const [signatories, setSignatories] = useState<Signatory[]>([]);
+  useEffect(() => { api.signatories().then(setSignatories).catch(() => setSignatories([])); }, []);
+  const signer = signatories.find((s) => s.id === signatoryId && s.active)
+    ?? signatories.find((s) => s.active && s.isDefault) ?? null;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -161,14 +182,29 @@ function TemplateEditor({
   const dirty =
     name !== template.name || kind !== template.kind || body !== template.body ||
     useLetterhead !== template.useLetterhead ||
+    signatoryId !== (template.signatoryId ?? "") ||
     description !== (template.description ?? "");
 
   /** Sample values so the preview reads like a letter instead of a form. */
   const sample = useMemo(() => {
     const values: Record<string, string> = {};
     for (const key of placeholdersIn(body)) values[key] = SAMPLE[key] ?? `«${key}»`;
-    return renderTemplate(body, values);
-  }, [body]);
+    if (signer) {
+      values["signatory.name"] = signer.name;
+      values["signatory.title"] = signer.title ?? "";
+    }
+    const text = renderTemplate(body, values);
+    if (!signer) return text;
+    // Where the signature will print: just above the signatory's name, as on an issued letter.
+    const lines = text.split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].replace(/\*/g, "").trim().toLowerCase() === signer.name.trim().toLowerCase()) {
+        lines.splice(i, 0, "[[signature]]");
+        break;
+      }
+    }
+    return lines.join("\n");
+  }, [body, signer]);
 
   function insert(key: string) {
     const el = bodyRef.current;
@@ -191,7 +227,7 @@ function TemplateEditor({
     setSaving(true);
     setError(null);
     try {
-      onSaved(await api.updateDocTemplate(template.id, { name, kind, description, body, useLetterhead }));
+      onSaved(await api.updateDocTemplate(template.id, { name, kind, description, body, useLetterhead, signatoryId }));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to save");
     } finally {
@@ -264,6 +300,16 @@ function TemplateEditor({
             </span>
           </div>
 
+          <Field label="Signed by" htmlFor="t-signer"
+            hint={signatories.length === 0 ? "Add signatories on the Letterpad page to print a signature." : undefined}>
+            <select id="t-signer" className={selectCls} value={signatoryId} onChange={(e) => setSignatoryId(e.target.value)}>
+              <option value="" className="bg-surface">The company&apos;s default signatory</option>
+              {signatories.filter((s) => s.active).map((s) => (
+                <option key={s.id} value={s.id} className="bg-surface">{s.name}{s.title ? ` — ${s.title}` : ""}</option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="When to use this" htmlFor="t-desc">
             <Input id="t-desc" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Sent once a candidate accepts verbally" />
@@ -275,7 +321,7 @@ function TemplateEditor({
           <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg/40">
             <Eye className="h-3.5 w-3.5" /> How it will look
           </p>
-          <LetterSheet body={sample} letterhead={useLetterhead ? letterhead : null} />
+          <LetterSheet body={sample} letterhead={useLetterhead ? letterhead : null} signatoryId={signer?.id ?? null} />
           <p className="mt-2 text-xs text-fg/35">
             Filled in with sample values. The real names and figures come from the employee you pick
             when you issue it.

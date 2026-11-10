@@ -39,6 +39,10 @@ public class ReviewCycle {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    /** The questions this cycle asks, as JSON (V76). Null for cycles from before: the free-text form. */
+    @Column(name = "questions")
+    private String questions;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -69,5 +73,7 @@ public class ReviewCycle {
     public ReviewCycleStatus getStatus() { return status; }
     public void setStatus(ReviewCycleStatus status) { this.status = status; }
     public UUID getCreatedBy() { return createdBy; }
+    public String getQuestions() { return questions; }
+    public void setQuestions(String v) { this.questions = v; }
     public Instant getCreatedAt() { return createdAt; }
 }

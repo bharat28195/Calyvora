@@ -16,6 +16,7 @@ import {
   type CandidateInput,
   type Shift,
   type ShiftInput,
+  type WorkDayPolicy,
   type Roster,
   type RosterEntry,
   type CompanySummary,
@@ -72,13 +73,24 @@ import {
   type Plan,
   type LeaveBalance,
   type PfSettings,
+  type StatutorySettings,
+  type PayrollMonthStatus,
+  type FilingFile,
+  type FilingIssue,
+  type TdsOpening,
   type LeavePolicy,
   type CompanyFile,
   type CursorPage,
   type TaxComputation,
   type TaxDeclaration,
   type TaxDeclarationRow,
-  type TaxRegime,
+  type TaxDeclarationInput,
+  type TaxSettings,
+  type TaxReviewInput,
+  type Form130,
+  type DocumentEmailState,
+  type TdsDeposits,
+  type TdsChallanInput,
   type LeaveRequest,
   type LeaveTypeBalance,
   type LoginResult,
@@ -94,6 +106,9 @@ import {
   type SearchResponse,
   type AssistantResponse,
   type Letterhead,
+  type Signatory,
+  type SettlementView,
+  type SettlementInput,
   type LetterheadInput,
   type ExitView,
   type StartExitInput,
@@ -104,6 +119,7 @@ import {
   type TeamStanding,
   type TeamSummary,
   type Designation,
+  type UserPreferences,
 } from "@/lib/types";
 import { mockBackend, type MailMessage } from "@/lib/mock/backend";
 
@@ -194,9 +210,58 @@ async function renewSession(): Promise<boolean> {
 export const auth = {
   get: () => accessToken,
   set: (t: string | null) => {
+    // A different session (sign-out, another person signing in on this tab) must never be shown the
+    // previous one's cached screens.
+    if (t === null) readCache.clear();
     accessToken = t;
   },
 };
+
+/**
+ * Recently read screens, so moving between pages is instant.
+ *
+ * <p>Every click was a fresh round trip to the backend — 150 to 500 ms each on the hosted plan, and
+ * a dashboard makes five — so going back to a page you just left waited as long as the first visit.
+ * A GET answered in the last {@link READ_CACHE_MS} is served from here instead.
+ *
+ * <p>Any write clears the whole cache, not just the path it touched: one check-in changes the
+ * dashboard, the day sheet, the month and the team overview, and working out which reads a write
+ * affects is exactly the bookkeeping that goes wrong. Short-lived on purpose — another person's
+ * check-in shows up within the TTL rather than never.
+ */
+const READ_CACHE_MS = 20_000;
+const readCache = new Map<string, { at: number; body: unknown }>();
+
+/** For the writes that do not go through `http` (multipart uploads): they change what reads return too. */
+function forgetReads() {
+  readCache.clear();
+}
+const inFlight = new Map<string, Promise<unknown>>();
+
+async function http<T>(path: string, init?: HttpInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method !== "GET") {
+    readCache.clear();
+    try {
+      return await httpRaw<T>(path, init);
+    } finally {
+      readCache.clear();   // and again after: a read that raced the write may have cached the old state
+    }
+  }
+  const hit = readCache.get(path);
+  if (hit && Date.now() - hit.at < READ_CACHE_MS) return structuredClone(hit.body) as T;
+  // Two components asking for the same thing at once share one request.
+  const pending = inFlight.get(path);
+  if (pending) return structuredClone(await pending) as T;
+  const request = httpRaw<T>(path, init)
+    .then((body) => {
+      if (body !== undefined) readCache.set(path, { at: Date.now(), body });
+      return body;
+    })
+    .finally(() => inFlight.delete(path));
+  inFlight.set(path, request);
+  return structuredClone(await request) as T;
+}
 
 /**
  * How long to keep trying while the backend is waking up. The hosted backend sleeps when idle and
@@ -244,7 +309,7 @@ function shouldRetry(attempt: number): boolean {
 /** {@code skipAuthRetry} marks the refresh call itself — retrying a 401 there would loop. */
 type HttpInit = RequestInit & { skipAuthRetry?: boolean };
 
-async function http<T>(path: string, init?: HttpInit): Promise<T> {
+async function httpRaw<T>(path: string, init?: HttpInit): Promise<T> {
   let renewed = false;
   // Whether this call is the one doing the waiting, and whether it is still entitled to retry.
   let leading = false;
@@ -374,6 +439,29 @@ function pageQuery(opts: object): string {
   return query ? `?${query}` : "";
 }
 
+/** Which sheet of the letterpad: page one, or the one for page two onwards (PD-69). */
+export type LetterpadSheet = "background" | "continuation";
+
+/** A multipart upload of one file as "file" — the browser sets the boundary, so no JSON helper. */
+async function upload<T>(path: string, file: Blob, name: string): Promise<T> {
+  if (!LIVE) return liveOnly("Uploads");
+  const form = new FormData();
+  form.append("file", file, name);
+  forgetReads();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
+    body: form,
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+  return body as T;
+}
+
+/** Letterpad images by sheet and version, as object URLs (see api.letterpadImage). */
+const letterpadCache = new Map<string, Promise<string>>();
+
 export const api = {
   // --- auth / registration ---
   /**
@@ -441,6 +529,27 @@ export const api = {
       : await mockBackend.login(email, password);
     auth.set(result.accessToken);
     return result;
+  },
+  /**
+   * Change your own password. The server signs every other session out and hands this one a fresh
+   * session, so the new access token replaces the old.
+   */
+  async changePassword(currentPassword: string, newPassword: string): Promise<LoginResult> {
+    if (!LIVE) {
+      throw new ApiError({ timestamp: "", status: 400, code: "VALIDATION_ERROR", message: "Passwords can't be changed in the offline demo." });
+    }
+    const result = await http<LoginResult>("/auth/change-password", {
+      method: "POST", body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    auth.set(result.accessToken);
+    return result;
+  },
+  /** Save your language, timezone and date/time style; answers with the /me you now get. */
+  async updatePreferences(prefs: UserPreferences): Promise<Me> {
+    if (!LIVE) {
+      throw new ApiError({ timestamp: "", status: 400, code: "VALIDATION_ERROR", message: "Preferences can't be saved in the offline demo." });
+    }
+    return http<Me>("/auth/preferences", { method: "PUT", body: JSON.stringify(prefs) });
   },
   /**
    * Restore a session on page load.
@@ -593,6 +702,19 @@ export const api = {
   endCompanySubscription(companyId: string): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/end`, { method: "POST" }) : Promise.reject(new Error("live only"));
   },
+  /** PD-74: archive (keep everything, stop sign-in and billing), restore, and delete for good. */
+  archiveCompany(companyId: string, reason?: string): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/archive`, { method: "POST", body: JSON.stringify({ reason }) })
+      : Promise.reject(new Error("live only"));
+  },
+  restoreCompany(companyId: string): Promise<CompanySummary> {
+    return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/restore`, { method: "POST" }) : Promise.reject(new Error("live only"));
+  },
+  deleteCompanyPermanently(companyId: string, confirmName: string, ownerPassword: string): Promise<{ rows: number; tables: number }> {
+    return LIVE ? http<{ rows: number; tables: number }>(`/platform/companies/${companyId}`, {
+      method: "DELETE", body: JSON.stringify({ confirmName, ownerPassword }),
+    }) : Promise.reject(new Error("live only"));
+  },
   renewCompanySubscription(companyId: string, months: number): Promise<CompanySummary> {
     return LIVE ? http<CompanySummary>(`/platform/companies/${companyId}/renew`, { method: "POST", body: JSON.stringify({ months }) }) : Promise.reject(new Error("live only"));
   },
@@ -644,7 +766,7 @@ export const api = {
     return LIVE ? http<TrialRequest[]>("/platform/trial-requests") : liveOnly("The trial queue");
   },
   /** Approving provisions the company on these terms — this is the moment a login starts existing. */
-  approveTrialRequest(id: string, terms: { password: string; seats: number; months: number; currency?: string }): Promise<CompanySummary> {
+  approveTrialRequest(id: string, terms: { password?: string; seats: number; months: number; currency?: string }): Promise<CompanySummary> {
     return LIVE
       ? http<CompanySummary>(`/platform/trial-requests/${id}/approve`, { method: "POST", body: JSON.stringify(terms) })
       : liveOnly("Approving a trial");
@@ -690,6 +812,15 @@ export const api = {
   },
 
   // --- shift scheduling / rostering ---
+  /** The standard day (hours, start) and the absence grace, for anyone not rostered (V70). */
+  workDay(): Promise<WorkDayPolicy> {
+    return LIVE ? http<WorkDayPolicy>("/shifts/work-day")
+      : Promise.resolve({ workDayMinutes: 540, workDayStart: "09:30", absentGraceMinutes: 120 });
+  },
+  setWorkDay(input: WorkDayPolicy): Promise<WorkDayPolicy> {
+    return LIVE ? http<WorkDayPolicy>("/shifts/work-day", { method: "PUT", body: JSON.stringify(input) })
+      : liveOnly("Changing the working day");
+  },
   shifts(): Promise<Shift[]> {
     return LIVE ? http<Shift[]>("/shifts") : mockBackend.shifts(accessToken);
   },
@@ -842,9 +973,12 @@ export const api = {
     return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/manager`, { method: "PATCH", body: JSON.stringify(input) })
       : mockBackend.saveManagerReview(accessToken, reviewId, input);
   },
-  approveReview(reviewId: string): Promise<PerformanceReview> {
-    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/approve`, { method: "POST" })
+  approveReview(reviewId: string, opts: { force?: boolean; issueLetter?: boolean } = {}): Promise<PerformanceReview> {
+    return LIVE ? http<PerformanceReview>(`/performance/reviews/${reviewId}/approve`, { method: "POST", body: JSON.stringify(opts) })
       : mockBackend.approveReview(accessToken, reviewId);
+  },
+  deleteReviewCycle(cycleId: string): Promise<void> {
+    return LIVE ? http<void>(`/performance/cycles/${cycleId}`, { method: "DELETE" }) : liveOnly("Review cycles");
   },
   listEmployees(): Promise<Employee[]> {
     return LIVE ? http<Employee[]>("/people/employees") : mockBackend.listEmployees(accessToken);
@@ -1038,6 +1172,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     if (title) form.append("title", title);
+    forgetReads();
     const res = await fetch(`${BASE}/knowledge/spaces/${spaceId}/files`, {
       method: "POST",
       credentials: "include",
@@ -1187,6 +1322,53 @@ export const api = {
   updatePfSettings(patch: Partial<Omit<PfSettings, "enabled">>): Promise<PfSettings> {
     return http<PfSettings>("/payroll/pf-settings", { method: "PATCH", body: JSON.stringify(patch) });
   },
+  /** Whether a month's payroll is finalised. The demo backend has no locking: every month is open. */
+  payrollMonthStatus(month: string): Promise<PayrollMonthStatus> {
+    return LIVE
+      ? http<PayrollMonthStatus>(`/payroll/months/${month}`)
+      : Promise.resolve({ month, finalized: false, finalizedAt: null, employees: null, totalGross: null, totalNet: null, totalEmployer: null });
+  },
+  finalizePayrollMonth(month: string): Promise<PayrollMonthStatus> {
+    return http<PayrollMonthStatus>(`/payroll/months/${month}/finalize`, { method: "POST" });
+  },
+  reopenPayrollMonth(month: string): Promise<PayrollMonthStatus> {
+    return http<PayrollMonthStatus>(`/payroll/months/${month}/reopen`, { method: "POST" });
+  },
+  /** Income and TDS from before Orbit this financial year (previous employer or old payroll). */
+  tdsOpenings(year?: string): Promise<TdsOpening[]> {
+    return http<TdsOpening[]>(`/payroll/tds-openings${year ? `?year=${year}` : ""}`);
+  },
+  saveTdsOpening(employeeId: string, body: { coveredThrough: string; income: number; tds: number; note?: string;
+                   employeePf?: number; professionalTax?: number },
+                 year?: string): Promise<TdsOpening> {
+    return http<TdsOpening>(`/payroll/tds-openings/${employeeId}${year ? `?year=${year}` : ""}`,
+      { method: "PUT", body: JSON.stringify(body) });
+  },
+  deleteTdsOpening(employeeId: string, year?: string): Promise<void> {
+    return http<void>(`/payroll/tds-openings/${employeeId}${year ? `?year=${year}` : ""}`, { method: "DELETE" });
+  },
+  /** Every finalised month, newest first. */
+  payrollMonths(): Promise<PayrollMonthStatus[]> {
+    return LIVE ? http<PayrollMonthStatus[]>("/payroll/months") : Promise.resolve([]);
+  },
+  /** What will stop a statutory return from being filed. */
+  filingReadiness(): Promise<FilingIssue[]> {
+    return http<FilingIssue[]>("/payroll/filings/readiness");
+  },
+  /** A return file for a finalised month, with who was left out and why. */
+  filingFile(kind: "ecr" | "esi" | "pt" | "lwf", month: string): Promise<FilingFile> {
+    return http<FilingFile>(`/payroll/filings/${month}/${kind}?format=json`);
+  },
+  /** Form 24Q deductee data for a financial-year quarter, e.g. "2026-27-Q3". */
+  form24q(quarter: string): Promise<FilingFile> {
+    return http<FilingFile>(`/payroll/filings/24q/${quarter}?format=json`);
+  },
+  statutorySettings(): Promise<StatutorySettings> {
+    return http<StatutorySettings>("/payroll/statutory-settings");
+  },
+  updateStatutorySettings(patch: Partial<Omit<StatutorySettings, "statutoryEnabled">>): Promise<StatutorySettings> {
+    return http<StatutorySettings>("/payroll/statutory-settings", { method: "PATCH", body: JSON.stringify(patch) });
+  },
   /**
    * Which capabilities are on for my own company.
    *
@@ -1305,7 +1487,7 @@ export const api = {
       ? http<TaxDeclaration>(`/tax/me/declaration${year ? `?year=${year}` : ""}`)
       : liveOnly("Income tax");
   },
-  saveTaxDeclaration(input: { regime?: TaxRegime; declared?: Record<string, number> }, year?: string): Promise<TaxDeclaration> {
+  saveTaxDeclaration(input: TaxDeclarationInput, year?: string): Promise<TaxDeclaration> {
     return LIVE
       ? http<TaxDeclaration>(`/tax/me/declaration${year ? `?year=${year}` : ""}`,
           { method: "PUT", body: JSON.stringify(input) })
@@ -1330,6 +1512,89 @@ export const api = {
   setTaxWindow(open: boolean): Promise<{ open: boolean }> {
     return LIVE
       ? http<{ open: boolean }>("/tax/window", { method: "POST", body: JSON.stringify({ open }) })
+      : liveOnly("Income tax");
+  },
+  /** The computation for a form not yet saved — the live figures beside it while typing. */
+  taxPreview(input: TaxDeclarationInput, year?: string): Promise<TaxComputation> {
+    return LIVE
+      ? http<TaxComputation>(`/tax/me/preview${year ? `?year=${year}` : ""}`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Income tax");
+  },
+  /** Attach a proof (PDF, PNG or JPEG, up to 5 MB) to a line, a rent period, a house or the previous employer. */
+  async uploadTaxProof(ownerType: "ITEM" | "RENT" | "HOUSE" | "PREVIOUS", ownerId: string, file: File,
+                       year?: string): Promise<TaxDeclaration> {
+    if (!LIVE) return liveOnly("Income tax");
+    const form = new FormData();
+    form.append("file", file);
+    form.append("ownerType", ownerType);
+    form.append("ownerId", ownerId);
+    if (year) form.append("year", year);
+    forgetReads();
+    const res = await fetch(`${BASE}/tax/me/proofs`, {
+      method: "POST",
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    return body as TaxDeclaration;
+  },
+  deleteTaxProof(proofId: string, year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/me/proofs/${proofId}${year ? `?year=${year}` : ""}`, { method: "DELETE" })
+      : liveOnly("Income tax");
+  },
+  /** A proof's bytes, for viewing — a plain link would not carry the bearer token. */
+  async taxProofBlob(proofId: string): Promise<Blob> {
+    const res = await fetch(`${BASE}/tax/proofs/${proofId}`, {
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    }
+    return res.blob();
+  },
+  myForm130(year?: string): Promise<Form130> {
+    return LIVE ? http<Form130>(`/tax/me/form130${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  taxSettings(): Promise<TaxSettings> {
+    return LIVE ? http<TaxSettings>("/tax/settings") : liveOnly("Income tax");
+  },
+  saveTaxSettings(input: TaxSettings): Promise<TaxSettings> {
+    return LIVE ? http<TaxSettings>("/tax/settings", { method: "PUT", body: JSON.stringify(input) }) : liveOnly("Income tax");
+  },
+  tdsDeposits(year?: string): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  saveTdsChallan(month: string, input: TdsChallanInput): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits/challans/${month}`, { method: "PUT", body: JSON.stringify(input) }) : liveOnly("Income tax");
+  },
+  clearTdsChallan(month: string): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits/challans/${month}`, { method: "DELETE" }) : liveOnly("Income tax");
+  },
+  saveTdsReceipt(quarter: string, receiptNo: string): Promise<TdsDeposits> {
+    return LIVE ? http<TdsDeposits>(`/tax/deposits/receipts/${quarter}`, { method: "PUT", body: JSON.stringify({ receiptNo }) }) : liveOnly("Income tax");
+  },
+  employeeTaxDeclaration(employeeId: string, year?: string): Promise<TaxDeclaration> {
+    return LIVE ? http<TaxDeclaration>(`/tax/declarations/${employeeId}${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  employeeTaxComputation(employeeId: string, year?: string): Promise<TaxComputation> {
+    return LIVE ? http<TaxComputation>(`/tax/declarations/${employeeId}/computation${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  employeeForm130(employeeId: string, year?: string): Promise<Form130> {
+    return LIVE ? http<Form130>(`/tax/declarations/${employeeId}/form130${year ? `?year=${year}` : ""}`) : liveOnly("Income tax");
+  },
+  reviewTax(employeeId: string, input: TaxReviewInput, year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/declarations/${employeeId}/review${year ? `?year=${year}` : ""}`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Income tax");
+  },
+  reopenTaxDeclaration(employeeId: string, year?: string): Promise<TaxDeclaration> {
+    return LIVE
+      ? http<TaxDeclaration>(`/tax/declarations/${employeeId}/reopen${year ? `?year=${year}` : ""}`, { method: "POST" })
       : liveOnly("Income tax");
   },
 
@@ -1443,6 +1708,15 @@ export const api = {
   markAttendance(input: MarkAttendanceInput): Promise<AttendanceEntry> {
     return LIVE ? http<AttendanceEntry>("/people/attendance/mark", { method: "POST", body: JSON.stringify(input) }) : mockBackend.markAttendance(accessToken, input);
   },
+  /** A manager or HR sets many people's days at once, applied immediately (V70). Reason required. */
+  correctAttendance(input: {
+    employeeIds: string[]; dates: string[]; status: import("@/lib/types").AttendanceStatus;
+    checkIn?: string; checkOut?: string; reason: string;
+  }): Promise<AttendanceEntry[]> {
+    return LIVE
+      ? http<AttendanceEntry[]>("/people/attendance/correct", { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Correcting attendance");
+  },
   employeeAttendance(employeeId: string, month?: string): Promise<AttendanceMonth> {
     const qs = month ? `?month=${month}` : "";
     return LIVE ? http<AttendanceMonth>(`/people/attendance/employees/${employeeId}${qs}`) : mockBackend.employeeAttendance(accessToken, employeeId, month);
@@ -1477,6 +1751,26 @@ export const api = {
   document(id: string): Promise<GeneratedDoc> {
     return LIVE ? http<GeneratedDoc>(`/documents/${id}`) : mockBackend.document(accessToken, id);
   },
+  /** The issued letter as a PDF on the letterpad — the same file the email attaches. */
+  async documentPdf(id: string): Promise<Blob> {
+    const res = await fetch(`${BASE}/documents/${id}/pdf`, {
+      credentials: "include",
+      headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
+    }
+    return res.blob();
+  },
+  documentEmail(id: string): Promise<DocumentEmailState> {
+    return LIVE ? http<DocumentEmailState>(`/documents/${id}/email`) : liveOnly("Emailing letters");
+  },
+  sendDocumentEmail(id: string, input: { to: string; subject: string; message: string }): Promise<DocumentEmailState> {
+    return LIVE
+      ? http<DocumentEmailState>(`/documents/${id}/email`, { method: "POST", body: JSON.stringify(input) })
+      : liveOnly("Emailing letters");
+  },
   deleteDocument(id: string): Promise<void> {
     return LIVE ? http<void>(`/documents/${id}`, { method: "DELETE" }) : mockBackend.deleteDocument(accessToken, id);
   },
@@ -1499,11 +1793,13 @@ export const api = {
    * browser to set its own with the boundary it generated. Everything else it does — the bearer
    * token, the waking-backend retry — does not apply to a one-off upload.
    */
-  async uploadLetterpad(file: File): Promise<Letterhead> {
+  /** The letterpad, or (PD-69) the continuation sheet for page two onwards. */
+  async uploadLetterpad(file: File, sheet: LetterpadSheet = "background"): Promise<Letterhead> {
     if (!LIVE) return liveOnly("The letterpad");
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${BASE}/documents/letterhead/background`, {
+    forgetReads();
+    const res = await fetch(`${BASE}/documents/letterhead/${sheet}`, {
       method: "POST",
       credentials: "include",
       headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : undefined,
@@ -1513,16 +1809,109 @@ export const api = {
     if (!res.ok) throw new ApiError((body as ApiErrorBody) ?? infrastructureError(res.status));
     return body as Letterhead;
   },
-  removeLetterpad(): Promise<Letterhead> {
+  removeLetterpad(sheet: LetterpadSheet = "background"): Promise<Letterhead> {
     return LIVE
-      ? http<Letterhead>("/documents/letterhead/background", { method: "DELETE" })
+      ? http<Letterhead>(`/documents/letterhead/${sheet}`, { method: "DELETE" })
       : liveOnly("The letterpad");
+  },
+
+  // --- signatories and the seal (PD-71) ---
+  signatories(): Promise<Signatory[]> {
+    return LIVE ? http<Signatory[]>("/documents/signatories") : Promise.resolve([]);
+  },
+  createSignatory(input: { name: string; title?: string; isDefault?: boolean }): Promise<Signatory> {
+    return LIVE ? http<Signatory>("/documents/signatories", { method: "POST", body: JSON.stringify(input) }) : liveOnly("Signatories");
+  },
+  updateSignatory(id: string, input: { name?: string; title?: string; isDefault?: boolean; active?: boolean }): Promise<Signatory> {
+    return LIVE ? http<Signatory>(`/documents/signatories/${id}`, { method: "PATCH", body: JSON.stringify(input) }) : liveOnly("Signatories");
+  },
+  async uploadSignature(id: string, file: Blob, name = "signature.png"): Promise<Signatory> {
+    return upload<Signatory>(`/documents/signatories/${id}/image`, file, name);
+  },
+  removeSignature(id: string): Promise<Signatory> {
+    return LIVE ? http<Signatory>(`/documents/signatories/${id}/image`, { method: "DELETE" }) : liveOnly("Signatories");
+  },
+  async uploadSeal(file: Blob, name = "seal.png"): Promise<Letterhead> {
+    return upload<Letterhead>("/documents/letterhead/seal", file, name);
+  },
+  removeSeal(): Promise<Letterhead> {
+    return LIVE ? http<Letterhead>("/documents/letterhead/seal", { method: "DELETE" }) : liveOnly("The seal");
+  },
+  /** A signature or the seal as an object URL, fetched with the token; one fetch per version. */
+  markImage(kind: "signature" | "seal", id: string, version: string): Promise<string> {
+    const path = kind === "seal" ? "/documents/letterhead/seal" : `/documents/signatories/${id}/image`;
+    const key = `mark:${path}:${version}`;
+    const hit = letterpadCache.get(key);
+    if (hit) return hit;
+    const p = (async () => {
+      const res = await fetch(`${BASE}${path}?v=${encodeURIComponent(version)}`, {
+        credentials: "include",
+        headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+      });
+      if (!res.ok) throw new Error("image " + res.status);
+      return URL.createObjectURL(await res.blob());
+    })();
+    letterpadCache.set(key, p);
+    p.catch(() => letterpadCache.delete(key));
+    return p;
+  },
+
+  // --- full and final settlement (PD-73) ---
+  settlement(employeeId: string): Promise<SettlementView> {
+    return LIVE ? httpRaw<SettlementView>(`/people/employees/${employeeId}/settlement`) : liveOnly("Settlements");
+  },
+  updateSettlement(employeeId: string, input: SettlementInput): Promise<SettlementView> {
+    return LIVE ? http<SettlementView>(`/people/employees/${employeeId}/settlement`, { method: "PATCH", body: JSON.stringify(input) })
+      : liveOnly("Settlements");
+  },
+  settlementAction(employeeId: string, action: "approve" | "reopen" | "paid", body?: { paidOn?: string; reference?: string }): Promise<SettlementView> {
+    return LIVE ? http<SettlementView>(`/people/employees/${employeeId}/settlement/${action}`, {
+      method: "POST", body: body ? JSON.stringify(body) : undefined,
+    }) : liveOnly("Settlements");
   },
   /** Where the uploaded letterpad is served. Versioned so a replacement is not read from cache. */
   letterpadImageUrl(version: string): string {
     return `${BASE}/documents/letterhead/background?v=${encodeURIComponent(version)}`;
   },
+  /**
+   * The letterpad image as a local object URL, fetched with the session's token.
+   *
+   * <p>The API reads the token from the Authorization header only, which neither an <img> nor a CSS
+   * background sends — so pointing either at {@link letterpadImageUrl} got a 401 and letters showed as
+   * bare text. One fetch per version, shared by every letter on screen.
+   */
+  letterpadImage(version: string, sheet: LetterpadSheet = "background"): Promise<string> {
+    const key = `${sheet}:${version}`;
+    const hit = letterpadCache.get(key);
+    if (hit) return hit;
+    const p = (async () => {
+      const res = await fetch(`${BASE}/documents/letterhead/${sheet}?v=${encodeURIComponent(version)}`, {
+        credentials: "include",
+        headers: auth.get() ? { Authorization: `Bearer ${auth.get()}` } : {},
+      });
+      if (!res.ok) throw new Error("letterpad " + res.status);
+      return URL.createObjectURL(await res.blob());
+    })();
+    letterpadCache.set(key, p);
+    p.catch(() => letterpadCache.delete(version));
+    return p;
+  },
 
+  /** Exits waiting for an admin's approval (PD-65). Admins only; others get a 403. */
+  exitRequests(): Promise<(ExitView & { employeeName: string; lastWorkingDay: string | null; reason: string | null; requestedByName: string | null })[]> {
+    return LIVE
+      ? http<ExitView[]>("/people/exits/requests").then((rows) => rows.map((r) => ({
+          ...r, employeeName: r.employeeName ?? "Employee", lastWorkingDay: r.requestedLastDay ?? null,
+          reason: r.requestedReason ?? null, requestedByName: r.requestedByName ?? null,
+        })))
+      : Promise.resolve([]);
+  },
+  approveExit(employeeId: string): Promise<ExitView> {
+    return LIVE ? http<ExitView>(`/people/employees/${employeeId}/exit/approve`, { method: "POST" }) : liveOnly("Exits");
+  },
+  rejectExit(employeeId: string): Promise<ExitView> {
+    return LIVE ? http<ExitView>(`/people/employees/${employeeId}/exit/reject`, { method: "POST" }) : liveOnly("Exits");
+  },
   exits(): Promise<ExitView[]> {
     return LIVE ? http<ExitView[]>("/people/exits") : liveOnly("Exits");
   },

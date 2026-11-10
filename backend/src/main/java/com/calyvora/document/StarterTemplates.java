@@ -9,13 +9,27 @@ import java.util.List;
  */
 final class StarterTemplates {
 
-    record Starter(String name, DocumentKind kind, String description, String body) {}
+    /**
+     * @param set which release of the library the template arrived in. A company is given every set it
+     *            has not had (see {@code DocumentService.ensureStarters}); a template it deleted from a
+     *            set it already had is never put back.
+     */
+    record Starter(String name, DocumentKind kind, String description, String body, int set) {
+        Starter(String name, DocumentKind kind, String description, String body) {
+            this(name, kind, description, body, 1);
+        }
+    }
+
+    /** The newest set. Raise it whenever templates are added to {@link LetterLibrary}. */
+    static final int CURRENT_SET = 2;
 
     private StarterTemplates() {
     }
 
     static List<Starter> all() {
-        return List.of(OFFER, JOINING, RELIEVING, EXPERIENCE, PROMOTION);
+        List<Starter> all = new java.util.ArrayList<>(List.of(OFFER, JOINING, RELIEVING, EXPERIENCE, PROMOTION));
+        all.addAll(LetterLibrary.SET_2);
+        return List.copyOf(all);
     }
 
     private static final Starter OFFER = new Starter(

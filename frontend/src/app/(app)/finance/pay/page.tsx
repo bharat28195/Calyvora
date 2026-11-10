@@ -8,7 +8,8 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
-import { money as fmtMoney } from "@/lib/format";
+import { money as fmtMoney, monthYear } from "@/lib/format";
+import { TaxDocuments } from "@/components/tax/tax-documents";
 
 // Company-currency formatting (Settings → Localization); per-record currency is ignored for display.
 function money(n: number | null | undefined, _currency?: string) {
@@ -62,6 +63,9 @@ export default function MyPayslipPage() {
             <p className="text-sm text-fg/50">{money(comp.currentMonthly, currency)}/mo{comp.effectiveDate ? ` · since ${comp.effectiveDate}` : ""}</p>
           </Card>
 
+          {/* Form 130 sits with the payslips too — "my Form 16" is a pay question before it is a tax one. */}
+          <TaxDocuments className="mt-4 print:hidden" />
+
           {comp.history.length > 1 && (
             <Card className="mt-4">
               <CardTitle>Compensation history</CardTitle>
@@ -99,6 +103,11 @@ export default function MyPayslipPage() {
                   <div className="min-w-0">
                     <p className="text-lg font-semibold">
                       Payslip <span className="font-normal text-fg/60">{formatMonth(slip.month)}</span>
+                      {slip.finalized === false && (
+                        <span className="ml-2 rounded-full bg-amber-400/10 px-2 py-0.5 align-middle text-[11px] font-medium text-amber-500">
+                          Provisional
+                        </span>
+                      )}
                     </p>
                     <p className="mt-2 text-sm font-medium uppercase tracking-wide">
                       {slip.companyName || me?.company.name}
@@ -171,19 +180,35 @@ export default function MyPayslipPage() {
                     never reaches the bank account — but it is the employee's pension, so a payslip
                     that hides it is telling half the story. Absent entirely when statutory payroll is
                     off or this person is not enrolled. */}
-                {slip.statutory && (
+                {/* Shown only when the employer actually contributes something: a payslip whose only
+                    statutory line is professional tax has no employer side to show. */}
+                {slip.statutory && slip.statutory.employerTotal > 0 && (
                   <div className="mt-5 rounded-lg border border-fg/10 px-4 py-3">
                     <p className="mb-2 text-xs uppercase tracking-wide text-fg/40">
                       Employer contributions (not deducted from your salary)
                     </p>
-                    <Row label="Pension fund (EPS)" value={money(slip.statutory.employerEps, currency)} />
-                    <Row label="Provident fund (EPF)" value={money(slip.statutory.employerEpf, currency)} />
-                    <Row label="Admin charges" value={money(slip.statutory.employerAdminCharges, currency)} />
-                    <Row label="EDLI" value={money(slip.statutory.employerEdli, currency)} />
+                    {slip.statutory.pfWages != null && (
+                      <>
+                        <Row label="Pension fund (EPS)" value={money(slip.statutory.employerEps ?? 0, currency)} />
+                        <Row label="Provident fund (EPF)" value={money(slip.statutory.employerEpf ?? 0, currency)} />
+                        <Row label="Admin charges" value={money(slip.statutory.employerAdminCharges ?? 0, currency)} />
+                        <Row label="EDLI" value={money(slip.statutory.employerEdli ?? 0, currency)} />
+                      </>
+                    )}
+                    {slip.statutory.employerEsi != null && (
+                      <Row label="ESI (employer)" value={money(slip.statutory.employerEsi, currency)} />
+                    )}
+                    {slip.statutory.lwfEmployer != null && (
+                      <Row label="Labour welfare fund (employer)" value={money(slip.statutory.lwfEmployer, currency)} />
+                    )}
                     <Row label="Total contributed for you" value={money(slip.statutory.employerTotal, currency)} strong />
                     <p className="mt-2 border-t border-fg/10 pt-2 text-[11px] text-fg/40">
-                      Contributions are calculated on PF wages of {money(slip.statutory.pfWages, currency)} for
-                      this month.
+                      {slip.statutory.pfWages != null && (
+                        <>PF is calculated on PF wages of {money(slip.statutory.pfWages, currency)} this month. </>
+                      )}
+                      {slip.statutory.esiWages != null && (
+                        <>ESI is calculated on gross wages of {money(slip.statutory.esiWages, currency)}.</>
+                      )}
                     </p>
                   </div>
                 )}
@@ -219,9 +244,7 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
 
 /** "2026-07" -> "July 2026", the way a payslip titles itself. */
 function formatMonth(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  if (!y || !m) return month;
-  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return monthYear(month);
 }
 
 /** BANK_TRANSFER -> "Bank transfer". */

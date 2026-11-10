@@ -15,6 +15,10 @@ export interface Me {
     lastName: string;
     role: Role;
     status: UserStatus;
+    /** Someone else chose this password (a new company's first admin); the app asks for a new one first. */
+    mustChangePassword?: boolean;
+    /** What this person chose for themselves; null where they kept the default (V68). */
+    preferences?: UserPreferences;
   };
   company: {
     id: string;
@@ -32,12 +36,25 @@ export interface Me {
    * disagree. Set the app-wide formatters from this, not from company.timezone.
    */
   timezone: string;
+  /** The language to show the app in: theirs, else the company's, else English (V68). */
+  language?: string;
   /**
    * What this person may do, permission key → "COMPANY" or "TEAM" (PD-54). Optional only for a
    * session cached before roles existed; read it through lib/permissions, which falls back to the
    * built-in defaults for the role.
    */
   permissions?: Record<string, "COMPANY" | "TEAM">;
+}
+
+export type DateFormatPref = "DMY" | "MDY" | "YMD";
+export type TimeFormatPref = "H12" | "H24";
+
+/** A person's own display choices. Null means "use the default". */
+export interface UserPreferences {
+  language: string | null;
+  timezone: string | null;
+  dateFormat: DateFormatPref | null;
+  timeFormat: TimeFormatPref | null;
 }
 
 export interface CompanySettings {
@@ -279,27 +296,166 @@ export interface ExpenseClaim {
 // --- income tax (India) -----------------------------------------------------------------------
 
 export type TaxRegime = "OLD" | "NEW";
+export type AgeBand = "BELOW_60" | "SENIOR" | "SUPER_SENIOR";
+export type ProofStatus = "NONE" | "SUBMITTED" | "ACCEPTED" | "PARTIAL" | "REJECTED";
 
-/** One section of the declaration form, with the statutory ceiling so the form can show it. */
-export interface TaxDeductionOption {
+/** One line the declaration form can show (Income-tax Act, 2025 numbering, the 1961 one alongside). */
+export interface TaxCatalogEntry {
   key: string;
-  section: string;
+  section: string | null;
+  oldSection: string | null;
+  /** "Sec 123 (80C)" */
+  sectionLabel: string;
   label: string;
-  /** null where the Act sets no ceiling — 80E, for instance. */
-  cap: number | null;
+  hint: string | null;
+  group: string;
+  /** Income to be taxed, rather than a relief. */
+  income: boolean;
   allowedInNewRegime: boolean;
 }
 
+export interface TaxProofFile {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+export interface TaxItem {
+  key: string;
+  amount: number;
+  detail: string | null;
+  proofStatus: ProofStatus;
+  acceptedAmount: number | null;
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
+export interface TaxRent {
+  id: string;
+  fromMonth: string;
+  toMonth: string;
+  monthlyRent: number;
+  city: string;
+  metro: boolean;
+  landlordName: string | null;
+  landlordPan: string | null;
+  landlordAddress: string | null;
+  landlordRelationship: string | null;
+  proofStatus: ProofStatus;
+  acceptedRent: number | null;
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
+export interface TaxHouse {
+  id: string;
+  letOut: boolean;
+  address: string | null;
+  lenderName: string | null;
+  lenderPan: string | null;
+  lenderAddress: string | null;
+  lenderType: LenderType | null;
+  interest: number;
+  annualRent: number;
+  municipalTax: number;
+  proofStatus: ProofStatus;
+  acceptedInterest: number | null;
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
+export interface TaxPrevious {
+  employerName: string | null;
+  tan: string | null;
+  income: number | null;
+  tds: number | null;
+  pf: number | null;
+  pt: number | null;
+  status: "NONE" | "SUBMITTED" | "ACCEPTED" | "REJECTED";
+  reviewNote: string | null;
+  proofs: TaxProofFile[];
+}
+
+export type LenderType = "FINANCIAL_INSTITUTION" | "EMPLOYER" | "OTHER";
+
 export interface TaxDeclaration {
+  employeeId: string;
+  employeeName: string;
+  /** Form 124 item 1, as the employee last certified it. */
+  employeeAddress: string | null;
+  employeePan: string | null;
+  /** For "son / daughter of" in the verification. */
+  parentName: string | null;
+  designation: string | null;
   financialYear: string;
   regime: TaxRegime;
   status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
   submittedAt: string | null;
-  /** Section key to the amount claimed, uncapped — what the employee typed. */
-  declared: Record<string, number>;
-  /** Whether HR still accepts changes for this year. */
+  /** Whether HR still accepts changes for this year (and so whether the regime can change). */
   windowOpen: boolean;
-  options: TaxDeductionOption[];
+  proofsOpen: boolean;
+  proofDeadline: string | null;
+  /** Past the proof deadline: only what HR accepted reduces the tax now. */
+  proofsDue: boolean;
+  parentsSenior: boolean;
+  ageBand: AgeBand;
+  dateOfBirthKnown: boolean;
+  salaryHasHra: boolean;
+  salaryHasLta: boolean;
+  /** Line key to the amount claimed (the older flat shape). */
+  declared: Record<string, number>;
+  items: TaxItem[];
+  rent: TaxRent[];
+  houses: TaxHouse[];
+  previous: TaxPrevious | null;
+  catalog: TaxCatalogEntry[];
+}
+
+export interface TaxRentInput {
+  id?: string | null;
+  fromMonth: string;
+  toMonth: string;
+  monthlyRent: number;
+  city: string;
+  landlordName?: string | null;
+  landlordPan?: string | null;
+  landlordAddress?: string | null;
+  landlordRelationship?: string | null;
+}
+
+export interface TaxHouseInput {
+  id?: string | null;
+  letOut: boolean;
+  address?: string | null;
+  lenderName?: string | null;
+  lenderPan?: string | null;
+  lenderAddress?: string | null;
+  lenderType?: LenderType | null;
+  interest: number;
+  annualRent?: number;
+  municipalTax?: number;
+}
+
+export interface TaxPreviousInput {
+  employerName?: string | null;
+  tan?: string | null;
+  income?: number;
+  tds?: number;
+  pf?: number;
+  pt?: number;
+}
+
+/** What is saved. Every part is optional; a missing part is left as it is. */
+export interface TaxDeclarationInput {
+  regime?: TaxRegime;
+  parentsSenior?: boolean;
+  items?: { key: string; amount: number; detail?: string | null }[];
+  rent?: TaxRentInput[];
+  houses?: TaxHouseInput[];
+  previous?: TaxPreviousInput;
+  employeeAddress?: string | null;
 }
 
 export interface TaxBandRow {
@@ -314,8 +470,43 @@ export interface TaxDeductionRow {
   key: string;
   section: string;
   label: string;
+  /** What the calculation used: claimed until the proof deadline, approved after it. */
   declared: number;
   allowed: number;
+  /** What the employee typed, and what HR approved (null until reviewed). Null for lines Orbit works out. */
+  claimed?: number | null;
+  approved?: number | null;
+  proofStatus?: string | null;
+  /** For a line inside a shared ceiling: the ceiling, and how much the lines above it used. */
+  limit?: number | null;
+  usedBefore?: number | null;
+  /** Home-loan interest counted under Section 22 instead of here. */
+  movedToHouse?: number | null;
+}
+
+export interface TaxGroupRow {
+  group: string;
+  claimed: number;
+  cap: number;
+  allowed: number;
+}
+
+export interface TaxMonthRow {
+  month: string;
+  source: "OPENING" | "LOCKED" | "PROJECTED" | "NONE";
+  gross: number;
+  tds: number | null;
+  pt: number;
+  /** The month's earnings line by line (Basic, HRA…); empty for months not paid here. */
+  heads: { name: string; amount: number }[];
+}
+
+export interface TaxHraMonthRow {
+  month: string;
+  hraReceived: number;
+  rentLessTenPercent: number;
+  percentOfBasic: number;
+  exempt: number;
 }
 
 export interface TaxRegimeComparison {
@@ -328,10 +519,19 @@ export interface TaxRegimeComparison {
 export interface TaxComputation {
   financialYear: string;
   regime: TaxRegime;
+  ageBand: AgeBand;
   currency: string;
   grossSalary: number;
+  previousEmployerIncome: number;
+  exemptions: TaxDeductionRow[];
   standardDeduction: number;
+  professionalTax: number;
+  salaryIncome: number;
+  houseProperty: number;
+  otherIncome: number;
+  grossTotalIncome: number;
   deductions: TaxDeductionRow[];
+  groups: TaxGroupRow[];
   totalDeductions: number;
   taxableIncome: number;
   bands: TaxBandRow[];
@@ -349,6 +549,14 @@ export interface TaxComputation {
   comparison: TaxRegimeComparison;
   /** False while the employer does not withhold income tax through Orbit — the figures are an estimate. */
   withheldByPayroll: boolean;
+  proofsDue: boolean;
+  months: TaxMonthRow[];
+  hraMonths: TaxHraMonthRow[];
+  /** Salary and tax from before this payroll: a previous employer or an opening balance. */
+  priorIncome: number;
+  priorTds: number;
+  /** Home-loan interest declared under 130 / 131 that counts under Section 22 instead. */
+  interestMovedToHouse: number;
 }
 
 export interface TaxDeclarationRow {
@@ -358,6 +566,73 @@ export interface TaxDeclarationRow {
   status: string;
   totalDeclared: number;
   annualTax: number;
+  proofs: number;
+  awaitingReview: number;
+}
+
+export interface TaxSettings {
+  declarationsOpen: boolean;
+  proofsOpen: boolean;
+  proofDeadline: string | null;
+  /** The person responsible for deducting tax, who signs Forms 124 and 130. */
+  signerName?: string | null;
+  signerParent?: string | null;
+  signerDesignation?: string | null;
+  signerPlace?: string | null;
+  /** The CIT (TDS) the TAN falls under — Form 130 Part A. */
+  citTdsAddress?: string | null;
+}
+
+export interface TdsDepositMonth {
+  month: string;
+  finalised: boolean;
+  tdsDeducted: number;
+  bsrCode: string | null;
+  depositDate: string | null;
+  challanSerial: string | null;
+  amount: number | null;
+}
+
+export interface TdsDeposits {
+  financialYear: string;
+  quarters: { quarter: string; label: string; receiptNo: string | null; months: TdsDepositMonth[] }[];
+}
+
+export interface TdsChallanInput {
+  bsrCode: string;
+  depositDate: string;
+  challanSerial: string;
+  amount?: number | null;
+}
+
+export interface TaxReviewInput {
+  type: "ITEM" | "RENT" | "HOUSE" | "PREVIOUS";
+  id?: string | null;
+  status: "ACCEPTED" | "PARTIAL" | "REJECTED";
+  acceptedAmount?: number | null;
+  note?: string | null;
+}
+
+export interface Form130 {
+  financialYear: string;
+  employerName: string;
+  employerAddress: string | null;
+  employerPan: string | null;
+  employerTan: string | null;
+  citTdsAddress: string | null;
+  employeeName: string;
+  employeeAddress: string | null;
+  employeePan: string | null;
+  employeeNo: string | null;
+  designation: string | null;
+  periodFrom: string;
+  periodTo: string;
+  signer: { name: string | null; parent: string | null; designation: string | null; place: string | null };
+  /** Part A summary — finalised months only. */
+  quarters: { quarter: string; label: string; receiptNo: string | null; amountPaid: number; tds: number; deposited: number }[];
+  /** Part A, section II — one row per month with tax; challan fields null until HR records it. */
+  challans: { month: string; tds: number; bsrCode: string | null; depositDate: string | null; challanSerial: string | null }[];
+  computation: TaxComputation;
 }
 
 export interface ExpenseSummary {
@@ -390,7 +665,14 @@ export type NotificationType =
   | "REVIEW_SELF_SUBMITTED"
   | "REVIEW_SUBMITTED"
   | "REVIEW_APPROVED"
-  | "ANNOUNCEMENT";
+  | "ANNOUNCEMENT"
+  | "EXIT_REQUESTED"
+  | "EXIT_DECIDED"
+  | "CHECKOUT_MISSED"
+  | "LETTER_TO_SIGN"
+  | "LETTER_SIGNED"
+  | "LETTER_DECLINED"
+  | "SUBSCRIPTION_ENDING";
 
 export interface AppNotification {
   id: string;
@@ -435,8 +717,18 @@ export interface AttendanceEntry {
   checkIn: string | null;
   checkOut: string | null;
   note: string | null;
-  /** True when the status was inferred (approved leave or a weekend) rather than marked. */
+  /** True when the status was inferred (leave, a weekend, or the absent/half-day rules) rather than marked. */
   derived: boolean;
+  /** Each check-in/check-out pair; checkOut is null while it is still running (V70). */
+  sessions?: { checkIn: string; checkOut: string | null }[];
+  /** First check-in to last check-out, in minutes. */
+  grossMinutes?: number | null;
+  /** Time actually checked in (closed sessions), in minutes. */
+  effectiveMinutes?: number | null;
+  /** Set while checked in: when the running session started. */
+  openSince?: string | null;
+  /** Hours owed that day, from the rostered shift or the company standard (9 h by default). */
+  requiredMinutes?: number | null;
 }
 export interface AttendanceDay {
   date: string;
@@ -508,12 +800,16 @@ export interface MarkAttendanceInput {
 
 /** Documents module (feedback D2/D3) — a template library and the letters generated from it. */
 export type DocumentKind =
-  | "OFFER_LETTER"
-  | "JOINING_LETTER"
-  | "RELIEVING_LETTER"
-  | "EXPERIENCE_LETTER"
-  | "PROMOTION_LETTER"
+  | "OFFER_LETTER" | "APPOINTMENT_LETTER" | "INTERNSHIP_OFFER" | "JOINING_LETTER"
+  | "CONFIRMATION_LETTER" | "PROBATION_EXTENSION"
+  | "INCREMENT_LETTER" | "PROMOTION_LETTER" | "TRANSFER_LETTER" | "BONUS_LETTER" | "APPRECIATION_LETTER"
+  | "SALARY_CERTIFICATE" | "EMPLOYMENT_VERIFICATION" | "NOC"
+  | "WARNING_LETTER" | "SHOW_CAUSE_NOTICE" | "PIP_LETTER" | "TERMINATION_LETTER"
+  | "RESIGNATION_ACCEPTANCE" | "RELIEVING_LETTER" | "EXPERIENCE_LETTER" | "NO_DUES_CERTIFICATE"
+  | "FNF_STATEMENT" | "INTERNSHIP_CERTIFICATE"
   | "CUSTOM";
+
+export type LetterDateStyle = "LONG" | "SHORT" | "NUMERIC";
 
 export interface DocumentTemplate {
   id: string;
@@ -527,6 +823,78 @@ export interface DocumentTemplate {
   /** The merge fields this body actually references. */
   placeholders: string[];
   updatedAt: string;
+  /** PD-71: who signs letters from this template; null = the company's default signatory. */
+  signatoryId?: string | null;
+}
+
+/** Someone authorised to sign the company's letters (PD-71). */
+export interface Signatory {
+  id: string;
+  name: string;
+  title: string | null;
+  hasImage: boolean;
+  isDefault: boolean;
+  active: boolean;
+  updatedAt: string;
+}
+
+/** Full and final settlement (PD-73). */
+export interface SettlementLine { label: string; amount: number; note: string | null }
+export interface SettlementExtraLine { label: string; amount: number; deduction: boolean }
+export interface SettlementStatement {
+  employeeName: string;
+  employeeNo: string | null;
+  designation: string | null;
+  department: string | null;
+  startDate: string | null;
+  lastWorkingDay: string;
+  currency: string;
+  service: string;
+  gratuityDue: boolean;
+  monthlyGross: number;
+  monthlyBasic: number;
+  dayRate: number;
+  noticeRequired: number | null;
+  noticeServed: number | null;
+  noticeShortfall: number;
+  leave: { type: string; available: number; encashed: boolean }[];
+  earnings: SettlementLine[];
+  deductions: SettlementLine[];
+  totalEarnings: number;
+  totalDeductions: number;
+  netPayable: number;
+  payBy: string;
+  notes: string[];
+}
+export interface SettlementView {
+  id: string;
+  employeeId: string;
+  status: "DRAFT" | "APPROVED" | "PAID";
+  encashTypes: string;
+  encashDays: number | null;
+  encashBasis: "BASIC_26" | "BASIC_30" | "GROSS_30";
+  noticeDays: number | null;
+  noticeWaived: boolean;
+  includeGratuity: boolean;
+  extraLines: SettlementExtraLine[];
+  note: string | null;
+  statement: SettlementStatement;
+  approvedAt: string | null;
+  documentId: string | null;
+  paidOn: string | null;
+  paidReference: string | null;
+}
+export interface SettlementInput {
+  encashTypes?: string;
+  encashDays?: number | null;
+  clearEncashDays?: boolean;
+  encashBasis?: string;
+  noticeDays?: number | null;
+  clearNoticeDays?: boolean;
+  noticeWaived?: boolean;
+  includeGratuity?: boolean;
+  extraLines?: SettlementExtraLine[];
+  note?: string;
 }
 
 /** Which typeface the letterpad prints in. Mapped to real font stacks in `lib/documents`. */
@@ -553,13 +921,49 @@ export interface Letterhead {
   useBackground: boolean;
   backgroundName: string | null;
   updatedAt: string;
+  /** The company's legal identity, printed in the footer of every page. */
+  cin?: string | null;
+  gstin?: string | null;
+  website?: string | null;
+  email?: string | null;
+  dateStyle?: LetterDateStyle;
+  /** Standard terms every letter quotes. */
+  probationDays?: number | null;
+  noticeProbation?: string | null;
+  noticePeriod?: string | null;
+  workingDays?: string | null;
+  workingHours?: string | null;
+  payDay?: string | null;
+  jurisdiction?: string | null;
+  /**
+   * PD-69 — page two onwards and the writing area. The continuation sheet came from page 2 of the
+   * uploaded file, was uploaded on its own, or was made from page one with the header cleared.
+   */
+  continuationSource?: "PAGE2" | "UPLOADED" | "DERIVED" | null;
+  /** CONTINUATION: the continuation sheet; SAME: the full letterpad on every page. */
+  laterPages?: "CONTINUATION" | "SAME";
+  /** Where the letter is written, in millimetres on A4. */
+  firstTopMm?: number;
+  firstBottomMm?: number;
+  laterTopMm?: number;
+  laterBottomMm?: number;
+  sideMm?: number;
+  /** PD-71: a company seal has been uploaded. */
+  hasSeal?: boolean;
 }
 export type LetterheadInput = Partial<
-  Omit<Letterhead, "updatedAt" | "hasBackground" | "backgroundName">
->;
+  Omit<Letterhead, "updatedAt" | "hasBackground" | "backgroundName" | "continuationSource">
+> & { remeasure?: boolean };
 export interface MergeField {
   key: string;
   label: string;
+}
+/** An issued letter's email form defaults and every time it has been sent (PD-64). */
+export interface DocumentEmailState {
+  to: string | null;
+  subject: string;
+  message: string;
+  sent: { id: string; to: string; subject: string; sentAt: string; delivered: boolean; error: string | null }[];
 }
 export interface GeneratedDoc {
   id: string;
@@ -572,6 +976,8 @@ export interface GeneratedDoc {
   useLetterhead: boolean;
   generatedBy: string | null;
   createdAt: string;
+  /** PD-71: whose signature prints on it. */
+  signatoryId?: string | null;
 }
 export interface DocumentPreview {
   title: string;
@@ -580,12 +986,15 @@ export interface DocumentPreview {
   values: Record<string, string>;
   /** Fields the profile couldn't fill — fix or override before issuing. */
   missing: string[];
+  signatoryId?: string | null;
 }
 export interface GenerateDocInput {
   templateId: string;
   employeeId?: string | null;
   title?: string;
   overrides?: Record<string, string>;
+  /** The letter as edited by hand; issued exactly as written. */
+  body?: string;
 }
 
 export interface Goal {
@@ -617,6 +1026,7 @@ export interface ReviewCycle {
   submittedCount: number;
   approvedCount: number;
   createdAt: string;
+  questions?: ReviewQuestion[];
 }
 
 export interface PerformanceReview {
@@ -649,16 +1059,36 @@ export interface PerformanceReview {
   goalsAchieved: number;
   goalsTotal: number;
   goals: Goal[];
+  /** PD-66: the cycle's questions (empty for an older free-text cycle) and both sides' answers. */
+  questions?: ReviewQuestion[];
+  selfAnswers?: Record<string, ReviewAnswer>;
+  managerAnswers?: Record<string, ReviewAnswer>;
+  newTitle?: string | null;
+  effectiveDate?: string | null;
+}
+
+/** One question a review cycle asks: a 1–5 rating or a written answer, of the employee, the manager or both. */
+export interface ReviewQuestion {
+  id: string;
+  text: string;
+  kind: "RATING" | "TEXT";
+  audience: "SELF" | "MANAGER" | "BOTH";
+}
+export interface ReviewAnswer {
+  rating?: number | null;
+  text?: string | null;
 }
 
 export interface CreateCycleInput {
   name: string;
   periodStart: string;
   periodEnd: string;
+  questions?: ReviewQuestion[];
 }
 export interface SelfAssessmentInput {
   selfAssessment: string;
   submit: boolean;
+  answers?: Record<string, ReviewAnswer>;
 }
 export interface ManagerReviewInput {
   rating?: number;
@@ -670,6 +1100,9 @@ export interface ManagerReviewInput {
   proposedSalary?: number;
   hikeNote?: string;
   submit: boolean;
+  answers?: Record<string, ReviewAnswer>;
+  newTitle?: string;
+  effectiveDate?: string;
 }
 
 /** Recruitment / ATS. */
@@ -729,12 +1162,21 @@ export interface Shift {
   startTime: string;
   endTime: string;
   color: string | null;
+  /** Hours of work the shift expects, in minutes (breaks excluded). */
+  workMinutes?: number;
 }
 export interface ShiftInput {
   name: string;
   startTime: string;
   endTime: string;
   color?: string;
+  workMinutes?: number;
+}
+/** The company's standard day and absence rule, set on the Shifts page (V70). */
+export interface WorkDayPolicy {
+  workDayMinutes: number;
+  workDayStart: string;
+  absentGraceMinutes: number;
 }
 export interface RosterEmployee {
   employeeId: string;
@@ -778,6 +1220,13 @@ export interface CompanySummary {
   /** Null for a company sold direct; set when it belongs to an agency. */
   agencyId: string | null;
   agencyName: string | null;
+  /** Only on the answer to a create: whether the new admin's welcome email went out. */
+  welcomeEmailSent?: boolean | null;
+  /** Only on the answer to a create, and only when the email did not go out: pass it on by hand. */
+  temporaryPassword?: string | null;
+  /** PD-74: archived — kept whole, nobody signs in, not billed. Null while live. */
+  archivedAt?: string | null;
+  archiveReason?: string | null;
 }
 
 /** An agency (a customer running several companies) as the platform owner sees it. */
@@ -817,7 +1266,8 @@ export interface CreateCompanyInput {
   adminFirstName: string;
   adminLastName: string;
   adminEmail: string;
-  password: string;
+  /** Optional — blank lets Orbit generate a temporary password. */
+  password?: string;
   seats: number;
   months: number;
   /** Owner console only: file the company under an agency. Omit to sell direct. */
@@ -984,6 +1434,8 @@ export interface PayslipComponent {
   value: number | null;
   basis: boolean;
   sortOrder?: number;
+  /** HRA or LTA when this earning is that allowance for income tax. */
+  taxTag?: "HRA" | "LTA" | null;
 }
 
 /** Analytics / Insights dashboard (Owner/Admin). A chart series is a list of these. */
@@ -1121,6 +1573,11 @@ export interface ExitView {
   checklistComplete: boolean;
   checklist: OnboardingTask[];
   letters: { id: string; kind: DocumentKind; title: string; createdAt: string }[];
+  /** An exit asked for and waiting for an admin (PD-65). Null when there is none. */
+  requestedLastDay?: string | null;
+  requestedReason?: string | null;
+  requestedByName?: string | null;
+  requestedAt?: string | null;
 }
 export interface StartExitInput {
   lastWorkingDay: string;
@@ -1294,8 +1751,11 @@ export interface TeamOverview {
   headcount: number;
   presentToday: number;
   onLeaveToday: number;
-  /** How many of `presentToday` are assumed rather than recorded (nobody marked them). */
+  /** Working today, not checked in yet, still inside shift start + grace. */
   unmarkedToday: number;
+  /** No check-in by shift start + grace, and no approved leave. */
+  absentToday?: number;
+  absentees?: { employeeName: string; jobTitle: string | null; reason: string | null }[];
   outToday: LeaveTodayEntry[];
   monthLeaves: CalendarLeave[];
 }
@@ -1357,6 +1817,10 @@ export interface Payslip {
    * holding the payslip; an absent section reads as "not applicable", which is the truth.
    */
   statutory: PayslipStatutory | null;
+  /** Income tax (TDS) withheld this month; null when the company does not withhold it here. */
+  incomeTax?: number | null;
+  /** From a finalised month — will never change. */
+  finalized?: boolean;
 }
 
 /**
@@ -1366,15 +1830,87 @@ export interface Payslip {
  * so the statutory block can be read on its own.
  */
 export interface PayslipStatutory {
+  // Each scheme's fields are null when it does not apply to this person (not enrolled in PF, above
+  // the ESI ceiling, a state without professional tax) — "not applicable", never "0".
   /** The wages PF was computed on, after any ceiling. Printed because it answers the most common
    *  payslip question in India: "why is my PF 1,800 when my basic is 50,000?" */
-  pfWages: number;
-  employeePf: number;
-  employerEps: number;
-  employerEpf: number;
-  employerAdminCharges: number;
-  employerEdli: number;
+  pfWages: number | null;
+  employeePf: number | null;
+  employerEps: number | null;
+  employerEpf: number | null;
+  employerAdminCharges: number | null;
+  employerEdli: number | null;
+  /** Gross wages ESI was computed on, after loss of pay. */
+  esiWages: number | null;
+  /** Zero (not null) for a low earner whose own share is waived. */
+  employeeEsi: number | null;
+  employerEsi: number | null;
+  professionalTax: number | null;
+  /** Two-letter code of the state the professional tax was computed for. */
+  ptState: string | null;
+  /** Labour Welfare Fund, only in the state's collection month. */
+  lwfEmployee: number | null;
+  lwfEmployer: number | null;
+  /** PF and ESI employer contributions together. */
   employerTotal: number;
+}
+
+/** A payroll month's lock. Once finalised, its payslips are read back as issued and never change. */
+export interface PayrollMonthStatus {
+  month: string;
+  finalized: boolean;
+  finalizedAt: string | null;
+  employees: number | null;
+  totalGross: number | null;
+  totalNet: number | null;
+  totalEmployer: number | null;
+}
+
+/** Income and TDS for one employee this financial year from before Orbit took over. */
+export interface TdsOpening {
+  employeeId: string;
+  financialYear: string;
+  /** Last month these figures cover, YYYY-MM. Orbit takes over from the month after. */
+  coveredThrough: string;
+  income: number;
+  tds: number;
+  note: string | null;
+  /** Employee PF and professional tax in those months (count for Sections 123 and 19). */
+  employeePf: number;
+  professionalTax: number;
+}
+
+/** A statutory return file, with the people who could not be included and why. */
+export interface FilingFile {
+  filename: string;
+  contentType: string;
+  content: string;
+  skipped: { employeeId: string; name: string; reason: string }[];
+}
+
+/** Something that will stop a return being filed. `employeeId` null = a company-level gap. */
+export interface FilingIssue {
+  employeeId: string | null;
+  name: string;
+  severity: "ERROR" | "WARNING";
+  message: string;
+}
+
+/** ESI / professional-tax settings and the registration numbers statutory files carry. */
+export interface StatutorySettings {
+  /** The vendor's switch. Without it neither ESI nor PT has any effect. */
+  statutoryEnabled: boolean;
+  esiEnabled: boolean;
+  esiEmployeeRate: number;
+  esiEmployerRate: number;
+  esiWageCeiling: number;
+  ptEnabled: boolean;
+  lwfEnabled: boolean;
+  pfEstablishmentCode: string | null;
+  esiEmployerCode: string | null;
+  tan: string | null;
+  companyPan: string | null;
+  ptRegistrationNo: string | null;
 }
 
 /** One company's Provident Fund rates, plus whether statutory payroll is switched on at all. */
@@ -1462,6 +1998,8 @@ export interface EmployeeFinance {
   panVerified: boolean;
   dateOfBirth: string | null;
   parentName: string | null;
+  /** Read by professional tax — Maharashtra's slabs differ by it. */
+  gender: "MALE" | "FEMALE" | "OTHER" | null;
 }
 
 export interface PayrollRunRow {
@@ -1475,6 +2013,10 @@ export interface PayrollRunRow {
   employeePf: number;
   /** Paid by the company on top — outside both `gross` and `net`. */
   employerContribution: number;
+  /** Deducted from this person, already inside `net`. */
+  employeeEsi: number;
+  /** Deducted from this person, already inside `net`. */
+  professionalTax: number;
 }
 /** A payroll run in flight or finished. `result` only for DONE, `error` only for FAILED. */
 export interface PayrollJob {

@@ -34,6 +34,20 @@ public final class Timezones {
         return forCompany(settings);
     }
 
+    /**
+     * The same chain with the account's own zone between the two: for somebody with no employee
+     * record (the platform owner, an admin who is not on the payroll), the account is where their
+     * clock lives (V68).
+     */
+    public static ZoneId resolve(Employee employee, String accountZone, CompanySettings settings) {
+        ZoneId own = employee == null ? null : parse(employee.getTimezone());
+        if (own != null) {
+            return own;
+        }
+        ZoneId account = parse(accountZone);
+        return account != null ? account : forCompany(settings);
+    }
+
     public static ZoneId forCompany(CompanySettings settings) {
         ZoneId company = settings == null ? null : parse(settings.getTimezone());
         return company == null ? DEFAULT : company;

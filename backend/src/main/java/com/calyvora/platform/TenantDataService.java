@@ -51,6 +51,10 @@ public class TenantDataService {
 
     private final JdbcTemplate jdbc;
     private final CompanyRepository companyRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.calyvora.identity.UserRepository userRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public TenantDataService(JdbcTemplate jdbc, CompanyRepository companyRepository) {
         this.jdbc = jdbc;
@@ -124,8 +128,62 @@ public class TenantDataService {
      * Requiring the name means the destructive act cannot be performed by a single gesture, which is
      * the only protection that survives a tired operator.
      */
+    /**
+     * Archive a customer (PD-74): everything kept, nobody signs in, nothing billed. The everyday way
+     * to remove a company — reversible with {@link #restore}.
+     */
     @Transactional
-    public Map<String, Object> delete(UUID companyId, String confirmationName) {
+    public Company archive(UUID companyId, String reason, UUID by) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new NotFoundException("Company not found"));
+        if (company.isPlatform()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "The platform's own workspace cannot be archived.");
+        }
+        if (company.isArchived()) {
+            throw new ApiException(ErrorCode.CONFLICT, "This company is already archived.");
+        }
+        String why = reason == null ? null : reason.trim();
+        if (why != null && why.length() > 300) why = why.substring(0, 300);
+        company.archive(by, why == null || why.isEmpty() ? null : why);
+        companyRepository.save(company);
+        log.warn("Archived company {} ({}) by {}: {}", companyId, company.getName(), by, why);
+        return company;
+    }
+
+    @Transactional
+    public Company restore(UUID companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new NotFoundException("Company not found"));
+        if (!company.isArchived()) {
+            throw new ApiException(ErrorCode.CONFLICT, "This company is not archived.");
+        }
+        company.restore();
+        companyRepository.save(company);
+        log.warn("Restored company {} ({})", companyId, company.getName());
+        return company;
+    }
+
+    /**
+     * Delete an archived customer for good (PD-74): the owner's password and the company's name, both
+     * typed. Archived first, so a permanent delete is always the second of two deliberate decisions.
+     */
+    @Transactional
+    public Map<String, Object> deletePermanently(UUID companyId, String confirmationName, String ownerPassword, UUID ownerId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new NotFoundException("Company not found"));
+        if (!company.isArchived()) {
+            throw new ApiException(ErrorCode.CONFLICT, "Archive the company first. Only an archived company can be deleted permanently.");
+        }
+        var owner = userRepository.findById(ownerId).orElseThrow(() -> new NotFoundException("Owner not found"));
+        if (ownerPassword == null || ownerPassword.isEmpty() || !passwordEncoder.matches(ownerPassword, owner.getPasswordHash())) {
+            log.warn("Permanent delete of company {} refused: wrong owner password from {}", companyId, ownerId);
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "That password is not correct.");
+        }
+        return delete(companyId, confirmationName);
+    }
+
+    @Transactional
+    Map<String, Object> delete(UUID companyId, String confirmationName) {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new NotFoundException("Company not found"));
 

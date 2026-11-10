@@ -1,6 +1,7 @@
-import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck } from "lucide-react";
+import { CalendarClock, CheckCircle2, XCircle, Target, FileText, Megaphone, Star, ClipboardCheck, DoorOpen, PenLine, Hourglass } from "lucide-react";
 import { createElement, type ReactNode } from "react";
 import type { NotificationType } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 
 /** One icon per notification type, so the inbox is scannable without reading every line. */
 export const NOTIFICATION_ICON: Record<NotificationType, ReactNode> = {
@@ -14,6 +15,13 @@ export const NOTIFICATION_ICON: Record<NotificationType, ReactNode> = {
   REVIEW_SUBMITTED: createElement(ClipboardCheck, { className: "h-4 w-4 text-amber-400" }),
   REVIEW_APPROVED: createElement(Star, { className: "h-4 w-4 text-emerald-400" }),
   ANNOUNCEMENT: createElement(Megaphone, { className: "h-4 w-4 text-fg/50" }),
+  EXIT_REQUESTED: createElement(DoorOpen, { className: "h-4 w-4 text-amber-400" }),
+  EXIT_DECIDED: createElement(DoorOpen, { className: "h-4 w-4 text-violet" }),
+  CHECKOUT_MISSED: createElement(CalendarClock, { className: "h-4 w-4 text-red-400" }),
+  LETTER_TO_SIGN: createElement(PenLine, { className: "h-4 w-4 text-violet" }),
+  LETTER_SIGNED: createElement(PenLine, { className: "h-4 w-4 text-emerald-400" }),
+  LETTER_DECLINED: createElement(PenLine, { className: "h-4 w-4 text-red-400" }),
+  SUBSCRIPTION_ENDING: createElement(Hourglass, { className: "h-4 w-4 text-amber-400" }),
 };
 
 /** "3m ago" / "2h ago" / "5d ago" — relative time reads better than a timestamp in an inbox. */
@@ -25,5 +33,5 @@ export function notificationAge(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }

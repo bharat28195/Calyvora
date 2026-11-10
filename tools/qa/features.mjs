@@ -159,23 +159,6 @@ await feature("Recruitment — job, candidate, pipeline", async () => {
   return `job + candidate, moved to ${moved.stage ?? "INTERVIEW"}, cleaned up`;
 });
 
-await feature("Work — project, task, sprint", async () => {
-  const proj = must(await call("POST", "/api/v1/work/projects", {
-    name: `QA Project ${stamp}`, key: `Q${String(stamp).slice(-4)}`, description: "Feature test",
-  }), "create project");
-  const task = must(await call("POST", `/api/v1/work/projects/${proj.id}/tasks`, {
-    title: `QA task ${stamp}`, description: "Feature test", priority: "MEDIUM", storyPoints: 3,
-  }), "create task");
-  const sprint = must(await call("POST", `/api/v1/work/projects/${proj.id}/sprints`, {
-    name: `QA Sprint ${stamp}`, goal: "Ship the test", startDate: "2026-09-05", endDate: "2026-09-19", capacityPoints: 20,
-  }), "create sprint");
-  const board = must(await call("GET", `/api/v1/work/projects/${proj.id}/board`), "board");
-  must(await call("DELETE", `/api/v1/work/tasks/${task.id}`), "delete task");
-  must(await call("DELETE", `/api/v1/work/sprints/${sprint.id}`), "delete sprint");
-  must(await call("POST", `/api/v1/work/projects/${proj.id}/archive`, {}), "archive project");
-  return "project, task, sprint, board; archived";
-});
-
 await feature("Knowledge — space, page, search", async () => {
   const space = must(await call("POST", "/api/v1/knowledge/spaces", {
     name: `QA Space ${stamp}`, key: `QS${String(stamp).slice(-4)}`, description: "Feature test",
@@ -225,19 +208,6 @@ await feature("Shifts — shift and roster", async () => {
   });
   must(await call("DELETE", `/api/v1/shifts/${shift.id}`), "delete shift");
   return `shift created, roster assign ${assign.status}`;
-});
-
-await feature("Clients — client and request", async () => {
-  const c = must(await call("POST", "/api/v1/clients", {
-    name: `QA Client ${stamp}`, contactName: "Test Contact", contactEmail: `qa.client.${stamp}@example.test`, status: "ACTIVE",
-  }), "create client");
-  const req = must(await call("POST", `/api/v1/clients/${c.id}/requests`, {
-    // Valid statuses are REQUESTED|IN_PROGRESS|DELIVERED|DECLINED. "OPEN" is not one of them.
-    title: `QA requirement ${stamp}`, description: "2 developers", status: "REQUESTED",
-  }), "add request");
-  must(await call("DELETE", `/api/v1/clients/${c.id}/requests/${req.id}`), "delete request");
-  must(await call("DELETE", `/api/v1/clients/${c.id}`), "delete client");
-  return "client + requirement, both removed";
 });
 
 await feature("Notifications", async () => {

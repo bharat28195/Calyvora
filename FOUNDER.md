@@ -1714,6 +1714,396 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   - Holidays and leave policy are edited by whoever holds LEAVE_POLICY_MANAGE (HR could already via
     the API; the screens only offered it to admins).
 
+### PD-55 · 2026-10-07 · Full statutory compliance, built to the Keka/Zoho standard (demo first)
+- **Decision (founder):** build the statutory payroll that Keka and Zoho sell — PF, ESI,
+  professional tax, monthly TDS and the government filing files — instead of leaving compliance to
+  the client's accountant. Market research (PD pricing discussion, same day) showed this is what lets
+  Orbit charge mid-market prices. Mobile app parked until this is done. Demo only until the founder
+  says otherwise.
+- **Filing reality:** EPFO, ESIC and the TDS system offer no filing API to third parties, so
+  "filings" means Orbit produces the exact upload files and the company uploads and pays them —
+  the same thing Keka and Zoho do. A done-for-you filing service with a partner CA is a later upsell.
+- **Built, step 1 — ESI and professional tax (V64):** `EsiCalculator` (0.75% / 3.25%, ₹21,000
+  ceiling decided per April/October contribution period, ₹176/day low-wage waiver, rounded up to the
+  rupee) and `ProfessionalTaxCalculator` (every levying state, FY 2026-27 slabs: monthly, annual and
+  half-yearly bases, February top-ups, Maharashtra by gender, Karnataka 60+ exemption, Odisha repealed
+  April 2026; Meghalaya/Tripura reported as unsupported rather than silently zero). Company switches and
+  registration numbers (PF code, ESI code, TAN, PAN, PT reg) in `statutory_settings`. HR can finally
+  enrol employees in PF/ESI and set their PT state from the People screen.
+- **Behaviour change:** PF, ESI and PT are now computed on wages actually *earned* (after loss of
+  pay), not the contracted month. PF on full basic for someone with unpaid days was an over-deduction.
+- **Built, step 2 — the month lock (V65):** payroll was recomputed on every view, so changing a salary
+  rewrote last month's payslip and anything filed from it. Finalising a month now stores every
+  payslip as issued (`payslip_snapshots`); the run, the payslip and future returns read the stored
+  copy. Only the latest locked month can be reopened. The fake "Publish payslips" button is gone.
+- **TDS now corrects itself:** once months are locked, each month withholds (year's tax − what locked
+  months actually withheld) ÷ months left, as Keka/Zoho do — a raise or late declaration no longer
+  leaves a lump in March. Unlocked earlier months count as an even twelfth, so a company that never
+  locks sees no change.
+- **Built, step 3 — the return files (Payroll → Returns):** PF ECR v2 (eleven `#~#` fields per
+  member), ESI monthly contribution file (ESIC template column order, as CSV), professional-tax
+  state-wise summary, Form 24Q Annexure I deductee data per quarter (missing PAN flagged under 206AA),
+  and a readiness check that names what will keep someone out of a return (no UAN, no ESI IP number,
+  no PAN, no PT state, missing PF/ESI codes or TAN). All built from finalised months only; anyone a
+  file cannot include is listed with the reason, never silently dropped. PF also stops EPS at 58.
+- **Built, step 4 — the year, by date (V66):** payroll took the newest salary for every month, so a
+  June raise re-priced May, and tax assumed today's salary all year. Now `SalaryCalendar` pays each
+  day at the salary in force that day (the first salary applies backwards — typing it in today must
+  not halve the month; the start/end date decides when pay begins and ends), and nobody is paid for
+  a month they were not employed. TDS projects the real year: opening balance + what locked months
+  paid + salary by date for the rest, and spreads the remaining tax over the months actually worked —
+  a mid-year joiner is no longer taxed as if on twelve months' salary. **Opening balances** (Form 12B
+  / the old system's year-to-date) are entered per employee under People → Statutory.
+- **Behaviour change worth knowing:** a payslip for a past open month now uses the salary in force
+  then, not today's; and an employee with an end date gets no payslip after it.
+- **Labour Welfare Fund:** fixed amounts on each state's calendar (June/December, December, or monthly) for the 12 states where 2026 amounts are confirmed; Madhya Pradesh, Haryana, Chhattisgarh and Kerala are reported as unsupported because published sources disagree. LWF summary file on the Returns page.
+- **Next:** Form 16 Part B, challan register, compliance calendar reminders.
+- **Before selling it as "full compliance":** a CA reviews every rule, then one parallel-run month
+  against a real client's existing payroll.
+
+### PD-56 · 2026-10-07 · Welcome email with sign-in details; password change inside the app
+- **Decision (founder):** when a trial is approved (or a company created), the work email becomes the
+  first admin and Orbit emails them their sign-in email and a temporary password, asking them to
+  change it. Everyone gets a settings icon to change their password from inside the app.
+- **Shape:** the temporary password is generated by Orbit when the owner leaves it blank (three groups
+  of four, no look-alike characters) and the admin is held on Account settings until they replace it
+  (`users.must_change_password`, V67) — a password that has sat in an inbox is never the one in use.
+  Changing a password signs every other device out and keeps this one signed in. The console only
+  sees the temporary password if the email could not be sent, once; agency-created companies (locked
+  until activation) get no email and the agency hands the details over.
+- **Replaces** the old "your sign-in details are coming separately" email and the console's
+  `demopass123` default.
+
+### PD-57 · 2026-10-07 · Profile menu; each person's language, timezone and date style
+- **Decision (founder):** clicking your name opens a menu (Account settings, Language & region, Change
+  password, Log out). Everyone can choose their own language, timezone and date/time format; English is
+  the default.
+- **Shape:** stored on the account (`users.language/timezone/date_format/time_format`, V68), null =
+  default. Language falls back to the company's, then English. The timezone is written to the employee
+  record when there is one — the same field that stamps attendance — and to the account only for people
+  without one (platform owner), so one person's clock never lives in two places. Languages: English,
+  Hindi, Spanish, French, German; the menus and account screens are translated, every other screen falls
+  back to English until translated (keys are the English text, so nothing ever shows a raw key).
+- **Next:** translate the remaining screens module by module, starting with the employee self-service
+  pages (Me, Finance, Time off).
+
+### PD-58 · 2026-10-08 · Letters for people who aren't employees; hand-edited letters
+- **Decision (founder):** an offer letter goes to someone who is not part of the company yet, so the
+  issuer must be able to type the name, designation and anything else by hand.
+- **Shape:** Documents → Generate has an **Employee / Someone new** switch. "Someone new" shows a form
+  of exactly the fields the chosen template uses (full name always; dates as date pickers; company,
+  today and signatory still automatic), sent as merge overrides — no employee row is created. A full
+  name fills first/last name and vice versa. **Edit text** turns the rendered letter into an editable
+  text box; the edited text is issued exactly as written (`body` on the generate request), with a
+  "Back to the template" reset. The typed name is stored on the letter (`generated_documents.
+  recipient_name`, V69) so the Issued list shows who it was for — this also fixes recruitment's
+  automatic offer letters, which used to appear with no name.
+
+### PD-59 · 2026-10-10 · Attendance that measures the day: sessions, required hours, absent and half day
+- **Trigger (founder QA as Ava + Priya):** Priya checked in and Ava's day sheet never showed it; the
+  dashboard said everyone was present at dawn; there was no absent count; a lunch break could not be
+  recorded; a regularization could be sent without a reason.
+- **Root cause of the missing check-in:** Priya's own clock was UTC, so a 03:25 IST check-in was
+  filed on the previous date. The server also answered "today" on its UTC clock, so admins saw
+  yesterday until 05:30 IST. Fix: India time is the default everywhere (V70 moves anyone pinned to
+  UTC back to the company zone; deliberate other zones are kept), and "today" is the company's.
+- **Decision (founder):** every check-in/check-out pair is a session (`attendance_punches`, V70).
+  Gross = first in to last out; effective = time actually checked in. Required hours come from the
+  rostered shift (`shifts.work_minutes`) or the company's standard day — **9 h**, set by the admin on
+  the Shifts page with the day's start time and an **absent grace** (default 2 h).
+- **Rules, both of which cost pay (founder: "half day should affect the pay"):** a finished,
+  self-clocked day short of its required hours is a **half day** (0.5 LOP); a working day with no
+  check-in by shift start + grace and no approved leave is **absent** (1 LOP). Derived at read time
+  in one place, so the day sheet, dashboard, month and payroll cannot disagree.
+- **Safety:** the rules apply only from `attendance_rules_from` (set to the release date by V70), so
+  switching them on never docks pay for months already worked. Null turns them off per company.
+- **Managers/HR correct directly (founder):** many people × many dates in one action, applied
+  immediately with a required reason, no approval — they hold the right. Leads are limited to their
+  own downline (PD-32). A hand-set day is exempt from both automatic rules; that is how a short or
+  absent day is regularized.
+- **Also:** Present today counts only people actually in (was: everyone not on leave); new Absent
+  tile and list; Departments page (the tile opened the org chart); Insights under Dashboard; account
+  settings in tabs; regularization reason required server-side.
+- **Speed:** a 20 s in-memory read cache in the API client makes going back to a page instant;
+  any write clears it. The remaining cost is the hosting: the demo backend is on Render's free plan
+  and the frontend proxies to it over the public URL (150–500 ms a call). Upgrading the plan and
+  using Render's private network are the next lever — a cost decision, not yet taken.
+- **Next (founder-approved order, PD-59 follow-ups):** attendance stats + automatic overtime;
+  full-depth tax declarations (Keka parity on sections, proofs + HR review, Form 16/12BB); manager
+  leave insights as charts for scale plus a short ranked "needs attention" list; expense advances;
+  referrals; 1:1s and feedback.
+
+### PD-60 · 2026-10-10 · Tax declarations at full depth, under the Income-tax Act, 2025
+- **Decision (founder):** tax declarations first, at Keka's depth but simpler to use, and correct to
+  the rupee because they drive monthly TDS. No third-party tax-filing marketplace.
+- **The law as built (tax year 2026-27, verified against published sources, Budget 2026 changed no
+  slab):** new regime 0/5/10/15/20/25/30% with the ₹60,000 rebate to ₹12 lakh and marginal relief;
+  old regime 0/5/20/30% (₹3L / ₹5L free for 60+ / 80+); standard deduction ₹75,000 / ₹50,000;
+  surcharge with relief at every threshold; 4% cess; income rounded to ₹10 (Section 516; tax to the
+  rupee since PD-61).
+  Sections shown with the 2025 Act's numbers and the 1961 ones beside them (Sec 123 (80C), 126
+  (80D), 129 (80E), 133 (80G), 153 (80TTA/TTB), 154 (80U)…). Forms are Form 124 (was 12BB) and
+  Form 130 (was Form 16). HRA metros are eight from 2026-27 (Bengaluru, Hyderabad, Pune, Ahmedabad
+  added by the draft Rules, 2026 — to be re-checked when the Rules are notified).
+- **Correctness fixes found on the way:** surcharge relief above ₹1 crore compared against bare tax
+  instead of tax plus the lower surcharge (over-relieved); 80D parents was a flat ₹50,000; employer
+  NPS had no ceiling; employee PF and professional tax did not reach the old-regime computation; HRA
+  was typed in rather than computed. All fixed and pinned by hand-worked tests (41 calculator cases,
+  HRA month by month, the whole flow end to end).
+- **Shape:** granular lines grouped under shared ceilings (one ₹1.5L across a dozen Section 123
+  items); rent by month range with city (HRA = least of three, every month); houses (self-occupied
+  ₹2L, let-out loss set-off ₹2L, none in the new regime); other income; previous employer (Form
+  12B equivalent); age from date of birth (born 1 April → senior that year). One year model
+  (`TaxYear`) feeds the payslip, the employee's screen and HR's alike.
+- **Proofs (founder-approved defaults):** declared amounts count until the proof deadline; from the
+  month after it, only what HR accepted. The regime can change only while declarations are open.
+  A claim whose amount changes after review goes back to HR. Rejecting needs a reason.
+- **Screens:** a nine-step guided declaration with both regimes priced live beside it (server-side
+  preview — no tax arithmetic in the browser); "How it's calculated"; HR list with proofs waiting and
+  a review screen per person; printable Form 124 and Form 130 Part B (Part A comes from TRACES).
+- **Data (V71):** old declaration keys mapped onto the new lines (80C → "Other Section 123",
+  home-loan interest → a house, a >₹25,000 parents' claim read as "parent is a senior"); salary
+  template lines tagged HRA / LTA. Tenant-bound per company, with a data test.
+
+### PD-61 · 2026-10-10 · Forms 124 and 130 laid out as the official ones; tax payable to the rupee
+- **Trigger (founder):** a real Form 16 Part A and Part B issued through TRACES and a Keka Form 124,
+  shared as the layout to build to. Only their structure was used; no personal data is in the code.
+- **Tax to the rupee, not to ₹10.** The TRACES Part B shows ₹2,93,520 tax + ₹11,741 cess =
+  ₹3,05,261. Orbit rounded the tax to ₹10 (₹3,05,260). Rounding to ten belongs to the return the
+  employee files; TDS deducted and certified is exact, and a payroll that rounds disagrees with every
+  Form 16 by up to ₹5. Income is still rounded to ₹10. A test reproduces that certificate exactly.
+- **Form 124** now follows the Rules' own table: serial / nature of claim / amount / evidence; HRA
+  per landlord (rent, name, address, PAN), LTA, interest on borrowing (lender name, address, PAN and
+  type — financial institution, employer, other), Chapter VI-A split into (A) Sections 123 and 124
+  — with "EPF (deducted from salary)" first — and (B) other sections as "Section 131 (Formerly
+  80EEA)"; then the employee's verification with "son/daughter of", place, date, designation.
+- **Form 130** has both parts, numbered line for line as TRACES prints them (1(a)–(e), 2(a)–(i), …
+  10(a)–(n), 11–21). Part A is a *draft from payroll* for HR to check the TRACES download against:
+  quarter summary (amount paid, deducted, deposited, 24Q receipt) and every challan (BSR, date,
+  serial). The signer's verification includes the amounts in words (Indian system).
+- **New data (V72, schema only):** employee address on the year's declaration; lender address and
+  type; the person responsible for TDS (name, parent, designation, place) and the CIT (TDS); a
+  challan per salary month; a receipt number per 24Q quarter. Manage tax is now three tabs —
+  Employees, TDS deposits, Settings.
+
+### PD-62 · 2026-10-10 · A computation screen that explains every rupee — and pays less where the law allows
+- **Trigger (founder):** a capture of Keka's income-tax computation page; "do whatever is best and
+  make Orbit way better than Keka". Orbit's engine already matched Keka line for line (their old-regime
+  example comes to ₹3,49,608 under Orbit's rules too); the gap was explanation, not arithmetic.
+- **Home-loan interest goes where it is worth most (engine change).** Interest declared under Section
+  130 / 131 (80EE / 80EEA) first fills Section 22's (24(b)) ₹2,00,000 for a self-occupied home; only
+  the excess stays under 130 / 131. Old regime only, bounded by both the self-occupied ceiling and the
+  ₹2,00,000 house-loss set-off, so nothing moved is wasted. On Keka's own example — ₹1,65,084 of interest
+  claimed under 131, ₹1,50,000 allowed — Orbit allows all of it: ₹4,704 less tax. The line keeps the
+  declared figure and says what moved, so it never looks like a claim vanished.
+- **Every capped line explains itself:** the ceiling, what the lines above used, what was left, the
+  amount counted, and "allowed = the smaller of the two" — Keka hides this behind a drill-in per row;
+  Orbit computes it server-side for every capped line (Section 123 and every shared ceiling).
+- **The screen:** six headline numbers and a paid-so-far bar; a chip saying whether declared or
+  HR-approved amounts are being counted; tax deducted per month as a chart (paid / expected / before
+  Orbit) with the three-way split; deductions as two tables (the ₹1.5 lakh pool, everything else) with
+  claimed / approved / allowed; salary head by head for all twelve months, each month tagged paid or
+  expected (so a mid-year raise shows from its month — heads always add to the month's gross);
+  professional tax month by month; slab bars; HRA table highlighting which of the three won.
+- **Kept on purpose:** taxable income rounded to ₹10 (Section 516), which Keka skips; tax to the rupee.
+
+### PD-63 · 2026-10-10 · The whole letter library, written to Indian practice
+- **Trigger (founder):** a real appointment letter and increment letter as references; "whatever letters
+  are not in Orbit, add them all as templates". Researched the set Indian HR issues across the
+  employee lifecycle and added every one missing: appointment, internship offer, confirmation,
+  probation extension, increment, transfer, bonus, appreciation, salary certificate, employment /
+  address verification, NOC, warning, show-cause, PIP, termination, resignation acceptance, no dues,
+  full and final settlement, internship certificate — 24 starters in all.
+- **What the references taught (now built in):** a salary annexure table (earnings, then employer
+  contributions for CTC or deductions for take-home), monthly and yearly, from the same template and
+  PF / ESI calculators as payroll, the yearly column always adding up to the annual figure exactly;
+  amounts in Indian grouping (27,68,832.00) and in words (lakh / crore); company CIN / GSTIN / website
+  / email in a footer repeated on every printed page; a company date style ("01 Aug, 2026"); the
+  signatory named once on the letterpad.
+- **Company terms written once:** probation days (and the computed probation end date), notice in and
+  after probation, working days and hours, pay day, jurisdiction — on the letterpad screen; leave
+  entitlement read from the leave policies, so a letter can never disagree with them.
+- **Better than the reference:** increment letters state the previous salary and the % increase
+  automatically; salary certificates quote the last three payslips; offers to people not yet employed
+  build the annexure from the typed salary; no starter uses "his/her" (a test enforces it).
+- **Existing companies** get the new letters once, beside their own (company_settings
+  .letter_starters_seeded, V73); a template a company deleted is never put back.
+- **Next (not built):** the employee accepting a letter in Orbit (name and date stamped on it), a
+  signature image, and the F&F figures computed from payroll instead of typed.
+
+### PD-64 · 2026-10-10 · Letters leave Orbit: PDF, email, and letterpads in any format
+- **Trigger (founder sheet, items 17–20):** the letterpad did not show when generating a letter, only
+  images could be uploaded, and issued letters could not be emailed.
+- **Root cause of the missing letterpad:** the API reads the token only from the Authorization header,
+  which neither a CSS background nor an <img> sends — so the image 401'd on every screen and letters
+  showed as bare text. Fixed by fetching it with the token into an object URL, cached per version.
+- **Letterpads as PDF or Word (.docx):** page one rendered to an image at 150 dpi on the server
+  (PDFBox; Word via the POI/xdocreport converter, iText 2.1.7 LGPL/MPL, BouncyCastle excluded).
+  Old .doc is refused with "save as .docx or PDF". Images still 2 MB, documents up to 10 MB.
+- **Letters as PDF:** OpenHTMLtoPDF renders the same body format the screen does (tables, page breaks,
+  headings), with Noto Sans/Serif embedded (the PDF base fonts have no ₹); the letterpad image is
+  drawn under every page, or the composed heading and footer repeat on every page.
+- **Send by email:** from "{company} via Orbit", replies to the letterpad's email, the letter
+  attached as PDF; every send recorded on the letter (V74 document_emails) with delivered / error.
+  Attachments added to the Resend and SMTP transports.
+- **Dockerfile:** fontconfig + FreeType in the runtime image for headless Java2D.
+
+### PD-65 · 2026-10-10 · An exit needs an admin's yes
+- **Decision (founder, item 26):** exits are approved by an admin before anyone is marked as leaving.
+- **Shape:** a new permission, Approve exits (EXITS_APPROVE), admin-only by default. Starting an exit
+  without it records a request (V75 columns on employees); the person stays exactly as they were —
+  pay, access, status — until an admin approves, which puts them on notice on the requested terms and
+  seeds the checklist. An admin starting one is the approval. Admins are notified; the requester hears
+  the decision. Requests can be withdrawn. Shown on Exits and in the inbox.
+
+### PD-66 · 2026-10-10 · Reviews with questions on both sides, and an outcome before a hike
+- **Decision (founder, items 6–7; default question set accepted):** each cycle carries its own
+  questions — ratings and written, for the employee, the manager or both. Standard set: achievements,
+  goals met, ownership, teamwork, strengths, areas to improve, support wanted (self), promotion
+  readiness (manager); editable per cycle. Cycles from before keep the free-text form.
+- **Flow:** employee answers theirs; the manager answers theirs beside the employee's, gives the overall
+  rating and proposes the outcome — hike by % (quick 5/8/10/12/15) or new salary, new title, effective
+  date; HR reads both side by side and approves, which applies pay from the effective date, the title,
+  and optionally issues the increment / promotion letter in the same step. Approval waits for the
+  self-assessment unless HR approves anyway, deliberately.
+- **Lists:** one line per person, filtered by stage (waiting on self / manager / to approve /
+  approved), opening one at a time; My team groups by cycle. Cycles with nothing approved can be
+  deleted (cleans up the "QA Cycle …" test rows on the demo). V76.
+
+### PD-67 · 2026-10-10 · One inbox, and a nudge for a forgotten check-out
+- **Inbox (items 4–5):** tabs All · Leave · Attendance · Comp-off · Expenses · Tax proofs · Exits ·
+  Tickets · Updates, each with a count; leave, corrections, comp-off, expenses and exits decided in
+  place, several at once. Built from each module's own queue, so it shows exactly what that person may
+  decide under the same rules — no second copy of the approval logic.
+- **Check-out reminder (item 3, next morning chosen):** hourly job; at 8 a.m. company time, anyone with
+  a session from yesterday never closed gets an email and an inbox note linking to the correction form
+  pre-filled for that day. Marked once sent (V77), so restarts never resend. First scheduled job in
+  the app (@EnableScheduling); it binds each company's tenant itself.
+
+### PD-68 · 2026-10-10 · Navigation, labels and the permission audit
+- **Navigation:** the most specific nav entry owns the page (Exits no longer lights up People; Roles
+  stays under Members). Time & attendance is its own section; People is about people. "Company
+  settings" vs "My account" (your language, timezone and password; the profile menu no longer
+  duplicates those tabs). Dialog headers stay pinned on long forms; hiring boards use the full width.
+- **Clarity:** department tiles say Present / On leave / Absent / Not in yet with a bar; the tax rent
+  step is laid out in two rows with hints under fields.
+- **Permission audit (item 21):** a test walks every permission-guarded GET in the app and checks an
+  employee is refused exactly what their role lacks and an admin nothing — new screens are covered
+  automatically. Found and fixed: anyone could read anyone's goals by id; now self, the chain above, or
+  HR / performance managers only.
+
+### PD-69 · 2026-10-10 · Letters of any length on the letterpad, written inside its blank area
+- **Trigger (founder, with a two-page Northwind letterpad as the example):** letters run to several
+  pages; page one must sit on the letterpad and the text must keep clear of its header, footer and
+  artwork, whatever format the letterpad arrives in. "The output should be very clean."
+- **Continuation sheet:** page 2 of an uploaded PDF/Word file becomes the sheet for page two onwards;
+  one can be uploaded separately; otherwise it is made from page one with the header cleared (painted
+  in the paper's own colour). HR can choose the full letterpad on every page instead. V78.
+- **Measured, not guessed:** on upload the page is scanned for the tallest band of empty rows (strict
+  near-white first, then ink-only for watermarked paper); the writing area is that band with 8 mm /
+  6 mm of air, and the side margin follows where the letterpad's own printing starts. Shown as a
+  dashed box on both sheets; every value adjustable in millimetres; "Measure again" resets.
+  Letterpads uploaded before this are measured on first read.
+- **Same layout everywhere:** the PDF uses @page :first margins plus the continuation underlay; the
+  screen shows real A4 pages laid out at 96 dpi and split by block (lists by item, tables by row with
+  the header and column widths kept); Print now prints the PDF. A test renders a three-page letter
+  and checks every line sits inside each page's writing area.
+- Images are now stored exactly as uploaded (only PDF/Word are rendered); an image Java cannot read
+  (WebP) prints on the default margins.
+
+### PD-70 · 2026-10-11 · CI at two speeds: the touched modules on every push, everything before prod
+- **Decision (founder):** don't run all ~660 backend tests on every push. Run only the tests of the
+  modules a change touches, and run the full suite before anything goes to production.
+- **How:** a first CI job reads the changed files and maps `com/calyvora/<module>/` to that module's
+  tests, plus the cross-cutting guards on every run (tenant isolation `rls`/`security` and the
+  permission audit `access`). Website- or docs-only pushes skip backend and frontend entirely.
+  The frontend build, lint and browser tests run only when `frontend/` changed.
+- **Always full:** pushes to `production` or `main`, pull requests into `production`, a hand-started
+  run ("Run workflow", full ticked), and any change to shared ground: common/auth/identity/company/
+  access/dev code, resources (migrations, config), pom.xml, Dockerfile, test support, or the workflow.
+- **Gap closed:** `production` was not watched by CI at all before this.
+- Also fixed: the sign-out browser test had been red since PD-57 moved Log out into the profile menu.
+
+### PD-71 · 2026-10-11 · Authorised signatories, their signatures and the company seal on letters
+- **Decision (founder):** letters carry a real signature, printed automatically.
+- **Shape:** Letterpad → Signatures & seal: any number of signatories (name, title, signature drawn,
+  typed or uploaded), one default; a template may name its own. The seal is optional. Uploaded images
+  are cleaned on the server (paper made transparent, cropped to the ink, scaled). Issuing a letter
+  puts a `[[signature]]` line above the signatory's name; screen and PDF draw the signature with the
+  seal beside it there, at the same size, so page breaks match. A letter remembers its signatory; a
+  signatory is switched off, never deleted, so old letters keep their signature. V79.
+
+### PD-72 · 2026-10-11 · Letters accepted with a signature
+- **Decision (founder):** employees accept and e-sign letters inside Orbit; candidates too.
+- **Shape:** HR sends an issued letter for signature. An employee signs under Me → My letters
+  (email and notification). A candidate, who has no login, gets a link for that one letter (random
+  token, only its hash stored in a table outside RLS, like invitations; expires, 1–60 days). The signer
+  reads the letter as images of the very PDF pages, types their name, draws or types a signature,
+  ticks consent, and accepts or declines with a reason. HR sees sent, opened, signed or declined, and
+  can remind (extends by a week) or withdraw (the link dies).
+- **Evidence:** the letter text's SHA-256 at send, re-checked at signing; signature, typed name,
+  time, IP and browser kept. The signed PDF adds an acceptance block and a "Signature record" audit
+  page. A signed letter cannot be deleted. Click-and-draw e-signature, not Aadhaar eSign (an add-on later). V80.
+
+### PD-73 · 2026-10-11 · Full and final settlement from payroll
+- **Decision (founder; defaults accepted):** F&F is worked out, not typed.
+- **Final salary** is the final month's payslip from the payroll engine, which already prorates to the
+  last day and applies LOP, PF, ESI, PT and TDS, so payslip and F&F cannot disagree. If that month is
+  finalised it was paid there and is left out. **Leave encashment:** the balance on the last day of
+  chosen types (Vacation by default) × basic ÷ 26 (or basic ÷ 30 or gross ÷ 30); days can be set.
+  **Gratuity:** 15/26 × basic × years, a final part-year of 6+ months counts, due at 5 years or 4 years
+  240 days, capped at ₹20 lakh. **Notice shortfall:** required (parsed from the letterpad's notice
+  period, or set) minus served (exit start to last day) × gross ÷ 30, waivable. Approved, unreimbursed
+  **expense claims** are paid. HR adds free lines (bonus, laptop, advance).
+- **Flow:** a draft recalculates live; approve freezes the statement and issues the FNF_STATEMENT
+  letter; reopen before payment; mark paid with date and reference. Payroll permission (salary data).
+  Pay-by date: 2 working days after the last day (Code on Wages). V81.
+- **Not yet:** TDS on encashment and other extras beyond the final payslip; adding the payout to the
+  bank file. Today they are an HR line and a separate transfer.
+
+### PD-74 · 2026-10-11 · Customers are archived, not deleted; a permanent delete is guarded
+- **Decision (founder):** production keeps real customers' data. Removing a company archives it:
+  every row kept, shown greyed out in the owner console with date and reason, its people cannot sign
+  in, and it is not billed. Restore undoes it in one click.
+- **Permanent delete:** only for a company already archived, from the owner console, after typing
+  the company's name and the **owner's own password** and ticking "cannot be undone". The server
+  re-checks name and password (BCrypt), refuses a live company (409), and logs every attempt.
+- **Enforced** where login and token refresh both pass (AuthService.issueSession): an open session
+  dies at its next refresh, within the access-token lifetime. V82 (archived_at/by/reason on companies).
+- Smaller deletes inside a company (letters, templates, candidates) are still hard deletes; to soft-delete later.
+
+### PD-75 · 2026-10-11 · An agency sees all its companies' subscriptions in one place
+- **Decision (founder):** agencies get a Subscriptions tab: status (active, renews within 30 days,
+  awaiting activation, ended, archived), paid-until with days left, seats used of bought with a bar,
+  per-person rate (agreed or standard), monthly and yearly cost, and a "Needs attention" list (ending
+  soon, ended, waiting, over seats → request seats). Money is per currency, never summed across.
+- Built only from the company summary the console already reads, so company-level facts only (no
+  employee data). **Process (founder):** every change to an agency-facing screen is reported
+  explicitly — what agencies will now see.
+
+### PD-76 · 2026-10-11 · Admins hear five days before the subscription ends
+- **Found:** when the end date passes, login still works but the app is locked (lock screen, API 402),
+  and the only warning was an in-app banner, which nobody sees unless they open the app.
+- **Decision (founder):** five days ahead, every active admin of the company gets an email and an
+  inbox notification linking to the Subscription page. Sent once per end date (`expiry_reminded_for`),
+  so extending the subscription earns a fresh reminder. The check is "five days or fewer, not yet
+  reminded", run hourly, so a server asleep on the day (the demo sleeps) still sends it on waking.
+  Archived and platform companies are skipped.
+
+### PD-77 · 2026-11-10 · Letter signing parked until after launch
+- **Found:** opening a letter to sign drew each page into a picture on the server. On the 512 MB
+  server that crashed the backend for every customer (go-live defect D1). Drawing one page at a time
+  and shrinking the JVM made it rarer but not gone: one clean run on 10 Nov, a crash on 8 Nov.
+- **Decision (founder):** take signing out of the app for launch and keep it as an upcoming feature.
+  The whole feature as it was lives on branch `parked/letter-signing` (commit 331bf7f). Removed from
+  the demo: the employee and candidate signing screens (`/me/letters`, `/sign/{token}`), the "Send for
+  signature" panel, `SigningController`, `SigningService` and the page drawing. Kept: generating,
+  downloading and emailing letters, signatories and their signatures printed on letters (PD-71), and
+  the database tables, so restoring needs no migration and old signed letters keep their audit page.
+- **To bring it back:** restore those files from `parked/letter-signing`, but have the employee's
+  browser draw the pages (pdf.js on the PDF the server already makes) instead of the server. That is
+  the fix D1 really needs. In the backlog under High.
+
 ## 4. Architecture Decision Log
 
 
@@ -1908,6 +2298,9 @@ _Template:_ Company · Industry · Feature requested · Problem experienced · I
 - **Admin Platform v1 + Billing v1.** · Control plane + get paid · Effort: Med · Deps: Identity ·
   Phase 1.
 
+- Letter signing back, with pages drawn in the browser (PD-77). · Code on `parked/letter-signing`
+  · After launch.
+
 ### Medium
 - Workflow engine, Notification service, Comments primitive, Search service. · Deps: event backbone
   · Phase 1–2.
@@ -1968,6 +2361,23 @@ resulting market gaps.
 ## 10. Lessons Learned
 
 > Knowledge base of mistakes, solutions, better approaches, and best practices. Newest first.
+
+- **2026-11-08 — Tests that read the clock pass in the morning and lie in the afternoon.** PD-59 made
+  people absent after shift start plus grace, and twelve tests that assumed "nobody is absent" began
+  failing after about 11:30 IST on weekdays. Looking into those failures, rather than rerunning them
+  in the morning, exposed a real payroll defect (D2): loss of pay was divided over the working days
+  elapsed so far, so one absence on the 2nd wiped out a month's salary. Lesson: explain a
+  time-dependent failure before pinning the test. Tests now state the assumption with
+  `attendanceRulesOff`.
+- **2026-11-08 — A 502 and a 500 are different memory problems.** Opening one letter to sign took the
+  demo server down (502, then 503 for minutes). A Java heap shortage fails that request with a 500
+  and the server lives on; a 502 means the host killed the process for using more memory than the
+  container has. With the heap allowed 75% of 512 MB, everything outside the heap (class metadata,
+  compiled code, PDFBox and Java2D's native image and font memory) had about 128 MB. A first fix at
+  60% crashed the demo again; native memory tracking then showed ~220 MB outside the heap, so 60%
+  still totalled ~550 MB. Fix: heap 45%, serial GC, code cache capped, two malloc arenas, and letter
+  pages rendered one per request. Lesson: size a container by the whole process, measured, not by
+  the heap; and on 512 MB this app has little headroom left.
 
 - **2026-07-10 — Refresh-token rotation is hostile to concurrent/duplicate refreshes.** A duplicate
   refresh (React StrictMode's dev double-invoke, or two browser tabs) re-presents the just-rotated
