@@ -4,6 +4,15 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-11-10 — Letter signing parked for launch (PD-77)
+- **Signing removed from the app.** Drawing letter pages on the 512 MB server could still crash it
+  (D1). The signing screens, the "Send for signature" panel and the server code behind them are gone;
+  letters are still generated, downloaded and emailed, with signatories' signatures printed on them.
+  The feature as it was is on branch `parked/letter-signing`, and no database table was changed.
+- **QA scripts** check a letter is generated and downloaded, and that signing is switched off.
+- **Removed** `frontend/Calyvora/`: 34 copies of Next.js files committed by mistake in f0e19cf, traced
+  through a worktree link by `next build`. Now in `.gitignore`.
+
 ### 2026-11-08 — Go-live fixes: letter signing no longer crashes the server, loss of pay is a share of the whole month
 From the go-live readiness review of 2026-11-02 (defects D1 to D5).
 - **D1 — Opening a letter to sign took the server down.** Every page was drawn into one response.

@@ -106,7 +106,6 @@ const NAV: NavItem[] = [
       { href: "/me", label: "Overview" },
       { href: "/me/attendance", label: "Attendance" },
       { href: "/me/leave", label: "Time off" },
-      { href: "/me/letters", label: "My letters" },
     ],
   },
   // Anyone who leads people, whatever their role is called. No payroll here, ever — see TeamService.

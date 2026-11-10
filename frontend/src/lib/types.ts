@@ -838,38 +838,6 @@ export interface Signatory {
   updatedAt: string;
 }
 
-/** A letter sent to be accepted with a signature (PD-72), as HR and the signer see it. */
-export type SignatureStatus = "SENT" | "VIEWED" | "SIGNED" | "DECLINED" | "WITHDRAWN" | "EXPIRED";
-export interface SignatureRequestView {
-  id: string;
-  documentId: string;
-  documentTitle: string;
-  signerName: string;
-  signerEmail: string | null;
-  employee: boolean;
-  status: SignatureStatus;
-  sentAt: string;
-  viewedAt: string | null;
-  decidedAt: string | null;
-  expiresAt: string;
-  declineReason: string | null;
-  typedName: string | null;
-  reminders: number;
-  open: boolean;
-}
-/** What the signer reads: the request, and how many printed pages to fetch one at a time (D1). */
-export interface SignerView {
-  requestId: string;
-  companyName: string;
-  documentTitle: string;
-  signerName: string;
-  message: string | null;
-  status: SignatureStatus;
-  expiresAt: string;
-  decidedAt: string | null;
-  pageCount: number;
-}
-
 /** Full and final settlement (PD-73). */
 export interface SettlementLine { label: string; amount: number; note: string | null }
 export interface SettlementExtraLine { label: string; amount: number; deduction: boolean }

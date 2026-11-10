@@ -2090,6 +2090,20 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   reminded", run hourly, so a server asleep on the day (the demo sleeps) still sends it on waking.
   Archived and platform companies are skipped.
 
+### PD-77 · 2026-11-10 · Letter signing parked until after launch
+- **Found:** opening a letter to sign drew each page into a picture on the server. On the 512 MB
+  server that crashed the backend for every customer (go-live defect D1). Drawing one page at a time
+  and shrinking the JVM made it rarer but not gone: one clean run on 10 Nov, a crash on 8 Nov.
+- **Decision (founder):** take signing out of the app for launch and keep it as an upcoming feature.
+  The whole feature as it was lives on branch `parked/letter-signing` (commit 331bf7f). Removed from
+  the demo: the employee and candidate signing screens (`/me/letters`, `/sign/{token}`), the "Send for
+  signature" panel, `SigningController`, `SigningService` and the page drawing. Kept: generating,
+  downloading and emailing letters, signatories and their signatures printed on letters (PD-71), and
+  the database tables, so restoring needs no migration and old signed letters keep their audit page.
+- **To bring it back:** restore those files from `parked/letter-signing`, but have the employee's
+  browser draw the pages (pdf.js on the PDF the server already makes) instead of the server. That is
+  the fix D1 really needs. In the backlog under High.
+
 ## 4. Architecture Decision Log
 
 
@@ -2283,6 +2297,9 @@ _Template:_ Company · Industry · Feature requested · Problem experienced · I
   High · Deps: Foundation, apps' events · Phase 1.
 - **Admin Platform v1 + Billing v1.** · Control plane + get paid · Effort: Med · Deps: Identity ·
   Phase 1.
+
+- Letter signing back, with pages drawn in the browser (PD-77). · Code on `parked/letter-signing`
+  · After launch.
 
 ### Medium
 - Workflow engine, Notification service, Comments primitive, Search service. · Deps: event backbone

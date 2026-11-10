@@ -6,7 +6,6 @@
 //   node tools/qa/recent.mjs
 //
 // It leaves one signed letter behind for Priya Nair (a signed letter is a record and cannot be deleted).
-import { deflateSync } from "node:zlib";
 
 const API = process.env.ORBIT_API ?? "https://calyvora-backend.onrender.com";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -31,29 +30,6 @@ async function call(tok, method, path, body) {
 }
 const login = async (email) => (await call(null, "POST", "/api/v1/auth/login", { email, password: "demopass123" })).json?.accessToken;
 
-/** A pen stroke as a PNG, built by hand so the script needs no image library. */
-function signaturePng() {
-  const w = 240, h = 80;
-  const raw = Buffer.alloc((w * 3 + 1) * h, 255);
-  for (let y = 0; y < h; y++) raw[y * (w * 3 + 1)] = 0;
-  for (let x = 30; x < 210; x++) {
-    const y = Math.round(40 + 18 * Math.sin(x / 14));
-    for (let t = -2; t <= 2; t++) raw.fill(30, (y + t) * (w * 3 + 1) + 1 + x * 3, (y + t) * (w * 3 + 1) + 1 + x * 3 + 3);
-  }
-  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
-  const crc = (buf) => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
-  const chunk = (type, data) => {
-    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
-    const td = Buffer.concat([Buffer.from(type), data]);
-    const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
-    return Buffer.concat([len, td, c]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
-  const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
-  return "data:image/png;base64," + png.toString("base64");
-}
-
 const wake = await call(null, "GET", "/actuator/health");
 console.log("wake", wake.status, wake.text.slice(0, 60));
 
@@ -68,7 +44,7 @@ const priyaId = (await call(T.MEMBER, "GET", "/api/v1/people/me")).json?.id;
 
 // ---- reads: everyone has their own; payroll and tax management only for those who run it ----
 const OWN = ["/api/v1/tax/me/declaration", "/api/v1/tax/me/computation", "/api/v1/tax/me/form130", "/api/v1/tax/settings",
-  "/api/v1/me/letters", "/api/v1/subscription/me", "/api/v1/people/attendance/me/today", "/api/v1/people/attendance/month-summary"];
+  "/api/v1/subscription/me", "/api/v1/people/attendance/me/today", "/api/v1/people/attendance/month-summary"];
 const RUNS_PAYROLL = ["/api/v1/payroll/months", "/api/v1/payroll/filings/readiness", "/api/v1/payroll/statutory-settings",
   "/api/v1/tax/declarations", "/api/v1/tax/deposits", "/api/v1/payroll/tds-openings", "/api/v1/documents/signatories"];
 for (const [role, tok] of Object.entries(T)) {
@@ -105,30 +81,19 @@ const q = `${fy}-${String(fy + 1).slice(2)}-Q1`;
 }
 log((await call(T.MEMBER, "POST", "/api/v1/tax/me/preview", {})).status === 200, "Member previews their tax");
 
-// ---- a letter: send, open page by page, sign ----
+// ---- a letter: generate and download. Signing is parked (branch parked/letter-signing) ----
 const templates = (await call(T.ADMIN, "GET", "/api/v1/documents/templates")).json ?? [];
 const tpl = templates.find((t) => t.kind === "APPOINTMENT_LETTER") ?? templates[0];
 const doc = await call(T.ADMIN, "POST", "/api/v1/documents", { templateId: tpl?.id, employeeId: priyaId, title: `QA letter ${Date.now()}` });
 log(doc.status === 201, "Generate a letter for an employee", String(doc.status));
-const sent = await call(T.ADMIN, "POST", `/api/v1/documents/${doc.json?.id}/signature`, { message: "QA signing check", validDays: 7 });
-log(sent.status === 200 && sent.json?.status === "SENT", "Send it for signature", String(sent.status));
-const rid = sent.json?.id;
-const view = await call(T.MEMBER, "GET", `/api/v1/me/letters/${rid}`);
-log(view.status === 200 && view.json?.pageCount > 0, "Employee opens it", `${view.status}, ${view.json?.pageCount} pages, ${view.size} B`);
-for (let i = 0; i < (view.json?.pageCount ?? 0); i++) {
-  const page = await call(T.MEMBER, "GET", `/api/v1/me/letters/${rid}/pages/${i}`);
-  log(page.status === 200 && page.type.startsWith("image/png"), `Page ${i + 1} shows`, `${page.status} ${page.size} B`);
-}
-log([403, 404].includes((await call(T.MANAGER, "GET", `/api/v1/me/letters/${rid}/pages/0`)).status), "Another employee cannot see a page");
+const pdf = await call(T.ADMIN, "GET", `/api/v1/documents/${doc.json?.id}/pdf`);
+log(pdf.status === 200 && pdf.type.includes("pdf"), "Download the letter as a PDF", `${pdf.status} ${pdf.size} B`);
 log([403, 404].includes((await call(acme, "GET", `/api/v1/documents/${doc.json?.id}`)).status), "Another company cannot open the letter");
-const signed = await call(T.MEMBER, "POST", `/api/v1/me/letters/${rid}/accept`, { typedName: "Priya Nair", signature: signaturePng(), agree: true });
-log(signed.status === 200 && signed.json?.status === "SIGNED", "Employee signs", `${signed.status} ${signed.json?.status ?? signed.text}`);
-const copy = await call(T.MEMBER, "GET", `/api/v1/me/letters/${rid}/pdf`);
-log(copy.status === 200 && copy.type.includes("pdf"), "Employee downloads the signed copy", `${copy.size} B`);
+log([403, 404].includes((await call(T.MEMBER, "GET", `/api/v1/documents/${doc.json?.id}/pdf`)).status), "A member cannot download HR's letters");
+log((await call(T.MEMBER, "GET", "/api/v1/me/letters")).status === 404, "Signing screens are switched off");
 log((await call(null, "GET", "/actuator/health")).status === 200, "Server still healthy after the letter");
 
 // ---- the rest of the edges ----
-log((await call(null, "GET", "/api/v1/public/sign/not-a-real-token-at-all-0000")).status === 404, "A bogus signing link is refused");
 log((await call(T.MEMBER, "POST", "/api/v1/auth/change-password", { currentPassword: "wrong-password-x", newPassword: "Another-pass-123" })).status === 400,
   "Change password refuses a wrong current password");
 for (const p of [`/api/v1/people/employees/${priyaId}/settlement`, `/api/v1/tax/declarations/${priyaId}`]) {

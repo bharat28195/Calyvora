@@ -54,7 +54,7 @@ const READS = [
   "/api/v1/payroll/months", "/api/v1/payroll/filings/readiness", "/api/v1/payroll/statutory-settings",
   "/api/v1/payroll/tds-openings", "/api/v1/tax/declarations", "/api/v1/tax/deposits", "/api/v1/tax/settings",
   "/api/v1/tax/me/declaration", "/api/v1/tax/me/computation", "/api/v1/tax/me/form130",
-  "/api/v1/people/attendance/month-summary", "/api/v1/shifts/work-day", "/api/v1/me/letters",
+  "/api/v1/people/attendance/month-summary", "/api/v1/shifts/work-day",
   "/api/v1/expenses", "/api/v1/expenses/me",
   "/api/v1/feed", "/api/v1/invitations", "/api/v1/shifts", "/api/v1/shifts/roster",
   "/api/v1/documents", "/api/v1/documents/templates",
@@ -107,7 +107,7 @@ await sweep("OWNER  ava.chen (Northwind)", ownerTok, READS, ids);
 const NARROW = [
   "/api/v1/auth/me", "/api/v1/dashboard/summary", "/api/v1/people/me", "/api/v1/people/employees",
   "/api/v1/people/me/payslip", "/api/v1/people/leave/mine", "/api/v1/people/leave",
-  "/api/v1/payroll/run", "/api/v1/expenses/me", "/api/v1/feed", "/api/v1/me/letters",
+  "/api/v1/payroll/run", "/api/v1/expenses/me", "/api/v1/feed",
   "/api/v1/helpdesk/tickets/mine", "/api/v1/notifications", "/api/v1/analytics/overview",
   "/api/v1/company/members", "/api/v1/people/employees/{emp}/compensation",
 ];

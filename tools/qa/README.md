@@ -10,7 +10,8 @@ node tools/qa/sweep.mjs
 PLATFORM_OWNER_PASSWORD='…' node tools/qa/features.mjs
 
 # PD-55 to PD-76: payroll lock and statutory files, income tax, settlement, and a letter
-# sent, opened page by page and signed — then checks the server is still up
+# generated and downloaded — then checks the server is still up. Letter signing is parked
+# on branch parked/letter-signing (2026-11-10), so the script checks it is switched off
 node tools/qa/recent.mjs
 ```
 

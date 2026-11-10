@@ -36,6 +36,8 @@ secrets/
 calyvora-site.zip
 *.log
 frontend/.next-build/
+# next build in a worktree follows the node_modules link and copies files here (f0e19cf)
+frontend/Calyvora/
 
 # Claude Code personal settings
 .claude/settings.local.json

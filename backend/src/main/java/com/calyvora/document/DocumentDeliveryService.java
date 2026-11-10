@@ -82,42 +82,6 @@ public class DocumentDeliveryService {
         return new Pdf(fileName(doc), render(doc));
     }
 
-    /** How many printed pages the letter has — what a signer's screen then asks for, one at a time. */
-    @Transactional(readOnly = true)
-    public int pageCount(UUID documentId) {
-        byte[] pdf = render(document(documentId));
-        try (org.apache.pdfbox.pdmodel.PDDocument d = org.apache.pdfbox.Loader.loadPDF(pdf)) {
-            return d.getNumberOfPages();
-        } catch (IOException e) {
-            throw new ApiException(ErrorCode.INTERNAL_ERROR, "The letter could not be shown.");
-        }
-    }
-
-    /**
-     * One page of the letter's PDF as a PNG (PD-72) — what a signer reads. The same pages the PDF
-     * has, so what someone signs is exactly what prints, on any phone, with no PDF viewer needed.
-     *
-     * <p>One page per request, deliberately (D1). Rendering every page into one JSON response allocated
-     * 236–360 MB for a four-page letter on a letterpad, and opening a single letter took the 512 MB
-     * server down for every customer. Subsampling lets PDFBox decode a full-page letterpad image at the
-     * resolution it is drawn at rather than the one it was scanned at.
-     */
-    @Transactional(readOnly = true)
-    public byte[] pageImage(UUID documentId, int index) {
-        byte[] pdf = render(document(documentId));
-        try (org.apache.pdfbox.pdmodel.PDDocument d = org.apache.pdfbox.Loader.loadPDF(pdf)) {
-            if (index < 0 || index >= d.getNumberOfPages()) throw new NotFoundException("No such page");
-            org.apache.pdfbox.rendering.PDFRenderer r = new org.apache.pdfbox.rendering.PDFRenderer(d);
-            r.setSubsamplingAllowed(true);
-            java.awt.image.BufferedImage img = r.renderImageWithDPI(index, 110, org.apache.pdfbox.rendering.ImageType.RGB);
-            java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
-            javax.imageio.ImageIO.write(img, "png", png);
-            return png.toByteArray();
-        } catch (IOException e) {
-            throw new ApiException(ErrorCode.INTERNAL_ERROR, "The letter could not be shown.");
-        }
-    }
-
     @Transactional(readOnly = true)
     public SendDefaults defaults(UUID documentId) {
         UUID companyId = TenantContext.getCompanyId();
