@@ -101,8 +101,8 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         assertThat(plans).hasSizeGreaterThanOrEqualTo(3);
         JsonNode essentials = null, complete = null;
         for (JsonNode p : plans) {
-            if ("ESSENTIALS".equals(p.get("code").asText())) essentials = p;
-            if ("COMPLETE".equals(p.get("code").asText())) complete = p;
+            if ("PAYROLL".equals(p.get("code").asText())) essentials = p;
+            if ("COMPLETE_2026".equals(p.get("code").asText())) complete = p;
         }
         assertThat(essentials).isNotNull();
         assertThat(complete).isNotNull();
@@ -115,12 +115,12 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         // unmentioned — otherwise "Essentials" would cost less and include everything.
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
         Session platform = platformOwner();
-        setPlan(platform, companyIdOf(platform, "Acme"), "ESSENTIALS");
+        setPlan(platform, companyIdOf(platform, "Acme"), "PAYROLL");
 
         JsonNode recruitment = featureState(owner, "RECRUITMENT");
         assertThat(recruitment.get("enabled").asBoolean()).isFalse();
         assertThat(recruitment.get("source").asText()).isEqualTo("PLAN");
-        assertThat(recruitment.get("planCode").asText()).isEqualTo("ESSENTIALS");
+        assertThat(recruitment.get("planCode").asText()).isEqualTo("PAYROLL");
 
         assertThat(featureState(owner, "PAYROLL").get("enabled").asBoolean()).isTrue();
     }
@@ -131,7 +131,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         // module one typed URL away.
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
         Session platform = platformOwner();
-        setPlan(platform, companyIdOf(platform, "Acme"), "ESSENTIALS");
+        setPlan(platform, companyIdOf(platform, "Acme"), "PAYROLL");
 
         mockMvc.perform(get("/api/v1/recruit/jobs").header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isForbidden())
@@ -149,11 +149,11 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         Session platform = platformOwner();
         String companyId = companyIdOf(platform, "Acme");
 
-        setPlan(platform, companyId, "ESSENTIALS");
+        setPlan(platform, companyId, "PAYROLL");
         mockMvc.perform(get("/api/v1/recruit/jobs").header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isForbidden());
 
-        setPlan(platform, companyId, "COMPLETE");
+        setPlan(platform, companyId, "COMPLETE_2026");
         mockMvc.perform(get("/api/v1/recruit/jobs").header("Authorization", "Bearer " + owner.accessToken()))
                 .andExpect(status().isOk());
     }
@@ -167,7 +167,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
         Session platform = platformOwner();
         String companyId = companyIdOf(platform, "Acme");
-        setPlan(platform, companyId, "ESSENTIALS");
+        setPlan(platform, companyId, "PAYROLL");
 
         override(platform, companyId, "RECRUITMENT", true);
         assertThat(featureState(owner, "RECRUITMENT").get("source").asText()).isEqualTo("COMPANY");
@@ -187,7 +187,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
         Session platform = platformOwner();
         String companyId = companyIdOf(platform, "Acme");
-        setPlan(platform, companyId, "ESSENTIALS");
+        setPlan(platform, companyId, "PAYROLL");
         override(platform, companyId, "RECRUITMENT", true);
         assertThat(featureState(owner, "RECRUITMENT").get("source").asText()).isEqualTo("COMPANY");
 
@@ -203,7 +203,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
         Session platform = platformOwner();
         String companyId = companyIdOf(platform, "Acme");
-        setPlan(platform, companyId, "ESSENTIALS");
+        setPlan(platform, companyId, "PAYROLL");
         assertThat(featureState(owner, "RECRUITMENT").get("enabled").asBoolean()).isFalse();
 
         setPlan(platform, companyId, null);
@@ -220,7 +220,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         Session acme = onboardOwner("Acme", "owner@acme.com", PW);
         Session beta = onboardOwner("Beta Corp", "owner@beta.com", PW);
         Session platform = platformOwner();
-        setPlan(platform, companyIdOf(platform, "Acme"), "ESSENTIALS");
+        setPlan(platform, companyIdOf(platform, "Acme"), "PAYROLL");
 
         mockMvc.perform(get("/api/v1/recruit/jobs").header("Authorization", "Bearer " + acme.accessToken()))
                 .andExpect(status().isForbidden());
@@ -240,7 +240,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(post("/api/v1/platform/companies/" + companyId + "/plan")
                         .header("Authorization", "Bearer " + owner.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("planCode", "COMPLETE"))))
+                        .content(json(Map.of("planCode", "COMPLETE_2026"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -251,7 +251,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         Session owner = onboardOwner("Acme", "owner@acme.com", PW);
         Session platform = platformOwner();
         String companyId = companyIdOf(platform, "Acme");
-        setPlan(platform, companyId, "ESSENTIALS");
+        setPlan(platform, companyId, "PAYROLL");
         for (Feature f : Feature.values()) {
             override(platform, companyId, f.name(), false);
         }
@@ -307,7 +307,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         onboardOwner("Acme", "owner@acme.com", PW);
         String companyId = companyIdOf(platform, "Acme");
 
-        mockMvc.perform(patch("/api/v1/platform/plans/ESSENTIALS")
+        mockMvc.perform(patch("/api/v1/platform/plans/PAYROLL")
                         .header("Authorization", "Bearer " + platform.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("active", false))))
@@ -316,7 +316,7 @@ class PlanAndFeatureIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(post("/api/v1/platform/companies/" + companyId + "/plan")
                         .header("Authorization", "Bearer " + platform.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("planCode", "ESSENTIALS"))))
+                        .content(json(Map.of("planCode", "PAYROLL"))))
                 .andExpect(status().isBadRequest());
     }
 }

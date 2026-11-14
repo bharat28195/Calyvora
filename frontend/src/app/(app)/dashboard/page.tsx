@@ -14,6 +14,7 @@ import { Alert } from "@/components/ui/alert";
 import { TeamOverviewSection } from "@/components/dashboard/team-overview";
 import { WhatsComingUp } from "@/components/dashboard/whats-coming-up";
 import { MyDay } from "@/components/attendance/self";
+import { isOn, useFeatures } from "@/hooks/useFeatures";
 import { can, canCompanyWide } from "@/lib/permissions";
 
 /** HR-suite dashboard: the People side of the company up front — attendance, time off, and your own day. */
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   // (PD-32): a MEMBER with one report gets it, an ADMIN gets it because they see everyone.
   const [leadsTeam, setLeadsTeam] = useState(false);
 
+  const features = useFeatures();
   useEffect(() => {
     api.dashboardSummary().then(setSummary).catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load dashboard"));
     api.leaveBalance().then(setBalance).catch(() => {});
@@ -52,10 +54,10 @@ export default function DashboardPage() {
             sub={`${summary?.departmentCount ?? 0} departments`} href="/people" />
           <Stat icon={<Building2 className="h-5 w-5 text-aqua" />} label="Departments" value={summary?.departmentCount ?? 0}
             sub="teams and headcount" href="/people/departments" />
-          <Stat icon={<ClipboardCheck className="h-5 w-5 text-amber-400" />} label="Performance" value={undefined}
-            sub="review cycles" href="/performance" />
-          <Stat icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="Payroll" value={undefined}
-            sub="salaries & payslips" href="/payroll" />
+          {isOn(features, "PERFORMANCE") && <Stat icon={<ClipboardCheck className="h-5 w-5 text-amber-400" />} label="Performance" value={undefined}
+            sub="review cycles" href="/performance" />}
+          {isOn(features, "PAYROLL") && <Stat icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="Payroll" value={undefined}
+            sub="salaries & payslips" href="/payroll" />}
         </div>
       )}
 
@@ -63,20 +65,20 @@ export default function DashboardPage() {
 
       <div className="mt-2 grid gap-6 lg:grid-cols-3">
         {/* Time Today — the live clock + check-in/out */}
-        <div className="lg:col-span-2"><MyDay /></div>
-        <div className="flex flex-col gap-6"><WhatsComingUp /></div>
+        {isOn(features, "ATTENDANCE") && <div className="lg:col-span-2"><MyDay /></div>}
+        <div className={isOn(features, "ATTENDANCE") ? "flex flex-col gap-6" : "flex flex-col gap-6 lg:col-span-3"}><WhatsComingUp /></div>
       </div>
 
       {/* Quick Access — jump straight to what you do most (Keka-style) */}
       <div className="mt-6">
         <h2 className="text-sm font-medium uppercase tracking-wide text-fg/40">Quick access</h2>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <QuickTile href="/me/attendance" icon={<Clock className="h-5 w-5 text-violet" />} label="Attendance" />
+          {isOn(features, "ATTENDANCE") && <QuickTile href="/me/attendance" icon={<Clock className="h-5 w-5 text-violet" />} label="Attendance" />}
           <QuickTile href="/me/leave" icon={<Palmtree className="h-5 w-5 text-amber-400" />}
             label="Time off" sub={leaveLeft != null ? `${leaveLeft} days left` : undefined} />
-          <QuickTile href="/finance/pay" icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="My pay" />
-          <QuickTile href="/performance/review" icon={<Target className="h-5 w-5 text-aqua" />} label="My review" />
-          <QuickTile href="/finance/expenses" icon={<Receipt className="h-5 w-5 text-violet" />} label="Expenses" />
+          {isOn(features, "PAYROLL") && <QuickTile href="/finance/pay" icon={<Wallet className="h-5 w-5 text-emerald-400" />} label="My pay" />}
+          {isOn(features, "PERFORMANCE") && <QuickTile href="/performance/review" icon={<Target className="h-5 w-5 text-aqua" />} label="My review" />}
+          {isOn(features, "EXPENSES") && <QuickTile href="/finance/expenses" icon={<Receipt className="h-5 w-5 text-violet" />} label="Expenses" />}
           <QuickTile href="/inbox" icon={<Inbox className="h-5 w-5 text-amber-400" />} label="Inbox" />
         </div>
       </div>

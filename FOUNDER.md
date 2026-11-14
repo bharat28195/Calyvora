@@ -2104,6 +2104,29 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   browser draw the pages (pdf.js on the PDF the server already makes) instead of the server. That is
   the fix D1 really needs. In the backlog under High.
 
+### PD-78 · 2026-11-14 · Sell part of Orbit to a small company, without the rest getting in the way
+- **Trigger:** a competitor invoice (SmartOffice, ₹69 per employee for attendance and payroll) and the
+  question of selling to small and large customers alike. Per-company module switches already existed
+  (PD-31); a check of what happens when one is off found four ways the rest still got in the way.
+- **Found and fixed:**
+  1. A company that never checks in here was still under the absence rules, with no way to turn
+     them off, so a payroll-only customer's payslips came out near ₹0. Now **Track attendance in
+     Orbit** (Company settings): off means nobody is marked absent or on a half day by the clock and
+     pay is cut only for approved unpaid leave or an absence HR marks; on again applies from that day.
+  2. Payroll guarded only `/payroll`; salaries, payslips, settlements and tax declarations sat under
+     `/people` and `/tax` and stayed open. Payroll now guards every screen that shows or changes pay
+     (a feature takes several address patterns). PAN, bank and UAN stay open: HR records, not pay.
+     Without payroll a review records its outcome and title but shows and changes no salary.
+  3. The working day (start, hours, absence grace) could only be set on the Shifts page, so a company
+     without Shifts could not set it. It is now also in Company settings (`/company/work-day`).
+  4. Menu entries and dashboard tiles that ignored the switches now hide with their module.
+- **Plans (founder, prices as proposed):** Attendance & Leave ₹49, Payroll ₹79, Growth ₹119, Complete
+  ₹149 per employee per month (V84). Payroll includes tax declarations and full and final, because
+  both are pay. The 2026-08 plans (Essentials, Growth, Complete) are retired, not deleted. Statutory
+  payroll and income-tax withholding stay out of every plan and are switched on per customer once
+  their figures are checked.
+- **Not in this change:** biometric devices, a mobile app, single sign-on, an audit log.
+
 ## 4. Architecture Decision Log
 
 

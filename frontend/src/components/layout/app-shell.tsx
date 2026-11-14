@@ -10,6 +10,7 @@ import {
   CalendarClock, Building2, LifeBuoy, DoorOpen, CalendarCheck, Network, Megaphone, FolderOpen,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useSession";
+import { useFeatures } from "@/hooks/useFeatures";
 import { IdleTimeout } from "@/components/layout/idle-timeout";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,11 @@ interface NavChild {
   perm?: PermissionKey;
   /** Needs the permission company-wide, not only for the holder's team. */
   permWide?: boolean;
+  /**
+   * The module this pane belongs to, when its section mixes modules (Finance holds pay and expenses).
+   * "ATTENDANCE" is not a sold module: it is whether the company tracks attendance in Orbit at all.
+   */
+  feature?: string;
 }
 interface NavItem {
   href: string;
@@ -93,8 +99,8 @@ const NAV: NavItem[] = [
   { href: "/analytics", label: "Insights", icon: BarChart3, roles: COMPANY, perm: "INSIGHTS_VIEW", feature: "ANALYTICS" },
   // The company feed: announcements, celebrations and questions, company-wide or to one team — the
   // place to post something everyone sees. Open to every company user; who can post company-wide
-  // vs team-only is enforced on the server. Not feature-gated, so a new company has it from day one.
-  { href: "/feed", label: "Announcements", icon: Megaphone, roles: COMPANY },
+  // vs team-only is enforced on the server. In every plan, but switchable like any module.
+  { href: "/feed", label: "Announcements", icon: Megaphone, roles: COMPANY, feature: "FEED" },
   // Everyone reads the company's policies and handbook; HR and admins publish them (DocumentAccess).
   { href: "/knowledge", label: "Company documents", icon: FolderOpen, roles: COMPANY, feature: "KNOWLEDGE" },
   // "Me" is attendance and time off. Everything that is really about money went to Finance and
@@ -104,7 +110,7 @@ const NAV: NavItem[] = [
     href: "/me", label: "Me", icon: CircleUser, roles: COMPANY,
     children: [
       { href: "/me", label: "Overview" },
-      { href: "/me/attendance", label: "Attendance" },
+      { href: "/me/attendance", label: "Attendance", feature: "ATTENDANCE" },
       { href: "/me/leave", label: "Time off" },
     ],
   },
@@ -116,10 +122,10 @@ const NAV: NavItem[] = [
     href: "/team", label: "My team", icon: Users, roles: COMPANY, leadsTeam: true,
     children: [
       { href: "/team", label: "Overview" },
-      { href: "/team/attendance", label: "Attendance" },
+      { href: "/team/attendance", label: "Attendance", feature: "ATTENDANCE" },
       { href: "/team/leave", label: "Time off" },
-      { href: "/team/expenses", label: "Expenses" },
-      { href: "/team/performance", label: "Performance" },
+      { href: "/team/expenses", label: "Expenses", feature: "EXPENSES" },
+      { href: "/team/performance", label: "Performance", feature: "PERFORMANCE" },
     ],
   },
   // Top level, and it took three attempts to get here. Under People it was HR-only, so a lead could
@@ -138,13 +144,13 @@ const NAV: NavItem[] = [
   {
     href: "/finance", label: "Finance", icon: Wallet, roles: COMPANY,
     children: [
-      { href: "/finance/pay", label: "My pay" },
+      { href: "/finance/pay", label: "My pay", feature: "PAYROLL" },
       { href: "/finance/mine", label: "My finances" },
-      { href: "/finance/expenses", label: "Expenses" },
+      { href: "/finance/expenses", label: "Expenses", feature: "EXPENSES" },
       // Everyone declares their own tax and picks their own regime — which one is cheaper depends
       // on the individual, so this cannot be an HR-only screen.
-      { href: "/finance/tax", label: "Tax declaration" },
-      { href: "/finance/tax/manage", label: "Manage tax", perm: "TAX_MANAGE" },
+      { href: "/finance/tax", label: "Tax declaration", feature: "PAYROLL" },
+      { href: "/finance/tax/manage", label: "Manage tax", perm: "TAX_MANAGE", feature: "PAYROLL" },
     ],
   },
   // One Performance section for everybody, with two extra panes for HR rather than a second
@@ -188,7 +194,7 @@ const NAV: NavItem[] = [
     children: [
       { href: "/people/attendance", label: "Attendance", perm: "ATTENDANCE_MANAGE", permWide: true },
       { href: "/people/time-off", label: "Time off", perm: "LEAVE_APPROVE", permWide: true },
-      { href: "/regularizations", label: "Regularizations", perm: "ATTENDANCE_MANAGE" },
+      { href: "/regularizations", label: "Regularizations", perm: "ATTENDANCE_MANAGE", feature: "ATTENDANCE" },
       { href: "/people/leave-policy", label: "Leave policy", perm: "LEAVE_POLICY_MANAGE" },
     ],
   },
@@ -274,8 +280,8 @@ function routeRule(pathname: string): { roles: Role[] | null; feature?: string; 
     for (const c of n.children ?? []) {
       // A pane with its own permission needs that; otherwise it needs whatever its section needs.
       entries.push(c.perm
-        ? { href: c.href, roles: n.roles, feature: n.feature, perm: c.perm, permWide: c.permWide }
-        : { href: c.href, roles: n.roles, feature: n.feature, perm: n.perm, permWide: n.permWide });
+        ? { href: c.href, roles: n.roles, feature: c.feature ?? n.feature, perm: c.perm, permWide: c.permWide }
+        : { href: c.href, roles: n.roles, feature: c.feature ?? n.feature, perm: n.perm, permWide: n.permWide });
     }
   }
   const matches = entries.filter((e) => pathname === e.href || pathname.startsWith(e.href + "/"));
@@ -296,7 +302,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [loggingOut, setLoggingOut] = useState(false);
   // Null until known. Nothing is hidden while it loads: showing a section briefly and then removing
   // it is far better than hiding one the customer has paid for because a request was slow.
-  const [features, setFeatures] = useState<Record<string, boolean> | null>(null);
+  const features = useFeatures();
   // Whether this person has anybody reporting to them. False until known, the opposite of `features`
   // above: showing a section that then vanishes is the right trade for a paid module, but "My team"
   // flashing up for somebody who has no team reads as a bug, and one extra second before a lead sees
@@ -314,9 +320,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const authenticated = session.status === "authenticated";
   useEffect(() => {
     if (!authenticated) return;
-    api.companyFeatures()
-      .then((list) => setFeatures(Object.fromEntries(list.map((f) => [f.feature, f.enabled]))))
-      .catch(() => setFeatures(null));
     api.myTeamStanding()
       .then((s) => setLeadsTeam(s.leadsTeam))
       .catch(() => setLeadsTeam(false));
@@ -365,7 +368,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // to them still runs exits for the business.
     .filter((n) => !n.leadsTeam || leadsTeam || seesWholeCompany)
     // Each pane can need its own permission (Manage tax, Review cycles, Designations…).
-    .map((n) => (n.children ? { ...n, children: n.children.filter((c) => allowed(c.perm, c.permWide)) } : n))
+    .map((n) => (n.children ? { ...n, children: n.children.filter((c) => allowed(c.perm, c.permWide)
+      && (!c.feature || features === null || features[c.feature] !== false)) } : n))
     // A section that is only its panes disappears when none of them is yours — and opens on the first that is.
     .filter((n) => !n.hideIfEmpty || (n.children?.length ?? 0) > 0)
     .map((n) => (n.hideIfEmpty && n.children?.length ? { ...n, href: n.children[0].href } : n));

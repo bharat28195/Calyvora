@@ -165,20 +165,28 @@ public abstract class IntegrationTestBase {
      * that assume nobody is absent call this to say so; attendance tests set the date themselves.
      */
     protected void attendanceRulesOff(Session session) throws Exception {
+        // Reading the settings creates the row if the company has none yet, so the update has one to change.
+        getJson("/api/v1/company/settings", session);
+        asTenant(session, "update company_settings set attendance_rules_from = null where company_id = ?");
+    }
+
+    /**
+     * Run one statement against the session's own company, its id bound as the LAST parameter after
+     * {@code args}. Tables are under FORCE row level security, so the tenant is bound on the same
+     * connection and reset afterwards. For setting up what no endpoint can, such as a date in the past.
+     */
+    protected int asTenant(Session session, String sql, Object... args) throws Exception {
         String payload = session.accessToken().split("[.]")[1];
         JsonNode claims = objectMapper.readTree(java.util.Base64.getUrlDecoder().decode(payload));
         String companyId = claims.get("companyId").asText();
-        // Reading the settings creates the row if the company has none yet, so the update has one to change.
-        getJson("/api/v1/company/settings", session);
-        // Tables are under FORCE row level security, so the tenant is bound on the same connection.
-        testJdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Integer>) c -> {
+        return testJdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Integer>) c -> {
             try (var set = c.prepareStatement("select set_config('calyvora.company_id', ?, false)")) {
                 set.setString(1, companyId);
                 set.execute();
             }
-            try (var st = c.prepareStatement(
-                    "update company_settings set attendance_rules_from = null where company_id = ?")) {
-                st.setObject(1, java.util.UUID.fromString(companyId));
+            try (var st = c.prepareStatement(sql)) {
+                for (int i = 0; i < args.length; i++) st.setObject(i + 1, args[i]);
+                st.setObject(args.length + 1, java.util.UUID.fromString(companyId));
                 return st.executeUpdate();
             } finally {
                 try (var reset = c.prepareStatement("select set_config('calyvora.company_id', '', false)")) {

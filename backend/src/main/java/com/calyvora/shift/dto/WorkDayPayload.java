@@ -13,6 +13,14 @@ import jakarta.validation.constraints.NotNull;
 public record WorkDayPayload(
         @NotNull @Min(30) @Max(1440) Integer workDayMinutes,
         @NotBlank String workDayStart,
-        @NotNull @Min(0) @Max(720) Integer absentGraceMinutes
+        @NotNull @Min(0) @Max(720) Integer absentGraceMinutes,
+        /**
+         * Whether attendance is tracked in Orbit at all (2026-11-14). Off for a company that only runs
+         * payroll here: nobody is marked absent or on a half day by the clock, so pay is cut only for
+         * approved unpaid leave. Null on a request leaves it as it is.
+         */
+        Boolean trackAttendance,
+        /** The day the absence rules started applying, ISO; null while tracking is off. Ignored on a request. */
+        String trackAttendanceFrom
 ) {
 }

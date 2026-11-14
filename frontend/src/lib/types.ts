@@ -67,6 +67,8 @@ export interface CompanySettings {
   logoUrl: string | null;
   /** Minutes of inactivity before a session ends; null means never. */
   sessionIdleMinutes: number | null;
+  /** Whether attendance is tracked in Orbit; drives the check-in screens. */
+  trackAttendance?: boolean;
 }
 
 export interface Member {
@@ -1177,6 +1179,10 @@ export interface WorkDayPolicy {
   workDayMinutes: number;
   workDayStart: string;
   absentGraceMinutes: number;
+  /** Whether attendance is tracked in Orbit; off for a company that only runs payroll here. */
+  trackAttendance?: boolean;
+  /** When the absence rules started applying; null while tracking is off. */
+  trackAttendanceFrom?: string | null;
 }
 export interface RosterEmployee {
   employeeId: string;

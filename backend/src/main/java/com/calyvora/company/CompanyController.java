@@ -19,9 +19,11 @@ import java.util.List;
 public class CompanyController {
 
     private final CompanyService companyService;
+    private final com.calyvora.shift.ShiftService shiftService;
 
-    public CompanyController(CompanyService companyService) {
+    public CompanyController(CompanyService companyService, com.calyvora.shift.ShiftService shiftService) {
         this.companyService = companyService;
+        this.shiftService = shiftService;
     }
 
     /** Any authenticated member can view their company. */
@@ -39,6 +41,24 @@ public class CompanyController {
     @PreAuthorize("@perm.has('COMPANY_SETTINGS')")
     public CompanySettingsResponse updateSettings(@Valid @RequestBody UpdateSettingsRequest request) {
         return companyService.updateSettings(request);
+    }
+
+    /**
+     * The working day and whether attendance is tracked (2026-11-14). The same settings Shifts edits,
+     * here so they work for a company without the Shifts module: the rules apply to everyone, rostered
+     * or not, so they cannot depend on buying the roster.
+     */
+    @GetMapping("/work-day")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS') or @perm.has('SHIFTS_MANAGE')")
+    public com.calyvora.shift.dto.WorkDayPayload workDay() {
+        return shiftService.workDay();
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/work-day")
+    @PreAuthorize("@perm.has('COMPANY_SETTINGS') or @perm.has('SHIFTS_MANAGE')")
+    public com.calyvora.shift.dto.WorkDayPayload setWorkDay(
+            @Valid @RequestBody com.calyvora.shift.dto.WorkDayPayload req) {
+        return shiftService.setWorkDay(req);
     }
 
     @GetMapping("/members")

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Search, Mail, Phone, MapPin, Briefcase, Building2, ListChecks, Plus, Trash2, CheckCircle2, Circle, Wallet, UserPlus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/hooks/useSession";
+import { isOn, useFeatures } from "@/hooks/useFeatures";
 import type { Department, Designation, Employee, OnboardingTask } from "@/lib/types";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -220,6 +221,8 @@ function EmployeeDetailModal({
 }) {
   const [tasks, setTasks] = useState<OnboardingTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Salaries belong to payroll: a company without it keeps no pay in Orbit.
+  const payroll = isOn(useFeatures(), "PAYROLL");
   const [newTask, setNewTask] = useState("");
   const canManage = admin;
   const canToggle = admin || isSelf;
@@ -274,7 +277,7 @@ function EmployeeDetailModal({
 
       <EmployeeGoals employeeId={employee.id} canEdit={admin || isSelf} />
 
-      {admin && (
+      {admin && payroll && (
         <div className="mt-6">
           <h3 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-fg/80">
             <Wallet className="h-4 w-4 text-emerald-400" /> Compensation
