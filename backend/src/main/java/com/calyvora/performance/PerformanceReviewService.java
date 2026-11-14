@@ -59,6 +59,7 @@ public class PerformanceReviewService {
 
     private final com.calyvora.access.PermissionService permissions;
     private final com.calyvora.document.DocumentService documentService;
+    private final com.calyvora.feature.FeatureService featureService;
 
     public PerformanceReviewService(ReviewCycleRepository cycleRepository,
                                     PerformanceReviewRepository reviewRepository,
@@ -68,7 +69,9 @@ public class PerformanceReviewService {
                                     NotificationService notificationService,
                                     com.calyvora.people.OrgScope orgScope,
             com.calyvora.access.PermissionService permissions,
-            @org.springframework.context.annotation.Lazy com.calyvora.document.DocumentService documentService) {
+            @org.springframework.context.annotation.Lazy com.calyvora.document.DocumentService documentService,
+            com.calyvora.feature.FeatureService featureService) {
+        this.featureService = featureService;
         this.permissions = permissions;
         this.documentService = documentService;
         this.orgScope = orgScope;
@@ -184,7 +187,7 @@ public class PerformanceReviewService {
         if (roster.isEmpty()) return List.of();
         boolean maySeePay = permissions.companyWide(principal, com.calyvora.access.Permission.SALARY_VIEW);
         List<PerformanceReview> reviews = reviewRepository.findByEmployeeIdInOrderByCreatedAtDesc(roster);
-        Bulk bulk = Bulk.forReviews(reviews, maySeePay, employeeRepository, userRepository,
+        Bulk bulk = Bulk.forReviews(reviews, maySeePay, payrollOn(), employeeRepository, userRepository,
                 cycleRepository, goalRepository, compensationRepository);
         return reviews.stream()
                 .map(r -> toResponse(r, bulk))
@@ -210,9 +213,10 @@ public class PerformanceReviewService {
                         java.util.Map<UUID, String> namesByUserId,
                         java.util.Map<UUID, ReviewCycle> cycles,
                         java.util.Map<UUID, List<Goal>> goals,
-                        java.util.Map<UUID, CompensationRecord> currentPay) {
+                        java.util.Map<UUID, CompensationRecord> currentPay,
+                        boolean payroll) {
 
-        static Bulk forReviews(List<PerformanceReview> reviews, boolean withPay,
+        static Bulk forReviews(List<PerformanceReview> reviews, boolean withPay, boolean payroll,
                                EmployeeRepository employeeRepository,
                                UserRepository userRepository,
                                ReviewCycleRepository cycleRepository,
@@ -241,7 +245,7 @@ public class PerformanceReviewService {
 
             // Newest first, so the first row seen per person is their current salary.
             java.util.Map<UUID, CompensationRecord> pay = new java.util.HashMap<>();
-            if (withPay && !employeeIds.isEmpty()) {
+            if (withPay && payroll && !employeeIds.isEmpty()) {
                 for (CompensationRecord c : compensationRepository
                         .findByEmployeeIdInOrderByEffectiveDateDescCreatedAtDesc(employeeIds)) {
                     pay.putIfAbsent(c.getEmployeeId(), c);
@@ -258,7 +262,7 @@ public class PerformanceReviewService {
                     : userRepository.findAllById(userIds).stream()
                             .collect(java.util.stream.Collectors.toMap(User::getId, User::fullName, (a, b) -> a));
 
-            return new Bulk(employees, names, cycles, goals, pay);
+            return new Bulk(employees, names, cycles, goals, pay, payroll);
         }
     }
 
@@ -412,7 +416,9 @@ public class PerformanceReviewService {
             employeeRepository.save(employee);
         }
 
-        BigDecimal newAnnual = resolveNewSalary(review);
+        // Without payroll the company has no salaries in Orbit to raise: the review records its outcome and
+        // any new title, and the pay decision is made wherever they run payroll.
+        BigDecimal newAnnual = payrollOn() ? resolveNewSalary(review) : null;
         if (newAnnual != null && newAnnual.signum() > 0) {
             CompensationResponse comp = compensationService.forEmployee(review.getEmployeeId());
             String reason = "Performance review: " + cycleName(review.getCycleId())
@@ -444,6 +450,11 @@ public class PerformanceReviewService {
     }
 
     // ---------- helpers ----------
+
+    /** Whether this company has payroll in Orbit; without it reviews carry no salary and change none. */
+    private boolean payrollOn() {
+        return featureService.isEnabled(com.calyvora.feature.Feature.PAYROLL);
+    }
 
     /** The new annual salary a hike implies, or null when there's no raise to apply. */
     private BigDecimal resolveNewSalary(PerformanceReview review) {
@@ -518,7 +529,7 @@ public class PerformanceReviewService {
                 currency = current.getCurrency() == null ? "USD" : current.getCurrency();
                 currentSalary = current.getAnnualAmount();
             }
-        } else {
+        } else if (payrollOn()) {
             try {
                 CompensationResponse comp = compensationService.forEmployee(review.getEmployeeId());
                 currency = comp.currency() == null ? "USD" : comp.currency();
@@ -528,9 +539,11 @@ public class PerformanceReviewService {
             }
         }
 
-        return PerformanceReviewResponse.of(review, cycleName, periodStart, periodEnd, cycleStatus,
+        PerformanceReviewResponse response = PerformanceReviewResponse.of(review, cycleName, periodStart, periodEnd, cycleStatus,
                 employeeName, jobTitle, managerName, currency, currentSalary, achieved, goals.size(), goalDtos)
                 .withQuestions(cycle == null ? List.of() : ReviewForms.questions(cycle.getQuestions()));
+        boolean payroll = bulk != null ? bulk.payroll() : payrollOn();
+        return payroll ? response : response.withoutPay();
     }
 
     /** The questions the review's cycle asks; empty for a cycle from before questions existed. */

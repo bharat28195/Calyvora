@@ -92,11 +92,27 @@ public class ShiftService {
         settings.setWorkDayMinutes(validMinutes(req.workDayMinutes()));
         settings.setWorkDayStart(parseTime(req.workDayStart()));
         settings.setAbsentGraceMinutes(req.absentGraceMinutes());
+        if (Boolean.FALSE.equals(req.trackAttendance())) {
+            settings.setAttendanceRulesFrom(null);
+        } else if (Boolean.TRUE.equals(req.trackAttendance()) && settings.getAttendanceRulesFrom() == null) {
+            // From today, never earlier: switching tracking on must not turn days already paid into absences.
+            settings.setAttendanceRulesFrom(java.time.LocalDate.now(companyZone(settings)));
+        }
         return of(settings);
     }
 
     private static WorkDayPayload of(CompanySettings s) {
-        return new WorkDayPayload(s.getWorkDayMinutes(), s.getWorkDayStart().toString(), s.getAbsentGraceMinutes());
+        return new WorkDayPayload(s.getWorkDayMinutes(), s.getWorkDayStart().toString(), s.getAbsentGraceMinutes(),
+                s.getAttendanceRulesFrom() != null,
+                s.getAttendanceRulesFrom() == null ? null : s.getAttendanceRulesFrom().toString());
+    }
+
+    private static java.time.ZoneId companyZone(CompanySettings s) {
+        try {
+            return java.time.ZoneId.of(s.getTimezone());
+        } catch (RuntimeException e) {
+            return java.time.ZoneId.of("Asia/Kolkata");
+        }
     }
 
     private static int validMinutes(int minutes) {

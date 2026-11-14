@@ -814,11 +814,11 @@ export const api = {
   // --- shift scheduling / rostering ---
   /** The standard day (hours, start) and the absence grace, for anyone not rostered (V70). */
   workDay(): Promise<WorkDayPolicy> {
-    return LIVE ? http<WorkDayPolicy>("/shifts/work-day")
-      : Promise.resolve({ workDayMinutes: 540, workDayStart: "09:30", absentGraceMinutes: 120 });
+    return LIVE ? http<WorkDayPolicy>("/company/work-day")
+      : Promise.resolve({ workDayMinutes: 540, workDayStart: "09:30", absentGraceMinutes: 120, trackAttendance: true, trackAttendanceFrom: null });
   },
   setWorkDay(input: WorkDayPolicy): Promise<WorkDayPolicy> {
-    return LIVE ? http<WorkDayPolicy>("/shifts/work-day", { method: "PUT", body: JSON.stringify(input) })
+    return LIVE ? http<WorkDayPolicy>("/company/work-day", { method: "PUT", body: JSON.stringify(input) })
       : liveOnly("Changing the working day");
   },
   shifts(): Promise<Shift[]> {

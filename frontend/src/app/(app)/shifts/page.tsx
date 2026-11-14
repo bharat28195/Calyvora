@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
+import { WorkDayCard } from "@/components/attendance/work-day-card";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -232,70 +233,4 @@ function hours(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m ? `${h}h ${m}m` : `${h}h`;
-}
-
-/**
- * The company's working day, for everyone not rostered onto a shift: when it starts, how many hours
- * of work it asks for, and how long after the start a person with no check-in counts as absent.
- * A day short of the hours becomes a half day, which payroll pays as half. Managers and HR can still
- * correct any day by hand.
- */
-function WorkDayCard() {
-  const [start, setStart] = useState("09:30");
-  const [workHours, setWorkHours] = useState("9");
-  const [graceHours, setGraceHours] = useState("2");
-  const [loaded, setLoaded] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.workDay().then((p) => {
-      setStart(p.workDayStart.slice(0, 5));
-      setWorkHours(String(p.workDayMinutes / 60));
-      setGraceHours(String(p.absentGraceMinutes / 60));
-    }).catch(() => {}).finally(() => setLoaded(true));
-  }, []);
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true); setError(null); setSaved(false);
-    try {
-      await api.setWorkDay({
-        workDayStart: start,
-        workDayMinutes: Math.round(Number(workHours) * 60),
-        absentGraceMinutes: Math.round(Number(graceHours) * 60),
-      });
-      setSaved(true);
-    } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't save the working day"); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <Card className="mt-6">
-      <CardTitle>Working day</CardTitle>
-      <p className="mt-1 text-sm text-fg/60">
-        For everyone not on a shift. No check-in by the start plus the grace means absent; fewer hours
-        than required means a half day.
-      </p>
-      {error && <Alert tone="error" className="mt-3">{error}</Alert>}
-      {saved && <Alert tone="success" className="mt-3">Saved.</Alert>}
-      <form onSubmit={save} className="mt-4 grid gap-3 sm:grid-cols-4">
-        <Field label="Day starts" htmlFor="wd-start">
-          <Input id="wd-start" type="time" value={start} onChange={(e) => { setStart(e.target.value); setSaved(false); }} />
-        </Field>
-        <Field label="Required hours" htmlFor="wd-hours">
-          <Input id="wd-hours" type="number" min="0.5" max="24" step="0.5" value={workHours}
-            onChange={(e) => { setWorkHours(e.target.value); setSaved(false); }} />
-        </Field>
-        <Field label="Absent after (hours)" htmlFor="wd-grace">
-          <Input id="wd-grace" type="number" min="0" max="12" step="0.25" value={graceHours}
-            onChange={(e) => { setGraceHours(e.target.value); setSaved(false); }} />
-        </Field>
-        <div className="flex items-end">
-          <Button type="submit" disabled={busy || !loaded}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
-        </div>
-      </form>
-    </Card>
-  );
 }

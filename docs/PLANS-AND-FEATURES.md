@@ -51,11 +51,21 @@ than meaning false.
 
 Seeded, and editable in the console:
 
-| Plan | Includes | Price |
-|---|---|---|
-| **Essentials** | Payroll, company feed | ₹99 |
-| **Growth** | + recruitment, expenses, shifts, helpdesk, clients | ₹149 |
-| **Complete** | + performance, work tracker, knowledge base, AI assistant, insights | ₹199 |
+Since 2026-11-14 (V84, PD-78), per employee per month:
+
+| Plan | For | Includes | Price |
+|---|---|---|---|
+| **Attendance & Leave** (`ATTENDANCE`) | Payroll run elsewhere | Shifts, announcements | ₹49 |
+| **Payroll** (`PAYROLL`) | Small companies | + payroll, payslips, bank file, tax declarations, full and final | ₹79 |
+| **Growth** (`GROWTH_2026`) | Growing companies | + expenses, recruitment, helpdesk, company documents | ₹119 |
+| **Complete** (`COMPLETE_2026`) | Mid-size | + performance, insights, AI assistant | ₹149 |
+
+The August plans (`ESSENTIALS`, `GROWTH`, `COMPLETE`) are retired: whoever is on one keeps it.
+Statutory payroll and income-tax withholding are in no plan; switch them on per company once checked.
+
+**Payroll guards every pay screen**, not only `/payroll`: salaries, payslips, settlements and
+`/tax`. A company without it can still use attendance with **Track attendance in Orbit** off
+(Company settings), so nobody is marked absent by the clock.
 
 **People, attendance, leave, documents and the dashboard are in every plan and are not switchable at
 all.** They are what an HR product *is*; selling a package without them would not be a smaller

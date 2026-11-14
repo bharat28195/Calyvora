@@ -4,6 +4,19 @@ All notable changes to Calyvora. Newest first. Dates are absolute (ISO `YYYY-MM-
 
 ## [Unreleased]
 
+### 2026-11-14 — Buy part of Orbit: modules stand alone, and plans from ₹49 (PD-78)
+- **Track attendance in Orbit**, in Company settings. Off, nobody is marked absent or on a half day by
+  the clock, so a company that only runs payroll here is paid in full less approved unpaid leave.
+  Before, it had the rules on with no way out and payslips came out near ₹0.
+- **Payroll guards every pay screen**: salaries, payslips, settlements and tax declarations, not only
+  `/payroll`. Reviews in a company without payroll show and change no salary.
+- **The working day** (start, hours, absence grace) is set in Company settings, so it works without
+  the Shifts module. Shifts still shows it.
+- **Menus and dashboard tiles** hide with their module: Announcements, My pay, Tax declaration, team
+  and finance Expenses, team Performance, and check-in when attendance is not tracked.
+- **New plans** (V84): Attendance & Leave ₹49, Payroll ₹79, Growth ₹119, Complete ₹149 per employee
+  per month. Essentials, Growth and Complete from August are retired; anyone on them keeps them.
+
 ### 2026-11-10 — Letter signing parked for launch (PD-77)
 - **Signing removed from the app.** Drawing letter pages on the 512 MB server could still crash it
   (D1). The signing screens, the "Send for signature" panel and the server code behind them are gone;

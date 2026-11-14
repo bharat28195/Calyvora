@@ -8,6 +8,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import type { Employee, ExitView, Page } from "@/lib/types";
 import { useSession } from "@/hooks/useSession";
+import { isOn, useFeatures } from "@/hooks/useFeatures";
 import { KIND_LABELS } from "@/lib/documents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -189,7 +190,9 @@ function ExitCard({
   const [newTask, setNewTask] = useState("");
   // The settlement is salary data, so it is payroll's to open (PD-73).
   const { me } = useSession();
-  const canSettle = can(me, "PAYROLL_MANAGE") && !!exit.lastWorkingDay;
+  // ...and needs payroll in Orbit at all: without it the final pay is worked out wherever they run payroll.
+  const payroll = isOn(useFeatures(), "PAYROLL");
+  const canSettle = payroll && can(me, "PAYROLL_MANAGE") && !!exit.lastWorkingDay;
   const pct = exit.tasksTotal === 0 ? 0 : Math.round((exit.tasksDone / exit.tasksTotal) * 100);
 
   async function run(action: () => Promise<unknown>) {

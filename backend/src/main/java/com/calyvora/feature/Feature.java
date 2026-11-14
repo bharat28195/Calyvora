@@ -2,6 +2,7 @@ package com.calyvora.feature;
 
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.util.AntPathMatcher;
 
 /**
  * The parts of Orbit that can be sold, or withheld, one customer at a time.
@@ -24,13 +25,26 @@ import java.util.List;
  * @param label       what the owner console and the customer's own screens call it
  * @param description one line, shown beside the toggle, so a plan can be assembled without guessing
  * @param defaultOn   the answer when nothing has been configured — see the note above
- * @param pathPrefix  the API surface this feature guards, or null when it guards none
+ * @param paths       Ant patterns for the API surface this feature guards; none when it guards no screen
  */
 public enum Feature {
 
-    PAYROLL("Payroll", "Salaries, payslips, payroll runs and the bank file", true, "/api/v1/payroll/"),
+    /**
+     * Everything that shows or changes pay, not only the payroll screens. Salaries, payslips, the full
+     * and final settlement and income-tax declarations live under {@code /people} and {@code /tax}, so
+     * guarding only {@code /payroll} left a customer without payroll able to open them (2026-11-14).
+     * Private details ({@code /finance}: PAN, bank, UAN) are deliberately not here: they are HR records.
+     */
+    PAYROLL("Payroll", "Salaries, payslips, payroll runs, the bank file, tax declarations and settlements", true,
+            "/api/v1/payroll/**",
+            "/api/v1/people/employees/*/compensation/**",
+            "/api/v1/people/employees/*/payslip/**",
+            "/api/v1/people/employees/*/settlement/**",
+            "/api/v1/people/me/compensation/**",
+            "/api/v1/people/me/payslip/**",
+            "/api/v1/tax/**"),
     STATUTORY_PAYROLL("Statutory payroll (PF)",
-            "Provident Fund computed on payslips. Off until the numbers have been checked.", false, null),
+            "Provident Fund computed on payslips. Off until the numbers have been checked.", false),
     /**
      * Deliberately separate from PF rather than folded into it.
      *
@@ -47,31 +61,33 @@ public enum Feature {
      */
     INCOME_TAX("Income tax (TDS)",
             "Income tax withheld on payslips, from each employee's declaration. Off until checked.",
-            false, null),
-    RECRUITMENT("Recruitment", "Job openings, candidate pipeline, offers and hiring", true, "/api/v1/recruit/"),
-    PERFORMANCE("Performance", "Review cycles, self and manager reviews, hikes", true, "/api/v1/performance/"),
+            false),
+    RECRUITMENT("Recruitment", "Job openings, candidate pipeline, offers and hiring", true, "/api/v1/recruit/**"),
+    PERFORMANCE("Performance", "Review cycles, self and manager reviews, hikes", true, "/api/v1/performance/**"),
     /**
      * Company documents: handbooks and policies HR publishes for everyone to read. The enum name
      * stays KNOWLEDGE because plans and company overrides store it by name.
      */
-    KNOWLEDGE("Company documents", "Policies and handbooks everyone can read", true, "/api/v1/knowledge/"),
-    HELPDESK("Helpdesk", "Internal tickets and replies", true, "/api/v1/helpdesk/"),
-    EXPENSES("Expenses", "Claims, approval and reimbursement", true, "/api/v1/expenses"),
-    SHIFTS("Shifts", "Shift patterns and the roster", true, "/api/v1/shifts"),
-    FEED("Company feed", "Announcements, posts and comments", true, "/api/v1/feed"),
-    ASSISTANT("AI assistant", "Answers questions from the company's own data", true, "/api/v1/assistant/"),
-    ANALYTICS("Insights", "Headcount, attrition and cost analytics", true, "/api/v1/analytics/");
+    KNOWLEDGE("Company documents", "Policies and handbooks everyone can read", true, "/api/v1/knowledge/**"),
+    HELPDESK("Helpdesk", "Internal tickets and replies", true, "/api/v1/helpdesk/**"),
+    EXPENSES("Expenses", "Claims, approval and reimbursement", true, "/api/v1/expenses", "/api/v1/expenses/**"),
+    SHIFTS("Shifts", "Shift patterns and the roster", true, "/api/v1/shifts", "/api/v1/shifts/**"),
+    FEED("Company feed", "Announcements, posts and comments", true, "/api/v1/feed", "/api/v1/feed/**"),
+    ASSISTANT("AI assistant", "Answers questions from the company's own data", true, "/api/v1/assistant/**"),
+    ANALYTICS("Insights", "Headcount, attrition and cost analytics", true, "/api/v1/analytics/**");
 
     private final String label;
     private final String description;
     private final boolean defaultOn;
-    private final String pathPrefix;
+    private static final AntPathMatcher MATCHER = new AntPathMatcher();
 
-    Feature(String label, String description, boolean defaultOn, String pathPrefix) {
+    private final String[] paths;
+
+    Feature(String label, String description, boolean defaultOn, String... paths) {
         this.label = label;
         this.description = description;
         this.defaultOn = defaultOn;
-        this.pathPrefix = pathPrefix;
+        this.paths = paths;
     }
 
     public String label() {
@@ -86,26 +102,21 @@ public enum Feature {
         return defaultOn;
     }
 
-    public String pathPrefix() {
-        return pathPrefix;
+    public List<String> paths() {
+        return List.of(paths);
     }
 
     /**
-     * The feature guarding {@code path}, if any.
-     *
-     * <p>Longest prefix wins, which is the whole reason this is a method rather than a map lookup:
-     * {@code /api/v1/payroll/} and a future {@code /api/v1/payroll/statutory/} would both match a
-     * statutory request, and the more specific one has to.
+     * The feature guarding {@code path}, if any. No two features claim the same address, so the first
+     * match is the only match; {@code FeatureTest} keeps it that way.
      */
     public static Feature guarding(String path) {
-        Feature best = null;
         for (Feature f : values()) {
-            if (f.pathPrefix != null && path.startsWith(f.pathPrefix)
-                    && (best == null || f.pathPrefix.length() > best.pathPrefix.length())) {
-                best = f;
+            for (String p : f.paths) {
+                if (MATCHER.match(p, path)) return f;
             }
         }
-        return best;
+        return null;
     }
 
     public static Feature parse(String raw) {
