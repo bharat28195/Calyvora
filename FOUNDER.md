@@ -2127,6 +2127,25 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   their figures are checked.
 - **Not in this change:** biometric devices, a mobile app, single sign-on, an audit log.
 
+### PD-79 · 2026-11-15 · Choosing a plan sets what the company pays
+- **Trigger:** go-live check. PD-78 plans only switched modules; billing still read the ₹149/₹99
+  list with its ₹1,299 minimum, so a 10-person shop sold the ₹49 plan would have been billed ₹1,299
+  unless the owner also typed an agreed price.
+- **Decision (founder: "build pricing set"):** putting a company on a plan copies the plan's price
+  onto its subscription (V85 `price_plan_code` records which plan). Copied, not read live, so editing
+  a plan's price later never re-prices months already billed.
+- **Rules:** a price agreed by hand is never overwritten by a plan change; typing a price makes it
+  agreed; moving between plans moves a plan price; taking a company off its plan, or a plan with no
+  price, puts a plan price back on the published list. Plan prices are rupees, so a company billed in
+  another currency stays on its list. A plan price skips the monthly minimum (a ₹49 plan with a
+  ₹1,299 floor is not a ₹49 plan) but keeps the published yearly offer (pay 10 months for 12); only a
+  hand-agreed price bills all 12.
+- **Existing companies** keep their current price until their plan is chosen again in the console.
+- **Agencies newly see** "plan rate" next to the per-person price for their companies, and the
+  plan code in the API row. Company-level only, as before.
+- **Also:** both websites' "Knowledge base & projects" card (still selling the work tracker retired on
+  2026-10-05) now reads "Company documents".
+
 ## 4. Architecture Decision Log
 
 
