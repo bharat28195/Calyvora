@@ -1,5 +1,8 @@
 package com.calyvora.feature;
 
+import com.calyvora.billing.PricingService;
+import com.calyvora.billing.Subscription;
+import com.calyvora.billing.SubscriptionRepository;
 import com.calyvora.company.Company;
 import com.calyvora.company.CompanyRepository;
 import com.calyvora.common.error.ApiException;
@@ -21,10 +24,13 @@ public class PlanService {
 
     private final PlanRepository repository;
     private final CompanyRepository companyRepository;
+    private final SubscriptionRepository subscriptionRepository;
 
-    public PlanService(PlanRepository repository, CompanyRepository companyRepository) {
+    public PlanService(PlanRepository repository, CompanyRepository companyRepository,
+                       SubscriptionRepository subscriptionRepository) {
         this.repository = repository;
         this.companyRepository = companyRepository;
+        this.subscriptionRepository = subscriptionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +76,7 @@ public class PlanService {
         if (planCode == null || planCode.isBlank()) {
             company.setPlanCode(null);
             companyRepository.save(company);
+            priceFrom(companyId, null);
             return;
         }
         String code = planCode.trim().toUpperCase();
@@ -81,6 +88,38 @@ public class PlanService {
         }
         company.setPlanCode(code);
         companyRepository.save(company);
+        priceFrom(companyId, plan);
+    }
+
+    /**
+     * PD-79: what the company pays follows the plan it was put on. Before this, choosing the ₹49 plan
+     * changed the modules and left the bill on the ₹149 list, unless the owner also remembered to type
+     * an agreed price — the kind of step that gets forgotten on the day it matters.
+     *
+     * <ul>
+     *   <li>A rate agreed by hand is never touched. It is what was signed, and moving a customer
+     *       between plans is not a renegotiation.</li>
+     *   <li>Otherwise a plan with a price sets that price, copied onto the subscription, so editing the
+     *       plan's price later does not re-price months already billed.</li>
+     *   <li>A plan with no price, no plan, or a company billed in another currency (plan prices are
+     *       rupees) goes back to the published list, if its rate had come from a plan.</li>
+     * </ul>
+     */
+    private void priceFrom(UUID companyId, Plan plan) {
+        Subscription sub = subscriptionRepository.findByCompanyId(companyId).orElse(null);
+        if (sub == null || sub.isAgreedPrice()) {
+            return;
+        }
+        boolean rupees = PricingService.DEFAULT_CURRENCY.equals(PricingService.currencyOf(sub));
+        if (plan != null && plan.getPricePerEmployee() != null && rupees) {
+            sub.setPricePerEmployee(plan.getPricePerEmployee());
+            sub.setCustomPrice(true);
+            sub.setPricePlanCode(plan.getCode());
+        } else if (sub.isPlanPrice()) {
+            sub.setCustomPrice(false);
+            sub.setPricePlanCode(null);
+        }
+        subscriptionRepository.save(sub);
     }
 
     private void applyTo(Plan plan, PlanPayload payload) {

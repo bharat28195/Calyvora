@@ -21,8 +21,9 @@ import java.util.UUID;
  * priced by the list effective then, so last month's invoice still reads what the customer was
  * actually asked to pay. Getting that wrong turns the billing page into something nobody can check.
  *
- * <p>A company the owner has quoted a flat rate ({@link Subscription#isCustomPrice()}) sits outside
- * the list entirely.
+ * <p>A company on a flat rate ({@link Subscription#isCustomPrice()}) sits outside the tiers and the
+ * monthly minimum. That rate is either agreed by hand, or copied from the company's plan when it was
+ * put on one (PD-79): a ₹49 plan with a ₹1,299 floor would not be a ₹49 plan.
  */
 @Service
 public class PricingService {
@@ -107,7 +108,9 @@ public class PricingService {
     @Transactional(readOnly = true)
     public BigDecimal annualPrepaidFor(Subscription sub, long headcount, YearMonth month) {
         BigDecimal monthly = monthlyFor(sub, headcount, month);
-        int months = sub != null && sub.isCustomPrice() ? 12 : listFor(month, currencyOf(sub)).getAnnualMonthsCharged();
+        // A plan price is published, so it keeps the published prepay offer. Only a rate agreed by
+        // hand is its own complete terms, prepay included.
+        int months = sub != null && sub.isAgreedPrice() ? 12 : listFor(month, currencyOf(sub)).getAnnualMonthsCharged();
         return monthly.multiply(BigDecimal.valueOf(months));
     }
 

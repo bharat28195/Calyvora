@@ -43,6 +43,15 @@ public class Subscription {
     @Column(name = "custom_price", nullable = false)
     private boolean customPrice;
 
+    /**
+     * The plan this flat rate was copied from when the company was put on it (PD-79), or null when the
+     * rate is the published list or was agreed by hand. Only meaningful with {@link #customPrice} set:
+     * a plan price is a flat rate like an agreed one, but it follows the plan when the plan changes,
+     * where an agreed rate stays put.
+     */
+    @Column(name = "price_plan_code", length = 32)
+    private String pricePlanCode;
+
     @Column(nullable = false, length = 3)
     private String currency = "INR";
 
@@ -110,6 +119,15 @@ public class Subscription {
     public boolean isCustomPrice() { return customPrice; }
 
     public void setCustomPrice(boolean customPrice) { this.customPrice = customPrice; }
+
+    public String getPricePlanCode() { return pricePlanCode; }
+    public void setPricePlanCode(String pricePlanCode) { this.pricePlanCode = pricePlanCode; }
+
+    /** A flat rate copied from the company's plan, not negotiated. */
+    public boolean isPlanPrice() { return customPrice && pricePlanCode != null; }
+
+    /** A flat rate agreed with this customer by hand — the one thing choosing a plan never touches. */
+    public boolean isAgreedPrice() { return customPrice && pricePlanCode == null; }
 
     // Charges are computed by PricingService, not here: the rate depends on the price list in force
     // for the month being billed, which is data this entity has no business reaching for.

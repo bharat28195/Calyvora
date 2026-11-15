@@ -1218,8 +1218,10 @@ export interface CompanySummary {
   daysLeft: number | null;
   locked: boolean;
   pricePerEmployee: number | null;
-  /** True when this rate was agreed with the customer, so publishing a new price list won't move it. */
+  /** True for a flat rate (agreed by hand, or copied from the plan), so publishing a new price list won't move it. */
   customPrice: boolean;
+  /** PD-79: the plan the flat rate came from; null when agreed by hand or on the published list. */
+  pricePlanCode?: string | null;
   monthlyRevenue: number | null;
   currency: string;
   createdAt: string | null;

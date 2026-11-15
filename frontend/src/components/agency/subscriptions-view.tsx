@@ -137,7 +137,7 @@ export function SubscriptionsView({ companies, onRequestSeats }: {
                   <td className="px-3 py-3"><SeatBar used={c.headcount} total={c.seats} /></td>
                   <td className="px-3 py-3">
                     <p className="tabular-nums">{c.pricePerEmployee != null ? `${money(c.pricePerEmployee, c.currency)}/person` : "—"}</p>
-                    <p className="text-xs text-fg/40">{c.customPrice ? "agreed rate" : "standard rate"}</p>
+                    <p className="text-xs text-fg/40">{c.customPrice ? (c.pricePlanCode ? "plan rate" : "agreed rate") : "standard rate"}</p>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{money(c.monthlyRevenue ?? 0, c.currency)}</td>
                   <td className="px-5 py-3 text-right tabular-nums text-fg/70">{money((c.monthlyRevenue ?? 0) * 12, c.currency)}</td>

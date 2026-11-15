@@ -345,6 +345,9 @@ public class PlatformService {
     @Transactional
     public CompanySummaryResponse setPrice(UUID companyId, BigDecimal pricePerEmployee) {
         Subscription sub = requireSubscription(companyId);
+        // Either way the rate is no longer the plan's: typed by hand it is agreed, and cleared it is the
+        // published list. Choosing a plan again is how to go back to the plan's price.
+        sub.setPricePlanCode(null);
         if (pricePerEmployee == null) {
             sub.setCustomPrice(false);
         } else {
@@ -475,7 +478,7 @@ public class PlatformService {
                 sub == null ? "NONE" : sub.getStatus().name(),
                 endsAt, daysLeft,
                 sub != null && sub.isLocked(),
-                price, sub != null && sub.isCustomPrice(), revenue, sub == null ? "INR" : sub.getCurrency(),
+                price, sub != null && sub.isCustomPrice(), sub == null ? null : sub.getPricePlanCode(), revenue, sub == null ? "INR" : sub.getCurrency(),
                 company.getCreatedAt() == null ? null : company.getCreatedAt().toString(),
                 agency == null ? null : agency.getId().toString(),
                 agency == null ? null : agency.getName(), null, null,

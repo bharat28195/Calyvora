@@ -27,6 +27,11 @@ public record CompanySummaryResponse(
         boolean locked,
         java.math.BigDecimal pricePerEmployee,
         boolean customPrice,
+        /**
+         * PD-79: the plan the rate was copied from, when it came from one; null for a rate agreed by
+         * hand or the published list. With {@code customPrice} this tells all three apart.
+         */
+        String pricePlanCode,
         java.math.BigDecimal monthlyRevenue,
         String currency,
         String createdAt,
@@ -52,7 +57,7 @@ public record CompanySummaryResponse(
     public CompanySummaryResponse withWelcome(com.calyvora.platform.PlatformService.Provisioned p) {
         return new CompanySummaryResponse(companyId, name, slug, status, adminName, adminEmail, headcount,
                 seats, subscriptionStatus, endsAt, daysLeft, locked, pricePerEmployee, customPrice,
-                monthlyRevenue, currency, createdAt, agencyId, agencyName,
+                pricePlanCode, monthlyRevenue, currency, createdAt, agencyId, agencyName,
                 p.welcomeEmailSent(), p.welcomeEmailSent() ? null : p.temporaryPassword(), archivedAt, archiveReason);
     }
 }

@@ -256,7 +256,7 @@ function CompaniesTable({ companies, busyId, act }: {
                   <p className="tabular-nums text-fg/80">{c.monthlyRevenue != null ? money(c.monthlyRevenue, c.currency) : "—"}<span className="text-xs text-fg/40">/mo</span></p>
                   <p className="text-xs text-fg/40">
                     {c.pricePerEmployee != null ? `${money(c.pricePerEmployee, c.currency)}/seat` : ""}
-                    {c.customPrice && <span className="text-fg/50"> · agreed</span>}
+                    {c.customPrice && <span className="text-fg/50"> · {c.pricePlanCode ? "plan price" : "agreed"}</span>}
                   </p>
                 </td>
                 {/* Status and expiry read as one fact — "active until March" — so they share a cell.
@@ -382,7 +382,7 @@ function RowActions({ company: c, busy, act }: {
     { label: "Extend by 12 months", run: () => act(c.companyId, () => api.renewCompanySubscription(c.companyId, 12)) },
     { label: "Change end date", run: () => setEditing("date") },
     { label: "Change seats", run: () => setEditing("seats") },
-    { label: c.customPrice ? "Change agreed price" : "Agree a custom price", run: () => setEditing("price") },
+    { label: c.customPrice && !c.pricePlanCode ? "Change agreed price" : "Agree a custom price", run: () => setEditing("price") },
   ];
   // Only offered once there is something to undo. The backend has always accepted a null price to
   // put a company back on the published list; nothing in the console could send one, so agreeing a

@@ -367,7 +367,13 @@ function CompanyFeatures({ plans, onError, onNote }: {
     setBusy("plan");
     try {
       setFeatures(await api.setCompanyPlan(companyId, planCode || null));
-      onNote(planCode ? `Moved to ${planCode}.` : "Taken off any plan.");
+      // The plan sets the price too (PD-79), so re-read the company to show what they now pay.
+      const fresh = await api.platformCompanies().catch(() => null);
+      if (fresh) setCompanies(fresh);
+      const now = fresh?.find((c) => c.companyId === companyId);
+      const kept = now?.customPrice && !now.pricePlanCode;
+      onNote((planCode ? `Moved to ${planCode}.` : "Taken off any plan.")
+        + (kept ? " Their agreed price stays as it is." : ""));
     } catch (e) {
       onError(e instanceof ApiError ? e.message : "Failed to change the plan");
     } finally {
@@ -421,6 +427,10 @@ function CompanyFeatures({ plans, onError, onNote }: {
         <p className="mt-2 text-xs text-fg/40">
           {company.headcount} people · {company.seats} seats
           {company.agencyName && <> · under {company.agencyName}</>}
+          {company.pricePerEmployee != null && (
+            <> · pays {company.currency === "INR" ? "₹" : `${company.currency} `}{company.pricePerEmployee}/person
+              {" "}({company.pricePlanCode ? "plan price" : company.customPrice ? "agreed price, kept when the plan changes" : "standard price list"})</>
+          )}
         </p>
       )}
 
