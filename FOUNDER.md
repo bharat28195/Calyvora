@@ -2489,3 +2489,18 @@ docs-as-code reviewed in PRs.
 - **Demo tools are demo-only:** `/demo/*` answers 404 unless the frontend is built with
   `NEXT_PUBLIC_DEMO_TOOLS=on`, set on the demo frontend (calyvora-frontend) and never on production.
 - **Still to do by hand:** the old password stays in git history, so it must never be reused.
+
+### PD-81 · 2026-11-21 · An Orbit phone app, with fingerprint unlock and location at check-in
+- **Trigger:** founder: Keka and greytHR both have apps; any employee should be able to open Orbit on
+  their phone with fingerprint/face and check in with location, "so our app seems advanced".
+- **Decision:** one Android/iOS app (`mobile/`, Capacitor) that opens the live Orbit site, not a second
+  app to maintain — anything shipped on the web is in the app the same minute. Android first (most
+  Indian staff); the App Store follows once the Android app is proven.
+- **Fingerprint/face:** an unlock on this phone, switched on by the person under Account → Password.
+  The session stays in its HttpOnly cookie; the phone stores only "lock is on". It proves who opened
+  the app, not who is at the gate — selfie check-in is the anti-proxy feature, and comes later.
+- **Location at check-in (V86):** per company, Off / Record / Office only. Offices are a point and a
+  radius. Read only at check-in and check-out — nobody is tracked during the day (DPDP: say so in
+  sales). "Office only" with no offices set up behaves as Record, so it can never lock everyone out.
+  Managers with company-wide attendance see where each check-in happened on the team day sheet.
+- **Not yet:** fake-GPS detection, push notifications, store listings, the Orbit app icon.

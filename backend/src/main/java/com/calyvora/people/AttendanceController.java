@@ -46,14 +46,17 @@ public class AttendanceController {
         return attendanceService.today(principal);
     }
 
+    /** The body is optional: {@code {latitude, longitude, accuracy}} when the device shares its location (PD-81). */
     @PostMapping("/me/check-in")
-    public AttendanceEntryResponse checkIn(@CurrentUser AuthPrincipal principal) {
-        return attendanceService.checkIn(principal);
+    public AttendanceEntryResponse checkIn(@CurrentUser AuthPrincipal principal,
+                                           @RequestBody(required = false) CheckinLocationService.Fix fix) {
+        return attendanceService.checkIn(principal, fix);
     }
 
     @PostMapping("/me/check-out")
-    public AttendanceEntryResponse checkOut(@CurrentUser AuthPrincipal principal) {
-        return attendanceService.checkOut(principal);
+    public AttendanceEntryResponse checkOut(@CurrentUser AuthPrincipal principal,
+                                            @RequestBody(required = false) CheckinLocationService.Fix fix) {
+        return attendanceService.checkOut(principal, fix);
     }
 
     /** Clear today's clock-in/out (so the day is open again). */

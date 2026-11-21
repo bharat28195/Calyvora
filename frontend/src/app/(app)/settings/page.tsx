@@ -12,6 +12,7 @@ import { Field } from "@/components/ui/field";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { WorkDayCard } from "@/components/attendance/work-day-card";
+import { CheckinLocationCard } from "@/components/attendance/checkin-location-card";
 
 const TIMEZONES = ["UTC", "Asia/Kolkata", "Asia/Singapore", "Asia/Dubai", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles"];
 const LOCALES = ["en", "en-GB", "fr", "de", "es", "hi"] as const;
@@ -196,6 +197,7 @@ export default function SettingsPage() {
       </Card>
 
       <WorkDayCard />
+      <CheckinLocationCard />
     </div>
   );
 }

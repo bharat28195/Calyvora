@@ -1,0 +1,72 @@
+name: Android app
+
+# Builds the Orbit Android app (mobile/, PD-81) into an installable APK. Runs on GitHub's machines,
+# which already have the Android SDK — nothing to install on a laptop.
+#
+#   * A push that touches mobile/ builds the DEMO app (opens the demo site).
+#   * "Run workflow" by hand picks the environment: demo or production.
+#
+# The APK is attached to the run under "Artifacts". It is a debug build, signed with a throwaway key:
+# fine to install on test phones (allow "install unknown apps"), not for the Play Store — a release
+# build needs the upload key, set up when we publish.
+on:
+  push:
+    branches: [ "product/**", production ]
+    paths: [ "mobile/**", ".github/workflows/android.yml" ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which Orbit the app opens"
+        type: choice
+        options: [ demo, production ]
+        default: demo
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Pick the site the app opens
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            echo "ORBIT_URL=https://orbit.calyvora.in" >> "$GITHUB_ENV"
+            echo "FLAVOUR=production" >> "$GITHUB_ENV"
+          else
+            echo "ORBIT_URL=https://calyvora-frontend.onrender.com" >> "$GITHUB_ENV"
+            echo "FLAVOUR=demo" >> "$GITHUB_ENV"
+          fi
+
+      - run: npm ci
+      - run: npx cap sync android
+
+      - name: Build
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbit-${{ env.FLAVOUR }}-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

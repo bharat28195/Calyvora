@@ -124,11 +124,18 @@ public class CompanySettings {
     @Column(name = "attendance_rules_from")
     private java.time.LocalDate attendanceRulesFrom = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
 
+    /** OFF, RECORD or ENFORCE — location at check-in (V86, PD-81). */
+    @Column(name = "checkin_location_mode", nullable = false)
+    private String checkinLocationMode = "OFF";
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     protected CompanySettings() {
     }
+
+    public String getCheckinLocationMode() { return checkinLocationMode; }
+    public void setCheckinLocationMode(String mode) { this.checkinLocationMode = mode; }
 
     public CompanySettings(UUID companyId) {
         this.companyId = companyId;

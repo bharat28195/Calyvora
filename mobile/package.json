@@ -1,0 +1,20 @@
+{
+  "name": "orbit-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Orbit for Android and iOS: the Orbit web app in a native shell, with fingerprint/face unlock and location at check-in (PD-81).",
+  "scripts": {
+    "sync": "cap sync",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capgo/capacitor-native-biometric": "8.9.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "typescript": "5.6.3"
+  }
+}

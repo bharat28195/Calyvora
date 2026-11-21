@@ -75,6 +75,24 @@ public class AttendanceService {
         this.companySettingsRepository = companySettingsRepository;
     }
 
+    /** Location at check-in (PD-81). Setter-injected so the long constructor above stays as it is. */
+    private CheckinLocationService checkinLocation;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setCheckinLocation(CheckinLocationService checkinLocation) {
+        this.checkinLocation = checkinLocation;
+    }
+
+    @Transactional
+    public AttendanceEntryResponse checkIn(AuthPrincipal principal) {
+        return checkIn(principal, null);
+    }
+
+    @Transactional
+    public AttendanceEntryResponse checkOut(AuthPrincipal principal) {
+        return checkOut(principal, null);
+    }
+
     /**
      * "Now" as this person experiences it. Attendance is the one place where the server's own clock
      * is the wrong clock: on a UTC host, an Indian employee clocking in at 04:15 IST was recorded at
@@ -478,18 +496,22 @@ public class AttendanceService {
      * session is open a second call does nothing: it never moves the time.
      */
     @Transactional
-    public AttendanceEntryResponse checkIn(AuthPrincipal principal) {
+    public AttendanceEntryResponse checkIn(AuthPrincipal principal, CheckinLocationService.Fix fix) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
         LocalDate today = today(employee);
+        List<AttendancePunch> sessions = punchRepository.findByEmployeeIdAndDateOrderByCheckInAsc(employee.getId(), today);
+        boolean open = !sessions.isEmpty() && sessions.get(sessions.size() - 1).getCheckOut() == null;
+        // Decided before anything is written: a refused check-in leaves no trace (PD-81).
+        CheckinLocationService.Placed placed = open ? null : checkinLocation.place(companyId, fix);
         AttendanceRecord record = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today)
                 .orElseGet(() -> attendanceRepository.save(new AttendanceRecord(UUID.randomUUID(), companyId,
                         employee.getId(), today, AttendanceStatus.PRESENT, null)));
-        List<AttendancePunch> sessions = punchRepository.findByEmployeeIdAndDateOrderByCheckInAsc(employee.getId(), today);
-        boolean open = !sessions.isEmpty() && sessions.get(sessions.size() - 1).getCheckOut() == null;
         if (!open) {
             LocalTime now = nowTime(employee);
-            punchRepository.save(new AttendancePunch(UUID.randomUUID(), companyId, employee.getId(), today, now));
+            AttendancePunch punch = new AttendancePunch(UUID.randomUUID(), companyId, employee.getId(), today, now);
+            punch.placeIn(placed);
+            punchRepository.save(punch);
             if (record.getCheckIn() == null) {
                 record.setCheckIn(now);
             }
@@ -506,7 +528,7 @@ public class AttendanceService {
 
     /** The signed-in employee checks out, closing the open session. The day's check-out is the last one. */
     @Transactional
-    public AttendanceEntryResponse checkOut(AuthPrincipal principal) {
+    public AttendanceEntryResponse checkOut(AuthPrincipal principal, CheckinLocationService.Fix fix) {
         UUID companyId = TenantContext.getCompanyId();
         Employee employee = requireSelf(companyId, principal);
         LocalDate today = today(employee);
@@ -526,6 +548,7 @@ public class AttendanceService {
         if (now.isBefore(last.getCheckIn())) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Check-out can't be before check-in");
         }
+        last.placeOut(checkinLocation.place(companyId, fix));
         last.setCheckOut(now);
         record.setCheckOut(now);
         validateTimes(record);

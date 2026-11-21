@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Alert } from "@/components/ui/alert";
+import { BiometricCard } from "@/components/layout/biometric-card";
 import { LANGUAGES, DEFAULT_LANGUAGE, translate } from "@/lib/i18n";
 import { COMMON_TIMEZONES, TIMEZONES, zoneLabel } from "@/lib/timezones";
 import { formatDate, formatTime, withLocale } from "@/lib/format";
@@ -84,6 +85,7 @@ export default function AccountPage() {
       </Card>}
       {tab === "preferences" && <PreferencesCard />}
       {tab === "password" && <PasswordCard />}
+      {tab === "password" && <BiometricCard />}
     </div>
   );
 }

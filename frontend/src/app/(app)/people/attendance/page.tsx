@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Check, MapPin } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { distanceLabel, mapLink, type LocationSpot } from "@/lib/location";
 import { useSession } from "@/hooks/useSession";
 import type { AttendanceDay, AttendanceEntry, AttendanceStatus } from "@/lib/types";
 import { Card } from "@/components/ui/card";
@@ -68,11 +69,21 @@ function TeamDaySheet() {
     });
   }, [sheet, filter]);
 
+  // Where each person checked in and out, when the company records location (PD-81).
+  const [spots, setSpots] = useState<Record<string, LocationSpot[]>>({});
+
   const load = useCallback(() => {
     setSheet(null);
     api.attendanceDay(date)
       .then(setSheet)
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load the day"));
+    api.checkinLocationDay(date)
+      .then((list) => {
+        const by: Record<string, LocationSpot[]> = {};
+        for (const s of list) (by[s.employeeId] ??= []).push(s);
+        setSpots(by);
+      })
+      .catch(() => setSpots({}));
   }, [date]);
   useEffect(() => load(), [load]);
   // Stepping off the end of a month with the arrows pages the grid along with it.
@@ -168,6 +179,7 @@ function TeamDaySheet() {
                     {e.checkIn && <> · in {hhmm(e.checkIn)}{e.checkOut && <> → {hhmm(e.checkOut)}</>}</>}
                     {e.note && <> · {e.note}</>}
                   </p>
+                  {spots[e.employeeId]?.map((s, i) => <SpotLine key={i} spot={s} />)}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {e.status && e.derived && <StatusChip status={e.status} derived />}
@@ -265,6 +277,31 @@ function ByTeam({ entries }: { entries: AttendanceEntry[] }) {
         </Card>
       ))}
     </div>
+  );
+}
+
+/** "In 09:12 at Head office · out 18:40, 3.2 km away" — each part links to the map. */
+function SpotLine({ spot }: { spot: LocationSpot }) {
+  const part = (label: string, time: string | null, lat: number | null, lng: number | null,
+                office: string | null, distance: number | null) => {
+    if (lat == null || lng == null) return null;
+    const where = office ? `at ${office}` : distance != null ? `${distanceLabel(distance)} from office` : "location shared";
+    return (
+      <a href={mapLink(lat, lng)} target="_blank" rel="noreferrer"
+        className={office ? "hover:text-violet" : "text-amber-400 hover:text-amber-300"}>
+        {label}{time ? ` ${hhmm(time)}` : ""} {where}
+      </a>
+    );
+  };
+  const inPart = part("in", spot.checkIn, spot.inLatitude, spot.inLongitude, spot.inOffice, spot.inDistanceM);
+  const outPart = part("out", spot.checkOut, spot.outLatitude, spot.outLongitude, spot.outOffice, spot.outDistanceM);
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-fg/40">
+      <MapPin className="h-3 w-3" />
+      {inPart}
+      {inPart && outPart && <span>·</span>}
+      {outPart}
+    </p>
   );
 }
 

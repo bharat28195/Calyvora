@@ -1,5 +1,6 @@
 "use client";
 
+import type { CheckinLocationMode, CheckinLocationSettings, Fix, LocationSpot, Office, OfficeInput } from "@/lib/location";
 import {
   ApiError,
   type ApiErrorBody,
@@ -1664,11 +1665,33 @@ export const api = {
   attendanceToday(): Promise<AttendanceEntry> {
     return LIVE ? http<AttendanceEntry>("/people/attendance/me/today") : mockBackend.attendanceToday(accessToken);
   },
-  checkIn(): Promise<AttendanceEntry> {
-    return LIVE ? http<AttendanceEntry>("/people/attendance/me/check-in", { method: "POST" }) : mockBackend.checkIn(accessToken);
+  // The location is optional: sent when the company asks for it and the device shared it (PD-81).
+  checkIn(fix?: Fix): Promise<AttendanceEntry> {
+    return LIVE ? http<AttendanceEntry>("/people/attendance/me/check-in", { method: "POST", ...(fix ? { body: JSON.stringify(fix) } : {}) }) : mockBackend.checkIn(accessToken);
   },
-  checkOut(): Promise<AttendanceEntry> {
-    return LIVE ? http<AttendanceEntry>("/people/attendance/me/check-out", { method: "POST" }) : mockBackend.checkOut(accessToken);
+  checkOut(fix?: Fix): Promise<AttendanceEntry> {
+    return LIVE ? http<AttendanceEntry>("/people/attendance/me/check-out", { method: "POST", ...(fix ? { body: JSON.stringify(fix) } : {}) }) : mockBackend.checkOut(accessToken);
+  },
+  // Location at check-in (PD-81). Live only: the mock backend has no notion of place.
+  checkinLocation(): Promise<CheckinLocationSettings> {
+    return LIVE ? http<CheckinLocationSettings>("/people/attendance/location") : Promise.resolve({ mode: "OFF", offices: [] });
+  },
+  setCheckinLocationMode(mode: CheckinLocationMode): Promise<CheckinLocationSettings> {
+    if (!LIVE) return liveOnly("Location at check-in");
+    return http<CheckinLocationSettings>("/people/attendance/location/mode", { method: "PUT", body: JSON.stringify({ mode }) });
+  },
+  addOffice(input: OfficeInput): Promise<Office> {
+    if (!LIVE) return liveOnly("Office locations");
+    return http<Office>("/people/attendance/location/offices", { method: "POST", body: JSON.stringify(input) });
+  },
+  deleteOffice(id: string): Promise<void> {
+    if (!LIVE) return liveOnly("Office locations");
+    return http<void>(`/people/attendance/location/offices/${id}`, { method: "DELETE" });
+  },
+  checkinLocationDay(date?: string): Promise<LocationSpot[]> {
+    if (!LIVE) return Promise.resolve([]);
+    const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+    return http<LocationSpot[]>(`/people/attendance/location/day${qs}`);
   },
   resetToday(): Promise<AttendanceEntry> {
     return LIVE ? http<AttendanceEntry>("/people/attendance/me/today", { method: "DELETE" }) : mockBackend.resetToday(accessToken);

@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, LogIn, LogOut, RotateCcw } from "lucide-react";
+import { Loader2, LogIn, LogOut, MapPin, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { currentFix, LocationError, type CheckinLocationMode, type Fix } from "@/lib/location";
 import type { AttendanceEntry, AttendanceMonth, AttendanceStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -95,16 +96,35 @@ export function MyDay() {
     return () => clearInterval(t);
   }, []);
 
+  // Whether the company asks where you are when you check in (PD-81).
+  const [locationMode, setLocationMode] = useState<CheckinLocationMode>("OFF");
+  const [locating, setLocating] = useState(false);
+  useEffect(() => {
+    api.checkinLocation().then((s) => setLocationMode(s.mode)).catch(() => {});
+  }, []);
+
   async function act(which: "in" | "out" | "reset") {
     setBusy(true);
     setError(null);
     try {
-      const next = which === "in" ? await api.checkIn()
-        : which === "out" ? await api.checkOut()
+      let fix: Fix | undefined;
+      if (which !== "reset" && locationMode !== "OFF") {
+        setLocating(true);
+        try {
+          fix = await currentFix();
+        } catch (e) {
+          // Recording only: check in anyway. Enforced: the server explains why it refuses.
+          if (locationMode === "ENFORCE") throw e;
+        } finally {
+          setLocating(false);
+        }
+      }
+      const next = which === "in" ? await api.checkIn(fix)
+        : which === "out" ? await api.checkOut(fix)
         : await api.resetToday();
       setEntry(next);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to record that");
+      setError(e instanceof ApiError || e instanceof LocationError ? e.message : "Failed to record that");
     } finally {
       setBusy(false);
     }
@@ -157,6 +177,12 @@ export function MyDay() {
             <Button onClick={() => act("in")} disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} {clockedIn ? "Check in again" : "Check in"}
             </Button>
+          )}
+          {locationMode !== "OFF" && (
+            <p className="inline-flex items-center gap-1 text-xs text-fg/40">
+              <MapPin className="h-3 w-3" />
+              {locating ? "Getting your location…" : "Your location is recorded at check-in and check-out"}
+            </p>
           )}
           {clockedIn && (
             <button onClick={() => act("reset")} disabled={busy}
