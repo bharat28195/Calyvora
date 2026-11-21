@@ -294,7 +294,7 @@ curl https://calyvora-backend.onrender.com/api/v1/dev/seed-all
 
 | Who | Email | Password |
 |---|---|---|
-| **Platform owner (you)** | `bharat28195@calyvora.in` | `Bharat@28195#` |
+| **Platform owner (you)** | `bharat28195@calyvora.in` | the `PLATFORM_OWNER_PASSWORD` value on Render |
 | Company admin | `ava.chen@northwind.demo` | `demopass123` |
 | HR | `leo.martins@northwind.demo` | `demopass123` |
 | Manager | `tom.becker@northwind.demo` | `demopass123` |

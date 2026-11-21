@@ -167,3 +167,6 @@ services:
         value: live
       - key: BACKEND_ORIGIN
         value: https://calyvora-backend.onrender.com
+      # Turns on /demo/seed (PD-80). Demo only — never set this on orbit-prod-frontend.
+      - key: NEXT_PUBLIC_DEMO_TOOLS
+        value: "on"

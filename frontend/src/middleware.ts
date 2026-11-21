@@ -28,8 +28,17 @@ function isPublic(pathname: string): boolean {
   return PUBLIC.some((p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)));
 }
 
+/** On for the demo frontend (Render env) and local dev; off — so the pages are absent — on production. */
+function demoToolsEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DEMO_TOOLS === "on" || process.env.NODE_ENV === "development";
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Demo tooling exists only on the demo deployment (PD-80).
+  if ((pathname === "/demo" || pathname.startsWith("/demo/")) && !demoToolsEnabled()) {
+    return new NextResponse("Not found", { status: 404 });
+  }
   if (isPublic(pathname)) return NextResponse.next();
 
   const hasSession = req.cookies.has(SESSION_COOKIE) || req.cookies.has("calyvora_rt");

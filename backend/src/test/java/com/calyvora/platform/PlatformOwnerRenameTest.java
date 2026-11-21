@@ -81,6 +81,26 @@ class PlatformOwnerRenameTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("an existing owner takes the password from the environment on restart")
+    void existing_owner_password_follows_the_environment() throws Exception {
+        // The deployment's real shape: the owner exists, holding an older password.
+        users.findByEmail(PLATFORM_OWNER_EMAIL).ifPresent(u ->
+                users.renamePlatformOwner(u.getId(), PLATFORM_OWNER_EMAIL,
+                        new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("old-leaked-pw")));
+
+        bootstrap.ensurePlatformOwner();
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("email", PLATFORM_OWNER_EMAIL, "password", PLATFORM_OWNER_PASSWORD))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("email", PLATFORM_OWNER_EMAIL, "password", "old-leaked-pw"))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("running it again changes nothing")
     void is_idempotent() {
         bootstrap.ensurePlatformOwner();

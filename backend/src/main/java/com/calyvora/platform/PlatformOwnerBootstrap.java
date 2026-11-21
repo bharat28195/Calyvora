@@ -99,8 +99,10 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
      */
     @Transactional
     public boolean ensurePlatformOwner() {
-        if (userRepository.existsByEmail(ownerEmail)) {
-            return false;   // already present under the configured address; nothing to do, no password needed.
+        var existing = userRepository.findByEmail(ownerEmail);
+        if (existing.isPresent()) {
+            syncPasswordFromEnvironment(existing.get());
+            return false;
         }
         // Both creating and moving the owner set a password, so one must be configured first — there is
         // no built-in default to fall back to. (An owner that already exists under a DIFFERENT address
@@ -177,6 +179,29 @@ public class PlatformOwnerBootstrap implements ApplicationRunner {
         log.warn("Moved the platform owner from {} to {} and reset its password. The old address can "
                 + "no longer sign in.", previous, ownerEmail);
         return true;
+    }
+
+    /**
+     * The environment is the source of truth for the owner's password (PD-80).
+     *
+     * <p>Before this, {@code PLATFORM_OWNER_PASSWORD} was read only when the account was first
+     * created. Changing it on Render afterwards did nothing — the old password, which had been
+     * published in the frontend bundle, kept working. Now every boot checks the stored hash against
+     * the configured value and replaces it when they differ. A password changed inside the app is
+     * therefore reverted on the next restart; change it on Render instead.
+     */
+    private void syncPasswordFromEnvironment(User owner) {
+        if (!passwordConfigured || owner.getRole() != Role.OWNER) {
+            return;
+        }
+        String hash = owner.getPasswordHash();
+        if (hash != null && passwordEncoder.matches(ownerPassword, hash)) {
+            return;
+        }
+        owner.setPasswordHash(passwordEncoder.encode(ownerPassword));
+        owner.setMustChangePassword(false);
+        userRepository.save(owner);
+        log.warn("Platform owner {}: password replaced with the value of PLATFORM_OWNER_PASSWORD.", ownerEmail);
     }
 
     private String uniqueSlug(String name) {

@@ -16,6 +16,10 @@ import { api, ApiError } from "@/lib/api";
  * <p>Deliberately outside the (auth) and (app) route groups: it needs no session, and it should not
  * inherit the sign-in chrome. It seeds on arrival and then shows every login, because the thing you
  * actually need three seconds before a demo is the credentials, not a confirmation message.
+ *
+ * <p>Demo deployment only (PD-80): the middleware answers 404 here unless NEXT_PUBLIC_DEMO_TOOLS=on,
+ * which is set on the demo frontend and never on production. The platform owner is not listed —
+ * its password lives only in the backend's PLATFORM_OWNER_PASSWORD, never in code.
  */
 
 type Login = { label: string; email: string; password: string; note: string };
@@ -24,8 +28,6 @@ type Login = { label: string; email: string; password: string; note: string };
 const DEMO_PASSWORD = "demopass123";
 
 const LOGINS: Login[] = [
-  { label: "Platform owner (you)", email: "bharat28195@calyvora.in", password: "Bharat@28195#",
-    note: "Every company on the platform, subscriptions, pricing, trial requests" },
   { label: "Company admin", email: "ava.chen@northwind.demo", password: DEMO_PASSWORD,
     note: "Northwind Robotics — the full HR product" },
   { label: "HR", email: "leo.martins@northwind.demo", password: DEMO_PASSWORD,

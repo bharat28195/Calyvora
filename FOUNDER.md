@@ -367,7 +367,7 @@ each with a *why* and an enforcement mechanism, and a tie-breaker priority order
   never overwrites or deletes — so a stray prefetch or a double-click can do no harm, and making it
   POST would mean it could not be reached from the address bar, which is the whole point. Still
   `@Profile("!prod")`: it must never exist on a deployment holding real customer data.
-- **The owner account moved** to `bharat28195@calyvora.in` / `Bharat@28195#`. **That password is in
+- **The owner account moved** to `bharat28195@calyvora.in` (password removed from the repo in PD-80). **That password was in
   the source tree, so it is not a secret** — anyone who can read the repo can sign in as the account
   that sees every customer. It exists so a fresh deployment works immediately; `PLATFORM_OWNER_PASSWORD`
   must be set on anything holding real data, and the app warns at every startup until it is.
@@ -2477,3 +2477,15 @@ docs-as-code reviewed in PRs.
   is). FOUNDER.md is the *narrative and rationale* (why we chose it, what we're thinking, where we're
   going). They must not contradict; when a decision here changes an architecture doc, update both in
   the same change.
+
+### PD-80 · 2026-11-21 · Owner password only from the environment; demo tools only on the demo
+- **Trigger:** the `/demo/seed` page shipped the platform owner's real password in its JavaScript,
+  readable by anyone on both production and the demo. And setting `PLATFORM_OWNER_PASSWORD` on Render
+  did nothing for an owner that already existed — the bootstrap read it only when creating the account.
+- **Decision (founder: "remove this owner password from any environment… should be from environment"):**
+  no owner password anywhere in the repo. On every start the bootstrap compares the owner's stored
+  password with `PLATFORM_OWNER_PASSWORD` and replaces it when they differ — Render is the source of
+  truth, so a password changed inside the app is reverted on the next restart.
+- **Demo tools are demo-only:** `/demo/*` answers 404 unless the frontend is built with
+  `NEXT_PUBLIC_DEMO_TOOLS=on`, set on the demo frontend (calyvora-frontend) and never on production.
+- **Still to do by hand:** the old password stays in git history, so it must never be reused.
